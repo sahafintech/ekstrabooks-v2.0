@@ -1,0 +1,51 @@
+<optgroup label="Assets">
+	<option value="Fixed Asset">
+		Fixed Asset
+	</option>
+	<option value="Other Current Asset">
+		Other Current Asset
+	</option>
+	<option value="Bank">
+		Bank
+	</option>
+	<option value="Cash">
+		Cash
+	</option>
+	<option value="Credit Card">
+		Credit Card
+	</option>
+</optgroup>
+<optgroup label="Liability">
+	<option value="Current Liability">
+		Current Liability
+	</option>
+	<option value="Long Term Liability">
+		Long-Term Liability
+	</option>
+</optgroup>
+<optgroup label="Income">
+	<option value="Sales">
+		Sales
+	</option>
+	<option value="Other Income">
+		Other Income
+	</option>
+<optgroup>
+<optgroup label="Cost Of Sale">
+	<option value="Cost Of Sale">
+		Cost Of Sale
+	</option>
+<optgroup>
+<optgroup label="Expenses">
+	<option value="Direct Expenses">
+		Direct Expenses
+	</option>
+	<option value="Other Expenses">
+		Other Expenses
+	</option>
+</optgroup>
+<optgroup label="Equity">
+	<option value="Equity">
+		Equity
+	</option>
+</optgroup>

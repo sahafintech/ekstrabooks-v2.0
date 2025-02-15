@@ -1,0 +1,1624 @@
+<?php
+
+namespace App\Http\Controllers\User;
+
+use App\Exports\CashInvoiceExport;
+use App\Http\Controllers\Controller;
+use App\Imports\CashInvoiceImport;
+use App\Models\Account;
+use App\Models\AuditLog;
+use App\Models\Business;
+use App\Models\BusinessSetting;
+use App\Models\Currency;
+use App\Models\HoldPosInvoice;
+use App\Models\Invoice;
+use App\Models\InvoiceItem;
+use App\Models\InvoiceItemTax;
+use App\Models\PrescriptionProduct;
+use App\Models\Product;
+use App\Models\Receipt;
+use App\Models\ReceiptItem;
+use App\Models\ReceiptItemTax;
+use App\Models\Tax;
+use App\Models\Transaction;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Maatwebsite\Excel\Facades\Excel;
+
+class ReceiptController extends Controller
+{
+    /**
+     * Create a new controller instance.
+     *
+     * @return void
+     */
+    // public function __construct()
+    // {
+    //     $this->middleware(function ($request, $next) {
+
+    //         if (package()->pos != 1) {
+    //             if (!$request->ajax()) {
+    //                 return back()->with('error', _lang('Sorry, This module is not available in your current package !'));
+    //             } else {
+    //                 return response()->json(['result' => 'error', 'message' => _lang('Sorry, This module is not available in your current package !')]);
+    //             }
+    //         }
+
+    //         return $next($request);
+    //     });
+    // }
+
+    public function index()
+    {
+        $receipts = Receipt::select('receipts.*')
+            ->with('customer')
+            ->orderBy("receipts.id", "desc")
+            ->get();
+
+        return view('backend.user.receipt.list', compact('receipts'));
+    }
+
+    public function create()
+    {
+        return view('backend.user.receipt.create');
+    }
+
+    public function show(Request $request, $id)
+    {
+        $receipt   = Receipt::with(['business', 'items'])->find($id);
+        return view('backend.user.receipt.view', compact('receipt'));
+    }
+
+    public function edit(Request $request, $id)
+    {
+        $receipt = Receipt::with('items')
+            ->where('id', $id)
+            ->first();
+
+        $transaction = Transaction::where('ref_id', $receipt->id)->where('ref_type', 'receipt')
+            ->whereHas('account', function ($query) {
+                $query->where('account_type', 'Bank')
+                    ->orWhere('account_type', 'Cash');
+            })
+            ->with('account')
+            ->first();
+
+        return view('backend.user.receipt.edit', compact('receipt', 'id', 'transaction'));
+    }
+
+    public function store(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'customer_id'    => 'nullable',
+            'title'          => 'required',
+            'receipt_date'   => 'required|date',
+            'product_id'     => 'required',
+            'currency'       => 'required',
+            'account_id'     => 'required',
+        ], [
+            'product_id.required' => _lang('You must add at least one item'),
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->route('receipts.create')
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        // if quantity is less than 1 or null then return with error
+        if (in_array(null, $request->quantity) || in_array('', $request->quantity) || in_array(0, $request->quantity)) {
+            return redirect()->back()->withInput()->with('error', _lang('Quantity is required'));
+        }
+
+        // if unit cost is less than 0 or null then return with error
+        if (in_array(null, $request->unit_cost) || in_array('', $request->unit_cost)) {
+            return redirect()->back()->withInput()->with('error', _lang('Unit Cost is required'));
+        }
+
+        $default_accounts = ['Accounts Receivable', 'Sales Tax Payable', 'Sales Discount Allowed', 'Inventory'];
+
+        // if these accounts are not exists then create it
+        foreach ($default_accounts as $account) {
+            if (!Account::where('account_name', $account)->where('business_id', $request->activeBusiness->id)->exists()) {
+                $account_obj = new Account();
+                if ($account == 'Accounts Receivable') {
+                    $account_obj->account_code = '1100';
+                } elseif ($account == 'Sales Tax Payable') {
+                    $account_obj->account_code = '2200';
+                } elseif ($account == 'Sales Discount Allowed') {
+                    $account_obj->account_code = '4009';
+                } elseif ($account == 'Inventory') {
+                    $account_obj->account_code = '1000';
+                }
+                $account_obj->account_name = $account;
+                if ($account == 'Accounts Receivable') {
+                    $account_obj->account_type = 'Other Current Asset';
+                } elseif ($account == 'Sales Tax Payable') {
+                    $account_obj->account_type = 'Current Liability';
+                } elseif ($account == 'Sales Discount Allowed') {
+                    $account_obj->account_type = 'Other Income';
+                } elseif ($account == 'Inventory') {
+                    $account_obj->account_type = 'Other Current Asset';
+                }
+                if ($account == 'Accounts Receivable') {
+                    $account_obj->dr_cr   = 'dr';
+                } elseif ($account == 'Sales Tax Payable') {
+                    $account_obj->dr_cr   = 'cr';
+                } elseif ($account == 'Sales Discount Allowed') {
+                    $account_obj->dr_cr   = 'dr';
+                } elseif ($account == 'Inventory') {
+                    $account_obj->dr_cr   = 'dr';
+                }
+                $account_obj->business_id = $request->activeBusiness->id;
+                $account_obj->user_id     = $request->activeBusiness->user->id;
+                $account_obj->opening_date   = now()->format('Y-m-d');
+                $account_obj->save();
+            }
+        }
+
+        $month = Carbon::parse($request->receipt_date)->format('F');
+        $year = Carbon::parse($request->receipt_date)->format('Y');
+        $today = now()->format('d');
+
+        // financial year
+        $financial_year = BusinessSetting::where('name', 'fiscal_year')->first()->value;
+        $end_month = explode(',', $financial_year)[1];
+        $start_day = BusinessSetting::where('name', 'start_day')->first()->value;
+        $end_day = $start_day + 5;
+
+        // if login as this user dont check the financial year
+        if (false) {
+            if (($month !== now()->format('F') || $year !== now()->format('Y')) || ($today <= $end_day && $month == now()->subMonth()->format('F') && $year == now()->format('Y')) || ($today <= 25 && $month == $end_month && $year == now()->subYear()->format('Y'))) {
+                return redirect()->back()->withInput()->with('error', _lang('Period Closed'));
+            }
+        }
+
+        DB::beginTransaction();
+
+        $summary = $this->calculateTotal($request);
+
+        $receipt                  = new Receipt();
+        $receipt->customer_id     = $request->input('customer_id');
+        $receipt->title           = $request->input('title');
+        $receipt->receipt_number  = get_business_option('receipt_number');
+        $receipt->order_number    = $request->input('order_number');
+        $receipt->receipt_date    = Carbon::parse($request->input('receipt_date'))->format('Y-m-d');
+        $receipt->sub_total       = $summary['subTotal'];
+        $receipt->grand_total     = $summary['grandTotal'];
+        $receipt->currency        = $request['currency'];
+        $receipt->converted_total = $request->input('converted_total');
+        $receipt->exchange_rate   = $request->input('exchange_rate');
+        $receipt->discount        = $summary['discountAmount'];
+        $receipt->discount_type   = $request->input('discount_type');
+        $receipt->discount_value  = $request->input('discount_value') ?? 0;
+        $receipt->note            = $request->input('note');
+        $receipt->footer          = $request->input('footer');
+        $receipt->user_id         = auth()->user()->id;
+        $receipt->business_id     = request()->activeBusiness->id;
+        $receipt->short_code      = rand(100000, 9999999) . uniqid();
+
+        $receipt->save();
+
+        $currentTime = Carbon::now();
+
+        for ($i = 0; $i < count($request->product_id); $i++) {
+            $receiptItem = $receipt->items()->save(new ReceiptItem([
+                'receipt_id'   => $receipt->id,
+                'product_id'   => $request->product_id[$i],
+                'product_name' => $request->product_name[$i],
+                'description'  => $request->description[$i],
+                'quantity'     => $request->quantity[$i],
+                'unit_cost'    => $request->unit_cost[$i],
+                'sub_total'    => ($request->unit_cost[$i] * $request->quantity[$i]),
+                'user_id'      => auth()->user()->id,
+                'business_id'  => request()->activeBusiness->id,
+            ]));
+
+            $product = Product::where('id', $request->product_id[$i])->first();
+
+            if ($product->allow_for_selling == 1) {
+                $transaction              = new Transaction();
+                $transaction->trans_date  = Carbon::parse($request->input('receipt_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                $transaction->account_id  = $product->income_account_id;
+                $transaction->dr_cr       = 'cr';
+                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $receiptItem->sub_total / $receipt->exchange_rate);
+                $transaction->transaction_currency    = $request->currency;
+                $transaction->currency_rate           = $receipt->exchange_rate;
+                $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $receiptItem->sub_total / $receipt->exchange_rate));
+                $transaction->description = _lang('Cash Invoice Income') . ' #' . $receipt->receipt_number;
+                $transaction->reference   = $request->input('reference');
+                $transaction->ref_id      = $receipt->id;
+                $transaction->ref_type    = 'receipt';
+                $transaction->customer_id = $receipt->customer_id;
+                $transaction->save();
+            }
+
+            if ($product->stock_management == 1 && $product->allow_for_purchasing == 1) {
+                $transaction              = new Transaction();
+                $transaction->trans_date  = Carbon::parse($request->input('receipt_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                $transaction->account_id  = get_account('Inventory')->id;
+                $transaction->dr_cr       = 'cr';
+                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $receiptItem->quantity);
+                $transaction->transaction_currency    = $request->currency;
+                $transaction->currency_rate           = $receipt->exchange_rate;
+                $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $receiptItem->quantity));
+                $transaction->description = $receiptItem->product_name . ' Sales #' . $receipt->receipt_number;
+                $transaction->ref_id      = $receipt->id;
+                $transaction->ref_type    = 'receipt';
+                $transaction->customer_id = $receipt->customer_id;
+                $transaction->save();
+
+                $transaction              = new Transaction();
+                $transaction->trans_date  = Carbon::parse($request->input('receipt_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+                $transaction->account_id  = $product->expense_account_id;
+                $transaction->dr_cr       = 'dr';
+                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $receiptItem->quantity);
+                $transaction->transaction_currency    = $request->currency;
+                $transaction->currency_rate = $receipt->exchange_rate;
+                $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $receiptItem->quantity));
+                $transaction->ref_type    = 'receipt';
+                $transaction->customer_id = $receipt->customer_id;
+                $transaction->ref_id      = $receipt->id;
+                $transaction->description = 'Cash Invoice #' . $receipt->receipt_number;
+                $transaction->save();
+            }
+
+            if (isset($request->taxes[$receiptItem->product_id])) {
+                foreach ($request->taxes[$receiptItem->product_id] as $taxId) {
+                    $tax = Tax::find($taxId);
+
+                    $receiptItem->taxes()->save(new ReceiptItemTax([
+                        'receipt_id' => $receipt->id,
+                        'tax_id'     => $taxId,
+                        'name'       => $tax->name . ' ' . $tax->rate . ' %',
+                        'amount'     => ($receiptItem->sub_total / 100) * $tax->rate,
+                    ]));
+
+                    $transaction              = new Transaction();
+                    $transaction->trans_date  = Carbon::parse($request->input('receipt_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                    $transaction->account_id  = $tax->account_id;
+                    $transaction->dr_cr       = 'cr';
+                    $transaction->transaction_currency    = $request->currency;
+                    $transaction->currency_rate = $receipt->exchange_rate;
+                    $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, (($receiptItem->sub_total / $receipt->exchange_rate) / 100) * $tax->rate));
+                    $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, (($receiptItem->sub_total / $receipt->exchange_rate) / 100) * $tax->rate);
+                    $transaction->description = _lang('Cash Invoice Tax') . ' #' . $receipt->receipt_number;
+                    $transaction->ref_id      = $receipt->id;
+                    $transaction->ref_type    = 'receipt tax';
+                    $transaction->tax_id      = $tax->id;
+                    $transaction->save();
+                }
+            }
+
+            //Update Stock
+            $product = $receiptItem->product;
+            if ($product->type == 'product' && $product->stock_management == 1) {
+                //Check Available Stock Quantity
+                if ($product->stock < $request->quantity[$i]) {
+                    DB::rollBack();
+                    return back()->with('error', $product->name . ' ' . _lang('Stock is not available!'));
+                }
+
+                $product->stock = $product->stock - $request->quantity[$i];
+                $product->save();
+            }
+        }
+
+        //Increment Receipt Number
+        BusinessSetting::where('name', 'receipt_number')->increment('value');
+
+        DB::commit();
+
+        $transaction              = new Transaction();
+        $transaction->customer_id  = $request->input('customer_id') ?? NULL;
+        $transaction->trans_date  = Carbon::parse($request->input('receipt_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+        $transaction->account_id  = $request->input('account_id');
+        $transaction->dr_cr       = 'dr';
+        $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
+        $transaction->transaction_currency    = $request->currency;
+        $transaction->currency_rate           = $receipt->exchange_rate;
+        $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
+        $transaction->description = 'Cash Invoice Payment #' . $receipt->receipt_number;
+        $transaction->transaction_method      = $request->input('method');
+        $transaction->reference   = $request->input('reference');
+        $transaction->ref_id      = $receipt->id;
+        $transaction->ref_type    = 'receipt';
+        $transaction->customer_id = $receipt->customer_id;
+        $transaction->save();
+
+        if ($request->input('discount_value') > 0) {
+            $transaction              = new Transaction();
+            $transaction->trans_date  = Carbon::parse($request->input('receipt_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+            $transaction->account_id  = get_account('Sales Discount Allowed')->id;
+            $transaction->dr_cr       = 'dr';
+            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
+            $transaction->transaction_currency    = $request->currency;
+            $transaction->currency_rate           = $receipt->exchange_rate;
+            $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
+            $transaction->description = _lang('Cash Invoice Discount') . ' #' . $receipt->receipt_number;
+            $transaction->ref_id      = $receipt->id;
+            $transaction->ref_type    = 'receipt';
+            $transaction->customer_id = $receipt->customer_id;
+            $transaction->save();
+        }
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Cash Invoice Created' . ' ' . $receipt->receipt_number;
+        $audit->save();
+
+        if ($receipt->id > 0) {
+            return redirect()->route('receipts.show', $receipt->id)->with('success', _lang('Saved Successfully'));
+        } else {
+            return back()->with('error', _lang('Something going wrong, Please try again'));
+        }
+    }
+
+    private function calculateTotal(Request $request)
+    {
+        $subTotal       = 0;
+        $taxAmount      = 0;
+        $discountAmount = 0;
+        $grandTotal     = 0;
+
+        for ($i = 0; $i < count($request->product_id); $i++) {
+            //Calculate Sub Total
+            $line_qnt       = $request->quantity[$i];
+            $line_unit_cost = $request->unit_cost[$i];
+            $line_total     = ($line_qnt * $line_unit_cost);
+
+            //Show Sub Total
+            $subTotal = ($subTotal + $line_total);
+
+            //Calculate Taxes
+            if (isset($request->taxes[$request->product_id[$i]])) {
+                for ($j = 0; $j < count($request->taxes[$request->product_id[$i]]); $j++) {
+                    $taxId       = $request->taxes[$request->product_id[$i]][$j];
+                    $tax         = Tax::find($taxId);
+                    $product_tax = ($line_total / 100) * $tax->rate;
+                    $taxAmount += $product_tax;
+                }
+            }
+
+            //Calculate Discount
+            if ($request->discount_type == '0') {
+                $discountAmount = ($subTotal / 100) * $request->discount_value ?? 0;
+            } else if ($request->discount_type == '1') {
+                $discountAmount = $request->discount_value ?? 0;
+            }
+        }
+
+        //Calculate Grand Total
+        $grandTotal = ($subTotal + $taxAmount) - $discountAmount;
+
+        return array(
+            'subTotal'       => $subTotal / $request->exchange_rate,
+            'taxAmount'      => $taxAmount / $request->exchange_rate,
+            'discountAmount' => $discountAmount / $request->exchange_rate,
+            'grandTotal'     => $grandTotal / $request->exchange_rate,
+        );
+    }
+
+    public function update(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'customer_id'    => 'nullable',
+            'title'          => 'required',
+            'receipt_date'   => 'required|date',
+            'product_id'     => 'required',
+            'currency'       => 'required',
+        ], [
+            'product_id.required' => _lang('You must add at least one item'),
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->route('receipts.edit', $id)
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        // if quantity is less than 1 or null then return with error
+        if (in_array(null, $request->quantity) || in_array('', $request->quantity) || in_array(0, $request->quantity)) {
+            return redirect()->back()->withInput()->with('error', _lang('Quantity is required'));
+        }
+
+        // if unit cost is less than 0 or null then return with error
+        if (in_array(null, $request->unit_cost) || in_array('', $request->unit_cost)) {
+            return redirect()->back()->withInput()->with('error', _lang('Unit Cost is required'));
+        }
+
+        $default_accounts = ['Accounts Receivable', 'Sales Tax Payable', 'Sales Discount Allowed', 'Inventory'];
+
+        // if these accounts are not exists then create it
+        foreach ($default_accounts as $account) {
+            if (!Account::where('account_name', $account)->where('business_id', NULL)->exists() && !Account::where('account_name', $account)->where('business_id', $request->activeBusiness->id)->exists()) {
+                $account_obj = new Account();
+                if ($account == 'Accounts Receivable') {
+                    $account_obj->account_code = '1100';
+                } elseif ($account == 'Sales Tax Payable') {
+                    $account_obj->account_code = '2200';
+                } elseif ($account == 'Sales Discount Allowed') {
+                    $account_obj->account_code = '4009';
+                } elseif ($account == 'Inventory') {
+                    $account_obj->account_code = '1000';
+                }
+                $account_obj->account_name = $account;
+                if ($account == 'Accounts Receivable') {
+                    $account_obj->account_type = 'Other Current Asset';
+                } elseif ($account == 'Sales Tax Payable') {
+                    $account_obj->account_type = 'Current Liability';
+                } elseif ($account == 'Sales Discount Allowed') {
+                    $account_obj->account_type = 'Other Income';
+                } elseif ($account == 'Inventory') {
+                    $account_obj->account_type = 'Other Current Asset';
+                }
+                if ($account == 'Accounts Receivable') {
+                    $account_obj->dr_cr   = 'dr';
+                } elseif ($account == 'Sales Tax Payable') {
+                    $account_obj->dr_cr   = 'cr';
+                } elseif ($account == 'Sales Discount Allowed') {
+                    $account_obj->dr_cr   = 'dr';
+                } elseif ($account == 'Inventory') {
+                    $account_obj->dr_cr   = 'dr';
+                }
+                $account_obj->business_id = $request->activeBusiness->id;
+                $account_obj->user_id     = $request->activeBusiness->user->id;
+                $account_obj->opening_date   = now()->format('Y-m-d');
+                $account_obj->save();
+            }
+        }
+
+        DB::beginTransaction();
+
+        $currentTime = Carbon::now();
+
+        $summary = $this->calculateTotal($request);
+
+        $receipt = Receipt::where('id', $id)->first();
+
+        $receipt->customer_id     = $request->input('customer_id');
+        $receipt->title           = $request->input('title');
+        $receipt->order_number    = $request->input('order_number');
+        $receipt->receipt_date    = Carbon::parse($request->input('receipt_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d');
+        $receipt->sub_total       = $summary['subTotal'];
+        $receipt->grand_total     = $summary['grandTotal'];
+        $receipt->currency        = $request['currency'];
+        $receipt->converted_total = $request->input('converted_total');
+        $receipt->exchange_rate   = $request->input('exchange_rate');
+        $receipt->discount        = $summary['discountAmount'];
+        $receipt->discount_type   = $request->input('discount_type');
+        $receipt->discount_value  = $request->input('discount_value') ?? 0;
+        $receipt->note            = $request->input('note');
+        $receipt->footer          = $request->input('footer');
+        $receipt->user_id         = auth()->user()->id;
+        $receipt->business_id     = request()->activeBusiness->id;
+
+        $receipt->save();
+
+        //Update Invoice item
+        foreach ($receipt->items as $receipt_item) {
+            $product = $receipt_item->product;
+            if ($product->type == 'product' && $product->stock_management == 1) {
+                $product->stock = $product->stock + $receipt_item->quantity;
+                $product->save();
+            }
+
+            $receipt_item->delete();
+
+            $transaction = Transaction::where('ref_id', $receipt->id)->where('ref_type', 'receipt')
+                ->where('account_id', $product->income_account_id)
+                ->first();
+
+            if($transaction != null) {
+                $transaction->delete();
+            }
+
+            $transaction = Transaction::where('ref_id', $receipt->id)->where('ref_type', 'receipt')
+                ->where('account_id', get_account('Inventory')->id)
+                ->first();
+
+            if ($transaction != null) {
+                $transaction->delete();
+            }
+
+            $transaction = Transaction::where('ref_id', $receipt->id)->where('ref_type', 'receipt')
+                ->where('account_id', $product->expense_account_id)
+                ->first();
+
+            if ($transaction != null) {
+                $transaction->delete();
+            }
+        }
+
+        $currentTime = Carbon::now();
+
+        for ($i = 0; $i < count($request->product_id); $i++) {
+            $receiptItem = $receipt->items()->save(new ReceiptItem([
+                'receipt_id'   => $receipt->id,
+                'product_id'   => $request->product_id[$i],
+                'product_name' => $request->product_name[$i],
+                'description'  => $request->description[$i],
+                'quantity'     => $request->quantity[$i],
+                'unit_cost'    => $request->unit_cost[$i],
+                'sub_total'    => ($request->unit_cost[$i] * $request->quantity[$i]),
+                'user_id'      => auth()->user()->id,
+                'business_id'  => request()->activeBusiness->id,
+            ]));
+
+            $product = Product::where('id', $request->product_id[$i])->first();
+
+            if ($product->allow_for_selling == 1) {
+                $transaction              = new Transaction();
+                $transaction->trans_date  = Carbon::parse($request->input('receipt_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                $transaction->account_id  = $product->income_account_id;
+                $transaction->dr_cr       = 'cr';
+                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $receiptItem->sub_total / $receipt->exchange_rate);
+                $transaction->transaction_currency    = $request->currency;
+                $transaction->currency_rate           = $receipt->exchange_rate;
+                $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $receiptItem->sub_total / $receipt->exchange_rate));
+                $transaction->description = _lang('Cash Invoice Income') . ' #' . $receipt->receipt_number;
+                $transaction->reference   = $request->input('reference');
+                $transaction->ref_id      = $receipt->id;
+                $transaction->ref_type    = 'receipt';
+                $transaction->customer_id = $receipt->customer_id;
+                $transaction->save();
+            }
+
+            if ($product->stock_management == 1 && $product->allow_for_purchasing == 1) {
+                $transaction              = new Transaction();
+                $transaction->trans_date  = Carbon::parse($request->input('receipt_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                $transaction->account_id  = get_account('Inventory')->id;
+                $transaction->dr_cr       = 'cr';
+                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $receiptItem->quantity);
+                $transaction->transaction_currency    = $request->currency;
+                $transaction->currency_rate           = $receipt->exchange_rate;
+                $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $receiptItem->quantity));
+                $transaction->description = $receiptItem->product_name . ' Sales #' . $receipt->receipt_number;
+                $transaction->ref_id      = $receipt->id;
+                $transaction->ref_type    = 'receipt';
+                $transaction->customer_id = $receipt->customer_id;
+                $transaction->save();
+
+                $transaction              = new Transaction();
+                $transaction->trans_date  = Carbon::parse($request->input('receipt_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+                $transaction->account_id  = $product->expense_account_id;
+                $transaction->dr_cr       = 'dr';
+                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $receiptItem->quantity);
+                $transaction->transaction_currency    = $request->currency;
+                $transaction->currency_rate = $receipt->exchange_rate;
+                $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $receiptItem->quantity));
+                $transaction->ref_type    = 'receipt';
+                $transaction->customer_id = $receipt->customer_id;
+                $transaction->ref_id      = $receipt->id;
+                $transaction->description = 'Cash Invoice #' . $receipt->receipt_number;
+                $transaction->save();
+            }
+
+            if (isset($request->taxes[$receiptItem->product_id])) {
+                $transaction = Transaction::where('ref_id', $receipt->id)->where('ref_type', 'receipt tax')
+                    ->get();
+
+                foreach ($transaction as $taxTransaction) {
+                    $taxTransaction->delete();
+                }
+
+                foreach ($request->taxes[$receiptItem->product_id] as $taxId) {
+                    $tax = Tax::find($taxId);
+
+                    $receiptItem->taxes()->save(new ReceiptItemTax([
+                        'receipt_id' => $receipt->id,
+                        'tax_id'     => $taxId,
+                        'name'       => $tax->name . ' ' . $tax->rate . ' %',
+                        'amount'     => ($receiptItem->sub_total / 100) * $tax->rate,
+                    ]));
+
+                    $transaction              = new Transaction();
+                    $transaction->trans_date  = Carbon::parse($request->input('receipt_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                    $transaction->account_id  = $tax->account_id;
+                    $transaction->dr_cr       = 'cr';
+                    $transaction->transaction_currency    = $request->currency;
+                    $transaction->currency_rate = $receipt->exchange_rate;
+                    $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, (($receiptItem->sub_total / $receipt->exchange_rate) / 100) * $tax->rate));
+                    $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, (($receiptItem->sub_total / $receipt->exchange_rate) / 100) * $tax->rate);
+                    $transaction->description = _lang('Cash Invoice Tax') . ' #' . $receipt->receipt_number;
+                    $transaction->ref_id      = $receipt->id;
+                    $transaction->ref_type    = 'receipt tax';
+                    $transaction->tax_id      = $tax->id;
+                    $transaction->save();
+                }
+            }
+
+            //Update Stock
+            $product = $receiptItem->product;
+            if ($product->type == 'product' && $product->stock_management == 1) {
+                //Check Available Stock Quantity
+                if ($product->stock < $request->quantity[$i]) {
+                    DB::rollBack();
+                    return back()->with('error', $product->name . ' ' . _lang('Stock is not available!'));
+                }
+
+                $product->stock = $product->stock - $request->quantity[$i];
+                $product->save();
+            }
+        }
+
+        DB::commit();
+
+        $transaction = Transaction::where('ref_id', $receipt->id)->where('ref_type', 'receipt')
+            ->with('account', function ($query) {
+                $query->where('account_type', 'Bank')
+                    ->orWhere('account_type', 'Cash');
+            })
+            ->first();
+
+        if ($transaction->account->id != $request->input('account_id')) {
+            $transaction->trans_date = Carbon::parse($request->input('receipt_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+            $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
+            $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
+            $transaction->account_id = $request->input('account_id');
+            $transaction->save();
+        } else {
+            $transaction->trans_date = Carbon::parse($request->input('receipt_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+            $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
+            $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
+            $transaction->save();
+        }
+
+        if ($transaction->transaction_method != $request->input('method')) {
+            $transaction->transaction_method = $request->input('method');
+            $transaction->save();
+        }
+
+        if ($request->input('discount_value') == 0) {
+            $transaction->trans_date = Carbon::parse($request->input('receipt_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+            $transaction = Transaction::where('ref_id', $receipt->id)->where('ref_type', 'receipt')
+                ->where('account_id', get_account('Sales Discount Allowed')->id)
+                ->first();
+            if ($transaction != null) {
+                $transaction->delete();
+            }
+        }
+
+        if ($request->input('discount_value') > 0) {
+            $transaction = Transaction::where('ref_id', $receipt->id)->where('ref_type', 'receipt')
+                ->where('account_id', get_account('Sales Discount Allowed')->id)
+                ->first();
+
+            if ($transaction == null) {
+                $transaction              = new Transaction();
+                $transaction->trans_date  = Carbon::parse($request->input('receipt_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                $transaction->account_id  = get_account('Sales Discount Allowed')->id;
+                $transaction->dr_cr       = 'dr';
+                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
+                $transaction->transaction_currency    = $request->currency;
+                $transaction->currency_rate           = $receipt->exchange_rate;
+                $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
+                $transaction->description = _lang('Cash Invoice Discount') . ' #' . $receipt->receipt_number;
+                $transaction->ref_id      = $receipt->id;
+                $transaction->ref_type    = 'receipt';
+                $transaction->customer_id = $receipt->customer_id;
+                $transaction->save();
+            } else {
+                $transaction->trans_date = Carbon::parse($request->input('receipt_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
+                $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
+                $transaction->save();
+            }
+        }
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Cash Invoice Updated' . ' ' . $receipt->receipt_number;
+        $audit->save();
+
+        if (!$request->ajax()) {
+            return redirect()->route('receipts.show', $receipt->id)->with('success', _lang('Updated Successfully'));
+        } else {
+            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $receipt, 'table' => '#invoices_table']);
+        }
+    }
+
+    public function destroy($id)
+    {
+        $receipt = Receipt::find($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Cash Invoice Deleted' . ' ' . $receipt->receipt_number;
+        $audit->save();
+
+        // increaase stock
+        foreach ($receipt->items as $receipt_item) {
+            $product = $receipt_item->product;
+            if ($product->type == 'product' && $product->stock_management == 1) {
+                $product->stock = $product->stock + $receipt_item->quantity;
+                $product->save();
+            }
+        }
+        // delete transactions
+        Transaction::where('ref_id', $receipt->id)
+            ->where(function ($query) {
+                $query->where('ref_type', 'receipt')
+                    ->orWhere('ref_type', 'receipt tax');
+            })
+            ->delete();
+        $receipt->delete();
+        return redirect()->route('receipts.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    public function pos()
+    {
+        return view('backend.user.pos.pos');
+    }
+
+    public function import_receipts(Request $request)
+    {
+        $request->validate([
+            'receipts_file' => 'required|mimes:xls,xlsx',
+        ]);
+
+        try {
+            Excel::import(new CashInvoiceImport, $request->file('receipts_file'));
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Cash Invoices Imported';
+        $audit->save();
+
+        return redirect()->route('receipts.index')->with('success', _lang('Invoices Imported'));
+    }
+
+    public function receipts_filter(Request $request)
+    {
+        $from =  explode('to', $request->date_range)[0] ?? '';
+        $to = explode('to', $request->date_range)[1] ?? '';
+
+        $query = Receipt::select('receipts.*')
+            ->with('customer');
+
+        if ($request->customer_id != '') {
+            $query->where('customer_id', $request->customer_id);
+        }
+
+        if ($from != '' && $to != '') {
+            $query->whereDate('receipt_date', '>=', Carbon::parse($from)->format('Y-m-d'))
+                ->whereDate('receipt_date', '<=', Carbon::parse($to)->format('Y-m-d'));
+        }
+
+        $receipts = $query->get();
+
+        $customer_id = $request->customer_id;
+        $date_range = $request->date_range;
+
+        return view('backend.user.receipt.list', compact('receipts', 'customer_id', 'date_range'));
+    }
+
+    private function calculatePosTotal(Request $request)
+    {
+        $subTotal       = 0;
+        $taxAmount      = 0;
+        $discountAmount = 0;
+        $grandTotal     = 0;
+
+        for ($i = 0; $i < count($request->product_id); $i++) {
+            //Calculate Sub Total
+            $line_qnt       = $request->quantity[$i];
+            $line_unit_cost = $request->unit_cost[$i];
+            $line_total     = ($line_qnt * $line_unit_cost);
+
+            //Show Sub Total
+            $subTotal = ($subTotal + $line_total);
+
+            //Calculate Taxes
+            if (isset($request->tax_amount)) {
+                foreach ($request->tax_amount as $index => $amount) {
+                    if($amount == 0) {
+                        continue;
+                    }
+                    $tax         = Tax::find($index);
+                    $product_tax = ($line_total / 100) * $tax->rate;
+                    $taxAmount += $product_tax;
+                }
+            }
+
+            //Calculate Discount
+            if ($request->discount_type == '0') {
+                $discountAmount = ($subTotal / 100) * $request->discount_value;
+            } else if ($request->discount_type == '1') {
+                $discountAmount = $request->discount_value;
+            }
+        }
+
+        //Calculate Grand Total
+        $grandTotal = ($subTotal + $taxAmount) - $discountAmount;
+
+        return array(
+            'subTotal'       => $subTotal,
+            'taxAmount'      => $taxAmount,
+            'discountAmount' => $discountAmount,
+            'grandTotal'     => $grandTotal,
+        );
+    }
+
+    public function export_pdf(Request $request, $id)
+    {
+        $receipt = Receipt::with(['business', 'items'])->find($id);
+        $pdf     = Pdf::loadView('backend.user.receipt.pdf', compact('receipt', 'id'));
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Cash Invoice PDF Exported' . ' ' . $receipt->receipt_number;
+        $audit->save();
+
+        return $pdf->download('receipt#-' . $receipt->receipt_number . '.pdf');
+    }
+
+    public function pos_store(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'customer_id'    => $request->credit_cash == 'provider' ? 'required' : 'nullable',
+            'client_id'      => $request->credit_cash == 'credit' || $request->credit_cash == 'provider' ? 'required' : 'nullable',
+            'product_id'     => 'required',
+            'currency'       => 'required',
+            'account_id'     => $request->credit_cash == 'cas' ? 'required' : 'nullable',
+        ], [
+            'product_id.required' => _lang('You must add at least one item'),
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->route('receipts.pos')
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        // if quantity is less than 1 or null then return with error
+        if (in_array(null, $request->quantity) || in_array('', $request->quantity) || in_array(0, $request->quantity)) {
+            return redirect()->back()->withInput()->with('error', _lang('Quantity is required'));
+        }
+
+        // if unit cost is less than 0 or null then return with error
+        if (in_array(null, $request->unit_cost) || in_array('', $request->unit_cost)) {
+            return redirect()->back()->withInput()->with('error', _lang('Unit Cost is required'));
+        }
+
+        $default_accounts = ['Accounts Receivable', 'Sales Tax Payable', 'Sales Discount Allowed', 'Inventory'];
+
+        // if these accounts are not exists then create it
+        foreach ($default_accounts as $account) {
+            if (!Account::where('account_name', $account)->where('business_id', $request->activeBusiness->id)->exists()) {
+                $account_obj = new Account();
+                if ($account == 'Accounts Receivable') {
+                    $account_obj->account_code = '1100';
+                } elseif ($account == 'Sales Tax Payable') {
+                    $account_obj->account_code = '2200';
+                } elseif ($account == 'Sales Discount Allowed') {
+                    $account_obj->account_code = '4009';
+                } elseif ($account == 'Inventory') {
+                    $account_obj->account_code = '1000';
+                }
+                $account_obj->account_name = $account;
+                if ($account == 'Accounts Receivable') {
+                    $account_obj->account_type = 'Other Current Asset';
+                } elseif ($account == 'Sales Tax Payable') {
+                    $account_obj->account_type = 'Current Liability';
+                } elseif ($account == 'Sales Discount Allowed') {
+                    $account_obj->account_type = 'Other Income';
+                } elseif ($account == 'Inventory') {
+                    $account_obj->account_type = 'Other Current Asset';
+                }
+                if ($account == 'Accounts Receivable') {
+                    $account_obj->dr_cr   = 'dr';
+                } elseif ($account == 'Sales Tax Payable') {
+                    $account_obj->dr_cr   = 'cr';
+                } elseif ($account == 'Sales Discount Allowed') {
+                    $account_obj->dr_cr   = 'cr';
+                } elseif ($account == 'Inventory') {
+                    $account_obj->dr_cr   = 'dr';
+                }
+                $account_obj->business_id = $request->activeBusiness->id;
+                $account_obj->user_id     = $request->activeBusiness->user->id;
+                $account_obj->opening_date   = now()->format('Y-m-d');
+                $account_obj->save();
+            }
+        }
+
+        $month = Carbon::parse($request->receipt_date)->format('F');
+        $year = Carbon::parse($request->receipt_date)->format('Y');
+        $today = now()->format('d');
+
+        // financial year
+        $financial_year = BusinessSetting::where('name', 'fiscal_year')->first()->value;
+        $end_month = explode(',', $financial_year)[1];
+        $start_day = BusinessSetting::where('name', 'start_day')->first()->value;
+        $end_day = $start_day + 5;
+
+        // if login as this user dont check the financial year
+        if (false) {
+            if (($month !== now()->format('F') || $year !== now()->format('Y')) || ($today <= $end_day && $month == now()->subMonth()->format('F') && $year == now()->format('Y')) || ($today <= 25 && $month == $end_month && $year == now()->subYear()->format('Y'))) {
+                return redirect()->back()->withInput()->with('error', _lang('Period Closed'));
+            }
+        }
+
+        $summary = $this->calculatePosTotal($request);
+
+        if ($request->credit_cash == 'cash') {
+
+            DB::beginTransaction();
+
+            $receipt                  = new Receipt();
+            $receipt->customer_id     = $request->input('client_id') ?? NULL;
+            $receipt->title           = 'Cash Invoice';
+            $receipt->receipt_number  = get_business_option('receipt_number');
+            $receipt->receipt_date    = Carbon::parse($request->input('invoice_date'))->format('Y-m-d');
+            $receipt->sub_total       = $summary['subTotal'];
+            $receipt->grand_total     = $summary['grandTotal'];
+            $receipt->currency        = $request['currency'];
+            $receipt->converted_total = $request->input('converted_total');
+            $receipt->exchange_rate   = $request->input('exchange_rate');
+            $receipt->discount        = $summary['discountAmount'];
+            $receipt->discount_type   = $request->input('discount_type') ?? 0;
+            $receipt->discount_value  = $request->input('discount_value') ?? 0;
+            $receipt->user_id         = auth()->user()->id;
+            $receipt->business_id     = request()->activeBusiness->id;
+            $receipt->short_code      = rand(100000, 9999999) . uniqid();
+            if ($request->appointment == 1) {
+                $receipt->queue_number    = BusinessSetting::where('name', 'queue_number')->first()->value;
+            }
+            $receipt->save();
+
+            for ($i = 0; $i < count($request->product_id); $i++) {
+                $receiptItem = $receipt->items()->save(new ReceiptItem([
+                    'receipt_id'   => $receipt->id,
+                    'product_id'   => $request->product_id[$i],
+                    'product_name' => $request->product_name[$i],
+                    'description'  => null,
+                    'quantity'     => $request->quantity[$i],
+                    'unit_cost'    => $request->unit_cost[$i],
+                    'sub_total'    => ($request->unit_cost[$i] * $request->quantity[$i]),
+                    'user_id'      => auth()->user()->id,
+                    'business_id'  => request()->activeBusiness->id,
+                ]));
+
+                $product = Product::where('id', $request->product_id[$i])->first();
+
+                if ($product->allow_for_selling == 1) {
+                    $transaction              = new Transaction();
+                    $transaction->trans_date  = now()->format('Y-m-d H:i:s');
+                    $transaction->account_id  = $product->income_account_id;
+                    $transaction->dr_cr       = 'cr';
+                    $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $receiptItem->sub_total / $receipt->exchange_rate);
+                    $transaction->transaction_currency    = $request->currency;
+                    $transaction->currency_rate           = $receipt->exchange_rate;
+                    $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $receiptItem->sub_total / $receipt->exchange_rate));
+                    $transaction->description = _lang('Cash Invoice Income') . ' #' . $receipt->receipt_number;
+                    $transaction->reference   = $request->input('reference');
+                    $transaction->ref_id      = $receipt->id;
+                    $transaction->ref_type    = 'receipt';
+                    $transaction->customer_id = $receipt->customer_id;
+                    $transaction->save();
+                }
+
+                if ($product->stock_management == 1 && $product->allow_for_purchasing == 1) {
+                    $transaction              = new Transaction();
+                    $transaction->trans_date  = now()->format('Y-m-d H:i:s');
+                    $transaction->account_id  = get_account('Inventory')->id;
+                    $transaction->dr_cr       = 'cr';
+                    $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $receiptItem->quantity);
+                    $transaction->transaction_currency    = $request->currency;
+                    $transaction->currency_rate           = $receipt->exchange_rate;
+                    $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $receiptItem->quantity));
+                    $transaction->description = $receiptItem->product_name . ' Sales #' . $receipt->receipt_number;
+                    $transaction->ref_id      = $receipt->id;
+                    $transaction->ref_type    = 'receipt';
+                    $transaction->customer_id = $receipt->customer_id;
+                    $transaction->save();
+
+                    $transaction              = new Transaction();
+                    $transaction->trans_date  = now()->format('Y-m-d H:i');
+                    $transaction->account_id  = $product->expense_account_id;
+                    $transaction->dr_cr       = 'dr';
+                    $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $receiptItem->quantity);
+                    $transaction->transaction_currency    = $request->currency;
+                    $transaction->currency_rate = $receipt->exchange_rate;
+                    $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $receiptItem->quantity));
+                    $transaction->ref_type    = 'receipt';
+                    $transaction->customer_id = $receipt->customer_id;
+                    $transaction->ref_id      = $receipt->id;
+                    $transaction->description = 'Cash Invoice #' . $receipt->receipt_number;
+                    $transaction->save();
+                }
+
+                if (isset($request->tax_amount)) {
+                    foreach ($request->tax_amount as $index => $amount) {
+                        $tax = Tax::find($index);
+
+                        $receiptItem->taxes()->save(new ReceiptItemTax([
+                            'receipt_id' => $receipt->id,
+                            'tax_id'     => $index,
+                            'name'       => $tax->name . ' ' . $tax->rate . ' %',
+                            'amount'     => ($receiptItem->sub_total / 100) * $tax->rate,
+                        ]));
+
+                        $transaction              = new Transaction();
+                        $transaction->trans_date  = now()->format('Y-m-d H:i:s');
+                        $transaction->account_id  = $tax->account_id;
+                        $transaction->dr_cr       = 'cr';
+                        $transaction->transaction_currency    = $request->currency;
+                        $transaction->currency_rate = $receipt->exchange_rate;
+                        $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, (($receiptItem->sub_total / $receipt->exchange_rate) / 100) * $tax->rate));
+                        $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, (($receiptItem->sub_total / $receipt->exchange_rate) / 100) * $tax->rate);
+                        $transaction->description = _lang('Cash Invoice Tax') . ' #' . $receipt->receipt_number;
+                        $transaction->ref_id      = $receipt->id;
+                        $transaction->ref_type    = 'receipt tax';
+                        $transaction->tax_id      = $tax->id;
+                        $transaction->save();
+                    }
+                }
+
+                //Update Stock
+                $product = $receiptItem->product;
+                if ($product->type == 'product' && $product->stock_management == 1) {
+                    //Check Available Stock Quantity
+                    if ($product->stock < $request->quantity[$i]) {
+                        DB::rollBack();
+                        return back()->with('error', $product->name . ' ' . _lang('Stock is not available!'));
+                    }
+
+                    $product->stock = $product->stock - $request->quantity[$i];
+                    $product->save();
+                }
+            }
+
+            //Increment Receipt Number
+            BusinessSetting::where('name', 'receipt_number')->increment('value');
+
+            if ($request->appointment == 1) {
+                // increment queue number
+                BusinessSetting::where('name', 'queue_number')->increment('value');
+            }
+
+            DB::commit();
+
+            $transaction              = new Transaction();
+            $transaction->customer_id  = $request->input('customer_id') ?? NULL;
+            $transaction->trans_date  = now()->format('Y-m-d H:i:s');
+            $transaction->account_id  = $request->input('account_id');
+            $transaction->dr_cr       = 'dr';
+            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
+            $transaction->transaction_currency    = $request->currency;
+            $transaction->currency_rate           = $receipt->exchange_rate;
+            $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
+            $transaction->description = 'Cash Invoice Payment #' . $receipt->receipt_number;
+            $transaction->transaction_method      = $request->input('method');
+            $transaction->reference   = $request->input('reference');
+            $transaction->ref_id      = $receipt->id;
+            $transaction->ref_type    = 'receipt';
+            $transaction->customer_id = $receipt->customer_id;
+            $transaction->save();
+
+            if ($request->input('discount_value') > 0) {
+                $transaction              = new Transaction();
+                $transaction->trans_date  = now()->format('Y-m-d H:i:s');
+                $transaction->account_id  = get_account('Sales Discount Allowed')->id;
+                $transaction->dr_cr       = 'dr';
+                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
+                $transaction->transaction_currency    = $request->currency;
+                $transaction->currency_rate           = $receipt->exchange_rate;
+                $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
+                $transaction->description = _lang('Cash Invoice Discount') . ' #' . $receipt->receipt_number;
+                $transaction->ref_id      = $receipt->id;
+                $transaction->ref_type    = 'receipt';
+                $transaction->customer_id = $receipt->customer_id;
+                $transaction->save();
+            }
+
+            if ($request->hold_pos_id != '') {
+                $holdPosInvoice = HoldPosInvoice::find($request->hold_pos_id);
+
+                if ($holdPosInvoice) {
+                    $holdPosInvoice->delete();
+                }
+            }
+
+            if ($request->prescription_products_id != "") {
+                $prescription_products = PrescriptionProduct::find($request->prescription_products_id);
+                $prescription_products->status = 1;
+                $prescription_products->save();
+            }
+        } elseif ($request->credit_cash == 'credit') {
+
+            DB::beginTransaction();
+
+            $invoice                  = new Invoice();
+            $invoice->customer_id     = $request->input('client_id');
+            $invoice->title           = $request->input('title');
+            $invoice->invoice_number  = get_business_option('invoice_number');
+            $invoice->order_number    = $request->input('order_number');
+            $invoice->invoice_date    = Carbon::parse($request->input('invoice_date'))->format('Y-m-d');
+            $invoice->due_date        = Carbon::parse($request->input('due_date'))->format('Y-m-d');
+            $invoice->sub_total       = $summary['subTotal'];
+            $invoice->grand_total     = $summary['grandTotal'];
+            $invoice->currency        = $request['currency'];
+            $invoice->converted_total = $request->input('converted_total');
+            $invoice->exchange_rate   = Currency::where('name', $request->currency)->first()->exchange_rate;
+            $invoice->paid            = 0;
+            $invoice->discount        = $summary['discountAmount'];
+            $invoice->discount_type   = $request->input('discount_type');
+            $invoice->discount_value  = $request->input('discount_value') ?? 0;
+            $invoice->template_type   = is_numeric($request->template) ? 1 : 0;
+            $invoice->template        = 'default';
+            $invoice->note            = $request->input('note');
+            $invoice->footer          = $request->input('footer');
+            $invoice->short_code      = rand(100000, 9999999) . uniqid();
+            if ($request->appointment == 1) {
+                $invoice->queue_number    = BusinessSetting::where('name', 'queue_number')->first()->value;
+            }
+            $invoice->save();
+
+            $currentTime = Carbon::now();
+
+            for ($i = 0; $i < count($request->product_id); $i++) {
+                $invoiceItem = $invoice->items()->save(new InvoiceItem([
+                    'invoice_id'   => $invoice->id,
+                    'product_id'   => $request->product_id[$i],
+                    'product_name' => $request->product_name[$i],
+                    'description'  => null,
+                    'quantity'     => $request->quantity[$i],
+                    'unit_cost'    => $request->unit_cost[$i],
+                    'sub_total'    => ($request->unit_cost[$i] * $request->quantity[$i]),
+                ]));
+
+                $product = Product::where('id', $request->product_id[$i])->first();
+
+                if ($product->allow_for_selling == 1) {
+                    $transaction              = new Transaction();
+                    $transaction->trans_date  = Carbon::parse($request->input('invoice_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                    $transaction->account_id  = $product->income_account_id;
+                    $transaction->dr_cr       = 'cr';
+                    $transaction->transaction_currency    = $request->currency;
+                    $transaction->currency_rate = $invoice->exchange_rate;
+                    $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $invoiceItem->sub_total));
+                    $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $invoiceItem->sub_total);
+                    $transaction->description = _lang('Credit Invoice Income') . ' #' . $invoice->invoice_number;
+                    $transaction->ref_id      = $invoice->id;
+                    $transaction->ref_type    = 'invoice';
+                    $transaction->customer_id = $invoice->customer_id;
+
+                    $transaction->save();
+                }
+
+                if ($product->stock_management == 1 && $product->allow_for_purchasing == 1) {
+                    $transaction              = new Transaction();
+                    $transaction->trans_date  = Carbon::parse($request->input('invoice_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                    $transaction->account_id  = get_account('Inventory')->id;
+                    $transaction->dr_cr       = 'cr';
+                    $transaction->transaction_currency    = $request->currency;
+                    $transaction->currency_rate           = $invoice->exchange_rate;
+                    $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $invoiceItem->quantity));
+                    $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $invoiceItem->quantity);
+                    $transaction->description = $invoiceItem->product_name . ' Sales #' . $invoice->invoice_number;
+                    $transaction->ref_id      = $invoice->id;
+                    $transaction->ref_type    = 'invoice';
+                    $transaction->customer_id = $invoice->customer_id;
+                    $transaction->save();
+
+                    $transaction              = new Transaction();
+                    $transaction->trans_date  = Carbon::parse($request->input('invoice_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+                    $transaction->account_id  = $product->expense_account_id;
+                    $transaction->dr_cr       = 'dr';
+                    $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $invoiceItem->quantity);
+                    $transaction->transaction_currency    = $request->currency;
+                    $transaction->currency_rate = $invoice->exchange_rate;
+                    $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $invoiceItem->quantity));
+                    $transaction->ref_type    = 'invoice';
+                    $transaction->customer_id = $invoice->customer_id;
+                    $transaction->ref_id      = $invoice->id;
+                    $transaction->description = 'Credit Invoice #' . $invoice->invoice_number;
+                    $transaction->save();
+                }
+
+                if (isset($request->tax_amount)) {
+                    foreach ($request->tax_amount as $index => $amount) {
+                        $tax = Tax::find($index);
+
+                        $invoiceItem->taxes()->save(new InvoiceItemTax([
+                            'invoice_id' => $invoice->id,
+                            'tax_id'     => $index,
+                            'name'       => $tax->name . ' ' . $tax->rate . ' %',
+                            'amount'     => ($invoiceItem->sub_total / 100) * $tax->rate,
+                        ]));
+
+                        $transaction              = new Transaction();
+                        $transaction->trans_date  = Carbon::parse($request->input('invoice_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                        $transaction->account_id  = $tax->account_id;
+                        $transaction->dr_cr       = 'cr';
+                        $transaction->transaction_currency    = $request->currency;
+                        $transaction->currency_rate = $invoice->exchange_rate;
+                        $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, ($invoiceItem->sub_total / 100) * $tax->rate));
+                        $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, ($invoiceItem->sub_total / 100) * $tax->rate);
+                        $transaction->description = _lang('Credit Invoice Tax') . ' #' . $invoice->invoice_number;
+                        $transaction->ref_id      = $invoice->id;
+                        $transaction->ref_type    = 'invoice tax';
+                        $transaction->tax_id      = $tax->id;
+                        $transaction->save();
+                    }
+                }
+
+                //Update Stock
+                $product = $invoiceItem->product;
+                if ($product->type == 'product' && $product->stock_management == 1) {
+                    //Check Available Stock Quantity
+                    if ($product->stock < $request->quantity[$i]) {
+                        DB::rollBack();
+                        return back()->with('error', $product->name . ' ' . _lang('Stock is not available!'));
+                    }
+
+                    $product->stock = $product->stock - $request->quantity[$i];
+                    $product->save();
+                }
+            }
+
+            //Increment Invoice Number
+            BusinessSetting::where('name', 'invoice_number')->increment('value');
+
+            if ($request->appointment == 1) {
+                // increment queue number
+                BusinessSetting::where('name', 'queue_number')->increment('value');
+            }
+
+            DB::commit();
+
+            $transaction              = new Transaction();
+            $transaction->trans_date  = Carbon::parse($request->input('invoice_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+            $transaction->account_id  = get_account('Accounts Receivable')->id;
+            $transaction->dr_cr       = 'dr';
+            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
+            $transaction->transaction_currency    = $request->currency;
+            $transaction->currency_rate           = $invoice->exchange_rate;
+            $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
+            $transaction->ref_id      = $invoice->id;
+            $transaction->ref_type    = 'invoice';
+            $transaction->customer_id = $invoice->customer_id;
+            $transaction->description = 'Credit Invoice #' . $invoice->invoice_number;
+            $transaction->save();
+
+            if ($request->input('discount_value') > 0) {
+                $transaction              = new Transaction();
+                $transaction->trans_date  = Carbon::parse($request->input('invoice_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                $transaction->account_id  = get_account('Sales Discount Allowed')->id;
+                $transaction->dr_cr       = 'dr';
+                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
+                $transaction->transaction_currency    = $request->currency;
+                $transaction->currency_rate           = $invoice->exchange_rate;
+                $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
+                $transaction->description = _lang('Credit Invoice Discount') . ' #' . $invoice->invoice_number;
+                $transaction->ref_id      = $invoice->id;
+                $transaction->ref_type    = 'invoice';
+                $transaction->customer_id = $invoice->customer_id;
+                $transaction->save();
+            }
+
+            if ($request->hold_pos_id != '') {
+                $holdPosInvoice = HoldPosInvoice::find($request->hold_pos_id);
+
+                if ($holdPosInvoice) {
+                    $holdPosInvoice->delete();
+                }
+            }
+
+            if ($request->prescription_products_id != "") {
+                $prescription_products = PrescriptionProduct::find($request->prescription_products_id);
+                $prescription_products->status = 1;
+                $prescription_products->save();
+            }
+        } elseif ($request->credit_cash == 'provider') {
+            DB::beginTransaction();
+
+            $invoice                  = new Invoice();
+            $invoice->customer_id     = $request->input('customer_id');
+            $invoice->title           = $request->input('title');
+            $invoice->invoice_number  = get_business_option('invoice_number');
+            $invoice->order_number    = $request->input('order_number');
+            $invoice->invoice_date    = Carbon::parse($request->input('invoice_date'))->format('Y-m-d');
+            $invoice->due_date        = Carbon::parse($request->input('due_date'))->format('Y-m-d');
+            $invoice->sub_total       = $summary['subTotal'];
+            $invoice->grand_total     = $summary['grandTotal'];
+            $invoice->currency        = $request['currency'];
+            $invoice->converted_total = $request->input('converted_total');
+            $invoice->exchange_rate   = Currency::where('name', $request->currency)->first()->exchange_rate;
+            $invoice->paid            = 0;
+            $invoice->discount        = $summary['discountAmount'];
+            $invoice->discount_type   = $request->input('discount_type');
+            $invoice->discount_value  = $request->input('discount_value') ?? 0;
+            $invoice->template_type   = is_numeric($request->template) ? 1 : 0;
+            $invoice->template        = 'default';
+            $invoice->note            = $request->input('note');
+            $invoice->footer          = $request->input('footer');
+            $invoice->short_code      = rand(100000, 9999999) . uniqid();
+            $invoice->client_id       = $request->input('client_id');
+            if ($request->appointment == 1) {
+                $invoice->queue_number    = BusinessSetting::where('name', 'queue_number')->first()->value;
+            }
+            $invoice->save();
+
+            $currentTime = Carbon::now();
+
+            for ($i = 0; $i < count($request->product_id); $i++) {
+                $invoiceItem = $invoice->items()->save(new InvoiceItem([
+                    'invoice_id'   => $invoice->id,
+                    'product_id'   => $request->product_id[$i],
+                    'product_name' => $request->product_name[$i],
+                    'description'  => null,
+                    'quantity'     => $request->quantity[$i],
+                    'unit_cost'    => $request->unit_cost[$i],
+                    'sub_total'    => ($request->unit_cost[$i] * $request->quantity[$i]),
+                ]));
+
+                $product = Product::where('id', $request->product_id[$i])->first();
+
+                if ($product->allow_for_selling == 1) {
+                    $transaction              = new Transaction();
+                    $transaction->trans_date  = Carbon::parse($request->input('invoice_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                    $transaction->account_id  = $product->income_account_id;
+                    $transaction->dr_cr       = 'cr';
+                    $transaction->transaction_currency    = $request->currency;
+                    $transaction->currency_rate = $invoice->exchange_rate;
+                    $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $invoiceItem->sub_total));
+                    $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $invoiceItem->sub_total);
+                    $transaction->description = _lang('Credit Invoice Income') . ' #' . $invoice->invoice_number;
+                    $transaction->ref_id      = $invoice->id;
+                    $transaction->ref_type    = 'invoice';
+                    $transaction->customer_id = $invoice->customer_id;
+
+                    $transaction->save();
+                }
+
+                if ($product->stock_management == 1 && $product->allow_for_purchasing == 1) {
+                    $transaction              = new Transaction();
+                    $transaction->trans_date  = Carbon::parse($request->input('invoice_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                    $transaction->account_id  = get_account('Inventory')->id;
+                    $transaction->dr_cr       = 'cr';
+                    $transaction->transaction_currency    = $request->currency;
+                    $transaction->currency_rate           = $invoice->exchange_rate;
+                    $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $invoiceItem->quantity));
+                    $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $invoiceItem->quantity);
+                    $transaction->description = $invoiceItem->product_name . ' Sales #' . $invoice->invoice_number;
+                    $transaction->ref_id      = $invoice->id;
+                    $transaction->ref_type    = 'invoice';
+                    $transaction->customer_id = $invoice->customer_id;
+                    $transaction->save();
+
+                    $transaction              = new Transaction();
+                    $transaction->trans_date  = Carbon::parse($request->input('invoice_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+                    $transaction->account_id  = $product->expense_account_id;
+                    $transaction->dr_cr       = 'dr';
+                    $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $invoiceItem->quantity);
+                    $transaction->transaction_currency    = $request->currency;
+                    $transaction->currency_rate = $invoice->exchange_rate;
+                    $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $product->purchase_cost * $invoiceItem->quantity));
+                    $transaction->ref_type    = 'invoice';
+                    $transaction->customer_id = $invoice->customer_id;
+                    $transaction->ref_id      = $invoice->id;
+                    $transaction->description = 'Credit Invoice #' . $invoice->invoice_number;
+                    $transaction->save();
+                }
+
+                if (isset($request->tax_amount)) {
+                    foreach ($request->tax_amount as $index => $amount) {
+                        $tax = Tax::find($index);
+
+                        $invoiceItem->taxes()->save(new InvoiceItemTax([
+                            'invoice_id' => $invoice->id,
+                            'tax_id'     => $index,
+                            'name'       => $tax->name . ' ' . $tax->rate . ' %',
+                            'amount'     => ($invoiceItem->sub_total / 100) * $tax->rate,
+                        ]));
+
+                        $transaction              = new Transaction();
+                        $transaction->trans_date  = Carbon::parse($request->input('invoice_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                        $transaction->account_id  = $tax->account_id;
+                        $transaction->dr_cr       = 'cr';
+                        $transaction->transaction_currency    = $request->currency;
+                        $transaction->currency_rate = $invoice->exchange_rate;
+                        $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, ($invoiceItem->sub_total / 100) * $tax->rate));
+                        $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, ($invoiceItem->sub_total / 100) * $tax->rate);
+                        $transaction->description = _lang('Credit Invoice Tax') . ' #' . $invoice->invoice_number;
+                        $transaction->ref_id      = $invoice->id;
+                        $transaction->ref_type    = 'invoice tax';
+                        $transaction->tax_id      = $tax->id;
+                        $transaction->save();
+                    }
+                }
+
+                //Update Stock
+                $product = $invoiceItem->product;
+                if ($product->type == 'product' && $product->stock_management == 1) {
+                    //Check Available Stock Quantity
+                    if ($product->stock < $request->quantity[$i]) {
+                        DB::rollBack();
+                        return back()->with('error', $product->name . ' ' . _lang('Stock is not available!'));
+                    }
+
+                    $product->stock = $product->stock - $request->quantity[$i];
+                    $product->save();
+                }
+            }
+
+            //Increment Invoice Number
+            BusinessSetting::where('name', 'invoice_number')->increment('value');
+
+            if ($request->appointment == 1) {
+                // increment queue number
+                BusinessSetting::where('name', 'queue_number')->increment('value');
+            }
+
+            DB::commit();
+
+            $transaction              = new Transaction();
+            $transaction->trans_date  = Carbon::parse($request->input('invoice_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+            $transaction->account_id  = get_account('Accounts Receivable')->id;
+            $transaction->dr_cr       = 'dr';
+            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
+            $transaction->transaction_currency    = $request->currency;
+            $transaction->currency_rate           = $invoice->exchange_rate;
+            $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
+            $transaction->ref_id      = $invoice->id;
+            $transaction->ref_type    = 'invoice';
+            $transaction->customer_id = $invoice->customer_id;
+            $transaction->description = 'Credit Invoice #' . $invoice->invoice_number;
+            $transaction->save();
+
+            if ($request->input('discount_value') > 0) {
+                $transaction              = new Transaction();
+                $transaction->trans_date  = Carbon::parse($request->input('invoice_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                $transaction->account_id  = get_account('Sales Discount Allowed')->id;
+                $transaction->dr_cr       = 'dr';
+                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
+                $transaction->transaction_currency    = $request->currency;
+                $transaction->currency_rate           = $invoice->exchange_rate;
+                $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
+                $transaction->description = _lang('Credit Invoice Discount') . ' #' . $invoice->invoice_number;
+                $transaction->ref_id      = $invoice->id;
+                $transaction->ref_type    = 'invoice';
+                $transaction->customer_id = $invoice->customer_id;
+                $transaction->save();
+            }
+
+            if ($request->hold_pos_id != '') {
+                $holdPosInvoice = HoldPosInvoice::find($request->hold_pos_id);
+
+                if ($holdPosInvoice) {
+                    $holdPosInvoice->delete();
+                }
+            }
+
+            if ($request->prescription_products_id != "") {
+                $prescription_products = PrescriptionProduct::find($request->prescription_products_id);
+                $prescription_products->status = 1;
+                $prescription_products->save();
+            }
+        }
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        if ($request->credit_cash == 'credit') {
+            $audit->event = 'Created Credit Invoice #' . $invoice->invoice_number;
+        } elseif ($request->credit_cash == 'provider') {
+            $audit->event = 'Created Credit Invoice for Provider #' . $invoice->invoice_number;
+        } else {
+            $audit->event = 'Created Cash Invoice #' . $receipt->receipt_number;
+        }
+        $audit->save();
+
+        if ($request->credit_cash == 'cash') {
+            return redirect()->route('receipts.invoice_pos', $receipt->id)->with('success', _lang('Saved Successfully'));
+        } else {
+            return redirect()->route('receipts.credit_invoice_pos', $invoice->id)->with('success', _lang('Saved Successfully'));
+        }
+    }
+
+    public function invoice_pos($id)
+    {
+        $receipt = Receipt::find($id);
+        return view('backend.user.pos.invoice_pos', compact('receipt'));
+    }
+
+    public function credit_invoice_pos($id)
+    {
+        $invoice = Invoice::find($id);
+        return view('backend.user.pos.credit_invoice_pos', compact('invoice'));
+    }
+
+    public function pos_products()
+    {
+        return Product::where('business_id', request()->activeBusiness->id)
+            ->where('type', 'product')
+            ->where('status', 1)
+            ->get();
+    }
+
+    public function pos_currency()
+    {
+        return Currency::where('business_id', request()->activeBusiness->id)
+            ->whereIn('id', json_decode(get_business_option('pos_currency')))
+            ->where('status', 1)
+            ->get();
+    }
+
+    public function pos_tax()
+    {
+        return Tax::where('business_id', request()->activeBusiness->id)->get();
+    }
+
+    public function receipts_all(Request $request)
+    {
+        if ($request->receipts == null) {
+            return redirect()->route('receipts.index')->with('error', _lang('Please Select invoice'));
+        }
+
+        $receipts = Receipt::whereIn('id', $request->receipts)->get();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Deleted Cash Invoices #' . $receipts->pluck('receipt_number')->implode(', ');
+        $audit->save();
+
+        foreach ($receipts as $receipt) {
+            // increaase stock
+            foreach ($receipt->items as $receipt_item) {
+                $product = $receipt_item->product;
+                if ($product->type == 'product' && $product->stock_management == 1) {
+                    $product->stock = $product->stock + $receipt_item->quantity;
+                    $product->save();
+                }
+            }
+            // delete transactions
+            $transactions = Transaction::where('ref_id', $receipt->id)->where('ref_type', 'receipt')->get();
+
+            foreach ($transactions as $trans) {
+                $trans->delete();
+            }
+
+            $receipt->delete();
+        }
+
+        return redirect()->route('receipts.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    public function export_receipts()
+    {
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Exported Cash Invoices';
+        $audit->save();
+
+        return Excel::download(new CashInvoiceExport, 'cash invoices ' . now()->format('d m Y') . '.xlsx');
+    }
+
+    public function pos_products_category($id)
+    {
+        return Product::where('category_id', $id)->get();
+    }
+}

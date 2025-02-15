@@ -1,0 +1,36 @@
+<option value="January,December">
+    January - December
+</option>
+<option value="February,January">
+    February - January
+</option>
+<option value="March,February">
+    March - February
+</option>
+<option value="April,March">
+    April - March
+</option>
+<option value="May,April">
+    May - April
+</option>
+<option value="June,May">
+    June - May
+</option>
+<option value="July,June">
+    July - June
+</option>
+<option value="August,July">
+    August - July
+</option>
+<option value="September,August">
+    September - August
+</option>
+<option value="October,September">
+    October - September
+</option>
+<option value="November,October">
+    November - October
+</option>
+<option value="December,November">
+    December - November
+</option>
