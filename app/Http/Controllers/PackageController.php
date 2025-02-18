@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Package;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 use Validator;
 
 class PackageController extends Controller
@@ -26,9 +27,8 @@ class PackageController extends Controller
      */
     public function index()
     {
-        $assets   = ['datatable'];
         $packages = Package::all();
-        return view('backend.admin.package.list', compact('packages', 'assets'));
+        return Inertia::render('Backend/Admin/Package/List', compact('packages'));
     }
 
     /**
@@ -38,8 +38,7 @@ class PackageController extends Controller
      */
     public function create(Request $request)
     {
-        $alert_col = 'col-lg-10 offset-lg-1';
-        return view('backend.admin.package.create', compact('alert_col'));
+        return Inertia::render('Backend/Admin/Package/Create');
     }
 
     /**

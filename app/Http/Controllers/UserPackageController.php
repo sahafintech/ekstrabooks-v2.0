@@ -5,19 +5,27 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\UserPackage;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class UserPackageController extends Controller
 {
     public function index()
     {
         $packages = UserPackage::all();
-        return view('backend.admin.user_package.list', compact('packages'));
+        return Inertia::render('Backend/Admin/UserPackages/List', compact('packages'));
     }
 
     public function create(Request $request)
     {
         $users = User::where('user_type', 'user')->get();
-        return view('backend.admin.user_package.create', compact('users'));
+        $currency_symbol = currency_symbol();
+        return Inertia::render('Backend/Admin/UserPackages/Create', compact('users', 'currency_symbol'));
+    }
+
+    public function show($id)
+    {
+        $packageData = UserPackage::find($id);
+        return Inertia::render('Backend/Admin/UserPackages/View', compact('packageData'));
     }
 
     public function store(Request $request)
@@ -63,9 +71,9 @@ class UserPackageController extends Controller
 
     public function edit($id)
     {
-        $package = UserPackage::find($id);
+        $packageData = UserPackage::find($id);
         $users = User::where('user_type', 'user')->get();
-        return view('backend.admin.user_package.edit', compact('package', 'id', 'users'));
+        return Inertia::render('Backend/Admin/UserPackages/Edit', compact('packageData', 'users', 'id'));
     }
 
     public function update(Request $request, $id)
@@ -100,5 +108,12 @@ class UserPackageController extends Controller
         $user_package->save();
 
         return redirect()->route('user_packages.index')->with('success', 'Package updated successfully');
+    }
+
+    public function destroy($id)
+    {
+        $user_package = UserPackage::find($id);
+        $user_package->delete();
+        return redirect()->route('user_packages.index')->with('success', 'Package deleted successfully');
     }
 }

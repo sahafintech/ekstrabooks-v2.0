@@ -8,6 +8,7 @@ use App\Models\UserPackage;
 use DataTables;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 use Validator;
 
 class SubscriptionPaymentController extends Controller
@@ -33,9 +34,12 @@ class SubscriptionPaymentController extends Controller
         $subscription_payments = SubscriptionPayment::select('subscription_payments.*')
             ->with('user', 'package', 'created_by')
             ->orderBy("subscription_payments.id", "desc")
-            ->get();
+            ->get()->map(function ($payment) {
+                $payment->amount = decimalPlace($payment->amount, currency_symbol());
+                return $payment;
+            });
 
-        return view('backend.admin.subscription_payment.list', compact('subscription_payments'));
+        return Inertia::render('Backend/Admin/SubscriptionPayments/List', compact('subscription_payments'));
     }
 
     /**
@@ -47,7 +51,8 @@ class SubscriptionPaymentController extends Controller
     {
         $user_packages = UserPackage::all();
         $users = User::where('user_type', 'user')->get();
-        return view('backend.admin.subscription_payment.create', compact('users', 'user_packages'));
+        $currency_symbol = currency_symbol();
+        return Inertia::render('Backend/Admin/SubscriptionPayments/Create', compact('user_packages', 'users', 'currency_symbol'));
     }
 
     public function membership_date($package_type, $subscription_date)

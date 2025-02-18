@@ -19,6 +19,12 @@
     @viteReactRefresh
     @vite(['resources/js/app.jsx', "resources/js/Pages/{$page['component']}.jsx"])
     @inertiaHead
+
+    <style>
+        * {
+            scrollbar-width: thin;
+        }
+    </style>
 </head>
 
 <body class="font-sans antialiased">

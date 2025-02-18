@@ -16,6 +16,7 @@ use Database\Seeders\BusinessSettingSeeder;
 use Database\Seeders\CurrencySeeder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
@@ -76,7 +77,7 @@ class DashboardController extends Controller
 				->limit(10)
 				->get();
 
-			return view("backend.admin.dashboard-admin", $data);
+			return Inertia::render('Backend/Admin/Dashboard-Admin', $data);
 		} else if ($user_type == 'user') {
 
 			$currency = Currency::all();

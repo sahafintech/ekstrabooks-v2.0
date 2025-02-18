@@ -18,6 +18,13 @@ return Application::configure(basePath: dirname(__DIR__))
 
         //
     })
+    ->withSingletons([
+        \Illuminate\Contracts\Http\Kernel::class => App\Http\Kernel::class
+    ])
+    
+    ->withSingletons([
+        \Illuminate\Contracts\Console\Kernel::class => App\Console\Kernel::class
+    ])
     ->withExceptions(function (Exceptions $exceptions) {
         //
     })->create();
