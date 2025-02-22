@@ -8,17 +8,21 @@ use App\Models\Page;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 use App\Models\SettingTranslation;
+use Carbon\Language;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
+use Inertia\Inertia;
 
-class PageController extends Controller {
+class PageController extends Controller
+{
 
     /**
      * Create a new controller instance.
      *
      * @return void
      */
-    public function __construct() {
+    public function __construct()
+    {
         date_default_timezone_set(get_option('timezone', 'Asia/Dhaka'));
     }
 
@@ -27,22 +31,28 @@ class PageController extends Controller {
      *
      * @return \Illuminate\Http\Response
      */
-    public function default_pages($slug = '') {
-        $data              = array();
-        $data['assets']    = ['tinymce'];
-        $data['alert_col'] = 'col-lg-8 offset-lg-2';
-        if ($slug != '') {
-            $data['pageData']  = json_decode(get_trans_option($slug . '_page'));
-            $data['pageMedia'] = json_decode(get_trans_option($slug . '_page_media'));
+    public function default_pages($slug = '')
+    {
+        $pageData = array();
+        $pageMedia = array();
 
-            return view("backend.admin.website_management.page.default.$slug", $data);
+        $languages = load_language();
+        
+        if ($slug != '') {
+            $pageData  = json_decode(get_trans_option($slug . '_page'));
+            $pageMedia = json_decode(get_trans_option($slug . '_page_media'));
+
+            return Inertia::render("Backend/Admin/WebsiteManagement/Pages/Default/$slug", compact('pageData','pageMedia', 'languages'));
         }
-        return view('backend.admin.website_management.page.default-list');
+        return Inertia::render('Backend/Admin/WebsiteManagement/Pages/DefaultList', compact('pageData', 'pageMedia', 'languages'));
     }
 
-    public function store_default_pages(Request $request) {
+    public function store_default_pages(Request $request)
+    {
         foreach ($_POST as $key => $value) {
-            if ($key == "_token" || $key == "model_language") {continue;}
+            if ($key == "_token" || $key == "model_language") {
+                continue;
+            }
 
             $data               = array();
             $data['value']      = is_array($value) ? json_encode($value) : $value;
@@ -62,7 +72,6 @@ class PageController extends Controller {
                 $translation->setting_id = $setting->id;
                 $translation->value      = $setting->value;
                 $translation->save();
-
             } else {
                 $setting        = new Setting();
                 $setting->name  = $key;
@@ -73,7 +82,6 @@ class PageController extends Controller {
                 $translation = new SettingTranslation(['value' => $data['value']]);
                 $setting->translation()->save($translation);
             }
-
         }
 
         //Upload File
@@ -89,10 +97,10 @@ class PageController extends Controller {
      *
      * @return \Illuminate\Http\Response
      */
-    public function index() {
-        $assets = ['datatable'];
-        $pages  = Page::all()->sortByDesc("id");
-        return view('backend.admin.website_management.page.list', compact('pages', 'assets'));
+    public function index()
+    {
+        $pages  = Page::with('translation')->get();
+        return Inertia::render('Backend/Admin/WebsiteManagement/Pages/List', compact('pages'));
     }
 
     /**
@@ -100,9 +108,9 @@ class PageController extends Controller {
      *
      * @return \Illuminate\Http\Response
      */
-    public function create(Request $request) {
-        $assets = ['tinymce'];
-        return view('backend.admin.website_management.page.create', compact('assets'));
+    public function create(Request $request)
+    {
+        return Inertia::render('Backend/Admin/WebsiteManagement/Pages/Create');
     }
 
     /**
@@ -111,7 +119,8 @@ class PageController extends Controller {
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request) {
+    public function store(Request $request)
+    {
         $validator = Validator::make($request->all(), [
             'trans.title' => 'required',
             'trans.body'  => 'required',
@@ -142,7 +151,6 @@ class PageController extends Controller {
         } else {
             return response()->json(['result' => 'success', 'action' => 'store', 'message' => _lang('Saved Sucessfully'), 'data' => $page, 'table' => '#pages_table']);
         }
-
     }
 
     /**
@@ -151,10 +159,11 @@ class PageController extends Controller {
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit(Request $request, $id) {
-        $page   = Page::find($id);
-        $assets = ['tinymce'];
-        return view('backend.admin.website_management.page.edit', compact('page', 'id', 'assets'));
+    public function edit(Request $request, $id)
+    {
+        $page   = Page::with('translation')->find($id);
+        $languages = load_language();
+        return Inertia::render('Backend/Admin/WebsiteManagement/Pages/Edit', compact('page', 'languages'));
     }
 
     /**
@@ -164,7 +173,8 @@ class PageController extends Controller {
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id) {
+    public function update(Request $request, $id)
+    {
         $validator = Validator::make($request->all(), [
             'trans.title' => 'required',
             'trans.body'  => 'required',
@@ -198,7 +208,6 @@ class PageController extends Controller {
         } else {
             return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Sucessfully'), 'data' => $page, 'table' => '#pages_table']);
         }
-
     }
 
     /**
@@ -207,14 +216,16 @@ class PageController extends Controller {
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id) {
+    public function destroy($id)
+    {
         $page = Page::find($id);
         $page->delete();
 
         return redirect()->route('pages.index')->with('success', _lang('Deleted Sucessfully'));
     }
 
-    private function upload_file($file_name, Request $request) {
+    private function upload_file($file_name, Request $request)
+    {
         if ($request->hasFile($file_name)) {
             $files = $request->file($file_name);
             //dd(array_keys($file)[0]);
@@ -241,5 +252,4 @@ class PageController extends Controller {
             }
         }
     }
-
 }

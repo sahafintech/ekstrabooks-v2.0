@@ -15,6 +15,8 @@ import {
     BadgeDollarSign,
 } from "lucide-react";
 
+import { usePage } from "@inertiajs/react";
+
 import { NavMain } from "@/components/nav-main";
 import { NavSettings } from "@/components/nav-settings";
 import { NavUser } from "@/components/nav-user";
@@ -51,22 +53,30 @@ const data = {
             plan: "Free",
         },
     ],
-    dashboard: [
+};
+
+export function AppSidebar({ ...props }) {
+    const { url, component } = usePage();
+
+    const isRoute = (name) => {
+        return route().current(name) || url.startsWith(route(name));
+    };
+
+    const dashboardItems = [
         {
             name: "Dashboard",
             url: route("dashboard.index"),
             icon: PieChart,
-            isActive: route().current("dashboard.index"),
+            isActive: isRoute("dashboard.index"),
         },
-    ],
-    navMain: [
+    ];
+
+    const navMainItems = [
         {
             title: "Packages",
             url: "#",
             icon: Gift,
-            isActive:
-                route().current("user_packages.index") ||
-                route().current("packages.index"),
+            isActive: isRoute("packages.index") || isRoute("user_packages.index"),
             items: [
                 {
                     title: "System Packages",
@@ -82,31 +92,33 @@ const data = {
             name: "Users",
             url: route("users.index"),
             icon: Users,
-            isActive: route().current("users.index"),
+            isActive: isRoute("users.index"),
         },
         {
             name: "Payments",
             url: route("subscription_payments.index"),
             icon: CreditCard,
-            isActive: route().current("subscription_payments.index"),
+            isActive: isRoute("subscription_payments.index"),
         },
         {
             name: "Payment Gateways",
-            url: "#",
+            url: route("payment_gateways.index"),
             icon: BadgeDollarSign,
+            isActive: isRoute("payment_gateways.index"),
         },
         {
             title: "Website Management",
             url: "#",
             icon: BookOpen,
+            isActive: isRoute("pages.default_pages") || isRoute("pages.index"),
             items: [
                 {
                     title: "Default Pages",
-                    url: "#",
+                    url: route("pages.default_pages"),
                 },
                 {
                     title: "Custom Pages",
-                    url: "#",
+                    url: route("pages.index"),
                 },
                 {
                     title: "Manage FAQ",
@@ -161,8 +173,9 @@ const data = {
                 },
             ],
         },
-    ],
-    settings: [
+    ];
+
+    const settingsItems = [
         {
             name: "Languages",
             url: "#",
@@ -195,19 +208,17 @@ const data = {
                 },
             ],
         },
-    ],
-};
+    ];
 
-export function AppSidebar({ ...props }) {
     return (
         <Sidebar collapsible="icon" {...props}>
             <SidebarHeader>
                 <TeamSwitcher teams={data.teams} />
             </SidebarHeader>
             <SidebarContent>
-                <NavDashboard items={data.dashboard} />
-                <NavMain items={data.navMain} />
-                <NavSettings settings={data.settings} />
+                <NavDashboard items={dashboardItems} />
+                <NavMain items={navMainItems} />
+                <NavSettings settings={settingsItems} />
             </SidebarContent>
             <SidebarFooter>
                 <NavUser user={data.user} />

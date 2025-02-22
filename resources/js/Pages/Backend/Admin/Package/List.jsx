@@ -16,13 +16,9 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuGroup,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Eye, Pencil, Trash2 } from "lucide-react";
+import TableActions from "@/Components/shared/TableActions";
+import TableWrapper from "@/Components/shared/TableWrapper";
 
 export default function List({ packages }) {
     const [confirmingPackageDeletion, setConfirmingPackageDeletion] =
@@ -52,6 +48,25 @@ export default function List({ packages }) {
         reset();
     };
 
+    const getRowActions = (pkg) => [
+        {
+            label: "View",
+            icon: Eye,
+            onClick: () => window.location = route("packages.show", pkg.id)
+        },
+        {
+            label: "Edit",
+            icon: Pencil,
+            onClick: () => window.location = route("packages.edit", pkg.id)
+        },
+        {
+            label: "Delete",
+            icon: Trash2,
+            onClick: () => confirmPackageDeletion(pkg.id),
+            className: "text-destructive focus:text-destructive"
+        }
+    ];
+
     return (
         <AuthenticatedLayout>
             <SidebarInset>
@@ -70,98 +85,61 @@ export default function List({ packages }) {
                         </div>
                     </div>
                     <div>
-                        <Table>
-                            <TableCaption>
-                                A list of your packages.
-                            </TableCaption>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>Cost</TableHead>
-                                    <TableHead>Package Type</TableHead>
-                                    <TableHead>Discount</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Popular</TableHead>
-                                    <TableHead>Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {packages.map((pkg) => (
-                                    <TableRow key={pkg.id}>
-                                        <TableCell>{pkg.name}</TableCell>
-                                        <TableCell>{pkg.cost}</TableCell>
-                                        <TableCell>
-                                            {pkg.package_type}
-                                        </TableCell>
-                                        <TableCell>{pkg.discount}%</TableCell>
-                                        <TableCell>
-                                            {pkg.status == 1 ? (
-                                                <span className="text-success">
-                                                    Active
-                                                </span>
-                                            ) : (
-                                                <span className="text-danger">
-                                                    Disabled
-                                                </span>
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            {pkg.is_popular == 1 ? (
-                                                <span className="text-success">
-                                                    Yes
-                                                </span>
-                                            ) : (
-                                                <span className="text-danger">
-                                                    No
-                                                </span>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger>
-                                                    <Button variant="secondary">
-                                                        <MoreVertical />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent>
-                                                    <DropdownMenuGroup>
-                                                        <Link
-                                                            href={route(
-                                                                "packages.edit",
-                                                                pkg.id
-                                                            )}
-                                                        >
-                                                            <DropdownMenuItem>
-                                                                Edit
-                                                            </DropdownMenuItem>
-                                                        </Link>
-                                                        <Link
-                                                            href={route(
-                                                                "packages.show",
-                                                                pkg.id
-                                                            )}
-                                                        >
-                                                            <DropdownMenuItem>
-                                                                View
-                                                            </DropdownMenuItem>
-                                                        </Link>
-                                                        <DropdownMenuItem
-                                                            onClick={() =>
-                                                                confirmPackageDeletion(
-                                                                    pkg.id
-                                                                )
-                                                            }
-                                                        >
-                                                            Delete
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuGroup>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </TableCell>
+                        <TableWrapper>
+                            <Table>
+                                <TableCaption>
+                                    A list of your packages.
+                                </TableCaption>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Name</TableHead>
+                                        <TableHead>Cost</TableHead>
+                                        <TableHead>Package Type</TableHead>
+                                        <TableHead>Discount</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead>Popular</TableHead>
+                                        <TableHead>Actions</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                </TableHeader>
+                                <TableBody>
+                                    {packages.map((pkg) => (
+                                        <TableRow key={pkg.id}>
+                                            <TableCell>{pkg.name}</TableCell>
+                                            <TableCell>{pkg.cost}</TableCell>
+                                            <TableCell>
+                                                {pkg.package_type}
+                                            </TableCell>
+                                            <TableCell>{pkg.discount}%</TableCell>
+                                            <TableCell>
+                                                {pkg.status == 1 ? (
+                                                    <span className="text-success">
+                                                        Active
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-danger">
+                                                        Disabled
+                                                    </span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                {pkg.is_popular == 1 ? (
+                                                    <span className="text-success">
+                                                        Yes
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-danger">
+                                                        No
+                                                    </span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                <TableActions actions={getRowActions(pkg)} />
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableWrapper>
                     </div>
                 </div>
             </SidebarInset>

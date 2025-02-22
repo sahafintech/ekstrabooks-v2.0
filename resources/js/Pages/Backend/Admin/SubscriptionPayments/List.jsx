@@ -25,6 +25,10 @@ DropdownMenuItem,
 DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+import TableWrapper from "@/Components/shared/TableWrapper";
+import TableActions from "@/Components/shared/TableActions";
+import { Pencil, Trash2 } from "lucide-react";
+
 export default function List({ subscription_payments }) {
 const [confirmingPaymentDeletion, setConfirmingPaymentDeletion] = useState(false);
 const [paymentId, setPaymentId] = useState(null);
@@ -52,6 +56,20 @@ const closeModal = () => {
 	reset();
 };
 
+const getRowActions = (payment) => [
+	{
+		label: "Edit",
+		icon: Pencil,
+		onClick: () => window.location = route("subscription_payments.edit", payment.id)
+	},
+	{
+		label: "Delete",
+		icon: Trash2,
+		onClick: () => confirmPaymentDeletion(payment.id),
+		className: "text-destructive focus:text-destructive"
+	}
+];
+
 return (
 	<AuthenticatedLayout>
 		<SidebarInset>
@@ -66,59 +84,45 @@ return (
 					</div>
 				</div>
 				<div>
-					<Table>
-						<TableCaption>A list of your recent payments.</TableCaption>
-						<TableHeader>
-							<TableRow>
-								<TableHead>User</TableHead>
-								<TableHead>Order ID</TableHead>
-								<TableHead>Method</TableHead>
-								<TableHead>Package</TableHead>
-								<TableHead>Amount</TableHead>
-								<TableHead>Status</TableHead>
-								<TableHead>Created By</TableHead>
-								<TableHead>Actions</TableHead>
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{subscription_payments.map((payment) => (
-								<TableRow key={payment.id}>
-									<TableCell>{payment.user.name}</TableCell>
-									<TableCell>{payment.order_id}</TableCell>
-									<TableCell>{payment.method}</TableCell>
-									<TableCell>{payment.package.name}</TableCell>
-									<TableCell>{payment.amount}</TableCell>
-									<TableCell>
-										{payment.status == 1 ? (
-											<span className="text-success">Completed</span>
-										) : (
-											<span className="text-danger">Pending</span>
-										)}
-									</TableCell>
-									<TableCell>{payment.created_by.name}</TableCell>
-									<TableCell className="text-right">
-										<DropdownMenu>
-											<DropdownMenuTrigger>
-												<Button variant="secondary">
-													<MoreVertical />
-												</Button>
-											</DropdownMenuTrigger>
-											<DropdownMenuContent>
-												<DropdownMenuGroup>
-													<Link href={route("subscription_payments.edit", payment.id)}>
-														<DropdownMenuItem>Edit</DropdownMenuItem>
-													</Link>
-													<DropdownMenuItem onClick={() => confirmPaymentDeletion(payment.id)}>
-														Delete
-													</DropdownMenuItem>
-												</DropdownMenuGroup>
-											</DropdownMenuContent>
-										</DropdownMenu>
-									</TableCell>
+					<TableWrapper>
+						<Table>
+							<TableCaption>A list of your recent payments.</TableCaption>
+							<TableHeader>
+								<TableRow>
+									<TableHead>User</TableHead>
+									<TableHead>Order ID</TableHead>
+									<TableHead>Method</TableHead>
+									<TableHead>Package</TableHead>
+									<TableHead>Amount</TableHead>
+									<TableHead>Status</TableHead>
+									<TableHead>Created By</TableHead>
+									<TableHead>Actions</TableHead>
 								</TableRow>
-							))}
-						</TableBody>
-					</Table>
+							</TableHeader>
+							<TableBody>
+								{subscription_payments.map((payment) => (
+									<TableRow key={payment.id}>
+										<TableCell>{payment.user.name}</TableCell>
+										<TableCell>{payment.order_id}</TableCell>
+										<TableCell>{payment.method}</TableCell>
+										<TableCell>{payment.package.name}</TableCell>
+										<TableCell>{payment.amount}</TableCell>
+										<TableCell>
+											{payment.status == 1 ? (
+												<span className="text-success">Completed</span>
+											) : (
+												<span className="text-danger">Pending</span>
+											)}
+										</TableCell>
+										<TableCell>{payment.created_by.name}</TableCell>
+										<TableCell>
+											<TableActions actions={getRowActions(payment)} />
+										</TableCell>
+									</TableRow>
+								))}
+							</TableBody>
+						</Table>
+					</TableWrapper>
 				</div>
 			</div>
 		</SidebarInset>

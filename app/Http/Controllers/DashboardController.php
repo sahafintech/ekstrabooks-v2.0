@@ -66,7 +66,12 @@ class DashboardController extends Controller
 				->with('user', 'package', 'created_by')
 				->orderBy("subscription_payments.id", "desc")
 				->limit(10)
-				->get();
+				->get()
+				->map(function ($payment) {
+					$payment->amount = decimalPlace($payment->amount, currency_symbol());
+					$payment->status = $payment->status == 1 ? 'Completed' : 'Pending';
+					return $payment;
+				});
 
 			$data['newUsers'] = User::where('user_type', 'user')
 				->whereHas('package', function ($query) {
@@ -77,7 +82,7 @@ class DashboardController extends Controller
 				->limit(10)
 				->get();
 
-			return Inertia::render('Backend/Admin/Dashboard-Admin', $data);
+			return Inertia::render('Backend/Admin/Dashboard-Admin', compact('data'));
 		} else if ($user_type == 'user') {
 
 			$currency = Currency::all();

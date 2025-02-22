@@ -16,25 +16,32 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import TableActions from "@/Components/shared/TableActions";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import TableWrapper from "@/Components/shared/TableWrapper";
+import TableActions from "@/Components/shared/TableActions";
+import { Pencil, Trash2 } from "lucide-react";
 
-export default function List({ packages }) {
-  const [confirmingPackageDeletion, setConfirmingPackageDeletion] = useState(false);
-  const [packageId, setPackageId] = useState(null);
+export default function List({ pages }) {
+  const [confirmingPageDeletion, setConfirmingPageDeletion] = useState(false);
+  const [pageId, setPageId] = useState(null);
 
-  const confirmPackageDeletion = (id) => {
-    setConfirmingPackageDeletion(true);
-    setPackageId(id);
+  const confirmPageDeletion = (id) => {
+    setConfirmingPageDeletion(true);
+    setPageId(id);
   };
 
   const { delete: destroy, processing, reset, clearErrors } = useForm({});
 
-  const deletePackage = (e) => {
+  const deletePage = (e) => {
     e.preventDefault();
 
-    destroy(route("user_packages.destroy", packageId), {
+    destroy(route("pages.destroy", pageId), {
       preserveScroll: true,
       onSuccess: () => closeModal(),
       onFinish: () => reset(),
@@ -42,26 +49,21 @@ export default function List({ packages }) {
   };
 
   const closeModal = () => {
-    setConfirmingPackageDeletion(false);
+    setConfirmingPageDeletion(false);
     clearErrors();
     reset();
   };
 
-  const getRowActions = (pkg) => [
-    {
-      label: "View",
-      icon: Eye,
-      onClick: () => window.location = route("user_packages.show", pkg.id)
-    },
+  const getRowActions = (page) => [
     {
       label: "Edit",
       icon: Pencil,
-      onClick: () => window.location = route("user_packages.edit", pkg.id)
+      onClick: () => window.location = route("pages.edit", page.id)
     },
     {
       label: "Delete",
       icon: Trash2,
-      onClick: () => confirmPackageDeletion(pkg.id),
+      onClick: () => confirmPageDeletion(page.id),
       className: "text-destructive focus:text-destructive"
     }
   ];
@@ -69,46 +71,42 @@ export default function List({ packages }) {
   return (
     <AuthenticatedLayout>
       <SidebarInset>
-        <PageHeader page="User Packages" subpage="List" url="user_packages.index" />
+        <PageHeader page="Website" subpage="List" url="pages.index" />
 
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           <div className="flex">
             <div>
-              <Link href={route("user_packages.create")}>
-                <Button>Add New Package</Button>
+              <Link href={route("pages.create")}>
+                <Button>Add New Page</Button>
               </Link>
             </div>
           </div>
           <div>
             <TableWrapper>
               <Table>
-                <TableCaption>A list of your packages.</TableCaption>
+                <TableCaption>A list of your pages.</TableCaption>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Cost</TableHead>
-                    <TableHead>Package Type</TableHead>
-                    <TableHead>Discount</TableHead>
+                    <TableHead>Title</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {packages.map((pkg) => (
-                    <TableRow key={pkg.id}>
-                      <TableCell>{pkg.name}</TableCell>
-                      <TableCell>{pkg.cost}</TableCell>
-                      <TableCell>{pkg.package_type}</TableCell>
-                      <TableCell>{pkg.discount}%</TableCell>
+                  {pages.map((page) => (
+                    <TableRow key={page.id}>
+                      <TableCell>{page.translation.title}</TableCell>
                       <TableCell>
-                        {pkg.status == 1 ? (
+                        {page.status == 1 ? (
                           <span className="text-success">Active</span>
                         ) : (
                           <span className="text-danger">Disabled</span>
                         )}
                       </TableCell>
+                      <TableCell>{page.created_at}</TableCell>
                       <TableCell>
-                        <TableActions actions={getRowActions(pkg)} />
+                        <TableActions actions={getRowActions(page)} />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -118,10 +116,10 @@ export default function List({ packages }) {
           </div>
         </div>
       </SidebarInset>
-      <Modal show={confirmingPackageDeletion} onClose={closeModal} maxWidth="sm">
-        <form onSubmit={deletePackage} className="p-6">
+      <Modal show={confirmingPageDeletion} onClose={closeModal} maxWidth="sm">
+        <form onSubmit={deletePage} className="p-6">
           <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-            Are you sure you want to delete this package?
+            Are you sure you want to delete this page?
           </h2>
 
           <div className="mt-6 flex justify-end">
@@ -130,7 +128,7 @@ export default function List({ packages }) {
             </Button>
 
             <Button variant="destructive" className="ms-3" disabled={processing}>
-              Delete Package
+              Delete Page
             </Button>
           </div>
         </form>

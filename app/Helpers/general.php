@@ -519,7 +519,7 @@ if (!function_exists('load_language')) {
 	{
 		$path = resource_path() . "/language";
 		$files = scandir($path);
-		$options = "";
+		$options = array();
 
 		foreach ($files as $file) {
 			$name = pathinfo($file, PATHINFO_FILENAME);
@@ -527,16 +527,12 @@ if (!function_exists('load_language')) {
 				continue;
 			}
 
-			$selected = "";
-			if ($active == $name) {
-				$selected = "selected";
-			} else {
-				$selected = "";
-			}
-
-			$options .= "<option value='$name' $selected>" . explode('---', $name)[0] . "</option>";
+			$options[] = [
+				'code' => $name,
+				'label' => _lang($name)
+			];
 		}
-		echo $options;
+		return $options;
 	}
 }
 

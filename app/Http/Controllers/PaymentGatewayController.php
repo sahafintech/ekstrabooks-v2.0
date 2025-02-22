@@ -6,6 +6,7 @@ use App\Models\Currency;
 use App\Models\PaymentGateway;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Inertia\Inertia;
 
 class PaymentGatewayController extends Controller {
 
@@ -25,7 +26,7 @@ class PaymentGatewayController extends Controller {
      */
     public function index() {
         $paymentgateways = PaymentGateway::all();
-        return view('backend.admin.payment_gateway.list', compact('paymentgateways'));
+        return Inertia::render('Backend/Admin/PaymentGateways/List', compact('paymentgateways'));
     }
 
     /**
@@ -102,9 +103,8 @@ class PaymentGatewayController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function edit(Request $request, $id) {
-        $alert_col      = 'col-lg-8 offset-lg-2';
         $paymentgateway = PaymentGateway::find($id);
-        return view('backend.admin.payment_gateway.edit', compact('paymentgateway', 'id', 'alert_col'));
+        return Inertia::render('Backend/Admin/PaymentGateways/Edit', compact('paymentgateway'));
     }
 
     /**
