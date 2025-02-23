@@ -575,9 +575,12 @@ Route::get('/pricing', [WebsiteController::class, 'pricing']);
 Route::get('/faq', [WebsiteController::class, 'faq']);
 Route::get('/blogs/{slug?}', [WebsiteController::class, 'blogs']);
 Route::get('/contact', [WebsiteController::class, 'contact']);
+Route::get('/privacy', [WebsiteController::class, 'privacy']);
 Route::post('/send_message', 'Website\WebsiteController@send_message');
 Route::post('/post_comment', 'Website\WebsiteController@post_comment');
 Route::post('/email_subscription', 'Website\WebsiteController@email_subscription');
+
+Route::get('/{slug?}', [WebsiteController::class, 'index']);
 
 //Online Invoice Payment
 Route::group(['prefix' => 'callback', 'namespace' => 'User\Gateway'], function () {

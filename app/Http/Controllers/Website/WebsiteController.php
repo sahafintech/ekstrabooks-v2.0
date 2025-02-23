@@ -16,6 +16,7 @@ use App\Utilities\Overrider;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+use Inertia\Inertia;
 
 class WebsiteController extends Controller
 {
@@ -56,7 +57,7 @@ class WebsiteController extends Controller
 			if (!$page) {
 				abort(404);
 			}
-			return view('website.page', compact('page'));
+			return Inertia::render('Website/page', compact('page'));
 		}
 
 		$data['pageData'] = json_decode(get_trans_option('home_page'));
@@ -69,40 +70,31 @@ class WebsiteController extends Controller
 		$data['blog_posts'] = Post::active()->limit(3)->orderBy('id', 'desc')->get();
 		$data['testimonials'] = Testimonial::all();
 
-		return view('website.index', $data);
+		return Inertia::render('Website/Index', $data);
 	}
 
 	public function about()
 	{
 		$data = array();
-		$data['pageData'] = json_decode(get_trans_option('about_page'));
-		$data['pageMedia'] = json_decode(get_trans_option('about_page_media'));
+		$data['pageData'] = Page::where('slug', 'about')->first();
 		$data['page_title'] = isset($data['pageData']->title) ? $data['pageData']->title : '';
-
-		$data['team_members'] = Team::all();
-		return view('website.about', $data);
+		return Inertia::render('Website/About', $data);
 	}
 
 	public function features()
 	{
 		$data = array();
-		$data['pageData'] = json_decode(get_trans_option('features_page'));
-		$data['pageMedia'] = json_decode(get_trans_option('features_page_media'));
+		$data['pageData'] = Page::where('slug', 'features')->first();
 		$data['page_title'] = isset($data['pageData']->title) ? $data['pageData']->title : '';
-
-		$data['features'] = Feature::all();
-		return view('website.features', $data);
+		return Inertia::render('Website/Features', $data);
 	}
 
 	public function pricing()
 	{
 		$data = array();
-		$data['pageData'] = json_decode(get_trans_option('pricing_page'));
-		$data['pageMedia'] = json_decode(get_trans_option('pricing_page_media'));
+		$data['pageData'] = Page::where('slug', 'pricing')->first();
 		$data['page_title'] = isset($data['pageData']->title) ? $data['pageData']->title : '';
-
-		$data['packages'] = Package::all();
-		return view('website.pricing', $data);
+		return Inertia::render('Website/Pricing', $data);
 	}
 
 	public function blogs($slug = '')
@@ -130,7 +122,7 @@ class WebsiteController extends Controller
 		$data['page_title'] = isset($data['pageData']->title) ? $data['pageData']->title : '';
 
 		$data['faqs'] = Faq::where('status', 1)->get();
-		return view('website.faq', $data);
+		return Inertia::render('Website/Faq', $data);
 	}
 
 	public function contact()
@@ -138,7 +130,7 @@ class WebsiteController extends Controller
 		$data['pageData'] = json_decode(get_trans_option('contact_page'));
 		$data['page_title'] = isset($data['pageData']->title) ? $data['pageData']->title : '';
 
-		return view('website.contact', $data);
+		return Inertia::render('Website/Contact', $data);
 	}
 
 	public function send_message(Request $request)
@@ -185,6 +177,11 @@ class WebsiteController extends Controller
 				return back()->with('error', $e->getMessage())->withInput();
 			}
 		}
+	}
+
+	public function privacy()
+	{
+		return Inertia::render('Website/Privacy');
 	}
 
 	public function post_comment(Request $request)

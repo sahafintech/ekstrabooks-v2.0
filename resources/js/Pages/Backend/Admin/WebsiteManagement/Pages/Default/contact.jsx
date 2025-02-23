@@ -388,15 +388,3 @@ export default function UpdateContactPage({ pageData, languages }) {
         </AuthenticatedLayout>
     );
 }
-
-}
-
-}
-
-}
-
-}
-
-}
-
-}
