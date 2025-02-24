@@ -3,6 +3,10 @@
 namespace App\Models;
 
 use App\Models\ProductUnit;
+use App\Models\InvoiceItem;
+use App\Models\PurchaseItem;
+use App\Models\SalesReturnItem;
+use App\Models\PurchaseReturnItem;
 use App\Traits\MultiTenant;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -56,5 +60,94 @@ class Product extends Model {
 
     public function brand() {
         return $this->belongsTo(Brands::class)->withDefault();
+    }
+
+    public function invoice_items() {
+        return $this->hasMany(InvoiceItem::class);
+    }
+
+    public function purchase_items() {
+        return $this->hasMany(PurchaseItem::class);
+    }
+
+    public function sales_return_items() {
+        return $this->hasMany(SalesReturnItem::class);
+    }
+
+    public function purchase_return_items() {
+        return $this->hasMany(PurchaseReturnItem::class);
+    }
+
+    /**
+     * Get all transactions related to this product
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    public function getAllTransactions() {
+        $sales = $this->invoice_items()
+            ->with('invoice')
+            ->select(
+                'invoice_date as date',
+                'invoice_items.quantity',
+                'invoice_items.unit_cost as unit_price',
+                'invoice_items.sub_total as total',
+                'invoices.invoice_number as reference'
+            )
+            ->join('invoices', 'invoices.id', '=', 'invoice_items.invoice_id')
+            ->join('customers', 'customers.id', '=', 'invoices.customer_id')
+            ->selectRaw("'sale' as type")
+            ->selectRaw('customers.name as party_name')
+            ->selectRaw("CONCAT('/user/invoice/', invoices.id) as reference_url");
+
+        $purchases = $this->purchase_items()
+            ->with('purchase')
+            ->select(
+                'purchase_date as date',
+                'purchase_items.quantity',
+                'purchase_items.unit_cost as unit_price',
+                'purchase_items.sub_total as total',
+                'purchases.bill_no as reference'
+            )
+            ->join('purchases', 'purchases.id', '=', 'purchase_items.purchase_id')
+            ->join('vendors', 'vendors.id', '=', 'purchases.vendor_id')
+            ->selectRaw("'purchase' as type")
+            ->selectRaw('vendors.name as party_name')
+            ->selectRaw("CONCAT('/user/purchase/', purchases.id) as reference_url");
+
+        $sale_returns = $this->sales_return_items()
+            ->with('sales_return')
+            ->select(
+                'return_date as date',
+                'sales_return_items.quantity',
+                'sales_return_items.unit_cost as unit_price',
+                'sales_return_items.sub_total as total',
+                'sales_returns.return_number as reference'
+            )
+            ->join('sales_returns', 'sales_returns.id', '=', 'sales_return_items.sales_return_id')
+            ->join('customers', 'customers.id', '=', 'sales_returns.customer_id')
+            ->selectRaw("'sale_return' as type")
+            ->selectRaw('customers.name as party_name')
+            ->selectRaw("CONCAT('/user/sales_return/', sales_returns.id) as reference_url");
+
+        $purchase_returns = $this->purchase_return_items()
+            ->with('purchase_return')
+            ->select(
+                'return_date as date',
+                'purchase_return_items.quantity',
+                'purchase_return_items.unit_cost as unit_price',
+                'purchase_return_items.sub_total as total',
+                'purchase_returns.return_number as reference'
+            )
+            ->join('purchase_returns', 'purchase_returns.id', '=', 'purchase_return_items.purchase_return_id')
+            ->join('vendors', 'vendors.id', '=', 'purchase_returns.supplier_id')
+            ->selectRaw("'purchase_return' as type")
+            ->selectRaw('vendors.name as party_name')
+            ->selectRaw("CONCAT('/user/purchase_return/', purchase_returns.id) as reference_url");
+
+        return $sales->union($purchases)
+            ->union($sale_returns)
+            ->union($purchase_returns)
+            ->orderBy('date', 'desc')
+            ->get();
     }
 }

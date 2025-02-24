@@ -9,7 +9,7 @@ import {
     SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-export function NavDashboard({ items }) {
+export function NavUserDashboard({ items }) {
     return (
         <SidebarGroup>
             <SidebarGroupLabel>Dashboard</SidebarGroupLabel>

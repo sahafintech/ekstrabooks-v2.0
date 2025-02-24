@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Purchase;
 use App\Traits\MultiTenant;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -31,6 +32,10 @@ class PurchaseItem extends Model {
 
     public function taxes() {
         return $this->hasMany(PurchaseItemTax::class, 'purchase_item_id');
+    }
+
+    public function purchase() {
+        return $this->belongsTo(Purchase::class, 'purchase_id');
     }
 
     protected function unitCost(): Attribute {

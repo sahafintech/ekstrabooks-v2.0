@@ -102,6 +102,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 	Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
 	Route::post('dashboard', [DashboardController::class, 'index'])->name('dashboard.filter');
+	Route::get('dashboard/inventory', [DashboardController::class, 'inventory'])->name('dashboard.inventory');
 
 	//Profile Controller
 	Route::get('profile', [ProfileController::class, 'index'])->name('profile.index');

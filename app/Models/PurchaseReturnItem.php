@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\PurchaseReturn;
 use App\Traits\MultiTenant;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -25,6 +26,10 @@ class PurchaseReturnItem extends Model
 
     public function taxes() {
         return $this->hasMany(PurchaseReturnItemTax::class, 'purchase_return_item_id');
+    }
+
+    public function purchase_return() {
+        return $this->belongsTo(PurchaseReturn::class, 'purchase_return_id');
     }
 
     protected function unitCost(): Attribute {

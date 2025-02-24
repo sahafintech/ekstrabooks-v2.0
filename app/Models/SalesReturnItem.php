@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\SalesReturn;
 use App\Traits\MultiTenant;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -25,6 +26,10 @@ class SalesReturnItem extends Model
 
     public function taxes() {
         return $this->hasMany(SalesReturnItemTax::class, 'sales_return_item_id');
+    }
+
+    public function sales_return() {
+        return $this->belongsTo(SalesReturn::class, 'sales_return_id');
     }
 
     protected function unitCost(): Attribute {

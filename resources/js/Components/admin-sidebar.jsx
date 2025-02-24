@@ -21,7 +21,7 @@ import { NavMain } from "@/components/nav-main";
 import { NavSettings } from "@/components/nav-settings";
 import { NavUser } from "@/components/nav-user";
 import { TeamSwitcher } from "@/components/team-switcher";
-import { NavDashboard } from "@/components/nav-dashboard";
+import { NavAdminDashboard } from "@/Components/nav-admin-dashboard";
 import {
     Sidebar,
     SidebarContent,
@@ -55,7 +55,7 @@ const data = {
     ],
 };
 
-export function AppSidebar({ ...props }) {
+export function AdminSidebar({ ...props }) {
     const { url, component } = usePage();
 
     const isRoute = (name) => {
@@ -216,7 +216,7 @@ export function AppSidebar({ ...props }) {
                 <TeamSwitcher teams={data.teams} />
             </SidebarHeader>
             <SidebarContent>
-                <NavDashboard items={dashboardItems} />
+                <NavAdminDashboard items={dashboardItems} />
                 <NavMain items={navMainItems} />
                 <NavSettings settings={settingsItems} />
             </SidebarContent>

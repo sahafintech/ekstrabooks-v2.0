@@ -2,7 +2,7 @@ import { Button } from "@/Components/ui/button";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Link } from "@inertiajs/react";
 import PageHeader from "@/Components/PageHeader";
-import { MoreVertical, FileUp, FileDown, Pencil, Eye, Trash2 } from "lucide-react";
+import { MoreVertical, FileUp, FileDown, Pencil, Eye, Trash2, LogInIcon } from "lucide-react";
 import Modal from "@/Components/Modal";
 import { useState } from "react";
 import { useFormSubmit } from "@/hooks/useFormSubmit";
@@ -120,6 +120,11 @@ export default function List({ users }) {
             icon: Trash2,
             onClick: () => confirmUserDeletion(user.id),
             className: "text-destructive focus:text-destructive"
+        },
+        {
+            label: "Login As User",
+            icon: LogInIcon,
+            onClick: () => window.location = route("users.login_as_user", user.id)
         }
     ];
 
