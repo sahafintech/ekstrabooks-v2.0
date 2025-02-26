@@ -7,16 +7,16 @@ use App\Http\Controllers\Controller;
 use App\Imports\ProductImport;
 use App\Models\Account;
 use App\Models\AuditLog;
+use App\Models\Brand;
+use App\Models\Brands;
+use App\Models\Category;
 use App\Models\Currency;
-use App\Models\InvoiceItem;
 use App\Models\Product;
 use App\Models\ProductUnit;
-use App\Models\PurchaseItem;
-use App\Models\ReceiptItem;
 use App\Models\Transaction;
 use Carbon\Carbon;
-use DataTables;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Validator;
 
@@ -35,14 +35,51 @@ class ProductController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        $products = Product::select('products.*')
-            ->with('product_unit')
-            ->orderBy("products.id", "desc")
-            ->get();
+        $query = Product::select('products.*')
+            ->with('product_unit');
 
-        return view('backend.user.product.list', compact('products'));
+        // Handle search
+        if ($request->has('search')) {
+            $search = $request->get('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('type', 'like', "%{$search}%");
+            });
+        }
+
+        // Handle filters
+        if ($request->has('filters')) {
+            $filters = $request->get('filters');
+
+            if (isset($filters['status'])) {
+                $query->whereIn('status', $filters['status']);
+            }
+
+            if (isset($filters['type'])) {
+                $query->whereIn('type', $filters['type']);
+            }
+        }
+
+        // Handle sorting
+        $sortField = $request->get('sort_field', 'id');
+        $sortDirection = $request->get('sort_direction', 'desc');
+        $query->orderBy($sortField, $sortDirection);
+
+        // Handle pagination
+        $perPage = $request->get('per_page', 10);
+        $products = $query->paginate($perPage);
+
+        return inertia('Backend/User/Product/List', [
+            'products' => $products->items(),
+            'meta' => [
+                'total' => $products->total(),
+                'per_page' => $products->perPage(),
+                'current_page' => $products->currentPage(),
+                'last_page' => $products->lastPage(),
+            ],
+        ]);
     }
 
     /**
@@ -52,9 +89,12 @@ class ProductController extends Controller
      */
     public function create(Request $request)
     {
-        $productUnits = ProductUnit::all();
+        $productUnits = ProductUnit::select('id', 'unit')->get();
+        $categories = Category::select('id', 'name')->get();
+        $brands = Brand::select('id', 'name')->get();
+        $accounts = Account::select('id', 'account_name')->get();
 
-        return view('backend.user.product.create', compact('productUnits'));
+        return Inertia::render('Backend/User/Product/Create', compact('productUnits', 'categories', 'brands', 'accounts'));
     }
 
     /**
@@ -86,13 +126,9 @@ class ProductController extends Controller
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return redirect()->route('products.create')
-                    ->withErrors($validator)
-                    ->withInput();
-            }
+            return redirect()->route('products.create')
+                ->withErrors($validator)
+                ->withInput();
         }
 
         $image = 'default.png';
@@ -145,6 +181,8 @@ class ProductController extends Controller
         $product->expense_account_id   = $request->input('expense_account_id');
         $product->status               = $request->input('status');
         $product->stock_management     = $request->stock_management;
+        $product->category_id          = $request->input('category_id');
+        $product->brand_id             = $request->input('brand_id');
         $product->save();
 
         if ($request->input('initial_stock') > 0) {
@@ -182,11 +220,7 @@ class ProductController extends Controller
         $audit->event = 'New Product Created - ' . $product->name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('products.index')->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'store', 'message' => _lang('Saved Successfully'), 'data' => $product, 'table' => '#products_table']);
-        }
+        return redirect()->route('products.index')->with('success', _lang('Saved Successfully'));
     }
 
     /**
@@ -197,12 +231,17 @@ class ProductController extends Controller
      */
     public function show(Request $request, $id)
     {
-        $product = Product::with('income_account')->with('expense_account')->find($id);
-        if (!$request->ajax()) {
-            return view('backend.user.product.view', compact('product', 'id'));
-        } else {
-            return view('backend.user.product.modal.view', compact('product', 'id'));
-        }
+        $product = Product::with([
+            'income_account',
+            'expense_account',
+            'product_unit',
+            'category',
+            'brand'
+        ])->findOrFail($id);
+
+        return inertia('Backend/User/Product/View', [
+            'product' => $product
+        ]);
     }
 
     /**
@@ -213,14 +252,27 @@ class ProductController extends Controller
      */
     public function edit(Request $request, $id)
     {
-        $product   = Product::find($id);
-        $product_invoices = InvoiceItem::where('product_id', $id)->sum('quantity');
-        $product_receipts = ReceiptItem::where('product_id', $id)->sum('quantity');
-        $product_purchases = PurchaseItem::where('product_id', $id)->sum('quantity');
+        $product = Product::with(['income_account', 'expense_account', 'product_unit'])
+            ->findOrFail($id);
 
-        $product_sales = $product_invoices + $product_receipts + $product_purchases;
+        $productUnits = ProductUnit::select('id', 'unit')->get();
+        $categories = Category::select('id', 'name')->get();
+        $brands = Brand::select('id', 'name')->get();
+        $accounts = Account::select('id', 'account_name')->get();
 
-        return view('backend.user.product.edit', compact('product', 'id', 'product_sales'));
+        return inertia('Backend/User/Product/Edit', [
+            'product' => $product,
+            'productUnits' => $productUnits,
+            'categories' => $categories,
+            'brands' => $brands,
+            'accounts' => $accounts->map(function ($account) {
+                return [
+                    'id' => $account->id,
+                    'name' => $account->account_name,
+                    'type' => $account->account_type
+                ];
+            }),
+        ]);
     }
 
     /**
@@ -251,13 +303,9 @@ class ProductController extends Controller
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return redirect()->route('products.edit', $id)
-                    ->withErrors($validator)
-                    ->withInput();
-            }
+            return redirect()->route('products.edit', $id)
+                ->withErrors($validator)
+                ->withInput();
         }
 
         if ($request->hasfile('image')) {
@@ -358,11 +406,7 @@ class ProductController extends Controller
         $audit->event = 'Product Updated - ' . $product->name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('products.index')->with('success', _lang('Updated Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $product, 'table' => '#products_table']);
-        }
+        return redirect()->route('products.index')->with('success', _lang('Updated Successfully'));
     }
 
     public function getProducts($type)

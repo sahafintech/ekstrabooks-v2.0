@@ -45,6 +45,7 @@ use App\Http\Controllers\User\CustomerController;
 use App\Http\Controllers\User\DepartmentController;
 use App\Http\Controllers\User\DesignationController;
 use App\Http\Controllers\User\HolidayController;
+use App\Http\Controllers\User\ImportController;
 use App\Http\Controllers\User\InventoryAdjustmentController;
 use App\Http\Controllers\User\InvoiceController;
 use App\Http\Controllers\User\InvoiceTemplateController;
@@ -284,6 +285,13 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 		// inventory adjustments
 		Route::resource('inventory_adjustments', InventoryAdjustmentController::class);
+
+		// Inventory Adjustment Import
+		Route::get('inventory_adjustment/import', [InventoryAdjustmentController::class, 'import'])->name('inventory_adjustment.import');
+		Route::post('inventory_adjustment/import/store', [InventoryAdjustmentController::class, 'importStore'])->name('inventory_adjustment.import.store');
+		Route::get('inventory_adjustment/import/progress', [InventoryAdjustmentController::class, 'importProgress'])->name('inventory_adjustment.import.progress');
+		Route::post('inventory_adjustment/import/process', [InventoryAdjustmentController::class, 'importProcess'])->name('inventory_adjustment.import.process');
+		Route::get('import/process/{name}/{id}', [ImportController::class, 'getImportProgress'])->name('import.process.progress');
 
 		//Invoices
 		Route::match(['get', 'post'], 'invoices/{id}/send_email', [InvoiceController::class, 'send_email'])->name('invoices.send_email');

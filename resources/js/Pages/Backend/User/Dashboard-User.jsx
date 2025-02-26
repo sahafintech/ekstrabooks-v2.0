@@ -64,8 +64,6 @@ export default function DashboardUser({
     receivables_payables,
     cashflow,
     transactions,
-    active_business,
-    businesses
 }) {
     const [selectedRange, setSelectedRange] = useState(range || 'all');
     const [customRange, setCustomRange] = useState(custom || '');
@@ -130,7 +128,7 @@ export default function DashboardUser({
     };
 
     return (
-        <AuthenticatedLayout businesses={businesses} active_business={active_business}>
+        <AuthenticatedLayout>
             <SidebarInset>
                 <PageHeader
                     page="Dashboard"

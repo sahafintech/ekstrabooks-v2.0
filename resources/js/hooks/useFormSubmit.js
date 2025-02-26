@@ -1,5 +1,5 @@
-import { useForm } from "@inertiajs/react";
-import { useEffect, useRef } from "react";
+import { router } from '@inertiajs/react';
+import { useState } from 'react';
 
 /**
  * Custom hook for handling form submissions with Inertia
@@ -9,29 +9,30 @@ import { useEffect, useRef } from "react";
  * @returns {Object} Form utilities and state
  */
 export function useFormSubmit(initialData, defaultRoute = null, options = {}) {
-    const form = useForm(initialData);
-    
-    // Keep track of whether this is the first render
-    const isFirstRender = useRef(true);
-    // Store previous initial data for comparison
-    const prevInitialData = useRef(initialData);
+    const [processing, setProcessing] = useState(false);
 
-    useEffect(() => {
-        if (isFirstRender.current) {
-            isFirstRender.current = false;
+    const submit = (method, url, opts = {}) => {
+        setProcessing(true);
+
+        const { data = {}, ...otherOptions } = opts;
+
+        const submitFn = {
+            post: router.post,
+            put: router.put,
+            delete: router.delete,
+        }[method];
+
+        if (!submitFn) {
+            console.error(`Invalid form submission method: ${method}`);
             return;
         }
 
-        // Check if initialData has actually changed
-        const hasChanged = Object.entries(initialData).some(
-            ([key, value]) => prevInitialData.current[key] !== value
-        );
-
-        if (hasChanged) {
-            prevInitialData.current = initialData;
-            form.setData(initialData);
-        }
-    }, [initialData]);
+        submitFn(url, data, {
+            preserveScroll: true,
+            onFinish: () => setProcessing(false),
+            ...otherOptions
+        });
+    };
 
     const handleSubmit = (e, method = "post", route = defaultRoute) => {
         e.preventDefault();
@@ -41,43 +42,11 @@ export function useFormSubmit(initialData, defaultRoute = null, options = {}) {
             return;
         }
 
-        const submitFn = {
-            post: form.post,
-            put: form.put,
-            delete: form.delete,
-        }[method];
-
-        if (!submitFn) {
-            console.error(`Invalid form submission method: ${method}`);
-            return;
-        }
-
-        submitFn(route, {
-            preserveScroll: true,
-            onSuccess: () => {
-                if (options.onSuccess) options.onSuccess();
-                if (options.resetOnSuccess) {
-                    form.reset();
-                    prevInitialData.current = initialData;
-                }
-            },
-            onError: options.onError,
-            onFinish: () => {
-                if (options.onFinish) options.onFinish();
-            },
-        });
+        submit(method, route, options);
     };
 
     return {
-        data: form.data,
-        setData: form.setData,
-        processing: form.processing,
-        errors: form.errors,
+        processing,
         handleSubmit,
-        reset: () => {
-            form.reset();
-            prevInitialData.current = initialData;
-        },
-        clearErrors: form.clearErrors,
     };
 }

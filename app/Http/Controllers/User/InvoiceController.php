@@ -27,6 +27,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
+use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 
 class InvoiceController extends Controller
@@ -61,16 +62,66 @@ class InvoiceController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        $invoices = Invoice::select('invoices.*')
-            ->with('customer')
+        $query = Invoice::select('invoices.*')
             ->where('is_recurring', 0)
             ->where('is_deffered', 0)
-            ->orderBy("invoices.id", "desc")
-            ->get();
+            ->with(['customer']);
 
-        return view('backend.user.invoice.list', compact('invoices'));
+        // Handle search
+        if ($request->has('search')) {
+            $search = $request->get('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('invoice_number', 'like', "%{$search}%")
+                    ->orWhere('order_number', 'like', "%{$search}%")
+                    ->orWhereHas('customer', function ($q) use ($search) {
+                        $q->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        // Handle filters
+        if ($request->has('filters')) {
+            $filters = $request->get('filters');
+
+            if (isset($filters['status'])) {
+                $query->whereIn('status', $filters['status']);
+            }
+
+            if (isset($filters['customer_id'])) {
+                $query->whereIn('customer_id', $filters['customer_id']);
+            }
+
+            if (isset($filters['date_range'])) {
+                if (!empty($filters['date_range']['start'])) {
+                    $query->where('invoice_date', '>=', $filters['date_range']['start']);
+                }
+                if (!empty($filters['date_range']['end'])) {
+                    $query->where('invoice_date', '<=', $filters['date_range']['end']);
+                }
+            }
+        }
+
+        // Handle sorting
+        $sortField = $request->get('sort_field', 'id');
+        $sortDirection = $request->get('sort_direction', 'desc');
+        $query->orderBy($sortField, $sortDirection);
+
+        // Handle pagination
+        $perPage = $request->get('per_page', 10);
+        $invoices = $query->paginate($perPage);
+
+        return Inertia::render('Backend/User/Invoice/List', [
+            'invoices' => $invoices->items(),
+            'meta' => [
+                'total' => $invoices->total(),
+                'per_page' => $invoices->perPage(),
+                'current_page' => $invoices->currentPage(),
+                'last_page' => $invoices->lastPage(),
+            ],
+        ]);
     }
 
     /**
@@ -80,7 +131,12 @@ class InvoiceController extends Controller
      */
     public function create(Request $request)
     {
-        return view('backend.user.invoice.create');
+        $customers = Customer::all();
+        $currencies = Currency::all();
+        $products = Product::all();
+        $taxes = Tax::all();
+
+        return Inertia::render('Backend/User/Invoice/Create', compact('customers', 'currencies', 'products', 'taxes'));
     }
 
     /**
@@ -97,7 +153,6 @@ class InvoiceController extends Controller
             'invoice_date'   => 'required|date',
             'due_date'       => 'required|after_or_equal:invoice_date',
             'product_id'     => 'required',
-            'template'       => 'required',
             'currency'       => 'required',
         ], [
             'product_id.required' => _lang('You must add at least one item'),
@@ -206,7 +261,7 @@ class InvoiceController extends Controller
         $invoice->discount_type   = $request->input('discount_type');
         $invoice->discount_value  = $request->input('discount_value') ?? 0;
         $invoice->template_type   = is_numeric($request->template) ? 1 : 0;
-        $invoice->template        = $request->input('template');
+        $invoice->template        = 'default';
         $invoice->note            = $request->input('note');
         $invoice->footer          = $request->input('footer');
         $invoice->short_code      = rand(100000, 9999999) . uniqid();
@@ -512,7 +567,6 @@ class InvoiceController extends Controller
             'invoice_date'   => 'required|date',
             'due_date'       => 'required|date|after_or_equal:invoice_date',
             'product_id'     => 'required',
-            'template'       => 'required',
             'currency'       => 'required',
         ], [
             'product_id.required' => _lang('You must add at least one item'),
@@ -633,7 +687,7 @@ class InvoiceController extends Controller
         $invoice->discount_type   = $request->input('discount_type');
         $invoice->discount_value  = $request->input('discount_value') ?? 0;
         $invoice->template_type   = $invoice->template_type   = is_numeric($request->template) ? 1 : 0;
-        $invoice->template        = $request->input('template');
+        $invoice->template        = 'default';
         $invoice->note            = $request->input('note');
         $invoice->footer          = $request->input('footer');
         if($attachment != ''){

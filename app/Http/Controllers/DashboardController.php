@@ -42,9 +42,6 @@ class DashboardController extends Controller
 		$user_type = $user->user_type;
 		$data = array();
 
-		$data['businesses'] = $request->businessList;
-		$data['active_business'] = $request->activeBusiness;
-
 		if ($user_type == 'admin') {
 			$data['total_user'] = User::where('user_type', 'user')->count();
 			$data['total_owner'] = User::where('user_type', 'user')
@@ -837,9 +834,6 @@ class DashboardController extends Controller
 		$custom = request()->get('custom');
 		$dashboard_type = 'inventory';
 
-		$businesses = request()->businessList;
-		$active_business = request()->activeBusiness;
-
 		// Get date range
 		if ($range == 'all') {
 			// Get the date of the first transaction
@@ -1090,8 +1084,6 @@ class DashboardController extends Controller
 			'category_stock',
 			'products',
 			'date_aggregation',
-			'businesses',
-			'active_business'
 		));
 	}
 }

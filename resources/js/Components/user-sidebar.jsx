@@ -14,6 +14,10 @@ import {
     CreditCard,
     BadgeDollarSign,
     Package,
+    GroupIcon,
+    ChartPieIcon,
+    Building2Icon,
+    FileText
 } from "lucide-react";
 
 import { usePage } from "@inertiajs/react";
@@ -75,7 +79,9 @@ export function UserSidebar({ businesses, active_business, ...props }) {
             title: "Products",
             url: "#",
             icon: Package,
-            isActive: isRoute("products.index") || isRoute("categories.index") || isRoute("brands.index") || isRoute("product_units.index") || isRoute("inventory_adjustments.index"),
+            isActive: isRoute("products.index") || isRoute("categories.index") || isRoute("brands.index") ||
+                isRoute("product_units.index") || isRoute("inventory_adjustments.index") ||
+                isRoute("products.create"),
             items: [
                 {
                     title: "All Products",
@@ -114,7 +120,7 @@ export function UserSidebar({ businesses, active_business, ...props }) {
                     url: route("purchase_orders.index"),
                 },
                 {
-                    tite: "Cash Purchase",
+                    title: "Cash Purchase",
                     url: route("cash_purchases.index"),
                 },
                 {
@@ -179,37 +185,107 @@ export function UserSidebar({ businesses, active_business, ...props }) {
 
     const navManagementItems = [
         {
-            name: "Languages",
+            title: "HR & Payroll",
             url: "#",
-            icon: Globe,
-        },
-        {
-            title: "System Settings",
-            url: "#",
-            icon: Settings2,
+            icon: GroupIcon,
             items: [
                 {
-                    title: "Business Types",
-                    url: "#",
+                    title: "Staff Management",
+                    url: route("staffs.index"),
                 },
                 {
-                    title: "Email Subscribers",
-                    url: "#",
+                    title: "Attendance",
+                    url: route("attendance.index"),
                 },
                 {
-                    title: "Notification Templates",
-                    url: "#",
+                    title: "Departments",
+                    url: route("departments.index"),
                 },
                 {
-                    title: "Database Backups",
-                    url: "#",
+                    title: "Designations",
+                    url: route("designations.index"),
                 },
                 {
-                    title: "Account Types",
-                    url: "#",
+                    title: "Manage Payroll",
+                    url: route("payslips.index"),
                 },
+                {
+                    title: "Accrue Payroll",
+                    url: route("payslips.accrue"),
+                },
+                {
+                    title: "Make Payment",
+                    url: route("payslips.make_payment"),
+                },
+                {
+                    title: "Holidays",
+                    url: route("holidays.index"),
+                },
+                {
+                    title: "Leave Management",
+                    url: route("leaves.index"),
+                },
+                {
+                    title: "Awards",
+                    url: route("awards.index"),
+                }
             ],
         },
+        {
+            title: "Accounting",
+            url: "#",
+            icon: ChartPieIcon,
+            items: [
+                {
+                    title: "Chart of Accounts",
+                    url: route("chart_of_accounts.list_chart_of_accounts"),
+                },
+                {
+                    title: "Journal Entry",
+                    url: route("journals.index"),
+                },
+                {
+                    title: "Transaction Methods",
+                    url: route("transaction_methods.index"),
+                }
+            ]
+        },
+        {
+            title: "Business",
+            url: "#",
+            icon: Building2Icon,
+            items: [
+                {
+                    title: "Manage Businesses",
+                    url: route("business.index"),
+                },
+                {
+                    title: "Roles & Permissions",
+                    url: route("roles.index"),
+                },
+                {
+                    title: "Business Settings",
+                    url: route("business.settings", active_business.id),
+                },
+                {
+                    title: "Tax Settings",
+                    url: route("taxes.index"),
+                },
+                {
+                    title: "Currency Settings",
+                    url: route("currency.index")
+                },
+                {
+                    title: "Audit Logs",
+                    url: route("audit_logs.index")
+                }
+            ]
+        },
+        {
+            name: "Reports",
+            url: "#",
+            icon: FileText,
+        }
     ];
 
     return (

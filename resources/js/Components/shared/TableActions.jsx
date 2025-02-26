@@ -1,14 +1,14 @@
-import { Button } from "@/Components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuGroup,
     DropdownMenuItem,
+    DropdownMenuGroup,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
 
-export default function TableActions({ actions }) {
+export default function TableActions({ actions = [] }) {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>

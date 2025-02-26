@@ -62,8 +62,6 @@ export default function DashboardInventory({
     daily_stock_movements,
     category_stock,
     date_aggregation,
-    businesses,
-    active_business,
 }) {
     const [selectedRange, setSelectedRange] = useState(range || 'all');
     const [customRange, setCustomRange] = useState(custom || '');
@@ -214,7 +212,7 @@ export default function DashboardInventory({
     };
 
     return (
-        <AuthenticatedLayout businesses={businesses} active_business={active_business}>
+        <AuthenticatedLayout>
             <SidebarInset>
                 <PageHeader
                     page="Dashboard"

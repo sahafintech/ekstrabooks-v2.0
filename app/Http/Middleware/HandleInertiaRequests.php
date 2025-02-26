@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use App\Models\Business;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -29,11 +30,22 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $user = $request->user();
+        $businesses = [];
+        $active_business = null;
+
+        if ($user && $user->user_type !== 'admin') {
+            $businesses = Business::where('user_id', $user->id)->get();
+            $active_business = $request->session()->get('active_business') ?? $businesses->first();
+        }
+
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $request->user(),
+                'user' => $user,
             ],
+            'businesses' => $businesses,
+            'active_business' => $active_business,
         ];
     }
 }

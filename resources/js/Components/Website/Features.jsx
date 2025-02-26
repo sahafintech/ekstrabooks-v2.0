@@ -41,7 +41,7 @@ export default function Features() {
     ];
 
     return (
-        <section className="bg-muted/30 py-24">
+        <section className="bg-muted/30 py-24 flex justify-center">
             <div className="container px-4 md:px-6">
                 <div className="flex flex-col items-center justify-center space-y-4 text-center">
                     <div className="space-y-2">
