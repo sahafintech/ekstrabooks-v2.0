@@ -5,7 +5,6 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\BillPaymentsController;
 use App\Http\Controllers\BrandsController;
 use App\Http\Controllers\BusinessTypeController;
-use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DefferedInvoiceController;
@@ -14,10 +13,13 @@ use App\Http\Controllers\EmailSubscriberController;
 use App\Http\Controllers\FaqController;
 use App\Http\Controllers\FeatureController;
 use App\Http\Controllers\HoldPosInvoiceController;
+use App\Http\Controllers\User\ImportController;
+use App\Http\Controllers\User\InventoryAdjustmentController;
 use App\Http\Controllers\InsuranceBenefitController;
 use App\Http\Controllers\InsuranceFamilySizeController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\LanguageController;
+use App\Http\Controllers\MainCategoryController;
 use App\Http\Controllers\MedicalRecordController;
 use App\Http\Controllers\MembershipController;
 use App\Http\Controllers\NotificationTemplateController;
@@ -31,6 +33,7 @@ use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\PurchaseReturnController;
 use App\Http\Controllers\ReceivePaymentsController;
 use App\Http\Controllers\ServerErrorController;
+use App\Http\Controllers\SubCategoryController;
 use App\Http\Controllers\SubscriptionPaymentController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\TestimonialController;
@@ -42,11 +45,10 @@ use App\Http\Controllers\User\BusinessController;
 use App\Http\Controllers\User\BusinessSettingsController;
 use App\Http\Controllers\User\CashPurchaseController;
 use App\Http\Controllers\User\CustomerController;
+use App\Http\Controllers\User\CustomerDocumentController;
 use App\Http\Controllers\User\DepartmentController;
 use App\Http\Controllers\User\DesignationController;
 use App\Http\Controllers\User\HolidayController;
-use App\Http\Controllers\User\ImportController;
-use App\Http\Controllers\User\InventoryAdjustmentController;
 use App\Http\Controllers\User\InvoiceController;
 use App\Http\Controllers\User\InvoiceTemplateController;
 use App\Http\Controllers\User\LeaveController;
@@ -70,6 +72,7 @@ use App\Http\Controllers\User\TaxController;
 use App\Http\Controllers\User\TransactionController;
 use App\Http\Controllers\User\TransactionMethodController;
 use App\Http\Controllers\User\VendorController;
+use App\Http\Controllers\User\VendorDocumentController;
 use App\Http\Controllers\UserPackageController;
 use App\Http\Controllers\UtilityController;
 use App\Http\Controllers\Website\WebsiteController;
@@ -278,7 +281,8 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('all_products', [ProductController::class, 'products_all'])->name('products.all');
 
 		// categories
-		Route::resource('categories', CategoryController::class);
+		Route::resource('sub_categories', SubCategoryController::class);
+		Route::resource('main_categories', MainCategoryController::class);
 
 		// brands
 		Route::resource('brands', BrandsController::class);
@@ -411,6 +415,8 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('purchase_orders/filter', [PurchaseOrderController::class, 'purchase_orders_filter'])->name('purchase_orders.filter');
 		Route::post('all_purchase_orders', [PurchaseOrderController::class, 'purchase_orders_all'])->name('purchase_orders.all');
 		Route::get('export_purchase_orders', [PurchaseOrderController::class, 'export_purchase_orders'])->name('purchase_orders.export');
+		Route::post('purchase_orders/{id}/convert_to_bill', [PurchaseOrderController::class, 'convert_to_bill'])->name('purchase_orders.convert_to_bill');
+		Route::post('purchase_orders/{id}/convert_to_cash', [PurchaseOrderController::class, 'convert_to_cash_purchase'])->name('purchase_orders.convert_to_cash_purchase');
 
 		// medical records
 		Route::resource('medical_records', MedicalRecordController::class);
@@ -466,6 +472,18 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('staff_documents/{employee_id}', [StaffDocumentController::class, 'index'])->name('staff_documents.index');
 		Route::get('staff_documents/create/{employee_id}', [StaffDocumentController::class, 'create'])->name('staff_documents.create');
 		Route::resource('staff_documents', StaffDocumentController::class)->except(['index', 'create', 'show']);
+		Route::post('staff_documents/store', [StaffDocumentController::class, 'store'])->name('staff_documents.store');
+		Route::delete('staff_documents/{id}', [StaffDocumentController::class, 'destroy'])->name('staff_documents.destroy');
+
+		//Customer Documents
+		Route::post('customer/documents/store', [CustomerDocumentController::class, 'store'])->name('customer.documents.store');
+		Route::delete('customer/documents/{id}', [CustomerDocumentController::class, 'destroy'])->name('customer.documents.destroy');
+		Route::get('customer/documents/create/{id}', [CustomerDocumentController::class, 'create'])->name('customer.documents.create');
+
+		//Vendor Documents
+		Route::post('vendor/documents/store', [VendorDocumentController::class, 'store'])->name('vendor.documents.store');
+		Route::delete('vendor/documents/{id}', [VendorDocumentController::class, 'destroy'])->name('vendor.documents.destroy');
+		Route::get('vendor/documents/create/{id}', [VendorDocumentController::class, 'create'])->name('vendor.documents.create');
 
 		//Holiday Controller
 		Route::get('holidays/get_table_data', [HolidayController::class, 'get_table_data']);
@@ -558,6 +576,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('pos/products/category/{id}', [ReceiptController::class, 'pos_products_category'])->name('receipts.pos.category');
 		Route::get('customer/get_deffered_invoices/{id}', [DefferedInvoiceController::class, 'get_invoices']);
 		Route::get('quotations/{id}/get_quotation_link', [QuotationController::class, 'get_quotation_link'])->name('quotations.get_quotation_link');
+		Route::get('/get-subcategories/{main_category_id}', [MainCategoryController::class, 'getSubCategories'])->name('get.subcategories');
 	});
 
 
@@ -584,13 +603,9 @@ Route::get('/pricing', [WebsiteController::class, 'pricing']);
 Route::get('/faq', [WebsiteController::class, 'faq']);
 Route::get('/blogs/{slug?}', [WebsiteController::class, 'blogs']);
 Route::get('/contact', [WebsiteController::class, 'contact']);
-Route::get('/privacy', [WebsiteController::class, 'privacy']);
 Route::post('/send_message', 'Website\WebsiteController@send_message');
 Route::post('/post_comment', 'Website\WebsiteController@post_comment');
 Route::post('/email_subscription', 'Website\WebsiteController@email_subscription');
-
-Route::get('/{slug?}', [WebsiteController::class, 'index']);
-
 //Online Invoice Payment
 Route::group(['prefix' => 'callback', 'namespace' => 'User\Gateway'], function () {
 	Route::get('paypal', 'PayPal\ProcessController@callback')->name('callback.PayPal');

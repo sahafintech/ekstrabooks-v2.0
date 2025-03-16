@@ -140,7 +140,7 @@ const ProductStatusBadge = ({ status }) => (
   </span>
 );
 
-export default function List({ products = [], meta = {} }) {
+export default function List({ products = [], meta = {}, filters = {} }) {
   const { auth } = usePage().props;
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -149,6 +149,14 @@ export default function List({ products = [], meta = {} }) {
   const [productToDelete, setProductToDelete] = useState(null);
   const [tableRef, setTableRef] = useState(null);
   const [processing, setProcessing] = useState(false);
+
+  // Format currency with proper ISO 4217 code
+  const formatCurrency = (amount, currencyCode = 'USD') => {
+    return new Intl.NumberFormat('en-US', { 
+      style: 'currency', 
+      currency: currencyCode 
+    }).format(amount);
+  };
 
   const handleDelete = (e) => {
     e.preventDefault();
@@ -205,14 +213,82 @@ export default function List({ products = [], meta = {} }) {
   };
 
   const handlePagination = (pagination) => {
-    const params = new URLSearchParams(window.location.search);
-    params.set('page', pagination.pageIndex + 1);
-    params.set('per_page', pagination.pageSize);
+    // Ensure we have valid numeric values for page and page size
+    const pageIndex = isNaN(pagination.pageIndex) ? 0 : pagination.pageIndex;
+    const pageSize = isNaN(pagination.pageSize) ? 10 : pagination.pageSize;
+    
+    // Create query parameters object (only include non-empty values)
+    const params = {
+      page: pageIndex + 1, // Convert 0-indexed to 1-indexed
+      per_page: pageSize,
+    };
+    
+    // Only add search if it's non-empty
+    if (pagination.globalFilter || filters.search) {
+      params.search = pagination.globalFilter || filters.search || '';
+    }
+    
+    // Only add column filters if they exist
+    const columnFiltersArray = pagination.columnFilters || filters.columnFilters || [];
+    if (columnFiltersArray.length > 0) {
+      params.columnFilters = JSON.stringify(columnFiltersArray);
+    }
+    
+    // Only add sorting if it exists
+    const sortingArray = pagination.sorting || filters.sorting || [];
+    if (sortingArray.length > 0) {
+      params.sorting = JSON.stringify(sortingArray);
+    }
 
-    router.get(`${route('products.index')}?${params.toString()}`, {}, {
+    // Debug the parameters being sent to the server
+    console.log('Sending to server:', params);
+    
+    // Update URL and fetch data
+    router.get(route('products.index'), params, {
       preserveState: true,
       preserveScroll: true,
-      only: ['products', 'meta']
+      only: ['products', 'meta', 'filters'],
+      replace: false, // Use false to update browser history
+    });
+  };
+
+  const handleDataTableChange = (updatedState) => {
+    // Ensure we have valid numeric values for page and page size
+    const pageIndex = isNaN(updatedState.pagination.pageIndex) ? 0 : updatedState.pagination.pageIndex;
+    const pageSize = isNaN(updatedState.pagination.pageSize) ? 10 : updatedState.pagination.pageSize;
+    
+    // Create query parameters object (only include non-empty values)
+    const params = {
+      page: pageIndex + 1, // Convert 0-indexed to 1-indexed
+      per_page: pageSize,
+    };
+    
+    // Only add search if it's non-empty
+    if (updatedState.globalFilter) {
+      params.search = updatedState.globalFilter;
+    }
+    
+    // Only add column filters if they exist
+    const columnFiltersArray = updatedState.columnFilters || [];
+    if (columnFiltersArray.length > 0) {
+      params.columnFilters = JSON.stringify(columnFiltersArray);
+    }
+    
+    // Only add sorting if it exists
+    const sortingArray = updatedState.sorting || [];
+    if (sortingArray.length > 0) {
+      params.sorting = JSON.stringify(sortingArray);
+    }
+
+    // Debug the parameters being sent to the server
+    console.log('Table state change:', params);
+    
+    // Update URL and fetch data
+    router.get(route('products.index'), params, {
+      preserveState: true,
+      preserveScroll: true,
+      only: ['products', 'meta', 'filters'],
+      replace: false, // Use false to update browser history
     });
   };
 
@@ -247,6 +323,7 @@ export default function List({ products = [], meta = {} }) {
             alt={row.original.name} 
           />
         ),
+        enableSorting: false,
       },
       {
         accessorKey: "name",
@@ -260,14 +337,18 @@ export default function List({ products = [], meta = {} }) {
         accessorKey: "purchase_cost",
         header: "Purchase Cost",
         cell: ({ row }) => (
-          <div className="text-right">{row.original.purchase_cost}</div>
+          <div className="text-right">
+            {formatCurrency(row.original.purchase_cost, row.original.currency || 'USD')}
+          </div>
         ),
       },
       {
         accessorKey: "selling_price",
         header: "Selling Price",
         cell: ({ row }) => (
-          <div className="text-right">{row.original.selling_price}</div>
+          <div className="text-right">
+            {formatCurrency(row.original.selling_price, row.original.currency || 'USD')}
+          </div>
         ),
       },
       {
@@ -335,6 +416,7 @@ export default function List({ products = [], meta = {} }) {
       id: "type",
       title: "Type",
       options: Array.from(new Set(products.map(p => p.type)))
+        .filter(Boolean)
         .map(type => ({ label: type, value: type })),
     },
   ];
@@ -353,7 +435,7 @@ export default function List({ products = [], meta = {} }) {
           <PageHeader page="Products" subpage="list" url="products.index" />
 
           <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-            <div className="flex justify-between">
+            <div className="flex items-center space-x-2">
               <Link href={route("products.create")}>
                 <Button>Add New Product</Button>
               </Link>
@@ -384,6 +466,17 @@ export default function List({ products = [], meta = {} }) {
                 totalRows={meta.total || 0}
                 pageCount={meta.last_page || 1}
                 onPaginationChange={handlePagination}
+                onTableStateChange={handleDataTableChange}
+                serverSide={true}
+                initialState={{
+                  pagination: {
+                    pageIndex: (meta.current_page || 1) - 1,
+                    pageSize: meta.per_page || 10,
+                  },
+                  globalFilter: filters.search || '',
+                  columnFilters: filters.columnFilters || [],
+                  sorting: filters.sorting || [],
+                }}
                 tableRef={setTableRef}
                 meta={meta}
               />

@@ -3,15 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
-use App\Models\Category;
+use App\Models\MainCategory;
+use App\Models\SubCategory;
 use Illuminate\Http\Request;
 
-class CategoryController extends Controller
+class MainCategoryController extends Controller
 {
     public function index()
     {
-        $categories = Category::all();
-        return view('backend.user.category.list', compact('categories'));
+        $categories = MainCategory::all();
+        return view('backend.user.main_category.list', compact('categories'));
     }
 
     public function create(Request $request)
@@ -19,7 +20,7 @@ class CategoryController extends Controller
         if (!$request->ajax()) {
             return back();
         } else {
-            return view('backend.user.category.create');
+            return view('backend.user.main_category.create');
         }
     }
 
@@ -37,7 +38,7 @@ class CategoryController extends Controller
             $data['image'] = $image_name;
         }
 
-        $category = new Category();
+        $category = new MainCategory();
         $category->name = $data['name'];
         $category->image = $data['image'] ?? 'default.png';
         $category->save();
@@ -49,12 +50,12 @@ class CategoryController extends Controller
         $audit->event = 'Category Created: ' . $category->name;
         $audit->save();
 
-        return redirect()->route('categories.index')->with('success', _lang('Category Created'));
+        return redirect()->route('main_categories.index')->with('success', _lang('Main Category Created'));
     }
 
     public function destroy(Request $request, $id)
     {
-        $category = Category::find($id);
+        $category = MainCategory::find($id);
 
         // delete image
         $image_path = public_path() . "/uploads/media/" . $category->image;
@@ -71,13 +72,13 @@ class CategoryController extends Controller
         $audit->event = 'Category Deleted: ' . $category->name;
         $audit->save();
 
-        return redirect()->route('categories.index')->with('success', _lang('Category Deleted'));
+        return redirect()->route('main_categories.index')->with('success', _lang('Main Category Deleted'));
     }
 
     public function edit(Request $request, $id)
     {
-        $category = Category::find($id);
-        return view('backend.user.category.edit', compact('category', 'id'));
+        $main_category = MainCategory::find($id);
+        return view('backend.user.main_category.edit', compact('main_category', 'id'));
     }
 
     public function update(Request $request, $id)
@@ -87,7 +88,7 @@ class CategoryController extends Controller
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ]);
 
-        $category = Category::find($id);
+        $category = MainCategory::find($id);
         $category->name = $request->name;
 
         if ($request->hasFile('image')) {
@@ -97,7 +98,7 @@ class CategoryController extends Controller
 
             // delete old image
             $image_path = public_path() . "/uploads/media/" . $category->image;
-            if (file_exists($image_path) && $$category->image !== 'default.png') {
+            if (file_exists($image_path) && $category->image !== 'default.png') {
                 unlink($image_path);
             }
 
@@ -110,9 +111,16 @@ class CategoryController extends Controller
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Category Updated: ' . $category->name;
+        $audit->event = 'Main Category Updated: ' . $category->name;
         $audit->save();
 
-        return redirect()->route('categories.index')->with('success', _lang('Category Updated'));
+        return redirect()->route('main_categories.index')->with('success', _lang('Main Category Updated'));
+    }
+
+    public function getSubCategories(Request $request)
+    {
+        $subCategories = SubCategory::where('main_category_id', $request->main_category_id)->get();
+
+        return response()->json($subCategories);
     }
 }

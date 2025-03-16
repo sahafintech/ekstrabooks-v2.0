@@ -16,6 +16,7 @@ use App\Models\ProductUnit;
 use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Validator;
@@ -41,30 +42,61 @@ class ProductController extends Controller
             ->with('product_unit');
 
         // Handle search
-        if ($request->has('search')) {
+        if ($request->has('search') && !empty($request->get('search'))) {
             $search = $request->get('search');
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('type', 'like', "%{$search}%");
+                    ->orWhere('type', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%");
             });
         }
 
-        // Handle filters
-        if ($request->has('filters')) {
-            $filters = $request->get('filters');
-
-            if (isset($filters['status'])) {
-                $query->whereIn('status', $filters['status']);
+        // Handle column filters
+        if ($request->has('columnFilters')) {
+            $columnFilters = $request->get('columnFilters');
+            
+            // Check if it's a JSON string and decode it
+            if (is_string($columnFilters)) {
+                $columnFilters = json_decode($columnFilters, true);
             }
-
-            if (isset($filters['type'])) {
-                $query->whereIn('type', $filters['type']);
+            
+            // Process each column filter
+            if (is_array($columnFilters)) {
+                foreach ($columnFilters as $filter) {
+                    if (isset($filter['id']) && isset($filter['value'])) {
+                        $columnId = $filter['id'];
+                        $filterValue = $filter['value'];
+                        
+                        if (!empty($filterValue)) {
+                            if (is_array($filterValue)) {
+                                $query->whereIn($columnId, $filterValue);
+                            } else {
+                                $query->where($columnId, $filterValue);
+                            }
+                        }
+                    }
+                }
             }
         }
 
         // Handle sorting
         $sortField = $request->get('sort_field', 'id');
         $sortDirection = $request->get('sort_direction', 'desc');
+        
+        if ($request->has('sorting')) {
+            $sorting = $request->get('sorting');
+            
+            // Check if it's a JSON string and decode it
+            if (is_string($sorting)) {
+                $sorting = json_decode($sorting, true);
+            }
+            
+            if (is_array($sorting) && !empty($sorting)) {
+                $sortField = $sorting[0]['id'] ?? 'id';
+                $sortDirection = $sorting[0]['desc'] ? 'desc' : 'asc';
+            }
+        }
+        
         $query->orderBy($sortField, $sortDirection);
 
         // Handle pagination
@@ -78,6 +110,11 @@ class ProductController extends Controller
                 'per_page' => $products->perPage(),
                 'current_page' => $products->currentPage(),
                 'last_page' => $products->lastPage(),
+            ],
+            'filters' => [
+                'search' => $request->get('search', ''),
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $request->get('sorting', []),
             ],
         ]);
     }
@@ -181,7 +218,7 @@ class ProductController extends Controller
         $product->expense_account_id   = $request->input('expense_account_id');
         $product->status               = $request->input('status');
         $product->stock_management     = $request->stock_management;
-        $product->category_id          = $request->input('category_id');
+        $product->sub_category_id      = $request->input('sub_category_id');
         $product->brand_id             = $request->input('brand_id');
         $product->save();
 
@@ -231,16 +268,27 @@ class ProductController extends Controller
      */
     public function show(Request $request, $id)
     {
-        $product = Product::with([
-            'income_account',
-            'expense_account',
-            'product_unit',
-            'category',
-            'brand'
-        ])->findOrFail($id);
+        $product = Product::with('income_account')
+            ->with('expense_account')
+            ->with('product_unit')
+            ->withSum('invoice_items', 'quantity')
+            ->withSum('invoice_items', 'sub_total')
+            ->withSum('purchase_items', 'quantity')
+            ->withSum('purchase_items', 'sub_total')
+            ->withSum('sales_return_items', 'quantity')
+            ->withSum('purchase_return_items', 'quantity')
+            ->withSum('receipt_items', 'quantity')
+            ->withSum('receipt_items', 'sub_total')
+            ->find($id);
+
+        $transactions = $product->getAllTransactions();
+        $suppliers = $product->getSuppliers();
 
         return inertia('Backend/User/Product/View', [
-            'product' => $product
+            'product' => $product,
+            'id' => $id,
+            'transactions' => $transactions,
+            'suppliers' => $suppliers
         ]);
     }
 
@@ -359,7 +407,7 @@ class ProductController extends Controller
         $product->stock_management     = $request->stock_management;
         $product->stock                = $request->input('initial_stock') ?? 0;
         $product->initial_stock        = $request->input('initial_stock') ?? 0;
-        $product->category_id          = $request->input('category_id');
+        $product->sub_category_id      = $request->input('sub_category_id');
         $product->brand_id             = $request->input('brand_id');
         $product->save();
 

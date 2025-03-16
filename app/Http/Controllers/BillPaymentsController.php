@@ -162,8 +162,8 @@ class BillPaymentsController extends Controller
         $validator = Validator::make($request->all(), [
             'trans_date' => 'required',
             'account_id' => 'required',
-            'method'     => 'required',
-            'customer_id' => 'required',
+            'method'     => 'nullable',
+            'vendor_id'  => 'required',
             'attachment' => 'nullable|mimes:jpeg,JPEG,png,PNG,jpg,doc,pdf,docx,zip',
         ]);
 
@@ -171,138 +171,184 @@ class BillPaymentsController extends Controller
             if ($request->ajax()) {
                 return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
             }
+            return redirect()->back()->withErrors($validator)->withInput();
         }
 
         if ($request->invoices == null) {
             return redirect()->back()->with('error', _lang('Please Select At Least One Invoice'));
         }
 
-        $payment = BillPayment::find($id);
-
-        for ($i = 0; $i < count($request->invoices); $i++) {
+        try {
             DB::beginTransaction();
+            
+            $payment = BillPayment::findOrFail($id);
 
-            $purchase = Purchase::find($request->invoices[$i]);
+            // Validate amounts before processing
+            for ($i = 0; $i < count($request->invoices); $i++) {
+                $purchase = Purchase::findOrFail($request->invoices[$i]);
+                $old_purchase_payment = PurchasePayment::where('purchase_id', $request->invoices[$i])
+                    ->where('payment_id', $payment->id)
+                    ->firstOrFail();
 
-            $old_purchase_payment = PurchasePayment::where('purchase_id', $request->invoices[$i])->where('payment_id', $payment->id)->first();
+                if ($request->amount[$request->invoices[$i]] > ($purchase->grand_total - ($purchase->paid - $old_purchase_payment->amount))) {
+                    throw new \Exception(_lang('Amount must be equal or less than due amount'));
+                }
 
-            if ($request->amount[$request->invoices[$i]] > ($purchase->grand_total - ($purchase->paid - $old_purchase_payment->amount))) {
-                return redirect()->back()->with('error', _lang('Amount must be equal or less than due amount'));
+                if ($request->amount[$request->invoices[$i]] <= 0) {
+                    throw new \Exception(_lang('Amount must be greater than 0'));
+                }
             }
 
-            if ($request->amount[$request->invoices[$i]] <= 0) {
-                return redirect()->back()->with('error', _lang('Amount must be greater than 0'));
-            }
-        }
+            $amount = array_sum(array_map('floatval', $request->amount));
 
-        $amount = 0;
+            // Update payment details
+            $payment->date = Carbon::parse($request->trans_date)->format('Y-m-d');
+            $payment->account_id = $request->account_id;
+            $payment->payment_method = $request->method;
+            $payment->amount = $amount;
+            $payment->vendor_id = $request->vendor_id;
+            $payment->reference = $request->reference;
+            $payment->save();
 
-        foreach ($request->invoices as $invoice) {
-            $amount += $request->amount[$invoice];
-        }
-
-        $payment->date = Carbon::parse($request->trans_date)->format('Y-m-d');
-        $payment->account_id = $request->account_id;
-        $payment->payment_method = $request->method;
-        $payment->amount = $amount;
-        $payment->vendor_id = $request->vendor_id;
-        $payment->reference = $request->reference;
-        $payment->save();
-
-        $attachment = '';
-        if ($request->hasfile('attachment')) {
-            $file       = $request->file('attachment');
-            $attachment = rand() . time() . $file->getClientOriginalName();
-            $file->move(public_path() . "/uploads/media/", $attachment);
-        }
-
-        $currentTime = Carbon::now();
-
-        for ($i = 0; $i < count($request->invoices); $i++) {
-            DB::beginTransaction();
-
-            $purchase = Purchase::find($request->invoices[$i]);
-
-            $old_purchase_payment = PurchasePayment::where('purchase_id', $request->invoices[$i])->where('payment_id', $payment->id)->first();
-
-            $purchase->paid   = $purchase->paid - $old_purchase_payment->amount;
-            if ($purchase->paid >= $purchase->grand_total) {
-                $purchase->status = 2; //Paid
-            } else if ($purchase->paid == 0) {
-                $purchase->status = 0; //Unpaid
-            } else if ($purchase->paid < $purchase->grand_total) {
-                $purchase->status = 1; //Partially Paid
-            }
-            $purchase->save();
-
-            $old_purchase_payment->delete();
-
-            $transactions = Transaction::where('ref_id', $request->invoices[$i])->where('ref_type', 'bill payment')->get();
-
-            foreach ($transactions as $transaction) {
-                $transaction->delete();
+            $attachment = '';
+            if ($request->hasfile('attachment')) {
+                $file = $request->file('attachment');
+                $attachment = rand() . time() . $file->getClientOriginalName();
+                $file->move(public_path() . "/uploads/media/", $attachment);
             }
 
-            $purchase_payment = new PurchasePayment();
-            $purchase_payment->purchase_id = $request->invoices[$i];
-            $purchase_payment->payment_id = $payment->id;
-            $purchase_payment->amount = convert_currency($purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $purchase->currency, $request->amount[$request->invoices[$i]]));
-            $purchase_payment->save();
+            $currentTime = Carbon::now();
 
-            $transaction              = new Transaction();
-            $transaction->trans_date  = Carbon::parse($request->trans_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-            $transaction->account_id  = $request->account_id;
-            $transaction->transaction_method      = $request->method;
-            $transaction->dr_cr       = 'cr';
-            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $purchase->currency, $request->amount[$request->invoices[$i]]);
-            $transaction->transaction_currency    = $purchase->currency;
-            $transaction->currency_rate           = $purchase->exchange_rate;
-            $transaction->base_currency_amount = convert_currency($purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $purchase->currency, $request->amount[$request->invoices[$i]]));
-            $transaction->reference   = $request->reference;
-            $transaction->description = _lang('Bill Invoice Payment') . ' #' . $purchase->bill_no;
-            $transaction->attachment  = $attachment;
-            $transaction->ref_id      = $request->invoices[$i] . ',' . $payment->id;
-            $transaction->ref_type    = 'bill payment';
-            $transaction->vendor_id = $request->vendor_id;
-            $transaction->save();
+            // Process each invoice
+            foreach ($request->invoices as $i => $invoice_id) {
+                $purchase = Purchase::findOrFail($invoice_id);
+                $old_purchase_payment = PurchasePayment::where('purchase_id', $invoice_id)
+                    ->where('payment_id', $payment->id)
+                    ->firstOrFail();
 
-            $transaction              = new Transaction();
-            $transaction->trans_date  = Carbon::parse($request->trans_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-            $transaction->account_id  = get_account('Accounts Payable')->id;
-            $transaction->dr_cr       = 'dr';
-            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $purchase->currency, $request->amount[$request->invoices[$i]]);
-            $transaction->transaction_currency    = $purchase->currency;
-            $transaction->currency_rate           = $purchase->exchange_rate;
-            $transaction->base_currency_amount = convert_currency($purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $purchase->currency, $request->amount[$request->invoices[$i]]));
-            $transaction->reference   = $request->reference;
-            $transaction->description = _lang('Bill Invoice Payment') . ' #' . $purchase->bill_no;
-            $transaction->attachment  = $attachment;
-            $transaction->ref_id      = $request->invoices[$i] . ',' . $payment->id;
-            $transaction->ref_type    = 'bill payment';
-            $transaction->vendor_id = $request->vendor_id;
-            $transaction->save();
+                // Reset purchase paid amount
+                $purchase->paid = $purchase->paid - $old_purchase_payment->amount;
+                $purchase->status = $this->calculatePurchaseStatus($purchase->paid, $purchase->grand_total);
+                $purchase->save();
+
+                // Delete old payment and transactions
+                $old_purchase_payment->delete();
+                Transaction::where('ref_id', $invoice_id . ',' . $payment->id)
+                    ->where('ref_type', 'bill payment')
+                    ->delete();
+
+                // Create new purchase payment
+                $purchase_payment = new PurchasePayment();
+                $purchase_payment->purchase_id = $invoice_id;
+                $purchase_payment->payment_id = $payment->id;
+                $purchase_payment->amount = convert_currency(
+                    $purchase->currency,
+                    $request->activeBusiness->currency,
+                    convert_currency(
+                        $request->activeBusiness->currency,
+                        $purchase->currency,
+                        $request->amount[$invoice_id]
+                    )
+                );
+                $purchase_payment->save();
+
+                // Create credit transaction
+                $this->createTransaction(
+                    $request,
+                    $purchase,
+                    $payment,
+                    $currentTime,
+                    'cr',
+                    $request->account_id,
+                    $attachment,
+                    $invoice_id
+                );
+
+                // Create debit transaction
+                $this->createTransaction(
+                    $request,
+                    $purchase,
+                    $payment,
+                    $currentTime,
+                    'dr',
+                    get_account('Accounts Payable')->id,
+                    $attachment,
+                    $invoice_id
+                );
+
+                // Update purchase paid amount
+                $purchase->paid = $purchase->paid + convert_currency(
+                    $purchase->currency,
+                    $request->activeBusiness->currency,
+                    convert_currency(
+                        $request->activeBusiness->currency,
+                        $purchase->currency,
+                        $request->amount[$invoice_id]
+                    )
+                );
+                $purchase->status = $this->calculatePurchaseStatus($purchase->paid, $purchase->grand_total);
+                $purchase->save();
+            }
+
+            // Create audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Bill Payment Updated for ' . $purchase->bill_no;
+            $audit->save();
 
             DB::commit();
+            return redirect()->route('bill_payments.index')->with('success', _lang('Payment Updated Successfully'));
 
-            $purchase->paid   = $purchase->paid + convert_currency($purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $purchase->currency, $request->amount[$request->invoices[$i]]));
-            if ($purchase->paid >= $purchase->grand_total) {
-                $purchase->status = 2; //Paid
-            } else if ($purchase->paid == 0) {
-                $purchase->status = 0; //Unpaid
-            } else if ($purchase->paid < $purchase->grand_total) {
-                $purchase->status = 1; //Partially Paid
-            }
-            $purchase->save();
+        } catch (\Exception $e) {
+            DB::rollback();
+            return redirect()->back()->with('error', $e->getMessage());
         }
+    }
 
-        // audit log
-        $audit = new AuditLog();
-        $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Bill Payment Updated for ' . $purchase->bill_no;
-        $audit->save();
+    private function calculatePurchaseStatus($paid, $grand_total)
+    {
+        if ($paid >= $grand_total) {
+            return 2; // Paid
+        } elseif ($paid == 0) {
+            return 0; // Unpaid
+        } else {
+            return 1; // Partially Paid
+        }
+    }
 
-        return redirect()->route('bill_payments.index')->with('success', _lang('Payment Updated Successfully'));
+    private function createTransaction($request, $purchase, $payment, $currentTime, $dr_cr, $account_id, $attachment, $invoice_id)
+    {
+        $transaction = new Transaction();
+        $transaction->trans_date = Carbon::parse($request->trans_date)
+            ->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)
+            ->format('Y-m-d H:i:s');
+        $transaction->account_id = $account_id;
+        $transaction->transaction_method = $request->method;
+        $transaction->dr_cr = $dr_cr;
+        $transaction->transaction_amount = convert_currency(
+            $request->activeBusiness->currency,
+            $purchase->currency,
+            $request->amount[$invoice_id]
+        );
+        $transaction->transaction_currency = $purchase->currency;
+        $transaction->currency_rate = $purchase->exchange_rate;
+        $transaction->base_currency_amount = convert_currency(
+            $purchase->currency,
+            $request->activeBusiness->currency,
+            convert_currency(
+                $request->activeBusiness->currency,
+                $purchase->currency,
+                $request->amount[$invoice_id]
+            )
+        );
+        $transaction->reference = $request->reference;
+        $transaction->description = _lang('Bill Invoice Payment') . ' #' . $purchase->bill_no;
+        $transaction->attachment = $attachment;
+        $transaction->ref_id = $invoice_id . ',' . $payment->id;
+        $transaction->ref_type = 'bill payment';
+        $transaction->vendor_id = $request->vendor_id;
+        $transaction->save();
     }
 
     public function destroy(Request $request, $id)

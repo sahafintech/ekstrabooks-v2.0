@@ -24,7 +24,7 @@ return new class extends Migration {
             $table->tinyInteger('stock_management')->default(0);
             $table->decimal('stock', 10, 2)->nullable();
             $table->decimal('intial_stock', 10, 2)->nullable();
-            $table->bigInteger('category_id')->nullable()->unsigned();
+            $table->bigInteger('sub_category_id')->nullable()->unsigned();
             $table->bigInteger('brand_id')->nullable()->unsigned();
             $table->tinyInteger('allow_for_selling')->default(0);
             $table->tinyInteger('allow_for_purchasing')->default(0);

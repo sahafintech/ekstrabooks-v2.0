@@ -11,6 +11,14 @@ use App\Models\Product;
 use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Imports\InventoryAdjustmentImport;
+use App\Jobs\InventoryAdjustmentJob;
 
 class InventoryAdjustmentController extends Controller
 {
@@ -263,5 +271,134 @@ class InventoryAdjustmentController extends Controller
 
         $adjustment->delete();
         return redirect()->route('inventory_adjustments.index')->with('success', 'Inventory adjustment deleted successfully');
+    }
+
+    /**
+     * Show the import form
+     *
+     * @return \Illuminate\View\View
+     */
+    public function import()
+    {
+        return view('backend.user.inventory_adjustment.import');
+    }
+
+    /**
+     * Handle the initial file upload
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function importStore(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'import_file' => 'required|mimes:xlsx,xls|max:2048',
+            'heading' => 'nullable|boolean'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => $validator->errors()->first()]);
+        }
+
+        try {
+            $file = $request->file('import_file');
+            $fileName = 'inventory_adjustment_' . time() . '.' . $file->getClientOriginalExtension();
+            $file->storeAs('imports', $fileName);
+
+            // Store import session data
+            session([
+                'import_file' => $fileName,
+                'has_heading' => $request->boolean('heading', true)
+            ]);
+
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            Log::error('Inventory Adjustment Import Error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => _lang('An error occurred while uploading the file')]);
+        }
+    }
+
+    /**
+     * Show the import progress page
+     *
+     * @return \Illuminate\View\View
+     */
+    public function importProgress()
+    {
+        if (!session('import_file')) {
+            return redirect()->route('inventory_adjustment.import')
+                ->with('error', _lang('No import file found. Please upload a file first.'));
+        }
+
+        return view('backend.user.inventory_adjustment.import_progress');
+    }
+
+    /**
+     * Process the uploaded file
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function importProcess(Request $request)
+    {
+        if (!session('import_file')) {
+            return response()->json(['success' => false, 'message' => _lang('No import file found')]);
+        }
+
+        try {
+            // Get the authenticated user's business ID
+            $businessId = $request->activeBusiness->id;
+            if (!$businessId) {
+                return response()->json(['success' => false, 'message' => _lang('No active business found')]);
+            }
+
+            // Validate the file first
+            $import = new InventoryAdjustmentImport();
+            $filePath = storage_path('app/imports/' . session('import_file'));
+            
+            // Validate the Excel file structure
+            try {
+                $rows = Excel::toCollection($import, $filePath)->first();
+                if ($rows->isEmpty()) {
+                    return response()->json(['success' => false, 'message' => _lang('The file is empty')]);
+                }
+            } catch (Exception $e) {
+                Log::error('Excel Import Error: ' . $e->getMessage());
+                return response()->json(['success' => false, 'message' => _lang('Invalid file format')]);
+            }
+
+            // Dispatch the batch with the job
+            $batch = Bus::batch([
+                new InventoryAdjustmentJob(
+                    $filePath,
+                    auth()->id(),
+                    $businessId
+                )
+            ])
+            ->name('inventory-adjustment')
+            ->onQueue('inventory-adjustment')
+            ->dispatch();
+
+            // Clear the import session data
+            session()->forget(['import_file', 'has_heading']);
+
+            return redirect()->route('inventory_adjustments.index')->with('success', _lang('Inventory adjustments imported successfully'));
+        } catch (Exception $e) {
+            Log::error('Inventory Adjustment Import Process Error: ' . $e->getMessage());
+            return redirect()->route('inventory_adjustments.index')->with('error', _lang('An error occurred while processing the file'));
+        }
+    }
+
+    public function importProcessProgress($batchId)
+    {
+        $batch = Bus::findBatch($batchId);
+        
+        return response()->json([
+            'total' => $batch->totalJobs,
+            'processed' => $batch->processedJobs(),
+            'progress' => $batch->progress(),
+            'finished' => $batch->finished(),
+            'failed' => $batch->failedJobs
+        ]);
     }
 }

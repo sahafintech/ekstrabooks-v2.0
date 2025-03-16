@@ -2021,7 +2021,7 @@ class ReportController extends Controller
 
 	public function inventory_details_export()
 	{
-		return Excel::download(new InventoryDetailsExport(session('start_date'), session('end_date'), session('category')), 'inventory details ' . now()->format('d m Y') . '.xlsx');
+		return Excel::download(new InventoryDetailsExport(session('start_date'), session('end_date'), session('sub_category')), 'inventory details ' . now()->format('d m Y') . '.xlsx');
 	}
 
 	public function inventory_summary_export()
@@ -2284,6 +2284,7 @@ class ReportController extends Controller
 		} else if ($request->isMethod('post')) {
 			@ini_set('max_execution_time', 0);
 			@set_time_limit(0);
+
 			$data = array();
 			$month = $request->month;
 			$year = $request->year;
@@ -2581,44 +2582,67 @@ class ReportController extends Controller
 			$page_title = _lang('Inventory Details Report');
 			$data = array();
 
-			$category = 'all';
+			$sub_category = 'all';
+			$main_category = 'all';
 
 			$date1 = Carbon::now()->subDays(30)->format('Y-m-d');
 			$date2 = Carbon::now()->format('Y-m-d');
 
 			session(['start_date' => $date1]);
 			session(['end_date' => $date2]);
-			session(['category' => $category]);
-
+			session(['sub_category' => $sub_category]);
+			session(['main_category' => $main_category]);
 
 			$products = Product::select(
 				'products.*',
-				'categories.id as category_id',
-				'categories.name as category_name',
+				'sub_categories.id as category_id',
+				'sub_categories.name as category_name',
 				'product_brands.id as brand_id',
-				'product_brands.name as brand_name'
+				'product_brands.name as brand_name',
+				'main_categories.id as main_category_id',
+				'main_categories.name as main_category_name'
 			)
-				->join('categories', 'categories.id', '=', 'products.category_id')
-				->join('product_brands', 'product_brands.id', '=', 'products.brand_id')
+				->leftJoin('sub_categories', 'sub_categories.id', '=', 'products.sub_category_id')
+				->leftJoin('product_brands', 'product_brands.id', '=', 'products.brand_id')
+				->leftJoin('main_categories', 'main_categories.id', '=', 'sub_categories.main_category_id')
 				->addSelect([
 					'total_sold_invoices' => InvoiceItem::selectRaw('IFNULL(SUM(quantity), 0)')
-						->whereColumn('product_id', 'products.id'),
+						->whereColumn('product_id', 'products.id')
+						->whereHas('invoice', function ($query) use ($date1, $date2) {
+							$query->whereDate('invoice_date', '>=', $date1)
+								->whereDate('invoice_date', '<=', $date2);
+						}),
 					'total_sold_receipts' => ReceiptItem::selectRaw('IFNULL(SUM(quantity), 0)')
-						->whereColumn('product_id', 'products.id'),
+						->whereColumn('product_id', 'products.id')
+						->whereHas('receipt', function ($query) use ($date1, $date2) {
+							$query->whereDate('receipt_date', '>=', $date1)
+								->whereDate('receipt_date', '<=', $date2);
+						}),
 					'total_stock_in' => PurchaseItem::selectRaw('IFNULL(SUM(quantity), 0)')
-						->whereColumn('product_id', 'products.id'),
+						->whereColumn('product_id', 'products.id')
+						->whereHas('purchase', function ($query) use ($date1, $date2) {
+							$query->whereDate('purchase_date', '>=', $date1)
+								->whereDate('purchase_date', '<=', $date2);
+						}),
 					'total_stock_adjustment_added' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
 						->whereColumn('product_id', 'products.id')
-						->where('adjustment_type', 'adds'),
+						->where('adjustment_type', 'adds')
+						->whereDate('adjustment_date', '>=', $date1)
+						->whereDate('adjustment_date', '<=', $date2),
 					'total_stock_adjustment_deducted' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
 						->whereColumn('product_id', 'products.id')
-						->where('adjustment_type', 'deducts'),
+						->where('adjustment_type', 'deducts')
+						->whereDate('adjustment_date', '>=', $date1)
+						->whereDate('adjustment_date', '<=', $date2),
 				])
 				->get()
 				->map(function ($product) {
 					// Calculate the total sold by summing invoices and receipts
-					$product->total_sold = $product->total_sold_invoices + $product->total_sold_receipts;
+					$product->total_sold = ($product->total_sold_invoices ?? 0) + ($product->total_sold_receipts ?? 0);
+
+					// Calculate total stock cost
 					$product->total_stock_cost = $product->stock * $product->purchase_cost;
+
 					return $product;
 				});
 
@@ -2629,7 +2653,7 @@ class ReportController extends Controller
 				// Extract category ID and name
 				[$categoryId, $categoryName] = explode('|', $categoryKey);
 
-				// Step 3: Within each category, group by brand and calculate total_sold per brand
+				// Step 3: Within each category, group by brand and calculate metrics
 				$brands = $categoryGroup->groupBy(function ($product) {
 					return $product->brand_id . '|' . $product->brand_name;
 				})->map(function ($brandGroup, $brandKey) {
@@ -2639,10 +2663,14 @@ class ReportController extends Controller
 					// Calculate total sold for the brand
 					$brandTotalSold = $brandGroup->sum('total_sold');
 
+					// Calculate total stock cost for the brand
+					$brandTotalStockCost = $brandGroup->sum('total_stock_cost');
+
 					return [
 						'brand_id' => $brandId,
 						'brand_name' => $brandName,
 						'total_sold' => $brandTotalSold,
+						'total_stock_cost' => $brandTotalStockCost,
 						'products' => $brandGroup->sortByDesc('total_sold')->values(),
 					];
 				});
@@ -2650,10 +2678,15 @@ class ReportController extends Controller
 				// Step 4: Sort brands within the category by total_sold descending
 				$sortedBrands = $brands->sortByDesc('total_sold')->values();
 
+				// Calculate total sold and stock cost for the category
+				$categoryTotalSold = $categoryGroup->sum('total_sold');
+				$categoryTotalStockCost = $categoryGroup->sum('total_stock_cost');
+
 				return [
 					'category_id' => $categoryId,
 					'category_name' => $categoryName,
-					'total_sold' => $categoryGroup->sum('total_sold'),
+					'total_sold' => $categoryTotalSold,
+					'total_stock_cost' => $categoryTotalStockCost,
 					'brands' => $sortedBrands,
 				];
 			});
@@ -2672,174 +2705,144 @@ class ReportController extends Controller
 			@set_time_limit(0);
 
 			$data = array();
-			$category = $request->category;
+			$sub_category = $request->sub_category;
+			$main_category = $request->main_category;
 
 			$date1 = Carbon::parse($request->date1)->format('Y-m-d');
 			$date2 = Carbon::parse($request->date2)->format('Y-m-d');
 
 			session(['start_date' => $date1]);
 			session(['end_date' => $date2]);
-			session(['category' => $category]);
+			session(['sub_category' => $sub_category]);
+			session(['main_category' => $main_category]);
 
+			$query = Product::select(
+				'products.*',
+				'sub_categories.id as category_id',
+				'sub_categories.name as category_name',
+				'product_brands.id as brand_id',
+				'product_brands.name as brand_name',
+				'main_categories.id as main_category_id',
+				'main_categories.name as main_category_name'
+			)
+				->leftJoin('sub_categories', 'sub_categories.id', '=', 'products.sub_category_id')
+				->leftJoin('product_brands', 'product_brands.id', '=', 'products.brand_id')
+				->leftJoin('main_categories', 'main_categories.id', '=', 'sub_categories.main_category_id');
 
-			if ($category == 'all') {
-				$products = Product::select(
-					'products.*',
-					'categories.id as category_id',
-					'categories.name as category_name',
-					'product_brands.id as brand_id',
-					'product_brands.name as brand_name'
-				)
-					->join('categories', 'categories.id', '=', 'products.category_id')
-					->join('product_brands', 'product_brands.id', '=', 'products.brand_id')
-					->addSelect([
-						'total_sold_invoices' => InvoiceItem::selectRaw('IFNULL(SUM(quantity), 0)')
-							->whereColumn('product_id', 'products.id'),
-						'total_sold_receipts' => ReceiptItem::selectRaw('IFNULL(SUM(quantity), 0)')
-							->whereColumn('product_id', 'products.id'),
-						'total_stock_in' => PurchaseItem::selectRaw('IFNULL(SUM(quantity), 0)')
-							->whereColumn('product_id', 'products.id'),
-						'total_stock_adjustment_added' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
-							->whereColumn('product_id', 'products.id')
-							->where('adjustment_type', 'adds'),
-						'total_stock_adjustment_deducted' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
-							->whereColumn('product_id', 'products.id')
-							->where('adjustment_type', 'deducts'),
-					])
-					->get()
-					->map(function ($product) {
-						// Calculate the total sold by summing invoices and receipts
-						$product->total_sold = $product->total_sold_invoices + $product->total_sold_receipts;
-						$product->total_stock_cost = $product->stock * $product->purchase_cost;
-						return $product;
-					});
-
-				// Step 2: Group products by category
-				$groupedByCategory = $products->groupBy(function ($product) {
-					return $product->category_id . '|' . $product->category_name;
-				})->map(function ($categoryGroup, $categoryKey) {
-					// Extract category ID and name
-					[$categoryId, $categoryName] = explode('|', $categoryKey);
-
-					// Step 3: Within each category, group by brand and calculate total_sold per brand
-					$brands = $categoryGroup->groupBy(function ($product) {
-						return $product->brand_id . '|' . $product->brand_name;
-					})->map(function ($brandGroup, $brandKey) {
-						// Extract brand ID and name
-						[$brandId, $brandName] = explode('|', $brandKey);
-
-						// Calculate total sold for the brand
-						$brandTotalSold = $brandGroup->sum('total_sold');
-
-						return [
-							'brand_id' => $brandId,
-							'brand_name' => $brandName,
-							'total_sold' => $brandTotalSold,
-							'products' => $brandGroup->sortByDesc('total_sold')->values(),
-						];
-					});
-
-					// Step 4: Sort brands within the category by total_sold descending
-					$sortedBrands = $brands->sortByDesc('total_sold')->values();
-
-					return [
-						'category_id' => $categoryId,
-						'category_name' => $categoryName,
-						'total_sold' => $categoryGroup->sum('total_sold'),
-						'brands' => $sortedBrands,
-					];
-				});
-
-				// Step 5: Optionally, sort categories as needed (e.g., by total_sold descending)
-				$sortedCategories = $groupedByCategory->sortByDesc('total_sold')->values();
-
-				// Assign to your data array
-				$data['products'] = $sortedCategories;
-			} else {
-				$products = Product::select(
-					'products.*',
-					'categories.id as category_id',
-					'categories.name as category_name',
-					'product_brands.id as brand_id',
-					'product_brands.name as brand_name'
-				)
-					->join('categories', 'categories.id', '=', 'products.category_id')
-					->join('product_brands', 'product_brands.id', '=', 'products.brand_id')
-					->addSelect([
-						'total_sold_invoices' => InvoiceItem::selectRaw('IFNULL(SUM(quantity), 0)')
-							->whereColumn('product_id', 'products.id'),
-						'total_sold_receipts' => ReceiptItem::selectRaw('IFNULL(SUM(quantity), 0)')
-							->whereColumn('product_id', 'products.id'),
-						'total_stock_in' => PurchaseItem::selectRaw('IFNULL(SUM(quantity), 0)')
-							->whereColumn('product_id', 'products.id'),
-						'total_stock_adjustment_added' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
-							->whereColumn('product_id', 'products.id')
-							->where('adjustment_type', 'adds'),
-						'total_stock_adjustment_deducted' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
-							->whereColumn('product_id', 'products.id')
-							->where('adjustment_type', 'deducts'),
-					])
-					->where('categories.name', $category)
-					->get()
-					->map(function ($product) {
-						// Calculate the total sold by summing invoices and receipts
-						$product->total_sold = $product->total_sold_invoices + $product->total_sold_receipts;
-						$product->total_stock_cost = $product->stock * $product->purchase_cost;
-						return $product;
-					});
-
-				// Step 2: Group products by category
-				$groupedByCategory = $products->groupBy(function ($product) {
-					return $product->category_id . '|' . $product->category_name;
-				})->map(function ($categoryGroup, $categoryKey) {
-					// Extract category ID and name
-					[$categoryId, $categoryName] = explode('|', $categoryKey);
-
-					// Step 3: Within each category, group by brand and calculate total_sold per brand
-					$brands = $categoryGroup->groupBy(function ($product) {
-						return $product->brand_id . '|' . $product->brand_name;
-					})->map(function ($brandGroup, $brandKey) {
-						// Extract brand ID and name
-						[$brandId, $brandName] = explode('|', $brandKey);
-
-						// Calculate total sold for the brand
-						$brandTotalSold = $brandGroup->sum('total_sold');
-
-						return [
-							'brand_id' => $brandId,
-							'brand_name' => $brandName,
-							'total_sold' => $brandTotalSold,
-							'products' => $brandGroup->sortByDesc('total_sold')->values(),
-						];
-					});
-
-					// Step 4: Sort brands within the category by total_sold descending
-					$sortedBrands = $brands->sortByDesc('total_sold')->values();
-
-					return [
-						'category_id' => $categoryId,
-						'category_name' => $categoryName,
-						'total_sold' => $categoryGroup->sum('total_sold'),
-						'brands' => $sortedBrands,
-					];
-				});
-
-				// Step 5: Optionally, sort categories as needed (e.g., by total_sold descending)
-				$sortedCategories = $groupedByCategory->sortByDesc('total_sold')->values();
-
-				// Assign to your data array
-				$data['products'] = $sortedCategories;
+			if ($main_category !== 'all') {
+				$query->where('main_categories.id', $main_category);
 			}
+
+			if ($sub_category !== 'all') {
+				$query->where('sub_categories.id', $sub_category);
+			}
+
+			$products = $query->addSelect([
+				'total_sold_invoices' => InvoiceItem::selectRaw('IFNULL(SUM(quantity), 0)')
+					->whereColumn('product_id', 'products.id')
+					->whereIn('product_id', Product::pluck('id')) // Ensures all products are included
+					->whereHas('invoice', function ($query) use ($date1, $date2) {
+						$query->whereBetween('invoice_date', [$date1, $date2]);
+					}, 'or'), // OR condition ensures products without invoices are not excluded
+
+				'total_sold_receipts' => ReceiptItem::selectRaw('IFNULL(SUM(quantity), 0)')
+					->whereColumn('product_id', 'products.id')
+					->whereIn('product_id', Product::pluck('id'))
+					->whereHas('receipt', function ($query) use ($date1, $date2) {
+						$query->whereBetween('receipt_date', [$date1, $date2]);
+					}, 'or'),
+
+				'total_stock_in' => PurchaseItem::selectRaw('IFNULL(SUM(quantity), 0)')
+					->whereColumn('product_id', 'products.id')
+					->whereIn('product_id', Product::pluck('id'))
+					->whereHas('purchase', function ($query) use ($date1, $date2) {
+						$query->whereBetween('purchase_date', [$date1, $date2]);
+					}, 'or'),
+
+				'total_stock_adjustment_added' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
+					->whereColumn('product_id', 'products.id')
+					->where('adjustment_type', 'adds')
+					->whereDate('adjustment_date', '>=', $date1)
+					->whereDate('adjustment_date', '<=', $date2),
+
+				'total_stock_adjustment_deducted' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
+					->whereColumn('product_id', 'products.id')
+					->where('adjustment_type', 'deducts')
+					->whereDate('adjustment_date', '>=', $date1)
+					->whereDate('adjustment_date', '<=', $date2),
+			])->get()
+				->map(function ($product) {
+					// Calculate the total sold by summing invoices and receipts
+					$product->total_sold = ($product->total_sold_invoices ?? 0) + ($product->total_sold_receipts ?? 0);
+
+					// Calculate total stock cost
+					$product->total_stock_cost = $product->stock * $product->purchase_cost;
+
+					return $product;
+				});
+
+			// Step 2: Group products by category
+			$groupedByCategory = $products->groupBy(function ($product) {
+				return $product->category_id . '|' . $product->category_name;
+			})->map(function ($categoryGroup, $categoryKey) {
+				// Extract category ID and name
+				[$categoryId, $categoryName] = explode('|', $categoryKey);
+
+				// Step 3: Within each category, group by brand and calculate metrics
+				$brands = $categoryGroup->groupBy(function ($product) {
+					return $product->brand_id . '|' . $product->brand_name;
+				})->map(function ($brandGroup, $brandKey) {
+					// Extract brand ID and name
+					[$brandId, $brandName] = explode('|', $brandKey);
+
+					// Calculate total sold for the brand
+					$brandTotalSold = $brandGroup->sum('total_sold');
+
+					// Calculate total stock cost for the brand
+					$brandTotalStockCost = $brandGroup->sum('total_stock_cost');
+
+					return [
+						'brand_id' => $brandId,
+						'brand_name' => $brandName,
+						'total_sold' => $brandTotalSold,
+						'total_stock_cost' => $brandTotalStockCost,
+						'products' => $brandGroup->sortByDesc('total_sold')->values(),
+					];
+				});
+
+				// Step 4: Sort brands within the category by total_sold descending
+				$sortedBrands = $brands->sortByDesc('total_sold')->values();
+
+				// Calculate total sold and stock cost for the category
+				$categoryTotalSold = $categoryGroup->sum('total_sold');
+				$categoryTotalStockCost = $categoryGroup->sum('total_stock_cost');
+
+				return [
+					'category_id' => $categoryId,
+					'category_name' => $categoryName,
+					'total_sold' => $categoryTotalSold,
+					'total_stock_cost' => $categoryTotalStockCost,
+					'brands' => $sortedBrands,
+				];
+			});
+
+			// Step 5: Optionally, sort categories as needed (e.g., by total_sold descending)
+			$sortedCategories = $groupedByCategory->sortByDesc('total_sold')->values();
+
+			// Assign to your data array
+			$data['products'] = $sortedCategories;
 
 			$data['date1'] = Carbon::parse($request->date1);
 			$data['date2'] = Carbon::parse($request->date2);
 
 			$data['page_title'] = _lang('Inventory Details Report');
-			$data['category'] = $category;
+			$data['sub_category'] = $sub_category;
+			$data['main_category'] = $main_category;
 
 			return view('backend.user.reports.inventory_details', $data);
 		}
 	}
+
 	public function inventory_summary(Request $request)
 	{
 		if ($request->isMethod('get')) {
@@ -2854,43 +2857,62 @@ class ReportController extends Controller
 
 			$products = Product::select(
 				'products.*',
-				'categories.id as category_id',
-				'categories.name as category_name',
+				'sub_categories.id as sub_category_id',
+				'sub_categories.name as sub_category_name',
 				'product_brands.id as brand_id',
 				'product_brands.name as brand_name'
 			)
-				->join('categories', 'categories.id', '=', 'products.category_id')
-				->join('product_brands', 'product_brands.id', '=', 'products.brand_id')
+				->leftjoin('sub_categories', 'sub_categories.id', '=', 'products.sub_category_id')
+				->leftjoin('product_brands', 'product_brands.id', '=', 'products.brand_id')
 				->addSelect([
 					'total_sold_invoices' => InvoiceItem::selectRaw('IFNULL(SUM(quantity), 0)')
-						->whereColumn('product_id', 'products.id'),
+						->whereColumn('product_id', 'products.id')
+						->whereHas('invoice', function ($query) use ($date1, $date2) {
+							$query->whereDate('invoice_date', '>=', $date1)
+								->whereDate('invoice_date', '<=', $date2);
+						}),
 					'total_sold_receipts' => ReceiptItem::selectRaw('IFNULL(SUM(quantity), 0)')
-						->whereColumn('product_id', 'products.id'),
+						->whereColumn('product_id', 'products.id')
+						->whereHas('receipt', function ($query) use ($date1, $date2) {
+							$query->whereDate('receipt_date', '>=', $date1)
+								->whereDate('receipt_date', '<=', $date2);
+						}),
 					'total_stock_in' => PurchaseItem::selectRaw('IFNULL(SUM(quantity), 0)')
-						->whereColumn('product_id', 'products.id'),
+						->whereColumn('product_id', 'products.id')
+						->whereHas('purchase', function ($query) use ($date1, $date2) {
+							$query->whereDate('purchase_date', '>=', $date1)
+								->whereDate('purchase_date', '<=', $date2);
+						}),
 					'total_stock_adjustment_added' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
 						->whereColumn('product_id', 'products.id')
-						->where('adjustment_type', 'adds'),
+						->where('adjustment_type', 'adds')
+						->whereDate('adjustment_date', '>=', $date1)
+						->whereDate('adjustment_date', '<=', $date2),
 					'total_stock_adjustment_deducted' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
 						->whereColumn('product_id', 'products.id')
-						->where('adjustment_type', 'deducts'),
+						->where('adjustment_type', 'deducts')
+						->whereDate('adjustment_date', '>=', $date1)
+						->whereDate('adjustment_date', '<=', $date2),
 				])
 				->get()
 				->map(function ($product) {
 					// Calculate the total sold by summing invoices and receipts
-					$product->total_sold = $product->total_sold_invoices + $product->total_sold_receipts;
+					$product->total_sold = ($product->total_sold_invoices ?? 0) + ($product->total_sold_receipts ?? 0);
+
+					// Calculate total stock cost
 					$product->total_stock_cost = $product->stock * $product->purchase_cost;
+
 					return $product;
 				});
 
 			// Step 2: Group products by category
 			$groupedByCategory = $products->groupBy(function ($product) {
-				return $product->category_id . '|' . $product->category_name;
+				return $product->sub_category_id . '|' . $product->sub_category_name;
 			})->map(function ($categoryGroup, $categoryKey) {
 				// Extract category ID and name
 				[$categoryId, $categoryName] = explode('|', $categoryKey);
 
-				// Step 3: Within each category, group by brand and calculate total_sold per brand
+				// Step 3: Within each category, group by brand and calculate metrics
 				$brands = $categoryGroup->groupBy(function ($product) {
 					return $product->brand_id . '|' . $product->brand_name;
 				})->map(function ($brandGroup, $brandKey) {
@@ -2900,10 +2922,14 @@ class ReportController extends Controller
 					// Calculate total sold for the brand
 					$brandTotalSold = $brandGroup->sum('total_sold');
 
+					// Calculate total stock cost for the brand
+					$brandTotalStockCost = $brandGroup->sum('total_stock_cost');
+
 					return [
 						'brand_id' => $brandId,
 						'brand_name' => $brandName,
 						'total_sold' => $brandTotalSold,
+						'total_stock_cost' => $brandTotalStockCost,
 						'products' => $brandGroup->sortByDesc('total_sold')->values(),
 					];
 				});
@@ -2911,10 +2937,15 @@ class ReportController extends Controller
 				// Step 4: Sort brands within the category by total_sold descending
 				$sortedBrands = $brands->sortByDesc('total_sold')->values();
 
+				// Calculate total sold and stock cost for the category
+				$categoryTotalSold = $categoryGroup->sum('total_sold');
+				$categoryTotalStockCost = $categoryGroup->sum('total_stock_cost');
+
 				return [
 					'category_id' => $categoryId,
 					'category_name' => $categoryName,
-					'total_sold' => $categoryGroup->sum('total_sold'),
+					'total_sold' => $categoryTotalSold,
+					'total_stock_cost' => $categoryTotalStockCost,
 					'brands' => $sortedBrands,
 				];
 			});
@@ -2942,46 +2973,64 @@ class ReportController extends Controller
 			session(['end_date' => $date2]);
 			session(['category' => $category]);
 
-
 			$products = Product::select(
 				'products.*',
-				'categories.id as category_id',
-				'categories.name as category_name',
+				'sub_categories.id as sub_category_id',
+				'sub_categories.name as sub_category_name',
 				'product_brands.id as brand_id',
 				'product_brands.name as brand_name'
 			)
-				->join('categories', 'categories.id', '=', 'products.category_id')
-				->join('product_brands', 'product_brands.id', '=', 'products.brand_id')
+				->leftjoin('sub_categories', 'sub_categories.id', '=', 'products.sub_category_id')
+				->leftjoin('product_brands', 'product_brands.id', '=', 'products.brand_id')
 				->addSelect([
 					'total_sold_invoices' => InvoiceItem::selectRaw('IFNULL(SUM(quantity), 0)')
-						->whereColumn('product_id', 'products.id'),
+						->whereColumn('product_id', 'products.id')
+						->whereHas('invoice', function ($query) use ($date1, $date2) {
+							$query->whereDate('invoice_date', '>=', $date1)
+								->whereDate('invoice_date', '<=', $date2);
+						}),
 					'total_sold_receipts' => ReceiptItem::selectRaw('IFNULL(SUM(quantity), 0)')
-						->whereColumn('product_id', 'products.id'),
+						->whereColumn('product_id', 'products.id')
+						->whereHas('receipt', function ($query) use ($date1, $date2) {
+							$query->whereDate('receipt_date', '>=', $date1)
+								->whereDate('receipt_date', '<=', $date2);
+						}),
 					'total_stock_in' => PurchaseItem::selectRaw('IFNULL(SUM(quantity), 0)')
-						->whereColumn('product_id', 'products.id'),
+						->whereColumn('product_id', 'products.id')
+						->whereHas('purchase', function ($query) use ($date1, $date2) {
+							$query->whereDate('purchase_date', '>=', $date1)
+								->whereDate('purchase_date', '<=', $date2);
+						}),
 					'total_stock_adjustment_added' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
 						->whereColumn('product_id', 'products.id')
-						->where('adjustment_type', 'adds'),
+						->where('adjustment_type', 'adds')
+						->whereDate('adjustment_date', '>=', $date1)
+						->whereDate('adjustment_date', '<=', $date2),
 					'total_stock_adjustment_deducted' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
 						->whereColumn('product_id', 'products.id')
-						->where('adjustment_type', 'deducts'),
+						->where('adjustment_type', 'deducts')
+						->whereDate('adjustment_date', '>=', $date1)
+						->whereDate('adjustment_date', '<=', $date2),
 				])
 				->get()
 				->map(function ($product) {
 					// Calculate the total sold by summing invoices and receipts
-					$product->total_sold = $product->total_sold_invoices + $product->total_sold_receipts;
+					$product->total_sold = ($product->total_sold_invoices ?? 0) + ($product->total_sold_receipts ?? 0);
+
+					// Calculate total stock cost
 					$product->total_stock_cost = $product->stock * $product->purchase_cost;
+
 					return $product;
 				});
 
 			// Step 2: Group products by category
 			$groupedByCategory = $products->groupBy(function ($product) {
-				return $product->category_id . '|' . $product->category_name;
+				return $product->sub_category_id . '|' . $product->sub_category_name;
 			})->map(function ($categoryGroup, $categoryKey) {
 				// Extract category ID and name
 				[$categoryId, $categoryName] = explode('|', $categoryKey);
 
-				// Step 3: Within each category, group by brand and calculate total_sold per brand
+				// Step 3: Within each category, group by brand and calculate metrics
 				$brands = $categoryGroup->groupBy(function ($product) {
 					return $product->brand_id . '|' . $product->brand_name;
 				})->map(function ($brandGroup, $brandKey) {
@@ -2991,10 +3040,14 @@ class ReportController extends Controller
 					// Calculate total sold for the brand
 					$brandTotalSold = $brandGroup->sum('total_sold');
 
+					// Calculate total stock cost for the brand
+					$brandTotalStockCost = $brandGroup->sum('total_stock_cost');
+
 					return [
 						'brand_id' => $brandId,
 						'brand_name' => $brandName,
 						'total_sold' => $brandTotalSold,
+						'total_stock_cost' => $brandTotalStockCost,
 						'products' => $brandGroup->sortByDesc('total_sold')->values(),
 					];
 				});
@@ -3002,10 +3055,15 @@ class ReportController extends Controller
 				// Step 4: Sort brands within the category by total_sold descending
 				$sortedBrands = $brands->sortByDesc('total_sold')->values();
 
+				// Calculate total sold and stock cost for the category
+				$categoryTotalSold = $categoryGroup->sum('total_sold');
+				$categoryTotalStockCost = $categoryGroup->sum('total_stock_cost');
+
 				return [
 					'category_id' => $categoryId,
 					'category_name' => $categoryName,
-					'total_sold' => $categoryGroup->sum('total_sold'),
+					'total_sold' => $categoryTotalSold,
+					'total_stock_cost' => $categoryTotalStockCost,
 					'brands' => $sortedBrands,
 				];
 			});
@@ -3088,12 +3146,12 @@ class ReportController extends Controller
 					// Calculate total sales
 					$product->total_sales = ($product->sub_total_invoices ?? 0) + ($product->sub_total_receipts ?? 0);
 
-					// Calculate gross profit
-					$product->gross_profit = ($product->selling_price - $product->purchase_cost) * $product->total_sold;
-
 					// Calculate average price
 					$total_sub_total = ($product->sub_total_invoices ?? 0) + ($product->sub_total_receipts ?? 0);
 					$product->average_price = $product->total_sold > 0 ? $total_sub_total / $product->total_sold : 0;
+
+					// Calculate gross profit
+					$product->gross_profit = ($product->average_price - $product->purchase_cost) * $product->total_sold;
 
 					// Calculate profit margin
 					// Corrected formula: (Total Sales - Total Cost) / Total Sales * 100
@@ -3255,12 +3313,12 @@ class ReportController extends Controller
 						// Calculate total sales
 						$product->total_sales = ($product->sub_total_invoices ?? 0) + ($product->sub_total_receipts ?? 0);
 
-						// Calculate gross profit
-						$product->gross_profit = ($product->selling_price - $product->purchase_cost) * $product->total_sold;
-
 						// Calculate average price
 						$total_sub_total = ($product->sub_total_invoices ?? 0) + ($product->sub_total_receipts ?? 0);
 						$product->average_price = $product->total_sold > 0 ? $total_sub_total / $product->total_sold : 0;
+
+						// Calculate gross profit
+						$product->gross_profit = ($product->average_price - $product->purchase_cost) * $product->total_sold;
 
 						// Calculate profit margin
 						// Corrected formula: (Total Sales - Total Cost) / Total Sales * 100
@@ -3405,12 +3463,12 @@ class ReportController extends Controller
 						// Calculate total sales
 						$product->total_sales = ($product->sub_total_invoices ?? 0) + ($product->sub_total_receipts ?? 0);
 
-						// Calculate gross profit
-						$product->gross_profit = ($product->selling_price - $product->purchase_cost) * $product->total_sold;
-
 						// Calculate average price
 						$total_sub_total = ($product->sub_total_invoices ?? 0) + ($product->sub_total_receipts ?? 0);
 						$product->average_price = $product->total_sold > 0 ? $total_sub_total / $product->total_sold : 0;
+
+						// Calculate gross profit
+						$product->gross_profit = ($product->average_price - $product->purchase_cost) * $product->total_sold;
 
 						// Calculate profit margin
 						// Corrected formula: (Total Sales - Total Cost) / Total Sales * 100

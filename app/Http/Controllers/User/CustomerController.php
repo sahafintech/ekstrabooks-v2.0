@@ -151,6 +151,16 @@ class CustomerController extends Controller
                 ->where('is_recurring', 0)
                 ->where('status', '!=', 0)
                 ->first();
+            
+            // Get recent transactions for the customer
+            $data['recent_transactions'] = Transaction::where('customer_id', $id)
+                ->whereHas('account', function ($query) {
+                    $query->where('account_type', '=', 'Cash')
+                        ->orWhere('account_type', '=', 'Bank');
+                })
+                ->orderBy('trans_date', 'desc')
+                ->limit(5)
+                ->get();
         }
 
         if (isset($_GET['tab']) && $_GET['tab'] == 'invoices') {

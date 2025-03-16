@@ -23,5 +23,9 @@ class Customer extends Model
     public function quotations(){
         return $this->hasMany(Quotation::class, 'customer_id');
     }
+    
+    public function documents(){
+        return $this->hasMany(CustomerDocument::class, 'customer_id');
+    }
 
 }

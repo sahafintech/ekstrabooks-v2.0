@@ -10,6 +10,7 @@ use App\Models\Purchase;
 use App\Models\PurchaseItem;
 use App\Models\PurchaseItemTax;
 use App\Models\Tax;
+use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -707,5 +708,213 @@ class PurchaseOrderController extends Controller
 		$audit->save();
 
 		return Excel::download(new BillInvoiceExport, 'purchases ' . now()->format('d m Y') . '.xlsx');
+	}
+
+	public function convert_to_bill($id)
+	{
+		DB::beginTransaction();
+		try {
+			$purchase = Purchase::find($id);
+			$purchase->order = 0;
+			$purchase->cash = 0;
+			$purchase->status = 0;
+			$purchase->approval_status = 1;
+			$purchase->save();
+			
+			// Set current time for transaction dates
+			$currentTime = Carbon::now();
+			
+			// Create transactions for each purchase item
+			foreach ($purchase->items as $purchaseItem) {
+				// Create transaction for the item
+				$transaction = new Transaction();
+				$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
+				$transaction->account_id = $purchaseItem->account_id;
+				$transaction->dr_cr = 'dr';
+				$transaction->transaction_amount = $purchaseItem->sub_total;
+				$transaction->transaction_currency = $purchase->currency;
+				$transaction->currency_rate = $purchase->exchange_rate;
+				$transaction->base_currency_amount = convert_currency($purchase->currency, $purchase->business->currency, $purchaseItem->sub_total);
+				$transaction->ref_type = 'bill invoice';
+				$transaction->vendor_id = $purchase->vendor_id;
+				$transaction->ref_id = $purchase->id;
+				$transaction->description = 'Bill Invoice #' . $purchase->bill_no;
+				$transaction->save();
+
+				// increase product stock
+				if ($purchaseItem->product->type == 'product' && $purchaseItem->product->stock_management == 1) {
+					$purchaseItem->product->stock = $purchaseItem->product->stock + $purchaseItem->quantity;
+					$purchaseItem->product->save();
+				}
+
+				// Create transactions for taxes if any
+				foreach ($purchaseItem->taxes as $tax) {
+					$transaction = new Transaction();
+					$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
+					$transaction->account_id = $tax->tax->account_id;
+					$transaction->dr_cr = 'dr';
+					$transaction->transaction_amount = $tax->amount;
+					$transaction->transaction_currency = $purchase->currency;
+					$transaction->currency_rate = $purchase->exchange_rate;
+					$transaction->base_currency_amount = convert_currency($purchase->currency, $purchase->business->currency, $tax->amount);
+					$transaction->description = _lang('Bill Invoice Tax') . ' #' . $purchase->bill_no;
+					$transaction->ref_id = $purchase->id;
+					$transaction->ref_type = 'bill invoice tax';
+					$transaction->tax_id = $tax->tax_id;
+					$transaction->save();
+				}
+			}
+
+			// Create accounts payable transaction
+			$transaction = new Transaction();
+			$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
+			$transaction->account_id = get_account('Accounts Payable')->id;
+			$transaction->dr_cr = 'cr';
+			$transaction->transaction_amount = $purchase->grand_total;
+			$transaction->transaction_currency = $purchase->currency;
+			$transaction->currency_rate = $purchase->exchange_rate;
+			$transaction->base_currency_amount = convert_currency($purchase->currency, $purchase->business->currency, $purchase->grand_total);
+			$transaction->ref_type = 'bill invoice';
+			$transaction->vendor_id = $purchase->vendor_id;
+			$transaction->ref_id = $purchase->id;
+			$transaction->description = 'Bill Invoice Payable #' . $purchase->bill_no;
+			$transaction->save();
+
+			// Create discount transaction if applicable
+			if ($purchase->discount > 0) {
+				$transaction = new Transaction();
+				$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
+				$transaction->account_id = get_account('Purchase Discount Allowed')->id;
+				$transaction->dr_cr = 'cr';
+				$transaction->transaction_amount = $purchase->discount;
+				$transaction->transaction_currency = $purchase->currency;
+				$transaction->currency_rate = $purchase->exchange_rate;
+				$transaction->base_currency_amount = convert_currency($purchase->currency, $purchase->business->currency, $purchase->discount);
+				$transaction->description = _lang('Bill Invoice Discount') . ' #' . $purchase->bill_no;
+				$transaction->ref_id = $purchase->id;
+				$transaction->ref_type = 'bill invoice';
+				$transaction->vendor_id = $purchase->vendor_id;
+				$transaction->save();
+			}
+
+			$purchase->save();
+
+			// audit log
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = auth()->user()->id;
+			$audit->event = 'Purchase Order Converted to Bill Invoice';
+			$audit->save();
+
+			DB::commit();
+			return redirect()->route('purchase_orders.index')->with('success', _lang('Converted Successfully'));
+		} catch (\Exception $e) {
+			DB::rollback();
+			return redirect()->route('purchase_orders.index')->with('error', _lang('An error occurred while converting the purchase order'));
+		}
+	}
+
+	public function convert_to_cash_purchase($id)
+	{
+		DB::beginTransaction();
+		try {
+			$purchase = Purchase::find($id);
+			$purchase->order = 0;
+			$purchase->cash = 1;
+			$purchase->paid = $purchase->grand_total;
+			$purchase->status = 2;
+			$purchase->approval_status = 1;
+			$purchase->save();
+			
+			// Set current time for transaction dates
+			$currentTime = Carbon::now();
+			
+			// Create transactions for each purchase item
+			foreach ($purchase->items as $purchaseItem) {
+				// Create transaction for the item
+				$transaction = new Transaction();
+				$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
+				$transaction->account_id = $purchaseItem->account_id;
+				$transaction->dr_cr = 'dr';
+				$transaction->transaction_amount = $purchaseItem->sub_total;
+				$transaction->transaction_currency = $purchase->currency;
+				$transaction->currency_rate = $purchase->exchange_rate;
+				$transaction->base_currency_amount = convert_currency($purchase->currency, $purchase->business->currency, $purchaseItem->sub_total);
+				$transaction->ref_type = 'cash purchase';
+				$transaction->vendor_id = $purchase->vendor_id;
+				$transaction->ref_id = $purchase->id;
+				$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
+				$transaction->save();
+
+				// increase product stock
+				if ($purchaseItem->product->type == 'product' && $purchaseItem->product->stock_management == 1) {
+					$purchaseItem->product->stock += $purchaseItem->quantity;
+					$purchaseItem->product->save();
+				}
+
+				// Create transactions for taxes if any
+				foreach ($purchaseItem->taxes as $tax) {
+					$transaction = new Transaction();
+					$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
+					$transaction->account_id = $tax->tax->account_id;
+					$transaction->dr_cr = 'dr';
+					$transaction->transaction_amount = $tax->amount;
+					$transaction->transaction_currency = $purchase->currency;
+					$transaction->currency_rate = $purchase->exchange_rate;
+					$transaction->base_currency_amount = convert_currency($purchase->currency, $purchase->business->currency, $tax->amount);
+					$transaction->description = _lang('Cash Purchase Tax') . ' #' . $purchase->bill_no;
+					$transaction->ref_id = $purchase->id;
+					$transaction->ref_type = 'cash purchase tax';
+					$transaction->tax_id = $tax->tax_id;
+					$transaction->save();
+				}
+			}
+
+			// Create credit account transaction
+			$transaction = new Transaction();
+			$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
+			$transaction->account_id = request()->input('credit_account_id');
+			$transaction->dr_cr = 'cr';
+			$transaction->transaction_amount = $purchase->grand_total;
+			$transaction->transaction_currency = $purchase->currency;
+			$transaction->currency_rate = $purchase->exchange_rate;
+			$transaction->base_currency_amount = convert_currency($purchase->currency, $purchase->business->currency, $purchase->grand_total);
+			$transaction->ref_type = 'cash purchase payment';
+			$transaction->ref_id = $purchase->id;
+			$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
+			$transaction->save();
+
+			// Create discount transaction if applicable
+			if ($purchase->discount > 0) {
+				$transaction = new Transaction();
+				$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
+				$transaction->account_id = get_account('Purchase Discount Allowed')->id;
+				$transaction->dr_cr = 'cr';
+				$transaction->transaction_amount = $purchase->discount;
+				$transaction->transaction_currency = $purchase->currency;
+				$transaction->currency_rate = $purchase->exchange_rate;
+				$transaction->base_currency_amount = convert_currency($purchase->currency, $purchase->business->currency, $purchase->discount);
+				$transaction->description = _lang('Cash Purchase Discount') . ' #' . $purchase->bill_no;
+				$transaction->ref_id = $purchase->id;
+				$transaction->ref_type = 'cash purchase';
+				$transaction->vendor_id = $purchase->vendor_id;
+				$transaction->save();
+			}
+
+			$purchase->save();
+
+			// audit log
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = auth()->user()->id;
+			$audit->event = 'Purchase Order Converted to Cash Purchase';
+			$audit->save();
+
+			DB::commit();
+			return redirect()->route('purchase_orders.index')->with('success', _lang('Converted Successfully'));
+		} catch (\Exception $e) {
+			DB::rollback();
+			return redirect()->route('purchase_orders.index')->with('error', _lang('An error occurred while converting the purchase order'));
+		}
 	}
 }

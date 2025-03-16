@@ -31,34 +31,55 @@ export function DataTable({
   totalRows = 0,
   pageCount: defaultPageCount,
   onPaginationChange,
+  onTableStateChange,
   tableRef,
   meta,
+  serverSide = false,
+  initialState = {},
 }) {
-  const [rowSelection, setRowSelection] = React.useState({})
-  const [columnVisibility, setColumnVisibility] = React.useState({})
-  const [columnFilters, setColumnFilters] = React.useState([])
-  const [sorting, setSorting] = React.useState([])
+  // Use initial state if provided, otherwise set defaults
+  const [rowSelection, setRowSelection] = React.useState(initialState.rowSelection || {})
+  const [columnVisibility, setColumnVisibility] = React.useState(initialState.columnVisibility || {})
+  const [columnFilters, setColumnFilters] = React.useState(initialState.columnFilters || [])
+  const [sorting, setSorting] = React.useState(initialState.sorting || [])
+  const [globalFilter, setGlobalFilter] = React.useState(initialState.globalFilter || "")
+
   const [{ pageIndex, pageSize }, setPagination] = React.useState(() => {
+    // Use initialState pagination if provided
+    if (initialState.pagination) {
+      return {
+        pageIndex: Number.isNaN(Number(initialState.pagination.pageIndex)) ? 0 : Number(initialState.pagination.pageIndex),
+        pageSize: Number.isNaN(Number(initialState.pagination.pageSize)) ? 10 : Number(initialState.pagination.pageSize)
+      };
+    }
+    
+    // Otherwise use URL params or meta data
     const params = new URLSearchParams(window.location.search);
+    const urlPageParam = params.get('page');
+    const urlPage = urlPageParam ? Number(urlPageParam) : null;
+    
     return {
-      pageIndex: Math.max(0, Number(params.get('page') || meta?.current_page || 1) - 1),
-      pageSize: Number(params.get('per_page') || meta?.per_page || 10)
+      pageIndex: Math.max(0, Number.isNaN(Number(urlPage || meta?.current_page)) ? 0 : Number(urlPage || meta?.current_page) - 1),
+      pageSize: Number.isNaN(Number(params.get('per_page') || meta?.per_page)) ? 10 : Number(params.get('per_page') || meta?.per_page)
     };
   });
 
   React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const urlPage = params.get('page');
-    const metaPage = meta?.current_page;
-    
-    // Prefer URL page over meta page
-    const newPageIndex = Math.max(0, Number(urlPage || metaPage || 1) - 1);
-    
-    setPagination(prev => ({
-      ...prev,
-      pageIndex: newPageIndex
-    }));
-  }, [meta?.current_page, window.location.search]);
+    // Only update pagination state from URL/meta if not server-side
+    if (!serverSide) {
+      const params = new URLSearchParams(window.location.search);
+      const urlPage = params.get('page');
+      const metaPage = meta?.current_page;
+
+      // Prefer URL page over meta page
+      const newPageIndex = Math.max(0, Number(urlPage || metaPage || 1) - 1);
+
+      setPagination(prev => ({
+        ...prev,
+        pageIndex: newPageIndex
+      }));
+    }
+  }, [meta?.current_page, window.location.search, serverSide]);
 
   const pagination = React.useMemo(
     () => ({
@@ -68,52 +89,160 @@ export function DataTable({
     [pageIndex, pageSize]
   )
 
-  const pageCount = React.useMemo(
-    () => defaultPageCount || Math.ceil(totalRows / pageSize),
-    [defaultPageCount, totalRows, pageSize]
-  )
+  // Calculate page count properly
+  const pageCount = React.useMemo(() => {
+    if (defaultPageCount !== undefined) {
+      return Number(defaultPageCount);
+    }
+    
+    if (totalRows !== undefined && pageSize !== undefined && pageSize > 0) {
+      return Math.ceil(Number(totalRows) / Number(pageSize));
+    }
+    
+    return -1; // -1 means infinite pages
+  }, [defaultPageCount, totalRows, pageSize]);
 
   const handlePaginationChange = React.useCallback(
     (newPagination) => {
-      setPagination(newPagination)
+      // Update the local state first
+      setPagination(newPagination);
+      
+      // Then call the parent component's handler if provided
       if (onPaginationChange) {
-        onPaginationChange(newPagination)
+        // Add a debugger statement to see what's happening
+        console.log('DataTable handlePaginationChange:', {
+          newPagination,
+          globalFilter,
+          columnFilters,
+          sorting
+        });
+        
+        onPaginationChange({
+          ...newPagination,
+          globalFilter,
+          columnFilters,
+          sorting
+        });
       }
     },
-    [onPaginationChange]
+    [onPaginationChange, globalFilter, columnFilters, sorting]
   )
+
+  // Handle changes to column filters with server-side support
+  const handleColumnFiltersChange = React.useCallback(
+    (filters) => {
+      setColumnFilters(filters);
+
+      if (serverSide && onTableStateChange) {
+        onTableStateChange({
+          pagination,
+          columnFilters: filters,
+          sorting,
+          globalFilter
+        });
+      }
+    },
+    [serverSide, onTableStateChange, pagination, sorting, globalFilter]
+  );
+
+  // Handle changes to sorting with server-side support
+  const handleSortingChange = React.useCallback(
+    (newSorting) => {
+      setSorting(newSorting);
+
+      if (serverSide && onTableStateChange) {
+        onTableStateChange({
+          pagination,
+          columnFilters,
+          sorting: newSorting,
+          globalFilter
+        });
+      }
+    },
+    [serverSide, onTableStateChange, pagination, columnFilters, globalFilter]
+  );
+
+  // Handle changes to global filter (search) with server-side support
+  const handleGlobalFilterChange = React.useCallback(
+    (newFilter) => {
+      setGlobalFilter(newFilter);
+
+      if (serverSide && onTableStateChange) {
+        onTableStateChange({
+          pagination,
+          columnFilters,
+          sorting,
+          globalFilter: newFilter
+        });
+      }
+    },
+    [serverSide, onTableStateChange, pagination, columnFilters, sorting]
+  );
 
   const table = useReactTable({
     data,
     columns,
-    pageCount: pageCount,
     state: {
+      pagination: {
+        pageIndex,
+        pageSize,
+      },
       sorting,
-      columnVisibility,
-      rowSelection,
       columnFilters,
-      pagination,
+      rowSelection,
+      columnVisibility,
+      globalFilter,
     },
+    pageCount: pageCount,
     enableRowSelection: true,
-    onRowSelectionChange: setRowSelection,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onColumnVisibilityChange: setColumnVisibility,
+    manualPagination: serverSide,
+    manualFiltering: serverSide,
+    manualSorting: serverSide,
     onPaginationChange: handlePaginationChange,
+    onSortingChange: handleSortingChange,
+    onColumnFiltersChange: handleColumnFiltersChange,
+    onRowSelectionChange: setRowSelection,
+    onColumnVisibilityChange: setColumnVisibility,
+    onGlobalFilterChange: handleGlobalFilterChange,
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: serverSide ? undefined : getFilteredRowModel(),
+    getPaginationRowModel: serverSide ? undefined : getPaginationRowModel(),
+    getSortedRowModel: serverSide ? undefined : getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
-    manualPagination: true,
   })
 
+  // Sync server data with table state
   React.useEffect(() => {
     if (tableRef) {
-      tableRef(table)
+      tableRef({
+        resetTable: () => {
+          setGlobalFilter("");
+          setColumnFilters([]);
+          setSorting([]);
+          setPagination({
+            pageIndex: 0,
+            pageSize: 10,
+          });
+        },
+        setPage: (page) => {
+          setPagination(prev => ({
+            ...prev,
+            pageIndex: Number(page) - 1, // Convert 1-indexed to 0-indexed
+          }));
+        },
+        getState: () => ({
+          pagination: {
+            pageIndex,
+            pageSize,
+          },
+          globalFilter,
+          columnFilters,
+          sorting,
+        }),
+      });
     }
-  }, [table, tableRef])
+  }, [tableRef, pageIndex, pageSize, globalFilter, columnFilters, sorting]);
 
   return (
     <div className="space-y-4">
@@ -121,6 +250,7 @@ export function DataTable({
         table={table}
         filterableColumns={filterableColumns}
         searchableColumns={searchableColumns}
+        serverSide={serverSide}
       />
       <TableWrapper>
         <Table>

@@ -15,6 +15,13 @@ class Payroll extends Model
      * @var string
      */
     protected $table = 'payslips';
+    
+    protected $fillable = [
+        'employee_id', 'month', 'year', 'current_salary', 'net_salary',
+        'tax_amount', 'taxes', 'tax_calculation_method_id', 'total_allowance',
+        'total_deduction', 'absence_fine', 'advance', 'advance_description',
+        'status', 'transaction_id'
+    ];
 
     public function staff() {
         return $this->belongsTo(Employee::class, 'employee_id')->withDefault();
@@ -26,6 +33,10 @@ class Payroll extends Model
 
     public function employee() {
         return $this->belongsTo(Employee::class, 'employee_id');
+    }
+    
+    public function taxCalculationMethod() {
+        return $this->belongsTo(TaxCalculationMethod::class);
     }
 
     protected function currentSalary(): Attribute{

@@ -1619,6 +1619,6 @@ class ReceiptController extends Controller
 
     public function pos_products_category($id)
     {
-        return Product::where('category_id', $id)->get();
+        return Product::where('sub_category_id', $id)->get();
     }
 }

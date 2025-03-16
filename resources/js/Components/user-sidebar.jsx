@@ -79,7 +79,7 @@ export function UserSidebar({ businesses, active_business, ...props }) {
             title: "Products",
             url: "#",
             icon: Package,
-            isActive: isRoute("products.index") || isRoute("categories.index") || isRoute("brands.index") ||
+            isActive: isRoute("products.index") || isRoute("sub_categories.index") || isRoute("main_categories.index") || isRoute("brands.index") ||
                 isRoute("product_units.index") || isRoute("inventory_adjustments.index") ||
                 isRoute("products.create"),
             items: [
@@ -88,8 +88,12 @@ export function UserSidebar({ businesses, active_business, ...props }) {
                     url: route("products.index"),
                 },
                 {
-                    title: "Categories",
-                    url: route("categories.index"),
+                    title: "Main Categories",
+                    url: route("main_categories.index"),
+                },
+                {
+                    title: "Sub Categories",
+                    url: route("sub_categories.index"),
                 },
                 {
                     title: "Brands",

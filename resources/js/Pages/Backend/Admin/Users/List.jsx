@@ -134,7 +134,7 @@ export default function List({ users }) {
                 <PageHeader page="Users" subpage="List" url="users.index" />
 
                 <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-                    <div className="flex justify-between">
+                    <div className="flex items-center space-x-2">
                         <Link href={route("users.create")}>
                             <Button>Add New User</Button>
                         </Link>

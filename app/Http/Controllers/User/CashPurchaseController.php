@@ -302,7 +302,7 @@ class CashPurchaseController extends Controller
 					$transaction              = new Transaction();
 					$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
 					$transaction->account_id  = $request->input('account_id')[$i];
-					$transaction->dr_cr       = Account::find($request->input('account_id')[$i])->dr_cr;
+					$transaction->dr_cr       = 'dr';
 					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $purchaseItem->sub_total / $purchase->exchange_rate);
 					$transaction->transaction_currency    = $request->currency;
 					$transaction->currency_rate = $purchase->exchange_rate;
@@ -318,7 +318,7 @@ class CashPurchaseController extends Controller
 					$transaction              = new PendingTransaction();
 					$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
 					$transaction->account_id  = $request->input('account_id')[$i];
-					$transaction->dr_cr       = Account::find($request->input('account_id')[$i])->dr_cr;
+					$transaction->dr_cr       = 'dr';
 					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, ($purchaseItem->sub_total / $purchase->exchange_rate) + $purchaseItem->taxes->sum('amount'));
 					$transaction->transaction_currency    = $request->currency;
 					$transaction->currency_rate = $purchase->exchange_rate;
@@ -332,7 +332,7 @@ class CashPurchaseController extends Controller
 					$transaction              = new PendingTransaction();
 					$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
 					$transaction->account_id  = $request->input('account_id')[$i];
-					$transaction->dr_cr       = Account::find($request->input('account_id')[$i])->dr_cr;
+					$transaction->dr_cr       = 'dr';
 					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $purchaseItem->sub_total / $purchase->exchange_rate);
 					$transaction->transaction_currency    = $request->currency;
 					$transaction->currency_rate = $purchase->exchange_rate;
@@ -850,7 +850,7 @@ class CashPurchaseController extends Controller
 					$transaction              = new Transaction();
 					$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
 					$transaction->account_id  = $request->input('account_id')[$i];
-					$transaction->dr_cr       = Account::find($request->input('account_id')[$i])->dr_cr;
+					$transaction->dr_cr       = 'dr';
 					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, ($purchaseItem->sub_total / $purchase->exchange_rate) + $purchaseItem->taxes->sum('amount'));
 					$transaction->transaction_currency    = $request->currency;
 					$transaction->currency_rate = $purchase->exchange_rate;
@@ -864,7 +864,7 @@ class CashPurchaseController extends Controller
 					$transaction              = new Transaction();
 					$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
 					$transaction->account_id  = $request->input('account_id')[$i];
-					$transaction->dr_cr       = Account::find($request->input('account_id')[$i])->dr_cr;
+					$transaction->dr_cr       = 'dr';
 					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $purchaseItem->sub_total / $purchase->exchange_rate);
 					$transaction->transaction_currency    = $request->currency;
 					$transaction->currency_rate = $purchase->exchange_rate;
@@ -880,7 +880,7 @@ class CashPurchaseController extends Controller
 					$transaction              = new PendingTransaction();
 					$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
 					$transaction->account_id  = $request->input('account_id')[$i];
-					$transaction->dr_cr       = Account::find($request->input('account_id')[$i])->dr_cr;
+					$transaction->dr_cr       = 'dr';
 					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, ($purchaseItem->sub_total / $purchase->exchange_rate) + $purchaseItem->taxes->sum('amount'));
 					$transaction->transaction_currency    = $request->currency;
 					$transaction->currency_rate = $purchase->exchange_rate;
@@ -894,7 +894,7 @@ class CashPurchaseController extends Controller
 					$transaction              = new PendingTransaction();
 					$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
 					$transaction->account_id  = $request->input('account_id')[$i];
-					$transaction->dr_cr       = Account::find($request->input('account_id')[$i])->dr_cr;
+					$transaction->dr_cr       = 'dr';
 					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $purchaseItem->sub_total / $purchase->exchange_rate);
 					$transaction->transaction_currency    = $request->currency;
 					$transaction->currency_rate = $purchase->exchange_rate;
@@ -1137,6 +1137,15 @@ class CashPurchaseController extends Controller
 		$audit->changed_by = auth()->user()->id;
 		$audit->event = 'Deleted Cash Purchase ' . $bill->bill_no;
 		$audit->save();
+
+		// descrease stock
+		foreach ($bill->items as $purchaseItem) {
+			$product = $purchaseItem->product;
+			if($product && $product->type == 'product' && $product->stock_management == 1) {
+				$product->stock = $product->stock - $purchaseItem->quantity;
+				$product->save();
+			}
+		}
 
 		// delete transactions
 		$transactions = Transaction::where('ref_id', $bill->id)

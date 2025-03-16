@@ -21,6 +21,8 @@ return new class extends Migration
             $table->float('adjusted_quantity');
             $table->float('new_quantity_on_hand');
             $table->string('adjustment_type');
+            $table->bigInteger('created_by')->unsigned();
+            $table->bigInteger('updated_by')->unsigned();
             $table->bigInteger('business_id')->unsigned();
             $table->bigInteger('user_id')->unsigned();
 

@@ -888,8 +888,8 @@ class DefferedInvoiceController extends Controller
         }
 
         if ($from != '' && $to != '') {
-            $query->whereDate('deffered_start', '>=', Carbon::parse($from)->format('Y-m-d'))
-                ->whereDate('deffered_end', '<=', Carbon::parse($to)->format('Y-m-d'));
+            $query->whereDate('invoice_date', '>=', Carbon::parse($from)->format('Y-m-d'))
+                ->whereDate('due_date', '<=', Carbon::parse($to)->format('Y-m-d'));
         }
 
         $invoices = $query->get();

@@ -18,7 +18,7 @@ import {
 import { CalendarIcon, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function Create({ customers = [], products = [], currencies = [], taxes = [] }) {
   const [invoiceItems, setInvoiceItems] = useState([{
@@ -38,6 +38,7 @@ export default function Create({ customers = [], products = [], currencies = [],
     invoice_date: format(new Date(), "yyyy-MM-dd"),
     due_date: "",
     currency: "",
+    converted_total: 0,
     discount_type: "percentage",
     discount_value: 0,
     template: "",
@@ -117,10 +118,47 @@ export default function Create({ customers = [], products = [], currencies = [],
 
   const convertCurrency = (amount) => {
     const selectedCurrency = currencies.find(c => c.id === data.currency);
-    const baseCurrency = currencies.find(c => c.is_base);
+    const baseCurrency = currencies.find(c => c.base_currency === 1);
     
     if (!selectedCurrency || !baseCurrency) return amount;
-    return amount * selectedCurrency.exchange_rate;
+    
+    // Convert from selected currency to base currency
+    // If selected is EUR with rate 0.92 and base is USD with rate 1
+    // then 100 EUR = (100 * (1/0.92)) = 108.70 USD
+    return amount * (1 / selectedCurrency.exchange_rate);
+  };
+
+  // Update converted_total whenever relevant values change
+  useEffect(() => {
+    const total = calculateTotal();
+    const convertedTotal = convertCurrency(total);
+    setData('converted_total', convertedTotal);
+  }, [data.currency, invoiceItems, data.discount_type, data.discount_value]);
+
+  const renderTotal = () => {
+    const total = calculateTotal();
+    const convertedTotal = convertCurrency(total);
+    const selectedCurrency = currencies.find(c => c.id === data.currency);
+    const baseCurrency = currencies.find(c => c.base_currency === 1);
+
+    if (!selectedCurrency) {
+      return (
+        <div className="text-lg font-bold">
+          Total: {total.toFixed(2)}
+        </div>
+      );
+    }
+
+    return (
+      <div className="text-lg font-bold">
+        Total: {selectedCurrency.name} {total.toFixed(2)}
+        {baseCurrency && selectedCurrency.id !== baseCurrency.id && (
+          <span className="text-sm ml-2 text-muted-foreground">
+            ({baseCurrency.name} {convertedTotal.toFixed(2)})
+          </span>
+        )}
+      </div>
+    );
   };
 
   const TaxSelector = ({ index }) => {
@@ -144,23 +182,6 @@ export default function Create({ customers = [], products = [], currencies = [],
           }}
           placeholder="Select taxes"
         />
-      </div>
-    );
-  };
-
-  const renderTotal = () => {
-    const total = calculateTotal();
-    const selectedCurrency = currencies.find(c => c.id === data.currency);
-    const baseCurrency = currencies.find(c => c.is_base);
-
-    return (
-      <div className="text-lg font-bold">
-        Total: {total.toFixed(2)} {selectedCurrency?.id}
-        {baseCurrency && data.currency !== baseCurrency.id && (
-          <span className="text-sm ml-2">
-            ({convertCurrency(total).toFixed(2)} {baseCurrency.id})
-          </span>
-        )}
       </div>
     );
   };
@@ -327,7 +348,7 @@ export default function Create({ customers = [], products = [], currencies = [],
                   <SearchableCombobox
                     options={currencies.map(currency => ({
                       id: currency.id,
-                      name: currency.description
+                      name: `${currency.name} - ${currency.description} (${currency.exchange_rate})`
                     }))}
                     value={data.currency}
                     onChange={(value) => setData("currency", value)}
