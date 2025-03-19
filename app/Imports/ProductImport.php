@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\Currency;
 use App\Models\Product;
 use App\Models\ProductUnit;
+use App\Models\SubCategory;
 use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -81,19 +82,19 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
                     'code' => $row['code'] ?? null,
                     'reorder_point' => $row['reorder_point'] ?? null,
                     'brand_id' => Brand::where('name', $row['brand'])->first()->id ?? null,
-                    'category_id' => Category::where('name', $row['category'])->first()->id ?? null,
+                    'sub_category_id' => SubCategory::where('name', $row['sub_category'])->first()->id ?? null,
                 ]);
 
-                if ($row['stock'] > 0) {
+                if ($row['intial_stock'] > 0) {
                     $transaction              = new Transaction();
                     $transaction->trans_date  = now()->format('Y-m-d H:i:s');
                     $transaction->account_id  = get_account('Inventory')->id;
                     $transaction->dr_cr       = 'dr';
                     $transaction->transaction_currency    = request()->activeBusiness->currency;
                     $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                    $transaction->base_currency_amount    = $product->purchase_cost * $row['stock'];
-                    $transaction->transaction_amount      = $product->purchase_cost * $row['stock'];
-                    $transaction->description = $product->name . ' Opening Stock #' . $row['stock'];
+                    $transaction->base_currency_amount    = $product->purchase_cost * $row['intial_stock'];
+                    $transaction->transaction_amount      = $product->purchase_cost * $row['intial_stock'];
+                    $transaction->description = $product->name . ' Opening Stock #' . $row['intial_stock'];
                     $transaction->ref_id      = $product->id;
                     $transaction->ref_type    = 'product';
                     $transaction->save();
@@ -104,9 +105,9 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
                     $transaction->dr_cr       = 'cr';
                     $transaction->transaction_currency    = request()->activeBusiness->currency;
                     $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                    $transaction->base_currency_amount    = $product->purchase_cost * $row['stock'];
-                    $transaction->transaction_amount      = $product->purchase_cost * $row['stock'];
-                    $transaction->description = $product->name . ' Opening Stock #' . $row['stock'];
+                    $transaction->base_currency_amount    = $product->purchase_cost * $row['intial_stock'];
+                    $transaction->transaction_amount      = $product->purchase_cost * $row['intial_stock'];
+                    $transaction->description = $product->name . ' Opening Stock #' . $row['intial_stock'];
                     $transaction->ref_id      = $product->id;
                     $transaction->ref_type    = 'product';
                     $transaction->save();
@@ -118,7 +119,8 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
                     'selling_price' => $row['selling_price'] ?? 0,
                     'descriptions' => $row['descriptions'],
                     'stock_management' => $row['stock_management'],
-                    'stock' => $product->stock + $row['stock'],
+                    'intial_stock' => $row['intial_stock'] ?? 0,
+                    'stock' => $product->stock + $row['intial_stock'] ?? 0,
                     'allow_for_selling' => $row['allow_for_selling'],
                     'income_account_id' => get_account($row['income_account_name'])->id,
                     'allow_for_purchasing' => $row['allow_for_purchasing'],
@@ -128,19 +130,19 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
                     'code' => $row['code'] ?? null,
                     'reorder_point' => $row['reorder_point'] ?? null,
                     'brand_id' => Brand::where('name', $row['brand'])->first()->id ?? null,
-                    'category_id' => Category::where('name', $row['category'])->first()->id ?? null,
+                    'sub_category_id' => SubCategory::where('name', $row['sub_category'])->first()->id ?? null,
                 ]);
 
-                if ($row['stock'] > 0) {
+                if ($row['intial_stock'] > 0) {
                     $transaction              = new Transaction();
                     $transaction->trans_date  = now()->format('Y-m-d H:i:s');
                     $transaction->account_id  = get_account('Inventory')->id;
                     $transaction->dr_cr       = 'dr';
                     $transaction->transaction_currency    = request()->activeBusiness->currency;
                     $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                    $transaction->base_currency_amount    = $product->purchase_cost * $row['stock'];
-                    $transaction->transaction_amount      = $product->purchase_cost * $row['stock'];
-                    $transaction->description = $product->name . ' Addition Stock #' . $row['stock'];
+                    $transaction->base_currency_amount    = $product->purchase_cost * $row['intial_stock'];
+                    $transaction->transaction_amount      = $product->purchase_cost * $row['intial_stock'];
+                    $transaction->description = $product->name . ' Addition Stock #' . $row['intial_stock'];
                     $transaction->ref_id      = $product->id;
                     $transaction->ref_type    = 'product';
                     $transaction->save();
@@ -151,9 +153,9 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
                     $transaction->dr_cr       = 'cr';
                     $transaction->transaction_currency    = request()->activeBusiness->currency;
                     $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                    $transaction->base_currency_amount    = $product->purchase_cost * $row['stock'];
-                    $transaction->transaction_amount      = $product->purchase_cost * $row['stock'];
-                    $transaction->description = $product->name . ' Addition Stock #' . $row['stock'];
+                    $transaction->base_currency_amount    = $product->purchase_cost * $row['intial_stock'];
+                    $transaction->transaction_amount      = $product->purchase_cost * $row['intial_stock'];
+                    $transaction->description = $product->name . ' Addition Stock #' . $row['intial_stock'];
                     $transaction->ref_id      = $product->id;
                     $transaction->ref_type    = 'product';
                     $transaction->save();
@@ -180,7 +182,7 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
             'expiry_date' => 'nullable',
             'code' => 'nullable',
             'brand' => 'nullable',
-            'category' => 'nullable',
+            'sub_category' => 'nullable',
             'image' => 'nullable',
         ];
     }

@@ -6,11 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\ProductUnit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 use Validator;
 
 class ProductUnitController extends Controller
 {
-
     /**
      * Create a new controller instance.
      *
@@ -25,11 +26,58 @@ class ProductUnitController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        $assets = ['datatable'];
-        $productunits = ProductUnit::all()->sortByDesc("id");
-        return view('backend.user.product_unit.list', compact('productunits', 'assets'));
+        $query = ProductUnit::query();
+
+        // Search functionality
+        if ($request->has('search') && !empty($request->get('search'))) {
+            $search = $request->get('search');
+            $query->where('unit', 'like', "%{$search}%");
+        }
+
+        // Column filtering
+        if ($request->has('columnFilters') && !empty($request->get('columnFilters'))) {
+            $columnFilters = json_decode($request->columnFilters, true);
+            foreach ($columnFilters as $filter) {
+                $query->where($filter['id'], 'like', "%{$filter['value']}%");
+            }
+        }
+
+        // Sorting
+        if ($request->has('sorting') && !empty($request->get('sorting'))) {
+            $sorting = json_decode($request->sorting, true);
+            foreach ($sorting as $sort) {
+                $query->orderBy($sort['id'], $sort['desc'] ? 'desc' : 'asc');
+            }
+        } else {
+            $query->orderBy('id', 'desc');
+        }
+
+        // Pagination
+        $perPage = $request->input('per_page', 10);
+        $page = $request->input('page', 1);
+        $productUnits = $query->paginate($perPage, ['*'], 'page', $page);
+
+        if ($request->wantsJson()) {
+            return response()->json($productUnits);
+        }
+
+        return Inertia::render('Backend/User/ProductUnit/List', [
+            'product_units' => $productUnits->items(),
+            'meta' => [
+                'total' => $productUnits->total(),
+                'per_page' => $productUnits->perPage(),
+                'current_page' => $productUnits->currentPage(),
+                'last_page' => $productUnits->lastPage(),
+                'links' => $productUnits->linkCollection()->toArray(),
+            ],
+            'filters' => [
+                'search' => $request->get('search', ''),
+                'columnFilters' => !empty($request->columnFilters) ? json_decode($request->columnFilters, true) : [],
+                'sorting' => !empty($request->sorting) ? json_decode($request->sorting, true) : [],
+            ],
+        ]);
     }
 
     /**
@@ -54,21 +102,11 @@ class ProductUnitController extends Controller
      */
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
+        $request->validate([
             'unit' => 'required|max:30',
         ]);
 
-        if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return redirect()->route('product_units.create')
-                    ->withErrors($validator)
-                    ->withInput();
-            }
-        }
-
-        $productunit       = new ProductUnit();
+        $productunit = new ProductUnit();
         $productunit->unit = $request->input('unit');
         $productunit->save();
 
@@ -79,27 +117,7 @@ class ProductUnitController extends Controller
         $audit->event = 'Product Unit Created' . ' ' . $productunit->unit;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('product_units.create')->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'store', 'message' => _lang('Saved Successfully'), 'data' => $productunit, 'table' => '#product_units_table']);
-        }
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function edit(Request $request, $id)
-    {
-        $productunit = ProductUnit::find($id);
-        if (!$request->ajax()) {
-            return back();
-        } else {
-            return view('backend.user.product_unit.modal.edit', compact('productunit', 'id'));
-        }
+        return redirect()->route('product_units.index')->with('success', _lang('Product Unit Created Successfully'));
     }
 
     /**
@@ -111,23 +129,12 @@ class ProductUnitController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $validator = Validator::make($request->all(), [
+        $request->validate([
             'unit' => 'required|max:30',
         ]);
 
-        if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return redirect()->route('product_units.edit', $id)
-                    ->withErrors($validator)
-                    ->withInput();
-            }
-        }
-
-        $productunit       = ProductUnit::find($id);
+        $productunit = ProductUnit::find($id);
         $productunit->unit = $request->input('unit');
-
         $productunit->save();
 
         // audit log
@@ -137,11 +144,7 @@ class ProductUnitController extends Controller
         $audit->event = 'Product Unit Updated' . ' ' . $productunit->unit;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('product_units.index')->with('success', _lang('Updated Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $productunit, 'table' => '#product_units_table']);
-        }
+        return redirect()->route('product_units.index')->with('success', _lang('Product Unit Updated Successfully'));
     }
 
     /**
@@ -162,6 +165,35 @@ class ProductUnitController extends Controller
         $audit->save();
 
         $productunit->delete();
-        return redirect()->route('product_units.index')->with('success', _lang('Deleted Successfully'));
+        return redirect()->route('product_units.index')->with('success', _lang('Product Unit Deleted Successfully'));
+    }
+
+    /**
+     * Remove multiple resources from storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy_multiple(Request $request)
+    {
+        if ($request->has('ids')) {
+            $ids = $request->ids;
+            $units = ProductUnit::whereIn('id', $ids)->get();
+            
+            foreach ($units as $unit) {
+                // audit log
+                $audit = new AuditLog();
+                $audit->date_changed = date('Y-m-d H:i:s');
+                $audit->changed_by = auth()->user()->id;
+                $audit->event = 'Product Unit Deleted: ' . $unit->unit;
+                $audit->save();
+                
+                $unit->delete();
+            }
+            
+            return redirect()->route('product_units.index')->with('success', _lang('Product Units Deleted'));
+        }
+        
+        return redirect()->route('product_units.index')->with('error', _lang('No product units selected'));
     }
 }

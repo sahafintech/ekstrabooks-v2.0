@@ -90,7 +90,7 @@ use Illuminate\Support\Facades\Route;
 |
  */
 
- $ev = get_option('email_verification', 0);
+$ev = get_option('email_verification', 0);
 
 Auth::routes(['verify' => $ev == 1 ? true : false]);
 // Route::get('/logout', 'Auth\AuthenticatedSessionController@destory');
@@ -274,6 +274,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 		//Product Controller
 		Route::resource('product_units', ProductUnitController::class)->except('show');
+		Route::post('product_units/destroy/multiple', [ProductUnitController::class, 'destroy_multiple'])->name('product_units.destroy_multiple');
 		Route::get('products/get_table_data', [ProductController::class, 'get_table_data']);
 		Route::get('products/export', [ProductController::class, 'product_export'])->name('products.export');
 		Route::resource('products', ProductController::class);
@@ -282,20 +283,25 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 		// categories
 		Route::resource('sub_categories', SubCategoryController::class);
+		Route::post('sub_categories/destroy/multiple', [SubCategoryController::class, 'destroy_multiple'])->name('sub_categories.destroy_multiple');
 		Route::resource('main_categories', MainCategoryController::class);
+		Route::post('main_categories/destroy/multiple', [MainCategoryController::class, 'destroy_multiple'])->name('main_categories.destroy_multiple');
 
 		// brands
 		Route::resource('brands', BrandsController::class);
+		Route::post('brands/destroy/multiple', [BrandsController::class, 'destroy_multiple'])->name('brands.destroy_multiple');
 
-		// inventory adjustments
+		// Inventory Adjustment Import (MUST BE BEFORE RESOURCE ROUTE)
+		Route::get('inventory_adjustments/import', [InventoryAdjustmentController::class, 'import'])->name('inventory_adjustments.import');
+		Route::post('inventory_adjustments/import/store', [InventoryAdjustmentController::class, 'importStore'])->name('inventory_adjustments.import.store');
+		Route::get('inventory_adjustments/import/progress', [InventoryAdjustmentController::class, 'importProgress'])->name('inventory_adjustments.import.progress');
+		Route::get('inventory_adjustments/import/status', [InventoryAdjustmentController::class, 'importStatus'])->name('inventory_adjustments.import.status');
+		Route::post('inventory_adjustments/import/process', [InventoryAdjustmentController::class, 'importProcess'])->name('inventory_adjustments.import.process');
+		Route::get('inventory_adjustments/export', [InventoryAdjustmentController::class, 'export'])->name('inventory_adjustments.export');
+
+		// inventory adjustments resource route
 		Route::resource('inventory_adjustments', InventoryAdjustmentController::class);
-
-		// Inventory Adjustment Import
-		Route::get('inventory_adjustment/import', [InventoryAdjustmentController::class, 'import'])->name('inventory_adjustment.import');
-		Route::post('inventory_adjustment/import/store', [InventoryAdjustmentController::class, 'importStore'])->name('inventory_adjustment.import.store');
-		Route::get('inventory_adjustment/import/progress', [InventoryAdjustmentController::class, 'importProgress'])->name('inventory_adjustment.import.progress');
-		Route::post('inventory_adjustment/import/process', [InventoryAdjustmentController::class, 'importProcess'])->name('inventory_adjustment.import.process');
-		Route::get('import/process/{name}/{id}', [ImportController::class, 'getImportProgress'])->name('import.process.progress');
+		Route::post('inventory_adjustments/destroy/multiple', [InventoryAdjustmentController::class, 'destroy_multiple'])->name('inventory_adjustments.destroy_multiple');
 
 		//Invoices
 		Route::match(['get', 'post'], 'invoices/{id}/send_email', [InvoiceController::class, 'send_email'])->name('invoices.send_email');
@@ -340,13 +346,10 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::match(['get', 'post'], 'receipts/{id}/send_email', [ReceiptController::class, 'send_email'])->name('receipts.send_email');
 		Route::match(['get', 'post'], 'receipts/receive_payment', [ReceiptController::class, 'receive_payment'])->name('receipts.receive_payment');
 		Route::get('receipts/{id}/export_pdf', [ReceiptController::class, 'export_pdf'])->name('receipts.export_pdf');
-		Route::get('pos', [ReceiptController::class, 'pos'])->name('receipts.pos');
 		Route::post('import_receipts', [ReceiptController::class, 'import_receipts'])->name('receipts.import');
 		Route::post('receipts/filter', [ReceiptController::class, 'receipts_filter'])->name('receipts.filter');
-		Route::post('pos/store', [ReceiptController::class, 'pos_store'])->name('receipts.pos_store');
 		Route::post('all_receipts', [ReceiptController::class, 'receipts_all'])->name('receipts.all');
 		Route::get('export_receipts', [ReceiptController::class, 'export_receipts'])->name('receipts.export');
-
 
 		// hold pos invoices
 		Route::resource('hold_pos_invoices', HoldPosInvoiceController::class);
@@ -606,6 +609,10 @@ Route::get('/contact', [WebsiteController::class, 'contact']);
 Route::post('/send_message', 'Website\WebsiteController@send_message');
 Route::post('/post_comment', 'Website\WebsiteController@post_comment');
 Route::post('/email_subscription', 'Website\WebsiteController@email_subscription');
+
+Route::get('/{slug?}', [WebsiteController::class, 'index']);
+
+
 //Online Invoice Payment
 Route::group(['prefix' => 'callback', 'namespace' => 'User\Gateway'], function () {
 	Route::get('paypal', 'PayPal\ProcessController@callback')->name('callback.PayPal');
