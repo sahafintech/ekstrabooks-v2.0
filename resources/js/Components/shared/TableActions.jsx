@@ -7,6 +7,7 @@ import {
     DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
+import { Link } from "@inertiajs/react";
 
 export default function TableActions({ actions = [] }) {
     return (
@@ -20,16 +21,27 @@ export default function TableActions({ actions = [] }) {
             <DropdownMenuContent align="end">
                 <DropdownMenuGroup>
                     {actions.map((action, index) => (
-                        <DropdownMenuItem
-                            key={index}
-                            onClick={action.onClick}
-                            className={action.className}
-                        >
-                            {action.icon && (
-                                <span className="mr-2">{action.icon}</span>
-                            )}
-                            {action.label}
-                        </DropdownMenuItem>
+                        action.href ? (
+                            <DropdownMenuItem key={index} asChild>
+                                <Link href={action.href} className={action.className}>
+                                    {action.icon && (
+                                        <span className="mr-2">{action.icon}</span>
+                                    )}
+                                    {action.label}
+                                </Link>
+                            </DropdownMenuItem>
+                        ) : (
+                            <DropdownMenuItem
+                                key={index}
+                                onClick={action.onClick}
+                                className={`${action.destructive ? 'text-destructive' : ''} ${action.className || ''}`}
+                            >
+                                {action.icon && (
+                                    <span className="mr-2">{action.icon}</span>
+                                )}
+                                {action.label}
+                            </DropdownMenuItem>
+                        )
                     ))}
                 </DropdownMenuGroup>
             </DropdownMenuContent>

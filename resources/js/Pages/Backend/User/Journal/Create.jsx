@@ -180,57 +180,61 @@ export default function Create({
           />
           <div className="p-4">
             <form onSubmit={submit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-12 gap-4">
                 {/* Journal Date */}
-                <div>
-                  <Label htmlFor="date">Journal Date</Label>
-                  <div className="mt-1">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full pl-3 text-left font-normal",
-                            !data.date && "text-muted-foreground"
-                          )}
-                        >
-                          {data.date ? (
-                            format(new Date(data.date), "PP")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={new Date(data.date)}
-                          onSelect={(date) => setData("date", date)}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <InputError message={errors.date} className="mt-1" />
+                <Label htmlFor="date" className="md:col-span-2 col-span-12">
+                  Journal Date
+                </Label>
+                <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full md:w-[240px] pl-3 text-left font-normal",
+                          !data.date && "text-muted-foreground"
+                        )}
+                      >
+                        {data.date ? (
+                          format(new Date(data.date), "PP")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={new Date(data.date)}
+                        onSelect={(date) => setData("date", date)}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <InputError message={errors.date} className="mt-2" />
                 </div>
 
                 {/* Journal Number */}
-                <div>
-                  <Label htmlFor="journal_number">Journal Number</Label>
+                <Label htmlFor="journal_number" className="md:col-span-2 col-span-12">
+                  Journal Number
+                </Label>
+                <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                   <Input
                     id="journal_number"
                     value={data.journal_number}
                     onChange={(e) => setData("journal_number", e.target.value)}
-                    className="mt-1"
+                    className="md:w-[240px] w-full"
                     readOnly
                   />
-                  <InputError message={errors.journal_number} className="mt-1" />
+                  <InputError message={errors.journal_number} className="mt-2" />
                 </div>
 
                 {/* Currency */}
-                <div>
-                  <Label htmlFor="trans_currency">Currency</Label>
+                <Label htmlFor="trans_currency" className="md:col-span-2 col-span-12">
+                  Currency
+                </Label>
+                <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                   <SearchableCombobox
                     value={data.trans_currency}
                     onValueChange={(value) => setData("trans_currency", value)}
@@ -239,8 +243,9 @@ export default function Create({
                       value: currency.code,
                       label: `${currency.code} - ${currency.name}`
                     }))}
+                    className="md:w-[240px] w-full"
                   />
-                  <InputError message={errors.trans_currency} className="mt-1" />
+                  <InputError message={errors.trans_currency} className="mt-2" />
                 </div>
               </div>
 

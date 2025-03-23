@@ -189,75 +189,76 @@ export default function Edit({
             <Card>
               <CardContent className="p-6">
                 <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-12 gap-4">
                     {/* Journal Date */}
-                    <div>
-                      <label htmlFor="date" className="block text-sm font-medium text-gray-700">
-                        Journal Date
-                      </label>
+                    <label htmlFor="date" className="md:col-span-2 col-span-12 block text-sm font-medium text-gray-700">
+                      Journal Date
+                    </label>
+                    <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
                             id="date"
                             variant={"outline"}
                             className={cn(
-                              "w-full pl-3 text-left font-normal mt-1 text-sm",
+                              "w-full md:w-[240px] pl-3 text-left font-normal",
                               !data.date && "text-muted-foreground"
                             )}
                           >
                             {data.date ? (
-                              format(new Date(data.date), "PPP")
+                              format(parseSafeDate(data.date), "PP")
                             ) : (
                               <span>Pick a date</span>
                             )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50 flex-shrink-0" />
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
                           <Calendar
                             mode="single"
-                            selected={new Date(data.date)}
+                            selected={parseSafeDate(data.date)}
                             onSelect={(date) => setData("date", format(date, "yyyy-MM-dd"))}
+                            disabled={(date) =>
+                              date > new Date() || date < new Date("1900-01-01")
+                            }
                             initialFocus
                           />
                         </PopoverContent>
                       </Popover>
-                      <InputError message={errors.date} className="mt-1" />
+                      <InputError message={errors.date || validationErrors.date} className="mt-2" />
                     </div>
 
                     {/* Journal Number */}
-                    <div>
-                      <label htmlFor="journal_number" className="block text-sm font-medium text-gray-700">
-                        Journal Number
-                      </label>
+                    <label htmlFor="journal_number" className="md:col-span-2 col-span-12 block text-sm font-medium text-gray-700">
+                      Journal Number
+                    </label>
+                    <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                       <Input
                         id="journal_number"
-                        type="text"
-                        className="mt-1"
                         value={data.journal_number}
                         onChange={(e) => setData("journal_number", e.target.value)}
+                        className="md:w-[240px] w-full"
                         readOnly
                       />
-                      <InputError message={errors.journal_number} className="mt-1" />
+                      <InputError message={errors.journal_number || validationErrors.journal_number} className="mt-2" />
                     </div>
 
                     {/* Currency */}
-                    <div>
-                      <label htmlFor="trans_currency" className="block text-sm font-medium text-gray-700">
-                        Currency
-                      </label>
+                    <label htmlFor="trans_currency" className="md:col-span-2 col-span-12 block text-sm font-medium text-gray-700">
+                      Currency
+                    </label>
+                    <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                       <SearchableCombobox
-                        id="trans_currency"
-                        className="mt-1"
-                        value={data.trans_currency}
-                        onValueChange={(value) => setData("trans_currency", value)}
-                        placeholder="Select a currency"
-                        items={currencies.map((currency) => ({
-                          value: currency.code,
-                          label: `${currency.code} - ${currency.name}`
+                        options={currencies.map(currency => ({
+                          id: currency.code,
+                          name: `${currency.code} - ${currency.name}`
                         }))}
+                        value={data.trans_currency}
+                        onChange={(value) => setData("trans_currency", value)}
+                        placeholder="Select currency"
+                        className="md:w-[240px] w-full"
                       />
-                      <InputError message={errors.trans_currency} className="mt-1" />
+                      <InputError message={errors.trans_currency || validationErrors.trans_currency} className="mt-2" />
                     </div>
                   </div>
 

@@ -8,12 +8,16 @@ use App\Imports\StaffImport;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\EmployeeDepartmentHistory;
+use App\Models\Department;
+use App\Models\Designation;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
+use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
-use Validator;
+use Illuminate\Validation\Rule;
 
 class StaffController extends Controller
 {
@@ -44,13 +48,44 @@ class StaffController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        $employees = Employee::with('department', 'designation')
-            ->select('employees.*')
-            ->get();
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
 
-        return view('backend.user.staff.list', compact('employees'));
+        $query = Employee::with('department', 'designation')
+            ->where('business_id', $request->activeBusiness->id);
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%$search%")
+                  ->orWhere('employee_id', 'like', "%$search%")
+                  ->orWhere('email', 'like', "%$search%")
+                  ->orWhere('phone', 'like', "%$search%");
+            });
+        }
+
+        $employees = $query->paginate($per_page);
+
+        $employees->transform(function ($employee) use ($request) {
+            $employee->basic_salary = formatAmount($employee->basic_salary, currency_symbol($request->activeBusiness->currency));
+            return $employee;
+        });
+
+        return Inertia::render('Backend/User/Staff/List', [
+            'employees' => $employees->items(),
+            'meta' => [
+                'current_page' => $employees->currentPage(),
+                'per_page' => $employees->perPage(),
+                'from' => $employees->firstItem(),
+                'to' => $employees->lastItem(),
+                'total' => $employees->total(),
+                'last_page' => $employees->lastPage(),
+            ],
+            'filters' => [
+                'search' => $search,
+            ],
+        ]);
     }
 
     /**
@@ -60,7 +95,13 @@ class StaffController extends Controller
      */
     public function create(Request $request)
     {
-        return view('backend.user.staff.create');
+        $departments = Department::where('business_id', $request->activeBusiness->id)->get();
+        $designations = Designation::where('business_id', $request->activeBusiness->id)->get();
+        
+        return Inertia::render('Backend/User/Staff/Create', [
+            'departments' => $departments,
+            'designations' => $designations,
+        ]);
     }
 
     /**
@@ -72,18 +113,21 @@ class StaffController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'employee_id'     =>
-            'required',
-            Rule::unique('employees')->where(function ($query) use($request) {
-                return $query->where('business_id', $request->activeBusiness->id);
-            }),
+            'employee_id'     => [
+                'required',
+                Rule::unique('employees')->where(function ($query) use($request) {
+                    return $query->where('business_id', $request->activeBusiness->id);
+                }),
+            ],
             'name'            => 'required|max:50',
             'date_of_birth'   => 'nullable',
-            'email'           =>
-            'nullable|email|',
-            Rule::unique('employees')->where(function ($query) use($request) {
-                return $query->where('business_id', $request->activeBusiness->id);
-            }),
+            'email'           => [
+                'nullable',
+                'email',
+                Rule::unique('employees')->where(function ($query) use($request) {
+                    return $query->where('business_id', $request->activeBusiness->id);
+                }),
+            ],
             'phone'           => 'nullable|max:30',
             'department_id'   => 'required',
             'designation_id'  => 'required',
@@ -92,18 +136,13 @@ class StaffController extends Controller
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return redirect()->route('staffs.create')
-                    ->withErrors($validator)
-                    ->withInput();
-            }
+            return back()->withErrors($validator)->withInput();
         }
 
         DB::beginTransaction();
 
         $employee                  = new Employee();
+        $employee->business_id     = $request->activeBusiness->id;
         $employee->employee_id     = $request->input('employee_id');
         $employee->name            = $request->input('name');
         $employee->date_of_birth   = $request->input('date_of_birth')? Carbon::parse($request->input('date_of_birth'))->format('Y-m-d') : null;
@@ -139,15 +178,11 @@ class StaffController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Created New Staff '.$employee->name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('staffs.index')->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'store', 'message' => _lang('Saved Successfully'), 'data' => $employee, 'table' => '#employees_table']);
-        }
+        return redirect()->route('staffs.index')->with('success', _lang('Saved Successfully'));
     }
 
     /**
@@ -158,8 +193,13 @@ class StaffController extends Controller
      */
     public function show(Request $request, $id)
     {
-        $employee  = Employee::with('department', 'designation')->find($id);
-        return view('backend.user.staff.view', compact('employee', 'id'));
+        $employee = Employee::with('department', 'designation', 'department_history')
+            ->where('business_id', $request->activeBusiness->id)
+            ->findOrFail($id);
+            
+        return Inertia::render('Backend/User/Staff/View', [
+            'employee' => $employee
+        ]);
     }
 
     /**
@@ -170,8 +210,17 @@ class StaffController extends Controller
      */
     public function edit(Request $request, $id)
     {
-        $employee  = Employee::find($id);
-        return view('backend.user.staff.edit', compact('employee', 'id'));
+        $employee = Employee::where('business_id', $request->activeBusiness->id)
+            ->findOrFail($id);
+            
+        $departments = Department::where('business_id', $request->activeBusiness->id)->get();
+        $designations = Designation::where('business_id', $request->activeBusiness->id)->get();
+        
+        return Inertia::render('Backend/User/Staff/Edit', [
+            'employee' => $employee,
+            'departments' => $departments,
+            'designations' => $designations,
+        ]);
     }
 
     /**
@@ -210,17 +259,13 @@ class StaffController extends Controller
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return redirect()->route('staffs.edit', $id)
-                    ->withErrors($validator)
-                    ->withInput();
-            }
+            return back()->withErrors($validator)->withInput();
         }
 
         DB::beginTransaction();
-        $employee                = Employee::find($id);
+        $employee = Employee::where('business_id', $request->activeBusiness->id)
+            ->findOrFail($id);
+            
         $employee->name          = $request->input('name');
         $employee->date_of_birth = $request->input('date_of_birth')? Carbon::parse($request->input('date_of_birth'))->format('Y-m-d') : null;
         $employee->email         = $request->input('email');
@@ -258,15 +303,11 @@ class StaffController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Updated Staff '.$employee->name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('staffs.index')->with('success', _lang('Updated Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $employee, 'table' => '#employees_table']);
-        }
+        return redirect()->route('staffs.index')->with('success', _lang('Updated Successfully'));
     }
 
     /**
@@ -275,19 +316,56 @@ class StaffController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        $employee = Employee::find($id);
+        $employee = Employee::where('business_id', $request->activeBusiness->id)
+            ->findOrFail($id);
 
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Deleted Staff '.$employee->name;
         $audit->save();
 
         $employee->delete();
+        
         return redirect()->route('staffs.index')->with('success', _lang('Deleted Successfully'));
+    }
+    
+    /**
+     * Bulk delete selected staff members
+     * 
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulkDelete(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'ids' => 'required|array',
+            'ids.*' => 'required|integer',
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator);
+        }
+
+        $employees = Employee::whereIn('id', $request->ids)
+            ->where('business_id', $request->activeBusiness->id)
+            ->get();
+            
+        foreach ($employees as $employee) {
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Deleted Staff '.$employee->name;
+            $audit->save();
+            
+            $employee->delete();
+        }
+        
+        return redirect()->route('staffs.index')->with('success', _lang('Selected staff deleted successfully'));
     }
 
     public function import_staffs(Request $request)
@@ -305,7 +383,7 @@ class StaffController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Imported Staffs';
         $audit->save();
 
