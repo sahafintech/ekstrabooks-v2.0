@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
+use App\Models\Customer;
 use App\Models\MedicalRecord;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class MedicalRecordController extends Controller
 {
@@ -25,13 +27,57 @@ class MedicalRecordController extends Controller
         });
     }
 
-    public function index() {
-        $records = MedicalRecord::all();
-        return view('backend.user.medical_record.list', compact('records'));
+    public function index(Request $request) {
+        $query = MedicalRecord::select('medical_records.*')->with('customer');
+
+        // handle search
+        if ($request->has('search') && !empty($request->get('search'))) {
+            $search = $request->get('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('medical_records.customer.name', 'like', "%{$search}%")
+                    ->orWhere('medical_records.customer.phone', 'like', "%{$search}%");
+            });
+        }
+
+        // handle column filters
+        if ($request->has('columnFilters')) {
+            $columnFilters = $request->get('columnFilters');
+            if (is_string($columnFilters)) {
+                $columnFilters = json_decode($columnFilters, true);
+            }
+            if (is_array($columnFilters)) {
+                foreach ($columnFilters as $column => $value) {
+                    if ($value !== null && $value !== '') {
+                        $query->where('medical_records.customer.' . $column, $value);
+                    }
+                }
+            }
+        }
+
+        // handle pagination
+        $perPage = $request->get('per_page', 10);
+        $records = $query->paginate($perPage);
+        return Inertia::render('Backend/User/MedicalRecord/List', [
+            'records' => $records->items(),
+            'meta' => [
+                'total' => $records->total(),
+                'per_page' => $records->perPage(),
+                'current_page' => $records->currentPage(),
+                'last_page' => $records->lastPage(),
+            ],
+            'filters' => [
+                'search' => $request->get('search', ''),
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $request->get('sorting', []),
+            ],
+        ]);
     }
 
     public function create() {
-        return view('backend.user.medical_record.create');
+        $customers = Customer::all();
+        return Inertia::render('Backend/User/MedicalRecord/Create', [
+            'customers' => $customers
+        ]);
     }
 
     public function store(Request $request) {
@@ -155,12 +201,22 @@ class MedicalRecordController extends Controller
 
     public function show($id) {
         $record = MedicalRecord::find($id);
-        return view('backend.user.medical_record.view', compact('record'));
+        $customer = Customer::find($record->customer_id);
+        
+        return Inertia::render('Backend/User/MedicalRecord/View', [
+            'record' => $record,
+            'customer' => $customer,
+        ]);
     }
 
     public function edit($id) {
-        $record = MedicalRecord::find($id);
-        return view('backend.user.medical_record.edit', compact('record', 'id'));
+        $medicalRecord = MedicalRecord::find($id);
+        $customers = Customer::all();
+        return Inertia::render('Backend/User/MedicalRecord/Edit', [
+            'medicalRecord' => $medicalRecord,
+            'id' => $id,
+            'customers' => $customers,
+        ]);
     }
 
     public function update(Request $request, $id) {

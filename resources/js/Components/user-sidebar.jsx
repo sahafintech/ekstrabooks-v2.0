@@ -145,7 +145,7 @@ export function UserSidebar({ businesses, active_business, ...props }) {
             title: "Customers",
             url: "#",
             icon: Users,
-            isActive: isRoute("customers.index"),
+            isActive: isRoute("customers.index") || isRoute("receipts.index") || isRoute("invoices.index") || isRoute("medical_records.index") || isRoute("quotations.index") || isRoute("deffered_invoices.index") || isRoute("purchase_returns.index") || isRoute("prescriptions.index") || isRoute("purchase_returns.index"),
             items: [
                 {
                     title: "All Customers",

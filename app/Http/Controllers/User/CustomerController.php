@@ -14,6 +14,7 @@ use App\Models\Transaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 
 class CustomerController extends Controller
@@ -47,12 +48,56 @@ class CustomerController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        $customers = Customer::select('customers.*')
-            ->orderBy("customers.id", "desc")
-            ->get();
-        return view('backend.user.customer.list', compact('customers'));
+        $query = Customer::select('customers.*');
+
+        // handle search
+        if ($request->has('search') && !empty($request->get('search'))) {
+            $search = $request->get('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        // handle column filters
+        if ($request->has('columnFilters')) {
+            $columnFilters = $request->get('columnFilters');
+            if (is_string($columnFilters)) {
+                $columnFilters = json_decode($columnFilters, true);
+            }
+            if (is_array($columnFilters)) {
+                foreach ($columnFilters as $column => $value) {
+                    if ($value !== null && $value !== '') {
+                        $query->where($column, $value);
+                    }
+                }
+            }
+        }
+
+        // handle sorting
+        if ($request->has('sort') && $request->has('direction')) {
+            $query->orderBy($request->get('sort'), $request->get('direction'));
+        }
+
+        // handle pagination
+        $perPage = $request->get('per_page', 10);
+        $customers = $query->paginate($perPage);
+        return Inertia::render('Backend/User/Customer/List', [
+            'customers' => $customers->items(),
+            'meta' => [
+                'total' => $customers->total(),
+                'per_page' => $customers->perPage(),
+                'current_page' => $customers->currentPage(),
+                'last_page' => $customers->lastPage(),
+            ],
+            'filters' => [
+                'search' => $request->get('search', ''),
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $request->get('sorting', []),
+            ],
+        ]);
     }
 
     /**
@@ -62,12 +107,7 @@ class CustomerController extends Controller
      */
     public function create(Request $request)
     {
-        $alert_col = 'col-lg-8 offset-lg-2';
-        if (!$request->ajax()) {
-            return view('backend.user.customer.create', compact('alert_col'));
-        } else {
-            return view('backend.user.customer.modal.create', compact('alert_col'));
-        }
+        return Inertia::render('Backend/User/Customer/Create');
     }
 
     /**
@@ -126,11 +166,7 @@ class CustomerController extends Controller
         $audit->event = 'Created Customer ' . $customer->name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('customers.index')->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'store', 'message' => _lang('Saved Successfully'), 'data' => $customer, 'table' => '#customers_table']);
-        }
+        return redirect()->route('customers.index')->with('success', _lang('Saved Successfully'));
     }
 
     /**
@@ -145,24 +181,24 @@ class CustomerController extends Controller
         $data['alert_col'] = 'col-lg-8 offset-lg-2';
         $data['customer'] = Customer::find($id);
 
-        if (!isset($_GET['tab'])) {
-            $data['invoice'] = Invoice::selectRaw('COUNT(id) as total_invoice, SUM(grand_total) as total_amount, sum(paid) as total_paid')
-                ->where('customer_id', $id)
-                ->where('is_recurring', 0)
-                ->where('status', '!=', 0)
-                ->first();
-            
-            // Get recent transactions for the customer
-            $data['recent_transactions'] = Transaction::where('customer_id', $id)
-                ->whereHas('account', function ($query) {
-                    $query->where('account_type', '=', 'Cash')
-                        ->orWhere('account_type', '=', 'Bank');
-                })
-                ->orderBy('trans_date', 'desc')
-                ->limit(5)
-                ->get();
-        }
+        // Always load the overview data, regardless of tab or if no tab is specified
+        $data['invoice'] = Invoice::selectRaw('COUNT(id) as total_invoice, SUM(grand_total) as total_amount, sum(paid) as total_paid')
+            ->where('customer_id', $id)
+            ->where('is_recurring', 0)
+            ->where('status', '!=', 0)
+            ->first();
+        
+        // Get recent transactions for the customer
+        $data['recent_transactions'] = Transaction::where('customer_id', $id)
+            ->whereHas('account', function ($query) {
+                $query->where('account_type', '=', 'Cash')
+                    ->orWhere('account_type', '=', 'Bank');
+            })
+            ->orderBy('trans_date', 'desc')
+            ->limit(5)
+            ->get();
 
+        // Load tab-specific data
         if (isset($_GET['tab']) && $_GET['tab'] == 'invoices') {
             $data['invoices'] = Invoice::where('customer_id', $id)
                 ->where('is_recurring', 0)
@@ -194,7 +230,7 @@ class CustomerController extends Controller
             $data['transactions']->withPath('?tab=' . $_GET['tab']);
         }
 
-        return view('backend.user.customer.view', $data);
+        return Inertia::render('Backend/User/Customer/View', $data);
     }
 
     /**
@@ -205,9 +241,8 @@ class CustomerController extends Controller
      */
     public function edit(Request $request, $id)
     {
-        $alert_col = 'col-lg-10 offset-lg-1';
         $customer  = Customer::find($id);
-        return view('backend.user.customer.edit', compact('customer', 'id', 'alert_col'));
+        return inertia('Backend/User/Customer/Edit', compact('customer', 'id'));
     }
 
     /**
@@ -266,11 +301,7 @@ class CustomerController extends Controller
         $audit->event = 'Updated Customer ' . $customer->name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('customers.index')->with('success', _lang('Updated Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $customer, 'table' => '#customers_table']);
-        }
+        return redirect()->route('customers.index')->with('success', _lang('Updated Successfully'));
     }
 
     /**

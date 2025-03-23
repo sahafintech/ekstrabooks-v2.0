@@ -4,25 +4,77 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\Currency;
+use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Prescription;
 use App\Models\PrescriptionProduct;
 use App\Models\PrescriptionProductItem;
+use App\Models\Product;
 use App\Models\Receipt;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class PrescriptionController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $prescriptions = Prescription::with('customer', 'medical_record')->get();
-        return view('backend.user.prescription.list', compact('prescriptions'));
+        $query = Prescription::with('customer', 'medical_record')->select('prescriptions.*');
+
+        // handle search
+        if ($request->has('search') && !empty($request->get('search'))) {
+            $search = $request->get('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('prescriptions.date', 'like', "%{$search}%")
+                    ->orWhere('prescriptions.customer.name', 'like', "%{$search}%")
+                    ->orWhere('prescriptions.customer.phone', 'like', "%{$search}%");
+            });
+        }
+
+        // handle column filters
+        if ($request->has('columnFilters')) {
+            $columnFilters = $request->get('columnFilters');
+            if (is_string($columnFilters)) {
+                $columnFilters = json_decode($columnFilters, true);
+            }
+            if (is_array($columnFilters)) {
+                foreach ($columnFilters as $column => $value) {
+                    if ($value !== null && $value !== '') {
+                        $query->where('prescriptions.' . $column, $value);
+                    }
+                }
+            }
+        }
+
+        // handle pagination
+        $per_page = $request->get('per_page', 10);
+        $prescriptions = $query->paginate($per_page);
+
+        return Inertia::render('Backend/User/Prescription/List', [
+            'prescriptions' => $prescriptions->items(),
+            'meta' => [
+                'total' => $prescriptions->total(),
+                'per_page' => $prescriptions->perPage(),
+                'current_page' => $prescriptions->currentPage(),
+                'last_page' => $prescriptions->lastPage(),
+            ],
+            'filters' => [
+                'search' => $request->get('search', ''),
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $request->get('sorting', []),
+            ],
+        ]);
     }
 
     public function create()
     {
-        return view('backend.user.prescription.create');
+        $customers = Customer::all();
+        $products = Product::all();
+        
+        return Inertia::render('Backend/User/Prescription/Create', [
+            'customers' => $customers,
+            'products' => $products
+        ]);
     }
 
     public function store(Request $request)
@@ -213,16 +265,15 @@ class PrescriptionController extends Controller
 
     public function show($id)
     {
-        $prescription = Prescription::where('id', $id)->with('customer', 'medical_record')->first();
-        $receipts = Receipt::where('customer_id', $prescription->customer_id)
-            ->where('receipt_date', Carbon::createFromFormat(get_date_format(), $prescription->date)->format('Y-m-d'))
-            ->get();
-
-        $invoices = Invoice::where('customer_id', $prescription->customer_id)
-            ->where('invoice_date', Carbon::createFromFormat(get_date_format(), $prescription->date)->format('Y-m-d'))
-            ->get();
-
-        return view('backend.user.prescription.view', compact('prescription', 'id', 'receipts', 'invoices'));
+        $prescription = Prescription::with(['customer', 'items.product'])->findOrFail($id);
+        $customer = $prescription->customer;
+        $prescriptionProduct = PrescriptionProduct::where('prescription_id', $prescription->id)->with('items')->first();
+        
+        return Inertia::render('Backend/User/Prescription/View', [
+            'prescription' => $prescription,
+            'customer' => $customer,
+            'products' => $prescriptionProduct ? $prescriptionProduct->items : [],
+        ]);
     }
 
     public function change_status(Request $request, $id)

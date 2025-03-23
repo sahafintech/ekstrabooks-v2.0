@@ -17,11 +17,11 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 
-const DeleteInvoiceModal = ({ show, onClose, onConfirm, processing }) => (
+const DeleteCustomersModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm} className="p-6">
       <h2 className="text-lg font-medium">
-        Are you sure you want to delete this invoice?
+        Are you sure you want to delete this customer?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -37,32 +37,32 @@ const DeleteInvoiceModal = ({ show, onClose, onConfirm, processing }) => (
           variant="destructive"
           disabled={processing}
         >
-          Delete Invoice
+          Delete Customer
         </Button>
       </div>
     </form>
   </Modal>
 );
 
-const ImportInvoicesModal = ({ show, onClose, onSubmit, processing }) => (
+const ImportCustomersModal = ({ show, onClose, onSubmit, processing }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onSubmit} className="p-6">
       <div className="ti-modal-header">
-        <h3 className="text-lg font-bold">Import Invoices</h3>
+        <h3 className="text-lg font-bold">Import Customers</h3>
       </div>
       <div className="ti-modal-body grid grid-cols-12">
         <div className="col-span-12">
           <div className="flex items-center justify-between">
             <label className="block font-medium text-sm text-gray-700">
-              Invoices File
+              Customers File
             </label>
-            <Link href="/uploads/media/default/sample_invoices.xlsx">
+            <Link href="/uploads/media/default/sample_customers.xlsx">
               <Button variant="secondary" size="sm">
                 Use This Sample File
               </Button>
             </Link>
           </div>
-          <input type="file" className="w-full dropify" name="invoices_file" required />
+          <input type="file" className="w-full dropify" name="customers_file" required />
         </div>
         <div className="col-span-12 mt-4">
           <ul className="space-y-3 text-sm">
@@ -100,18 +100,18 @@ const ImportInvoicesModal = ({ show, onClose, onSubmit, processing }) => (
           type="submit"
           disabled={processing}
         >
-          Import Invoices
+          Import Items
         </Button>
       </div>
     </form>
   </Modal>
 );
 
-const DeleteAllInvoicesModal = ({ show, onClose, onConfirm, processing }) => (
+const DeleteAllCustomersModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm} className="p-6">
       <h2 className="text-lg font-medium">
-        Are you sure you want to delete all selected invoices?
+        Are you sure you want to delete all selected customers?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -134,40 +134,32 @@ const DeleteAllInvoicesModal = ({ show, onClose, onConfirm, processing }) => (
   </Modal>
 );
 
-const InvoiceStatusBadge = ({ status }) => {
-  const statusMap = {
-    0: { label: "Draft", className: "text-gray-600" },
-    1: { label: "Active", className: "text-blue-600" },
-    2: { label: "Paid", className: "text-success" },
-    3: { label: "Partially Paid", className: "text-warning" },
-    4: { label: "Canceled", className: "text-danger" }
-  };
-
-  return (
-    <span className={statusMap[status].className}>
-      {statusMap[status].label}
-    </span>
-  );
-};
-
-export default function List({ invoices = [], meta = {} }) {
+export default function List({ customers = [], meta = {}, filters = {} }) {
   const { auth } = usePage().props;
-  const [selectedInvoices, setSelectedInvoices] = useState([]);
+  const [selectedCustomers, setSelectedCustomers] = useState([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
-  const [invoiceToDelete, setInvoiceToDelete] = useState(null);
+  const [customerToDelete, setCustomerToDelete] = useState(null);
   const [tableRef, setTableRef] = useState(null);
   const [processing, setProcessing] = useState(false);
+
+  // Format currency with proper ISO 4217 code
+  const formatCurrency = (amount, currencyCode = 'USD') => {
+    return new Intl.NumberFormat('en-US', { 
+      style: 'currency', 
+      currency: currencyCode 
+    }).format(amount);
+  };
 
   const handleDelete = (e) => {
     e.preventDefault();
     setProcessing(true);
-
-    router.delete(route('invoices.destroy', invoiceToDelete), {
+    
+    router.delete(route('customers.destroy', customerToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
-        setInvoiceToDelete(null);
+        setCustomerToDelete(null);
         setProcessing(false);
       },
       onError: () => {
@@ -179,13 +171,13 @@ export default function List({ invoices = [], meta = {} }) {
   const handleDeleteAll = (e) => {
     e.preventDefault();
     if (!tableRef) return;
-
+    
     const selectedIds = tableRef.getSelectedRowModel().rows.map(row => row.original.id);
     if (selectedIds.length === 0) return;
 
     setProcessing(true);
-    router.post(route('invoices.destroy-multiple'), {
-      invoices: selectedIds
+    router.post(route('customers.destroy-multiple'), {
+      customers: selectedIds
     }, {
       onSuccess: () => {
         setShowDeleteAllModal(false);
@@ -202,8 +194,8 @@ export default function List({ invoices = [], meta = {} }) {
     e.preventDefault();
     const formData = new FormData(e.target);
     setProcessing(true);
-
-    router.post(route('invoices.import'), formData, {
+    
+    router.post(route('customers.import'), formData, {
       onSuccess: () => {
         setShowImportModal(false);
         setProcessing(false);
@@ -215,14 +207,82 @@ export default function List({ invoices = [], meta = {} }) {
   };
 
   const handlePagination = (pagination) => {
-    const params = new URLSearchParams(window.location.search);
-    params.set('page', pagination.pageIndex + 1);
-    params.set('per_page', pagination.pageSize);
+    // Ensure we have valid numeric values for page and page size
+    const pageIndex = isNaN(pagination.pageIndex) ? 0 : pagination.pageIndex;
+    const pageSize = isNaN(pagination.pageSize) ? 10 : pagination.pageSize;
+    
+    // Create query parameters object (only include non-empty values)
+    const params = {
+      page: pageIndex + 1, // Convert 0-indexed to 1-indexed
+      per_page: pageSize,
+    };
+    
+    // Only add search if it's non-empty
+    if (pagination.globalFilter || filters.search) {
+      params.search = pagination.globalFilter || filters.search || '';
+    }
+    
+    // Only add column filters if they exist
+    const columnFiltersArray = pagination.columnFilters || filters.columnFilters || [];
+    if (columnFiltersArray.length > 0) {
+      params.columnFilters = JSON.stringify(columnFiltersArray);
+    }
+    
+    // Only add sorting if it exists
+    const sortingArray = pagination.sorting || filters.sorting || [];
+    if (sortingArray.length > 0) {
+      params.sorting = JSON.stringify(sortingArray);
+    }
 
-    router.get(`${route('invoices.index')}?${params.toString()}`, {}, {
+    // Debug the parameters being sent to the server
+    console.log('Sending to server:', params);
+    
+    // Update URL and fetch data
+    router.get(route('customers.index'), params, {
       preserveState: true,
       preserveScroll: true,
-      only: ['invoices', 'meta']
+      only: ['customers', 'meta', 'filters'],
+      replace: false, // Use false to update browser history
+    });
+  };
+
+  const handleDataTableChange = (updatedState) => {
+    // Ensure we have valid numeric values for page and page size
+    const pageIndex = isNaN(updatedState.pagination.pageIndex) ? 0 : updatedState.pagination.pageIndex;
+    const pageSize = isNaN(updatedState.pagination.pageSize) ? 10 : updatedState.pagination.pageSize;
+    
+    // Create query parameters object (only include non-empty values)
+    const params = {
+      page: pageIndex + 1, // Convert 0-indexed to 1-indexed
+      per_page: pageSize,
+    };
+    
+    // Only add search if it's non-empty
+    if (updatedState.globalFilter) {
+      params.search = updatedState.globalFilter;
+    }
+    
+    // Only add column filters if they exist
+    const columnFiltersArray = updatedState.columnFilters || [];
+    if (columnFiltersArray.length > 0) {
+      params.columnFilters = JSON.stringify(columnFiltersArray);
+    }
+    
+    // Only add sorting if it exists
+    const sortingArray = updatedState.sorting || [];
+    if (sortingArray.length > 0) {
+      params.sorting = JSON.stringify(sortingArray);
+    }
+
+    // Debug the parameters being sent to the server
+    console.log('Table state change:', params);
+    
+    // Update URL and fetch data
+    router.get(route('customers.index'), params, {
+      preserveState: true,
+      preserveScroll: true,
+      only: ['customers', 'meta', 'filters'],
+      replace: false, // Use false to update browser history
     });
   };
 
@@ -248,54 +308,20 @@ export default function List({ invoices = [], meta = {} }) {
         enableHiding: false,
       },
       {
-        accessorKey: "invoice_number",
-        header: "Invoice Number",
+        accessorKey: "name",
+        header: "Name",
       },
       {
-        accessorKey: "customer",
-        header: "Customer",
-        cell: ({ row }) => row.original.customer.name,
+        accessorKey: "company_name",
+        header: "Company Name",
       },
       {
-        accessorKey: "invoice_date",
-        header: "Date",
+        accessorKey: "email",
+        header: "Email",
       },
       {
-        accessorKey: "due_date",
-        header: "Due Date",
-      },
-      {
-        accessorKey: "grand_total",
-        header: "Grand Total",
-        cell: ({ row }) => (
-          <div className="text-right">{row.original.grand_total}</div>
-        ),
-      },
-      {
-        accessorKey: "paid",
-        header: "Paid",
-        cell: ({ row }) => (
-          <div className="text-right">{row.original.paid}</div>
-        ),
-      },
-      {
-        accessorKey: "due",
-        header: "Due",
-        cell: ({ row }) => (
-          <div className="text-right">{row.original.grand_total - row.original.paid}</div>
-        ),
-      },
-      {
-        accessorKey: "status",
-        header: "Status",
-        cell: ({ row }) => (
-          <div className="text-center">
-            <InvoiceStatusBadge status={row.original.status} />
-          </div>
-        ),
-        filterFn: (row, id, value) => {
-          return value.includes(row.getValue(id))
-        },
+        accessorKey: "phone",
+        header: "Phone",
       },
       {
         id: "actions",
@@ -306,18 +332,18 @@ export default function List({ invoices = [], meta = {} }) {
               {
                 label: "Edit",
                 icon: Edit,
-                onClick: () => router.visit(route('invoices.edit', row.original.id))
+                onClick: () => router.visit(route('customers.edit', row.original.id))
               },
               {
                 label: "View",
                 icon: Eye,
-                onClick: () => router.visit(route('invoices.show', row.original.id))
+                onClick: () => router.visit(route('customers.show', row.original.id))
               },
               {
                 label: "Delete",
                 icon: Trash2,
                 onClick: () => {
-                  setInvoiceToDelete(row.original.id);
+                  setCustomerToDelete(row.original.id);
                   setShowDeleteModal(true);
                 },
                 className: "text-red-600"
@@ -335,23 +361,16 @@ export default function List({ invoices = [], meta = {} }) {
       id: "status",
       title: "Status",
       options: [
-        { label: "Draft", value: "0" },
         { label: "Active", value: "1" },
-        { label: "Paid", value: "2" },
-        { label: "Partially Paid", value: "3" },
-        { label: "Canceled", value: "4" },
+        { label: "Disabled", value: "0" },
       ],
     },
   ];
 
   const searchableColumns = [
     {
-      id: "invoice_number",
-      title: "Invoice Number",
-    },
-    {
-      id: "customer.name",
-      title: "Customer Name",
+      id: "name",
+      title: "Name",
     },
   ];
 
@@ -359,12 +378,12 @@ export default function List({ invoices = [], meta = {} }) {
     <AuthenticatedLayout>
       <SidebarInset>
         <div className="main-content">
-          <PageHeader page="Invoices" subpage="list" url="invoices.index" />
+          <PageHeader page="Customers" subpage="list" url="customers.index" />
 
           <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
             <div className="flex items-center space-x-2">
               <Link href={route("customers.create")}>
-                <Button>Add New Invoice</Button>
+                <Button>Add New Customer</Button>
               </Link>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -377,7 +396,7 @@ export default function List({ invoices = [], meta = {} }) {
                     <FileUp className="mr-2 h-4 w-4" /> Import
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href={route('invoices.export')}>
+                    <Link href={route('customers.export')}>
                       <FileDown className="mr-2 h-4 w-4" /> Export
                     </Link>
                   </DropdownMenuItem>
@@ -385,37 +404,48 @@ export default function List({ invoices = [], meta = {} }) {
               </DropdownMenu>
             </div>
 
-            <DataTable
-              columns={columns}
-              data={invoices}
-              filterableColumns={filterableColumns}
-              searchableColumns={searchableColumns}
-              totalRows={meta.total || 0}
-              pageCount={meta.last_page || 1}
-              onPaginationChange={handlePagination}
-              tableRef={setTableRef}
-              meta={meta}
-            />
+              <DataTable
+                columns={columns}
+                data={customers}
+                filterableColumns={filterableColumns}
+                searchableColumns={searchableColumns}
+                totalRows={meta.total || 0}
+                pageCount={meta.last_page || 1}
+                onPaginationChange={handlePagination}
+                onTableStateChange={handleDataTableChange}
+                serverSide={true}
+                initialState={{
+                  pagination: {
+                    pageIndex: (meta.current_page || 1) - 1,
+                    pageSize: meta.per_page || 10,
+                  },
+                  globalFilter: filters.search || '',
+                  columnFilters: filters.columnFilters || [],
+                  sorting: filters.sorting || [],
+                }}
+                tableRef={setTableRef}
+                meta={meta}
+              />
           </div>
 
-          <DeleteInvoiceModal
+          <DeleteCustomersModal
             show={showDeleteModal}
             onClose={() => setShowDeleteModal(false)}
             onConfirm={handleDelete}
             processing={processing}
           />
 
-          <ImportInvoicesModal
-            show={showImportModal}
-            onClose={() => setShowImportModal(false)}
-            onSubmit={handleImport}
-            processing={processing}
-          />
-
-          <DeleteAllInvoicesModal
+          <DeleteAllCustomersModal
             show={showDeleteAllModal}
             onClose={() => setShowDeleteAllModal(false)}
             onConfirm={handleDeleteAll}
+            processing={processing}
+          />
+
+          <ImportCustomersModal
+            show={showImportModal}
+            onClose={() => setShowImportModal(false)}
+            onSubmit={handleImport}
             processing={processing}
           />
         </div>

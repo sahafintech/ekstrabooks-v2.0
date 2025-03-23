@@ -37,8 +37,8 @@ export function BusinessSwitcher({ businesses, active_business }) {
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                <activeBusiness.logo className="size-4" />
+              <div className="flex aspect-square size-8 items-center justify-center">
+                <img src={`/uploads/media/${activeBusiness.logo}`} className="size-full rounded-lg" />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">
@@ -65,7 +65,7 @@ export function BusinessSwitcher({ businesses, active_business }) {
                   className="gap-2 p-2"
                 >
                   <div className="flex size-6 items-center justify-center rounded-sm border">
-                    <business.logo className="size-4 shrink-0" />
+                    <img src={`/uploads/media/${business.logo}`} className="size-full rounded-lg" alt={business.name} />
                   </div>
                   {business.name}
                   <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>
