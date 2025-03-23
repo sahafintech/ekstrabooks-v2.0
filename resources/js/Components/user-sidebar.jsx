@@ -61,13 +61,29 @@ export function UserSidebar({ businesses, active_business, ...props }) {
         }
     ];
 
+    // Enhanced isRoute function that handles routes with wildcards for parameters
     const isRoute = (name) => {
-        return route().current(name) || url.startsWith(route(name));
+        // Check if it's exactly the current route
+        if (route().current(name)) {
+            return true;
+        }
+        
+        // Extract the base path from the current URL
+        const currentPath = window.location.pathname;
+        
+        // Get the route base
+        const routeBase = route(name).split('?')[0]; // Remove any query parameters
+        
+        // Create a pattern that matches the route base followed by any parameters
+        // This will match routes like /invoices/* or /customers/*
+        const pattern = new RegExp(`^${routeBase}(\\/|$)`);
+        
+        return pattern.test(currentPath);
     };
 
     const dashboardItems = [
         {
-            name: "Dashboard",
+            title: "Dashboard",
             url: route("dashboard.index"),
             icon: PieChart,
             isActive: isRoute("dashboard.index"),
@@ -86,26 +102,32 @@ export function UserSidebar({ businesses, active_business, ...props }) {
                 {
                     title: "All Products",
                     url: route("products.index"),
+                    isActive: isRoute("products.index") || isRoute("products.create"),
                 },
                 {
                     title: "Main Categories",
                     url: route("main_categories.index"),
+                    isActive: isRoute("main_categories.index"),
                 },
                 {
                     title: "Sub Categories",
                     url: route("sub_categories.index"),
+                    isActive: isRoute("sub_categories.index"),
                 },
                 {
                     title: "Brands",
                     url: route("brands.index"),
+                    isActive: isRoute("brands.index"),
                 },
                 {
                     title: "Units",
                     url: route("product_units.index"),
+                    isActive: isRoute("product_units.index"),
                 },
                 {
                     title: "Inventory Adjustment",
                     url: route("inventory_adjustments.index"),
+                    isActive: isRoute("inventory_adjustments.index"),
                 }
             ],
         },
@@ -113,31 +135,38 @@ export function UserSidebar({ businesses, active_business, ...props }) {
             title: "Suppliers",
             url: "#",
             icon: Users,
-            isActive: isRoute("vendors.index"),
+            isActive: isRoute("vendors.index") || isRoute("purchase_orders.index") || isRoute("cash_purchases.index") || 
+                     isRoute("bill_invoices.index") || isRoute("billI_invoices.pay_bill") || isRoute("purchase_returns.index"),
             items: [
                 {
                     title: "All Suppliers",
                     url: route("vendors.index"),
+                    isActive: isRoute("vendors.index"),
                 },
                 {
                     title: "Purchase Order",
                     url: route("purchase_orders.index"),
+                    isActive: isRoute("purchase_orders.index"),
                 },
                 {
                     title: "Cash Purchase",
                     url: route("cash_purchases.index"),
+                    isActive: isRoute("cash_purchases.index"),
                 },
                 {
                     title: "Bill Invoice",
                     url: route("bill_invoices.index"),
+                    isActive: isRoute("bill_invoices.index"),
                 },
                 {
                     title: "Pay Bills",
                     url: route("billI_invoices.pay_bill"),
+                    isActive: isRoute("billI_invoices.pay_bill"),
                 },
                 {
                     title: "Purchase Return",
                     url: route("purchase_returns.index"),
+                    isActive: isRoute("purchase_returns.index"),
                 }
             ],
         },
@@ -145,43 +174,54 @@ export function UserSidebar({ businesses, active_business, ...props }) {
             title: "Customers",
             url: "#",
             icon: Users,
-            isActive: isRoute("customers.index") || isRoute("receipts.index") || isRoute("invoices.index") || isRoute("medical_records.index") || isRoute("quotations.index") || isRoute("deffered_invoices.index") || isRoute("purchase_returns.index") || isRoute("prescriptions.index") || isRoute("purchase_returns.index"),
+            isActive: isRoute("customers.index") || isRoute("receipts.index") || isRoute("invoices.index") || 
+                     isRoute("medical_records.index") || isRoute("quotations.index") || isRoute("deffered_invoices.index") || 
+                     isRoute("sales_returns.index") || isRoute("prescriptions.index") || isRoute("receive_payments.index"),
             items: [
                 {
                     title: "All Customers",
                     url: route("customers.index"),
+                    isActive: isRoute("customers.index"),
                 },
                 {
                     title: "Cash Invoice",
                     url: route("receipts.index"),
+                    isActive: isRoute("receipts.index"),
                 },
                 {
                     title: "Credit Invoice",
                     url: route("invoices.index"),
+                    isActive: isRoute("invoices.index"),
                 },
                 {
                     title: "Medical Records",
                     url: route("medical_records.index"),
+                    isActive: isRoute("medical_records.index"),
                 },
                 {
                     title: "Prescriptions",
                     url: route("prescriptions.index"),
+                    isActive: isRoute("prescriptions.index"),
                 },
                 {
                     title: "Deffered Invoice",
                     url: route("deffered_invoices.index"),
+                    isActive: isRoute("deffered_invoices.index"),
                 },
                 {
                     title: "Received Payment",
                     url: route("receive_payments.index"),
+                    isActive: isRoute("receive_payments.index"),
                 },
                 {
                     title: "Sales Return",
                     url: route("sales_returns.index"),
+                    isActive: isRoute("sales_returns.index"),
                 },
                 {
                     title: "Quotations",
                     url: route("quotations.index"),
+                    isActive: isRoute("quotations.index"),
                 }
             ]
         }
@@ -192,46 +232,60 @@ export function UserSidebar({ businesses, active_business, ...props }) {
             title: "HR & Payroll",
             url: "#",
             icon: GroupIcon,
+            isActive: isRoute("staffs.index") || isRoute("attendance.index") || isRoute("departments.index") || 
+                     isRoute("designations.index") || isRoute("payslips.index") || isRoute("payslips.accrue") || 
+                     isRoute("payslips.make_payment") || isRoute("holidays.index") || isRoute("leaves.index") || 
+                     isRoute("awards.index"),
             items: [
                 {
                     title: "Staff Management",
                     url: route("staffs.index"),
+                    isActive: isRoute("staffs.index"),
                 },
                 {
                     title: "Attendance",
                     url: route("attendance.index"),
+                    isActive: isRoute("attendance.index"),
                 },
                 {
                     title: "Departments",
                     url: route("departments.index"),
+                    isActive: isRoute("departments.index"),
                 },
                 {
                     title: "Designations",
                     url: route("designations.index"),
+                    isActive: isRoute("designations.index"),
                 },
                 {
                     title: "Manage Payroll",
                     url: route("payslips.index"),
+                    isActive: isRoute("payslips.index"),
                 },
                 {
                     title: "Accrue Payroll",
                     url: route("payslips.accrue"),
+                    isActive: isRoute("payslips.accrue"),
                 },
                 {
                     title: "Make Payment",
                     url: route("payslips.make_payment"),
+                    isActive: isRoute("payslips.make_payment"),
                 },
                 {
                     title: "Holidays",
                     url: route("holidays.index"),
+                    isActive: isRoute("holidays.index"),
                 },
                 {
                     title: "Leave Management",
                     url: route("leaves.index"),
+                    isActive: isRoute("leaves.index"),
                 },
                 {
                     title: "Awards",
                     url: route("awards.index"),
+                    isActive: isRoute("awards.index"),
                 }
             ],
         },
@@ -239,18 +293,22 @@ export function UserSidebar({ businesses, active_business, ...props }) {
             title: "Accounting",
             url: "#",
             icon: ChartPieIcon,
+            isActive: isRoute("accounts.index") || isRoute("journals.index") || isRoute("transaction_methods.index"),
             items: [
                 {
                     title: "Chart of Accounts",
-                    url: route("chart_of_accounts.list_chart_of_accounts"),
+                    url: route("accounts.index"),
+                    isActive: isRoute("accounts.index"),
                 },
                 {
                     title: "Journal Entry",
                     url: route("journals.index"),
+                    isActive: isRoute("journals.index"),
                 },
                 {
                     title: "Transaction Methods",
                     url: route("transaction_methods.index"),
+                    isActive: isRoute("transaction_methods.index"),
                 }
             ]
         },
@@ -258,37 +316,48 @@ export function UserSidebar({ businesses, active_business, ...props }) {
             title: "Business",
             url: "#",
             icon: Building2Icon,
+            isActive: isRoute("business.index") || isRoute("roles.index") || 
+                     isRoute("taxes.index") || isRoute("currency.index") || isRoute("audit_logs.index") ||
+                     url.includes('/business/settings/'),
             items: [
                 {
                     title: "Manage Businesses",
                     url: route("business.index"),
+                    isActive: isRoute("business.index"),
                 },
                 {
                     title: "Roles & Permissions",
                     url: route("roles.index"),
+                    isActive: isRoute("roles.index"),
                 },
                 {
                     title: "Business Settings",
                     url: route("business.settings", active_business.id),
+                    isActive: url.includes('/business/settings/'),
                 },
                 {
                     title: "Tax Settings",
                     url: route("taxes.index"),
+                    isActive: isRoute("taxes.index"),
                 },
                 {
                     title: "Currency Settings",
-                    url: route("currency.index")
+                    url: route("currency.index"),
+                    isActive: isRoute("currency.index"),
                 },
                 {
                     title: "Audit Logs",
-                    url: route("audit_logs.index")
+                    url: route("audit_logs.index"),
+                    isActive: isRoute("audit_logs.index"),
                 }
             ]
         },
         {
-            name: "Reports",
+            title: "Reports",
             url: "#",
             icon: FileText,
+            isActive: false, // Will need to be updated when report routes are added
+            items: []
         }
     ];
 

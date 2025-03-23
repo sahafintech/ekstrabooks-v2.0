@@ -432,7 +432,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		//Accounts
 		Route::get('accounts/{accountId}/{amount}/convert_due_amount', [AccountController::class, 'convert_due_amount']);
 		Route::resource('accounts', AccountController::class);
-		Route::get('chart_of_accounts', [AccountController::class, 'chart_of_accounts'])->name('chart_of_accounts.list_chart_of_accounts');
 		Route::post('account/import_statement/{id}', [AccountController::class, 'importStatement'])->name('accounts.import_statement');
 		Route::post('import_accounts', [AccountController::class, 'import_accounts'])->name('accounts.import');
 		Route::get('export_accounts', [AccountController::class, 'export_accounts'])->name('accounts.export');
@@ -444,17 +443,13 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('invoice_templates/element/{element}', [InvoiceTemplateController::class, 'get_element']);
 		Route::resource('invoice_templates', InvoiceTemplateController::class);
 
-		//Transaction Categories
-		// Route::resource('transaction_categories', TransactionCategoryController::class)->except('show');
-		// Route::get('categorize_transactions/{id}', [TransactionController::class, 'categorize_transactions'])->name('categorize_transactions.index');
-		// Route::post('categorize_transactions/{id}', [UncategorizedTransactionController::class, 'store'])->name('categorize_transactions.store');
-
 		//Transaction
 		Route::get('transactions/get_table_data', [TransactionController::class, 'get_table_data']);
 		Route::resource('transactions', TransactionController::class);
 
 		//Transaction Methods
 		Route::resource('transaction_methods', TransactionMethodController::class)->except('view');
+		Route::post('transaction_methods/bulk_delete', [TransactionMethodController::class, 'bulkDelete'])->name('transaction_methods.bulk_delete');
 
 		//HR Module
 		Route::resource('departments', DepartmentController::class);

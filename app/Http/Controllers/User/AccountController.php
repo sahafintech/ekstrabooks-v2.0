@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Imports\AccountsImport;
 use App\Imports\BankStatementImport;
 use App\Models\Account;
+use App\Models\AccountType;
 use App\Models\AuditLog;
 use App\Models\Currency;
 use App\Models\Invoice;
@@ -16,6 +17,7 @@ use App\Models\Vendor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Validator;
 
@@ -34,50 +36,73 @@ class AccountController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        $accounts = Account::where(function ($query) {
-            $query->where('account_type', '=', 'Bank')
-                ->orWhere('account_type', '=', 'Cash');
-        })->where(function ($query) {
-            $query->where('business_id', '=', request()->activeBusiness->id)
-                ->orWhere('business_id', '=', NULL);
-        })
-            ->get();
+        $query = Account::query();
 
-        $banks = Account::where('account_type', 'Bank')
-            ->where('business_id', '=', request()->activeBusiness->id)
-            ->get();
-
-        $bankBalance = 0;
-
-        foreach ($banks as $bank) {
-            $bankBalance += get_account_balance($bank->id);
+        // Apply search filter if provided
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('account_name', 'like', "%{$search}%")
+                  ->orWhere('account_code', 'like', "%{$search}%")
+                  ->orWhere('account_type', 'like', "%{$search}%");
+            });
         }
 
-        $cashs = Account::where('account_type', 'Cash')
-            ->where(function ($query) {
-                $query->where('business_id', '=', request()->activeBusiness->id)
-                    ->orWhere('business_id', '=', NULL);
-            })
-            ->get();
-
-        $cashBalance = 0;
-
-        foreach ($cashs as $cash) {
-            $cashBalance += get_account_balance($cash->id);
+        // Apply column filters if provided
+        if ($request->has('columnFilters') && !empty($request->columnFilters)) {
+            $columnFilters = json_decode($request->columnFilters, true);
+            
+            foreach ($columnFilters as $filter) {
+                $id = $filter['id'];
+                $value = $filter['value'];
+                
+                if ($id === 'account_type' && !empty($value)) {
+                    $query->where('account_type', $value);
+                }
+            }
         }
 
-        return view('backend.user.account.list', compact('accounts', 'bankBalance', 'cashBalance'));
-    }
+        // Apply sorting if provided
+        if ($request->has('sorting') && !empty($request->sorting)) {
+            $sorting = json_decode($request->sorting, true);
+            
+            foreach ($sorting as $sort) {
+                $id = $sort['id'];
+                $desc = $sort['desc'];
+                
+                $direction = $desc ? 'desc' : 'asc';
+                $query->orderBy($id, $direction);
+            }
+        } else {
+            // Default sorting
+            $query->orderBy('account_name', 'asc');
+        }
 
-    public function chart_of_accounts()
-    {
-        $accounts = Account::where(function ($query) {
-            $query->where('business_id', '=', request()->activeBusiness->id);
-        })->get();
+        // Get pagination parameters
+        $perPage = $request->has('per_page') ? (int)$request->per_page : 10;
+        $page = $request->has('page') ? (int)$request->page : 1;
 
-        return view('backend.user.account.chartofaccounts.list_chart_of_accounts', compact('accounts'));
+        // Get paginated results
+        $accounts = $query->paginate($perPage, ['*'], 'page', $page);
+
+        return Inertia::render('Backend/User/Account/List', [
+            'accounts' => $accounts->items(),
+            'meta' => [
+                'current_page' => $accounts->currentPage(),
+                'per_page' => $accounts->perPage(),
+                'total' => $accounts->total(),
+                'last_page' => $accounts->lastPage(),
+                'from' => $accounts->firstItem(),
+                'to' => $accounts->lastItem(),
+            ],
+            'filters' => [
+                'search' => $request->search ?? '',
+                'columnFilters' => !empty($request->columnFilters) ? json_decode($request->columnFilters, true) : [],
+                'sorting' => !empty($request->sorting) ? json_decode($request->sorting, true) : [],
+            ],
+        ]);
     }
 
     /**
@@ -87,11 +112,14 @@ class AccountController extends Controller
      */
     public function create(Request $request)
     {
-        if (!$request->ajax()) {
-            return back();
-        } else {
-            return view('backend.user.account.modal.create');
-        }
+        // Get currencies for the dropdown
+        $currencies = Currency::all();
+        $accountTypes = AccountType::all();
+        
+        return Inertia::render('Backend/User/Account/Create', [
+            'currencies' => $currencies,
+            'accountTypes' => $accountTypes,
+        ]);
     }
 
     /**
@@ -116,11 +144,11 @@ class AccountController extends Controller
         ]);
 
         if (($request->account_type == 'Bank' || $request->account_type == 'Cash') && $request->currency == null) {
-            return back()->with('error', 'Please Select Currency');
+            return redirect()->back()->withErrors(['currency' => 'Please Select Currency'])->withInput();
         }
 
         if (($request->account_type !== 'Bank' && $request->account_type !== 'Cash' && $request->account_type !== 'Other Current Asset' && $request->account_type !== 'Fixed Asset') && $request->opening_balance > 0) {
-            return back()->with('error', 'Only Assets Can Have Opening Balance');
+            return redirect()->back()->withErrors(['opening_balance' => 'Only Assets Can Have Opening Balance'])->withInput();
         }
 
         if (!Account::where('account_name', 'Common Shares')->where('business_id', $request->activeBusiness->id)->exists()) {
@@ -147,8 +175,8 @@ class AccountController extends Controller
         $account->account_number  = $request->input('account_number');
         $account->currency        = $request->input('currency');
         $account->description     = $request->input('description');
-        $account->user_id         = auth()->user()->id;
-        $account->business_id     = request()->activeBusiness->id;
+        $account->user_id         = auth()->id();
+        $account->business_id     = $request->activeBusiness->id;
         if ($request->account_type == 'Bank' || $request->account_type == 'Cash' || $request->account_type == 'Other Current Asset' || $request->account_type == 'Cost Of Sale' || $request->account_type == 'Fixed Asset' || $request->account_type == 'Direct Expenses' || $request->account_type == 'Other Expenses') {
             $account->dr_cr = 'dr';
         } else {
@@ -206,15 +234,11 @@ class AccountController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = auth()->id();
         $audit->event = 'Created Account ' . $account->account_name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('chart_of_accounts.list_chart_of_accounts')->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'store', 'message' => _lang('Saved Successfully'), 'data' => $account, 'table' => '#accounts_table']);
-        }
+        return redirect()->route('accounts.index')->with('success', 'Account created successfully');
     }
 
     /**
@@ -225,12 +249,8 @@ class AccountController extends Controller
      */
     public function show(Request $request, $id)
     {
-        $account = Account::with([
+        $account = Account::where('id', $id)->with([
             'transactions' => function ($query) {
-                $query->orderBy('trans_date', 'desc');
-            }
-        ])->with([
-            'uncategorized_transactions' => function ($query) {
                 $query->orderBy('trans_date', 'desc');
             }
         ])
@@ -261,11 +281,10 @@ class AccountController extends Controller
 
         $combined_transactions = $this->combine($payment_income_transactions, $payslip_transactions, $normal_transactions);
 
-        if (!$request->ajax()) {
-            return view('backend.user.account.view', compact('account', 'combined_transactions', 'id'));
-        } else {
-            return view('backend.user.account.modal.view', compact('account', 'combined_transactions', 'id'));
-        }
+        return Inertia::render('Backend/User/Account/Show', [
+            'account' => $account,
+            'combined_transactions' => $combined_transactions,
+        ]);
     }
 
     function combine($payment_income_transactions, $payslip_transactions, $normal_transactions)
@@ -359,11 +378,14 @@ class AccountController extends Controller
             ->where('ref_type', 'open')
             ->sum('transaction_amount');
 
-        if (!$request->ajax()) {
-            return back();
-        } else {
-            return view('backend.user.account.modal.edit', compact('account', 'id', 'openingBalance'));
-        }
+        // Get currencies for the dropdown
+        $currencies = Currency::all();
+        
+        return Inertia::render('Backend/User/Account/Edit', [
+            'account' => $account,
+            'openingBalance' => $openingBalance,
+            'currencies' => $currencies,
+        ]);
     }
 
     /**
@@ -388,11 +410,11 @@ class AccountController extends Controller
         ]);
 
         if (($request->account_type == 'Bank' || $request->account_type == 'Cash') && $request->currency == null) {
-            return back()->with('error', 'Please Select Currency');
+            return redirect()->back()->withErrors(['currency' => 'Please Select Currency'])->withInput();
         }
 
         if (($request->account_type !== 'Bank' && $request->account_type !== 'Cash' && $request->account_type !== 'Other Current Asset' && $request->account_type !== 'Fixed Asset') && $request->opening_balance > 0) {
-            return back()->with('error', 'Only Assets Can Have Opening Balance');
+            return redirect()->back()->withErrors(['opening_balance' => 'Only Assets Can Have Opening Balance'])->withInput();
         }
 
         if (!Account::where('account_name', 'Common Shares')->where('business_id', $request->activeBusiness->id)->exists()) {
@@ -503,15 +525,11 @@ class AccountController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = auth()->id();
         $audit->event = 'Updated Account ' . $account->account_name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('chart_of_accounts.list_chart_of_accounts')->with('success', _lang('Updated Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $account, 'table' => '#accounts_table']);
-        }
+        return redirect()->route('accounts.index')->with('success', 'Account updated successfully');
     }
 
     public function convert_due_amount(Request $request, $accountId, $amount)
@@ -532,19 +550,56 @@ class AccountController extends Controller
     {
         $account = Account::find($id);
         if ($account->transactions->count() > 0) {
-            return back()->with('error', _lang('This Account has transactions. Please delete them first !'));
+            return redirect()->back()->withErrors(['delete' => 'This Account has transactions. Please delete them first!']);
         }
 
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = auth()->id();
         $audit->event = 'Deleted Account ' . $account->account_name;
         $audit->save();
 
         $account->delete();
 
-        return redirect()->route('chart_of_accounts.list_chart_of_accounts')->with('success', _lang('Deleted Successfully'));
+        return redirect()->route('accounts.index')->with('success', 'Account deleted successfully');
+    }
+
+    public function destroyMultiple(Request $request)
+    {
+        $accountIds = $request->accounts;
+        $deletedCount = 0;
+        $failedCount = 0;
+        
+        foreach ($accountIds as $id) {
+            $account = Account::find($id);
+            
+            if (!$account) {
+                $failedCount++;
+                continue;
+            }
+            
+            if ($account->transactions->count() > 0) {
+                $failedCount++;
+                continue;
+            }
+            
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->id();
+            $audit->event = 'Deleted Account ' . $account->account_name;
+            $audit->save();
+            
+            $account->delete();
+            $deletedCount++;
+        }
+        
+        if ($failedCount > 0) {
+            return back()->with('warning', $deletedCount . ' accounts deleted successfully. ' . $failedCount . ' accounts could not be deleted because they have transactions.');
+        }
+        
+        return back()->with('success', $deletedCount . ' accounts deleted successfully');
     }
 
     public function importStatement(Request $request)
@@ -568,7 +623,7 @@ class AccountController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = auth()->id();
         $audit->event = 'Imported Accounts';
         $audit->save();
 
@@ -582,7 +637,7 @@ class AccountController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = auth()->id();
         $audit->event = 'Exported Accounts';
         $audit->save();
     }
@@ -591,19 +646,13 @@ class AccountController extends Controller
     {
         if ($request->isMethod('get')) {
 
-            $date1 = Carbon::now()->subDays(30)->format('Y-m-d');
-            $date2 = Carbon::now()->format('Y-m-d');
+            $date1 = $request->has('date1') ? Carbon::parse($request->date1)->format('Y-m-d') : Carbon::now()->subDays(30)->format('Y-m-d');
+            $date2 = $request->has('date2') ? Carbon::parse($request->date2)->format('Y-m-d') : Carbon::now()->format('Y-m-d');
 
             session(['start_date' => $date1]);
             session(['end_date' => $date2]);
 
-            $account = Account::where('id', $id)->with([
-                'transactions' => function ($query) use ($date1, $date2) {
-                    $query->whereDate('trans_date', '>=', $date1)
-                        ->whereDate('trans_date', '<=', $date2)
-                        ->orderBy('trans_date', 'desc');
-                }
-            ])->first();
+            $account = Account::where('id', $id)->first();
 
             $normal_transactions = $account->transactions()
                 ->whereNotIn('ref_type', ['invoice payment', 'bill payment', 'd invoice payment', 'payslip', 'd invoice income', 'd invoice tax'])
@@ -635,8 +684,45 @@ class AccountController extends Controller
                 ->groupBy('trans_date');
 
             $combined_transactions = $this->combine($payment_income_transactions, $payslip_transactions, $normal_transactions);
+            
+            // Sort transactions by date
+            $combined_transactions = $combined_transactions->sortByDesc('trans_date');
+            
+            // Calculate running balance
+            $opening_balance = $account->opening_balance;
+            $running_balance = [];
+            $current_balance = $opening_balance;
+            
+            foreach ($combined_transactions as $key => $transaction) {
+                if ($transaction->dr_cr == 'dr') {
+                    $current_balance += $transaction->base_currency_amount;
+                } else {
+                    $current_balance -= $transaction->base_currency_amount;
+                }
+                $running_balance[$key] = $current_balance;
+            }
+            
+            $balances = [
+                'opening' => $opening_balance,
+                'closing' => end($running_balance) ?: $opening_balance,
+                'running' => $running_balance
+            ];
 
-            return view('backend.user.account.account_statement', compact('account', 'combined_transactions'));
+            $date1Obj = Carbon::parse($date1);
+            $date2Obj = Carbon::parse($date2);
+            
+            $dateRange = [
+                'from' => $date1Obj->format('Y-m-d'),
+                'to' => $date2Obj->format('Y-m-d')
+            ];
+
+            // Return Inertia view with JSON data
+            return Inertia::render('Backend/User/Account/AccountStatement', [
+                'account' => $account,
+                'transactions' => $combined_transactions->values(),
+                'balances' => $balances,
+                'dateRange' => $dateRange
+            ]);
         } else {
             $request->validate([
                 'date1' => 'required',
@@ -648,50 +734,8 @@ class AccountController extends Controller
 
             session(['start_date' => $date1]);
             session(['end_date' => $date2]);
-
-            $account = Account::where('id', $id)->with([
-                'transactions' => function ($query) use ($date1, $date2) {
-                    $query->whereDate('trans_date', '>=', $date1)
-                        ->whereDate('trans_date', '<=', $date2)
-                        ->orderBy('trans_date', 'desc');
-                }
-            ])->first();
-
-            $normal_transactions = $account->transactions()
-                ->whereNotIn('ref_type', ['invoice payment', 'bill payment', 'd invoice payment', 'payslip', 'd invoice income', 'd invoice tax'])
-                ->whereDate('trans_date', '>=', $date1)
-                ->whereDate('trans_date', '<=', $date2)
-                ->get();
-
-            $get_payment_income_transactions = $account->transactions()
-                ->whereIn('ref_type', ['invoice payment', 'bill payment', 'd invoice payment', 'd invoice income', 'd invoice tax'])
-                ->whereDate('trans_date', '>=', $date1)
-                ->whereDate('trans_date', '<=', $date2)
-                ->get(); // Fetch the transactions as a collection
-
-            $payment_income_transactions = $get_payment_income_transactions->groupBy(function ($transaction) {
-                // Check if the ref_id contains a comma
-                if (strpos($transaction->ref_id, ',') !== false) {
-                    // Extract the second part of ref_id
-                    return explode(',', $transaction->ref_id)[1];
-                }
-                // Otherwise, return the ref_id as is
-                return $transaction->ref_id;
-            });
-
-            $payslip_transactions = $account->transactions()
-                ->where('ref_type', 'payslip')
-                ->whereDate('trans_date', '>=', $date1)
-                ->whereDate('trans_date', '<=', $date2)
-                ->get()
-                ->groupBy('trans_date');
-
-            $combined_transactions = $this->combine($payment_income_transactions, $payslip_transactions, $normal_transactions);
-
-            $date1 = Carbon::parse($request->date1);
-            $date2 = Carbon::parse($request->date2);
-
-            return view('backend.user.account.account_statement', compact('account', 'combined_transactions', 'date1', 'date2'));
+            
+            return redirect()->route('accounts.account_statement', ['id' => $id, 'date1' => $date1, 'date2' => $date2]);
         }
     }
 

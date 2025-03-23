@@ -1,11 +1,11 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@/Components/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuGroup,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@/Components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
 
 export default function TableActions({ actions = [] }) {
@@ -26,7 +26,7 @@ export default function TableActions({ actions = [] }) {
                             className={action.className}
                         >
                             {action.icon && (
-                                <action.icon className="mr-2 h-4 w-4" />
+                                <span className="mr-2">{action.icon}</span>
                             )}
                             {action.label}
                         </DropdownMenuItem>

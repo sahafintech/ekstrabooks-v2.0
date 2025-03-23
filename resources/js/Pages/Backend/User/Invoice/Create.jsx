@@ -29,6 +29,9 @@ export default function Create({ customers = [], products = [], currencies = [],
     unit_cost: 0,
     taxes: []
   }]);
+  
+  const [exchangeRate, setExchangeRate] = useState(1);
+  const [baseCurrencyInfo, setBaseCurrencyInfo] = useState(null);
 
   const { data, setData, post, processing, errors, reset } = useForm({
     customer_id: "",
@@ -38,6 +41,7 @@ export default function Create({ customers = [], products = [], currencies = [],
     invoice_date: format(new Date(), "yyyy-MM-dd"),
     due_date: "",
     currency: "",
+    exchange_rate: 1,
     converted_total: 0,
     discount_type: "percentage",
     discount_value: 0,
@@ -117,29 +121,62 @@ export default function Create({ customers = [], products = [], currencies = [],
   };
 
   const convertCurrency = (amount) => {
-    const selectedCurrency = currencies.find(c => c.id === data.currency);
-    const baseCurrency = currencies.find(c => c.base_currency === 1);
-    
-    if (!selectedCurrency || !baseCurrency) return amount;
+    if (!exchangeRate || exchangeRate === 0) return amount;
     
     // Convert from selected currency to base currency
+    // According to the ISO 4217 standard:
     // If selected is EUR with rate 0.92 and base is USD with rate 1
-    // then 100 EUR = (100 * (1/0.92)) = 108.70 USD
-    return amount * (1 / selectedCurrency.exchange_rate);
+    // then 100 EUR = (100 / 0.92) = 108.70 USD
+    return amount / exchangeRate;
   };
+
+  // Find and set base currency on component mount
+  useEffect(() => {
+    const baseC = currencies.find(c => c.exchange_rate === 1);
+    if (baseC) {
+      setBaseCurrencyInfo(baseC);
+    }
+  }, [currencies]);
+
+  // Fetch exchange rate when currency changes
+  useEffect(() => {
+    if (data.currency) {
+      const selectedCurrency = currencies.find(c => c.id === data.currency);
+      if (selectedCurrency) {
+        // Fetch real-time exchange rate from API
+        fetch(`/user/find_currency/${selectedCurrency.name}`)
+          .then(response => response.json())
+          .then(currencyData => {
+            if (currencyData && currencyData.exchange_rate) {
+              setExchangeRate(currencyData.exchange_rate);
+              setData('exchange_rate', currencyData.exchange_rate);
+            } else {
+              // Fallback to the rate from props
+              setExchangeRate(selectedCurrency.exchange_rate);
+              setData('exchange_rate', selectedCurrency.exchange_rate);
+            }
+          })
+          .catch(error => {
+            console.error("Error fetching currency rate:", error);
+            // Fallback to the rate from props
+            setExchangeRate(selectedCurrency.exchange_rate);
+            setData('exchange_rate', selectedCurrency.exchange_rate);
+          });
+      }
+    }
+  }, [data.currency]);
 
   // Update converted_total whenever relevant values change
   useEffect(() => {
     const total = calculateTotal();
     const convertedTotal = convertCurrency(total);
     setData('converted_total', convertedTotal);
-  }, [data.currency, invoiceItems, data.discount_type, data.discount_value]);
+  }, [data.currency, invoiceItems, data.discount_type, data.discount_value, exchangeRate]);
 
   const renderTotal = () => {
     const total = calculateTotal();
     const convertedTotal = convertCurrency(total);
     const selectedCurrency = currencies.find(c => c.id === data.currency);
-    const baseCurrency = currencies.find(c => c.base_currency === 1);
 
     if (!selectedCurrency) {
       return (
@@ -150,12 +187,15 @@ export default function Create({ customers = [], products = [], currencies = [],
     }
 
     return (
-      <div className="text-lg font-bold">
-        Total: {selectedCurrency.name} {total.toFixed(2)}
-        {baseCurrency && selectedCurrency.id !== baseCurrency.id && (
-          <span className="text-sm ml-2 text-muted-foreground">
-            ({baseCurrency.name} {convertedTotal.toFixed(2)})
-          </span>
+      <div className="flex flex-col">
+        <div className="text-lg font-bold">
+          Total: {selectedCurrency.name} {total.toFixed(2)}
+        </div>
+        {baseCurrencyInfo && selectedCurrency.id !== baseCurrencyInfo.id && (
+          <div className="text-sm text-muted-foreground">
+            Converted: {baseCurrencyInfo.name} {convertedTotal.toFixed(2)} 
+            <span className="text-xs ml-1">(Rate: {exchangeRate})</span>
+          </div>
         )}
       </div>
     );
@@ -188,6 +228,24 @@ export default function Create({ customers = [], products = [], currencies = [],
 
   const submit = (e) => {
     e.preventDefault();
+    
+    // Prepare form data to match the expected controller format
+    setData({
+      ...data,
+      exchange_rate: exchangeRate,
+      product_id: invoiceItems.map(item => item.product_id),
+      product_name: invoiceItems.map(item => item.product_name),
+      description: invoiceItems.map(item => item.description),
+      quantity: invoiceItems.map(item => item.quantity),
+      unit_cost: invoiceItems.map(item => item.unit_cost),
+      taxes: Object.fromEntries(
+        invoiceItems.map(item => [
+          item.product_id,
+          item.taxes.map(tax => tax.id)
+        ])
+      )
+    });
+    
     post(route("invoices.store"), {
       preserveScroll: true,
       onSuccess: () => {

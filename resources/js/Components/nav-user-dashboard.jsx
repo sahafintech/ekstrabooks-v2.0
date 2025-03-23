@@ -19,7 +19,7 @@ export function NavUserDashboard({ items }) {
                         <SidebarMenuButton asChild>
                             <Link href={item.url}>
                                 {item.icon && <item.icon />}
-                                <span>{item.name}</span>
+                                <span>{item.title}</span>
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>

@@ -1,0 +1,250 @@
+import { useForm } from "@inertiajs/react";
+import { Label } from "@/Components/ui/label";
+import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import { SidebarInset, SidebarSeparator } from "@/Components/ui/sidebar";
+import PageHeader from "@/Components/PageHeader";
+import { Input } from "@/Components/ui/input";
+import InputError from "@/Components/InputError";
+import { Button } from "@/Components/ui/button";
+import { toast } from "sonner";
+import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import { Textarea } from "@/Components/ui/textarea";
+import { Calendar } from "@/Components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/Components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
+
+export default function Edit({ account, openingBalance, currencies = [], accountTypes = [] }) {
+
+  const [showCurrency, setShowCurrency] = useState(
+    account.account_type === "Bank" || account.account_type === "Cash"
+  );
+
+  // Prepare initial form data from account data
+  const { data, setData, put, processing, errors } = useForm({
+    account_code: account.account_code || "",
+    account_name: account.account_name || "",
+    account_type: account.account_type || "",
+    opening_date: account.opening_date
+      ? format(new Date(account.opening_date), "yyyy-MM-dd")
+      : format(new Date(), "yyyy-MM-dd"),
+    account_number: account.account_number || "",
+    currency: account.currency ? account.currency.split(' ')[0] : "",
+    description: account.description || "",
+    opening_balance: openingBalance || 0,
+  });
+
+  // Handle account type change to determine if currency should be shown
+  useEffect(() => {
+    const isBankOrCash = data.account_type === "Bank" || data.account_type === "Cash";
+    setShowCurrency(isBankOrCash);
+
+    // Reset currency if not bank or cash
+    if (!isBankOrCash) {
+      setData("currency", "");
+    }
+  }, [data.account_type]);
+
+  const submit = (e) => {
+    e.preventDefault();
+    put(route("accounts.update", account.id), {
+      preserveScroll: true,
+      onSuccess: () => {
+        toast.success("Account updated successfully");
+      },
+    });
+  };
+
+  const isAssetType = (type) => {
+    return ["Bank", "Cash", "Other Current Asset", "Fixed Asset"].includes(type);
+  };
+
+  return (
+    <AuthenticatedLayout>
+      <SidebarInset>
+        <PageHeader page="Chart of Accounts" subpage="Edit Account" url="accounts.index" />
+
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+          <form onSubmit={submit}>
+            <div className="grid grid-cols-12 mt-2">
+              <Label htmlFor="account_code" className="md:col-span-2 col-span-12">
+                Account Code *
+              </Label>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                <Input
+                  id="account_code"
+                  type="text"
+                  value={data.account_code}
+                  onChange={(e) => setData("account_code", e.target.value)}
+                  className="md:w-1/2 w-full"
+                  required
+                />
+                <InputError message={errors.account_code} className="text-sm" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-12 mt-2">
+              <Label htmlFor="account_name" className="md:col-span-2 col-span-12">
+                Account Name *
+              </Label>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                <Input
+                  id="account_name"
+                  type="text"
+                  value={data.account_name}
+                  onChange={(e) => setData("account_name", e.target.value)}
+                  className="md:w-1/2 w-full"
+                  required
+                />
+                <InputError message={errors.account_name} className="text-sm" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-12 mt-2">
+              <Label htmlFor="account_type" className="md:col-span-2 col-span-12">
+                Account Type *
+              </Label>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                <div className="md:w-1/2 w-full">
+                  <SearchableCombobox
+                    options={accountTypes.map(accountType => ({
+                      id: accountType.type,
+                      name: accountType.type
+                    }))}
+                    value={data.account_type}
+                    onChange={(value) => setData("account_type", value)}
+                    placeholder="Select account type"
+                  />
+                </div>
+                <InputError message={errors.account_type} className="text-sm" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-12 mt-2">
+              <Label htmlFor="opening_date" className="md:col-span-2 col-span-12">
+                Opening Date *
+              </Label>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "md:w-1/2 w-full justify-start text-left font-normal",
+                        !data.opening_date && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {data.opening_date ? (
+                        format(new Date(data.opening_date), "PPP")
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={data.opening_date ? new Date(data.opening_date) : new Date()}
+                      onSelect={(date) =>
+                        setData("opening_date", date ? format(date, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"))
+                      }
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <InputError message={errors.opening_date} className="text-sm" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-12 mt-2">
+              <Label htmlFor="account_number" className="md:col-span-2 col-span-12">
+                Account Number
+              </Label>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                <Input
+                  id="account_number"
+                  type="text"
+                  value={data.account_number}
+                  onChange={(e) => setData("account_number", e.target.value)}
+                  className="md:w-1/2 w-full"
+                />
+                <InputError message={errors.account_number} className="text-sm" />
+              </div>
+            </div>
+
+            {showCurrency && (
+              <div className="grid grid-cols-12 mt-2">
+                <Label htmlFor="currency" className="md:col-span-2 col-span-12">
+                  Currency *
+                </Label>
+                <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                  <div className="md:w-1/2 w-full">
+                    <SearchableCombobox
+                      options={currencies.map(currency => ({
+                        id: currency.name,
+                        name: `${currency.name} - ${currency.description} (${currency.exchange_rate})`
+                      }))}
+                      value={data.currency}
+                      onChange={(value) => setData("currency", value)}
+                      placeholder="Select currency"
+                    />
+                  </div>
+                  <InputError message={errors.currency} className="text-sm" />
+                </div>
+              </div>
+            )}
+
+            {isAssetType(data.account_type) && (
+              <div className="grid grid-cols-12 mt-2">
+                <Label htmlFor="opening_balance" className="md:col-span-2 col-span-12">
+                  Opening Balance
+                </Label>
+                <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                  <Input
+                    id="opening_balance"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={data.opening_balance}
+                    onChange={(e) => setData("opening_balance", e.target.value)}
+                    className="md:w-1/2 w-full"
+                  />
+                  <InputError message={errors.opening_balance} className="text-sm" />
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-12 mt-2">
+              <Label htmlFor="description" className="md:col-span-2 col-span-12">
+                Description
+              </Label>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                <Textarea
+                  id="description"
+                  value={data.description}
+                  onChange={(e) => setData("description", e.target.value)}
+                  className="md:w-1/2 w-full"
+                  rows={3}
+                />
+                <InputError message={errors.description} className="text-sm" />
+              </div>
+            </div>
+
+            <SidebarSeparator className="my-4" />
+
+            <Button type="submit" disabled={processing}>
+              Update Account
+            </Button>
+          </form>
+        </div>
+      </SidebarInset>
+    </AuthenticatedLayout>
+  );
+}

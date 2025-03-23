@@ -363,7 +363,7 @@ export default function List({ invoices = [], meta = {} }) {
 
           <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
             <div className="flex items-center space-x-2">
-              <Link href={route("customers.create")}>
+              <Link href={route("invoices.create")}>
                 <Button>Add New Invoice</Button>
               </Link>
               <DropdownMenu>

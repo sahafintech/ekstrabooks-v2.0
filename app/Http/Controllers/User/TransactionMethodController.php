@@ -5,7 +5,9 @@ namespace App\Http\Controllers\User;
 use App\Http\Controllers\Controller;
 use App\Models\TransactionMethod;
 use Illuminate\Http\Request;
-use Validator;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
+use Inertia\Inertia;
 
 class TransactionMethodController extends Controller {
 
@@ -21,23 +23,28 @@ class TransactionMethodController extends Controller {
      *
      * @return \Illuminate\Http\Response
      */
-    public function index() {
-        $assets             = ['datatable'];
-        $transactionmethods = TransactionMethod::all()->sortByDesc("id");
-        return view('backend.user.transaction_method.list', compact('transactionmethods', 'assets'));
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function create(Request $request) {
-        if (!$request->ajax()) {
-            return view('backend.user.transaction_method.create');
-        } else {
-            return view('backend.user.transaction_method.modal.create');
+    public function index(Request $request) {
+        $query = TransactionMethod::query()
+            ->where('business_id', request()->activeBusiness->id);
+        
+        if ($request->has('search') && $request->search != '') {
+            $query->where('name', 'like', '%' . $request->search . '%');
         }
+        
+        $transaction_methods = $query->paginate($request->get('per_page', 10));
+        
+        return Inertia::render('Backend/User/TransactionMethod/List', [
+            'transaction_methods' => $transaction_methods->items(),
+            'meta' => [
+                'current_page' => $transaction_methods->currentPage(),
+                'per_page' => $transaction_methods->perPage(),
+                'from' => $transaction_methods->firstItem(),
+                'to' => $transaction_methods->lastItem(),
+                'total' => $transaction_methods->total(),
+                'last_page' => $transaction_methods->lastPage()
+            ],
+            'filters' => $request->only('search')
+        ]);
     }
 
     /**
@@ -48,51 +55,22 @@ class TransactionMethodController extends Controller {
      */
     public function store(Request $request) {
         $validator = Validator::make($request->all(), [
-            'name'        => 'required|max:50',
-            'status'      => 'required',
-            'user_id'     => '',
-            'business_id' => '',
+            'name'   => 'required|max:50',
+            'status' => 'required',
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return redirect()->route('transaction_methods.create')
-                    ->withErrors($validator)
-                    ->withInput();
-            }
+            return back()->withErrors($validator->errors());
         }
 
-        $transactionmethod         = new TransactionMethod();
-        $transactionmethod->name   = $request->input('name');
+        $transactionmethod = new TransactionMethod();
+        $transactionmethod->name = $request->input('name');
         $transactionmethod->status = $request->input('status');
-
+        $transactionmethod->business_id = request()->activeBusiness->id;
+        $transactionmethod->user_id = Auth::user()->id;
         $transactionmethod->save();
-        $transactionmethod->status = status($request->status);
 
-        if (!$request->ajax()) {
-            return redirect()->route('transaction_methods.index')->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'store', 'message' => _lang('Saved Successfully'), 'data' => $transactionmethod, 'table' => '#transaction_methods_table']);
-        }
-
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function edit(Request $request, $id) {
-        $transactionmethod = TransactionMethod::find($id);
-        if (!$request->ajax()) {
-            return view('backend.user.transaction_method.edit', compact('transactionmethod', 'id'));
-        } else {
-            return view('backend.user.transaction_method.modal.edit', compact('transactionmethod', 'id'));
-        }
-
+        return redirect()->route('transaction_methods.index')->with('success', _lang('Transaction Method Added Successfully'));
     }
 
     /**
@@ -104,35 +82,27 @@ class TransactionMethodController extends Controller {
      */
     public function update(Request $request, $id) {
         $validator = Validator::make($request->all(), [
-            'name'        => 'required|max:50',
-            'status'      => 'required',
-            'user_id'     => '',
-            'business_id' => '',
+            'name'   => 'required|max:50',
+            'status' => 'required',
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return redirect()->route('transaction_methods.edit', $id)
-                    ->withErrors($validator)
-                    ->withInput();
-            }
+            return back()->withErrors($validator->errors());
         }
 
-        $transactionmethod         = TransactionMethod::find($id);
-        $transactionmethod->name   = $request->input('name');
+        $transactionmethod = TransactionMethod::where('id', $id)
+            ->where('business_id', request()->activeBusiness->id)
+            ->first();
+            
+        if (!$transactionmethod) {
+            return redirect()->route('transaction_methods.index')->with('error', _lang('Transaction Method not found!'));
+        }
+        
+        $transactionmethod->name = $request->input('name');
         $transactionmethod->status = $request->input('status');
-
         $transactionmethod->save();
-        $transactionmethod->status = status($request->status);
 
-        if (!$request->ajax()) {
-            return redirect()->route('transaction_methods.index')->with('success', _lang('Updated Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $transactionmethod, 'table' => '#transaction_methods_table']);
-        }
-
+        return redirect()->route('transaction_methods.index')->with('success', _lang('Transaction Method Updated Successfully'));
     }
 
     /**
@@ -142,8 +112,33 @@ class TransactionMethodController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function destroy($id) {
-        $transactionmethod = TransactionMethod::find($id);
+        $transactionmethod = TransactionMethod::where('id', $id)
+            ->where('business_id', request()->activeBusiness->id)
+            ->first();
+            
+        if (!$transactionmethod) {
+            return redirect()->route('transaction_methods.index')->with('error', _lang('Transaction Method not found!'));
+        }
+        
         $transactionmethod->delete();
-        return redirect()->route('transaction_methods.index')->with('success', _lang('Deleted Successfully'));
+        return redirect()->route('transaction_methods.index')->with('success', _lang('Transaction Method Deleted Successfully'));
+    }
+    
+    /**
+     * Bulk delete transaction methods
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulkDelete(Request $request) {
+        if (!$request->ids || !is_array($request->ids)) {
+            return redirect()->route('transaction_methods.index')->with('error', _lang('Please select at least one transaction method'));
+        }
+        
+        TransactionMethod::whereIn('id', $request->ids)
+            ->where('business_id', request()->activeBusiness->id)
+            ->delete();
+            
+        return redirect()->route('transaction_methods.index')->with('success', _lang('Selected Transaction Methods Deleted Successfully'));
     }
 }

@@ -15,18 +15,61 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
+use Inertia\Inertia;
+use App\Models\Account;
+use App\Models\Customer;
+use App\Models\Vendor;
 
 class JournalController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $journals = Journal::all();
-        return view('backend.user.journal.list', compact('journals'));
+        $search = $request->input('search', '');
+        $perPage = $request->input('per_page', 10);
+        
+        $query = Journal::query()
+            ->where('business_id', request()->activeBusiness->id)
+            ->with('created_user', 'approved_user')
+            ->orderBy('id', 'desc');
+            
+        if (!empty($search)) {
+            $query->where(function($q) use ($search) {
+                $q->where('journal_number', 'like', "%$search%")
+                  ->orWhere('transaction_amount', 'like', "%$search%");
+            });
+        }
+        
+        $journals = $query->paginate($perPage);
+        
+        return Inertia::render('Backend/User/Journal/List', [
+            'journals' => $journals->items(),
+            'meta' => [
+                'total' => $journals->total(),
+                'per_page' => $journals->perPage(),
+                'current_page' => $journals->currentPage(),
+                'last_page' => $journals->lastPage(),
+                'from' => $journals->firstItem(),
+                'to' => $journals->lastItem()
+            ],
+            'filters' => [
+                'search' => $search
+            ]
+        ]);
     }
 
     public function create()
     {
-        return view('backend.user.journal.create');
+        $accounts = Account::all();
+        $currencies = Currency::all();
+        $customers = Customer::all();
+        $vendors = Vendor::all();
+        
+        return Inertia::render('Backend/User/Journal/Create', [
+            'accounts' => $accounts,
+            'currencies' => $currencies,
+            'customers' => $customers,
+            'vendors' => $vendors
+        ]);
     }
 
     public function store(Request $request)
@@ -162,7 +205,6 @@ class JournalController extends Controller
 
     public function edit(Request $request, $id)
     {
-
         $journal = Journal::find($id);
         if ($journal->status == 1) {
             $transactions = Transaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->get();
@@ -170,7 +212,19 @@ class JournalController extends Controller
             $transactions = PendingTransaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->get();
         }
 
-        return view('backend.user.journal.edit', compact('journal', 'transactions', 'id'));
+        $accounts = Account::all();
+        $currencies = Currency::all();
+        $customers = Customer::all();
+        $vendors = Vendor::all();
+
+        return Inertia::render('Backend/User/Journal/Edit', [
+            'journal' => $journal,
+            'transactions' => $transactions,
+            'accounts' => $accounts,
+            'currencies' => $currencies,
+            'customers' => $customers,
+            'vendors' => $vendors
+        ]);
     }
 
     public function update(Request $request, $id)
@@ -359,11 +413,23 @@ class JournalController extends Controller
 
     public function show($id)
     {
-        $journal = Journal::where('id', $id)->with('created_user', 'approved_user')->first();
-        $transactions = Transaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->get();
+        $journal = Journal::where('id', $id)
+            ->where('business_id', request()->activeBusiness->id)
+            ->with('created_user', 'approved_user')
+            ->first();
+            
+        if (!$journal) {
+            return redirect()->route('journals.index')->with('error', _lang('Journal not found!'));
+        }
+        
+        $transactions = Transaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->with('account', 'customer', 'vendor')->get();
         $pending_transactions = PendingTransaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->get();
 
-        return view('backend.user.journal.view', compact('journal', 'transactions', 'id', 'pending_transactions'));
+        return Inertia::render('Backend/User/Journal/View', [
+            'journal' => $journal,
+            'transactions' => $transactions,
+            'pending_transactions' => $pending_transactions
+        ]);
     }
 
     public function export_journal($id)
