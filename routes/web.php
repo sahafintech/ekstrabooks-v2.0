@@ -453,8 +453,10 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 		//HR Module
 		Route::resource('departments', DepartmentController::class);
+		Route::post('departments/bulk_delete', [DepartmentController::class, 'bulk_delete'])->name('departments.bulk_delete');
 		Route::get('designations/get_designations/{deaprtment_id}', [DesignationController::class, 'get_designations']);
 		Route::resource('designations', DesignationController::class)->except('show');
+		Route::post('designations/bulk_delete', [DesignationController::class, 'bulk_delete'])->name('designations.bulk_delete');
 		// Route::get('salary_scales/get_salary_scales/{designation_id}', [SalaryScaleController::class, 'get_salary_scales']);
 		// Route::get('salary_scales/filter_by_department/{department_id}', [SalaryScaleController::class, 'index'])->name('salary_scales.filter_by_department');
 		// Route::resource('salary_scales', SalaryScaleController::class);

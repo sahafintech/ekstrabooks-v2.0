@@ -5,8 +5,11 @@ namespace App\Http\Controllers\User;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Designation;
+use App\Models\Department;
 use Illuminate\Http\Request;
-use Validator;
+use Inertia\Inertia;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 
 class DesignationController extends Controller {
 
@@ -35,10 +38,37 @@ class DesignationController extends Controller {
      *
      * @return \Illuminate\Http\Response
      */
-    public function index() {
-        $assets       = ['datatable'];
-        $designations = Designation::all()->sortByDesc("id");
-        return view('backend.user.designation.list', compact('designations', 'assets'));
+    public function index(Request $request) {
+        $search = $request->search;
+        $per_page = $request->per_page ?? 10;
+
+        $query = Designation::query()->where('business_id', $request->activeBusiness->id);
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%$search%")
+                  ->orWhere('descriptions', 'like', "%$search%");
+            });
+        }
+
+        $designations = $query->with('department')->orderByDesc('id')->paginate($per_page);
+        $departments = Department::where('business_id', $request->activeBusiness->id)->get();
+
+        return Inertia::render('Backend/User/Designation/List', [
+            'designations' => $designations->items(),
+            'departments' => $departments,
+            'meta' => [
+                'current_page' => $designations->currentPage(),
+                'per_page' => $designations->perPage(),
+                'from' => $designations->firstItem(),
+                'to' => $designations->lastItem(),
+                'total' => $designations->total(),
+                'last_page' => $designations->lastPage(),
+            ],
+            'filters' => [
+                'search' => $search,
+            ],
+        ]);
     }
 
     /**
@@ -67,36 +97,26 @@ class DesignationController extends Controller {
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return redirect()->route('designations.create')
-                    ->withErrors($validator)
-                    ->withInput();
-            }
+            return response()->json(['errors' => $validator->errors()], 422);
         }
 
         $designation                = new Designation();
         $designation->name          = $request->input('name');
         $designation->descriptions  = $request->input('descriptions');
         $designation->department_id = $request->input('department_id');
+        $designation->business_id   = $request->activeBusiness->id;
 
         $designation->save();
-        $designation->department_id = $designation->department->name;
 
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Created Designation ' . $designation->name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('designations.create')->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'store', 'message' => _lang('Saved Successfully'), 'data' => $designation, 'table' => '#designations_table']);
-        }
-
+        session()->flash('success', 'Designation created successfully');
+        return back();
     }
 
     /**
@@ -138,35 +158,36 @@ class DesignationController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function update(Request $request, $id) {
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'name'          => 'required',
             'department_id' => 'required',
         ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
 
         $designation                = Designation::find($id);
         $designation->name          = $request->input('name');
         $designation->descriptions  = $request->input('descriptions');
         $designation->department_id = $request->input('department_id');
         $designation->save();
-        $designation->department_id = $designation->department->name;
 
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Updated Designation ' . $designation->name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('designations.index')->with('success', _lang('Updated Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $designation, 'table' => '#designations_table']);
-        }
-
+        session()->flash('success', 'Designation updated successfully');
+        return back();
     }
 
     public function get_designations(Request $request, $department_id) {
-        $designations = Designation::where('department_id', $department_id)->get();
+        $designations = Designation::where('department_id', $department_id)
+            ->where('business_id', $request->activeBusiness->id)
+            ->get();
         return response()->json($designations);
     }
 
@@ -182,7 +203,7 @@ class DesignationController extends Controller {
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Deleted Designation ' . $designation->name;
         $audit->save();
 
@@ -190,7 +211,35 @@ class DesignationController extends Controller {
             $designation->delete();
             return redirect()->route('designations.index')->with('success', _lang('Deleted Successfully'));
         } catch (\Exception $e) {
-            return redirect()->route('designations.index')->with('error', _lang('This items is already exists in other entity'));
+            return redirect()->route('designations.index')->with('error', _lang('This item is already exists in other entity'));
         }
+    }
+
+    /**
+     * Bulk Delete
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_delete(Request $request) {
+        $ids = $request->ids;
+        $designations = Designation::whereIn('id', $ids)->get();
+        
+        foreach($designations as $designation) {
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Deleted Designation ' . $designation->name;
+            $audit->save();
+
+            try {
+                $designation->delete();
+            } catch (\Exception $e) {
+                // Continue with the next designation
+            }
+        }
+        
+        return back()->with('success', 'Selected designations deleted successfully');
     }
 }

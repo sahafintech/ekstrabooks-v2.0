@@ -4,11 +4,15 @@ namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Employee;
 use App\Models\Leave;
 use Carbon\Carbon;
 use DataTables;
 use Illuminate\Http\Request;
-use Validator;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Inertia\Inertia;
 
 class LeaveController extends Controller {
 
@@ -24,63 +28,101 @@ class LeaveController extends Controller {
      *
      * @return \Illuminate\Http\Response
      */
-    public function index() {
-        $leaves = Leave::select('leaves.*')
-            ->with('staff')
-            ->get();
+    public function index(Request $request) {
+        $search = $request->input('search');
+        $date = $request->input('date');
+        $perPage = $request->input('per_page', 10);
 
-        return view('backend.user.leave.list', compact('leaves'));
+        $query = Leave::select('leaves.*')->with('staff');
+
+        // Apply search filter if provided
+        if ($search) {
+            $query->whereHas('staff', function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%");
+            })
+            ->orWhere('leave_type', 'like', "%{$search}%")
+            ->orWhere('description', 'like', "%{$search}%");
+        }
+
+        // Apply date filter if provided
+        if ($date) {
+            $query->where(function ($q) use ($date) {
+                $q->where('start_date', '<=', $date)
+                  ->where('end_date', '>=', $date);
+            });
+        }
+
+        $leaves = $query->orderBy('id', 'DESC')->paginate($perPage);
+
+        // Get staff for dropdown
+        $staff = Employee::select('id', 'name')->get();
+
+        return Inertia::render('Backend/User/Leave/List', [
+            'leaves' => $leaves->items(),
+            'meta' => [
+                'current_page' => $leaves->currentPage(),
+                'from' => $leaves->firstItem(),
+                'last_page' => $leaves->lastPage(),
+                'path' => $leaves->path(),
+                'per_page' => $leaves->perPage(),
+                'to' => $leaves->lastItem(),
+                'total' => $leaves->total(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'date' => $date,
+                'per_page' => $perPage,
+            ],
+            'staff' => $staff,
+        ]);
     }
 
     /**
-     * Show the form for creating a new resource.
+     * Show the form for creating a new leave record.
      *
      * @return \Illuminate\Http\Response
      */
-    public function create(Request $request) {
-        if (!$request->ajax()) {
-            return back();
-        } else {
-            return view('backend.user.leave.modal.create');
-        }
+    public function create()
+    {
+        // Get staff for dropdown
+        $staff = Employee::select('id', 'name')->get();
+
+        return Inertia::render('Backend/User/Leave/Create', [
+            'staff' => $staff,
+        ]);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Store a newly created leave record in storage.
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request) {
+    public function store(Request $request)
+    {
         $validator = Validator::make($request->all(), [
-            'employee_id'    => 'required',
-            'leave_type'     => 'required',
+            'employee_id' => 'required',
+            'leave_type' => 'required',
             'leave_duration' => 'required',
-            'start_date'     => 'required|date',
-            'end_date'       => 'required|date|after_or_equal:start_date',
-            'status'         => 'required',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+            'total_days' => 'required|numeric',
+            'status' => 'required',
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return redirect()->route('leaves.create')
-                    ->withErrors($validator)
-                    ->withInput();
-            }
+            return back()->withErrors($validator)->withInput();
         }
 
-        $leave                 = new Leave();
-        $leave->employee_id    = $request->input('employee_id');
-        $leave->leave_type     = $request->input('leave_type');
-        $leave->leave_duration = $request->input('leave_duration');
-        $leave->start_date     = Carbon::parse($request->input('start_date'))->format('Y-m-d');
-        $leave->end_date       = Carbon::parse($request->input('end_date'))->format('Y-m-d');
-        $leave->total_days     = $request->input('total_days');
-        $leave->description    = $request->input('description');
-        $leave->status         = $request->input('status');
-
+        $leave = new Leave();
+        $leave->employee_id = $request->employee_id;
+        $leave->leave_type = $request->leave_type;
+        $leave->leave_duration = $request->leave_duration;
+        $leave->start_date = $request->start_date;
+        $leave->end_date = $request->end_date;
+        $leave->total_days = $request->total_days;
+        $leave->description = $request->description;
+        $leave->status = $request->status;
         $leave->save();
 
         // audit log
@@ -90,11 +132,7 @@ class LeaveController extends Controller {
         $audit->event = 'Created Leave ' . $leave->leave_type;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('leaves.create')->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'store', 'message' => _lang('Saved Successfully'), 'data' => $leave, 'table' => '#leaves_table']);
-        }
+        return redirect()->route('leaves.index')->with('success', 'Leave created successfully.');
     }
 
     /**
@@ -104,69 +142,66 @@ class LeaveController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function show(Request $request, $id) {
-        $leave = Leave::find($id);
-        if (!$request->ajax()) {
-            return back();
-        } else {
-            return view('backend.user.leave.modal.view', compact('leave', 'id'));
-        }
-
+        $leave = Leave::with('staff')->find($id);
+        
+        return Inertia::render('Backend/User/Leave/View', [
+            'leave' => $leave
+        ]);
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * Show the form for editing the specified leave record.
      *
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit(Request $request, $id) {
-        $leave = Leave::find($id);
-        if (!$request->ajax()) {
-            return back();
-        } else {
-            return view('backend.user.leave.modal.edit', compact('leave', 'id'));
-        }
+    public function edit($id)
+    {
+        $leave = Leave::findOrFail($id);
+        $staff = Employee::select('id', 'name')->get();
+
+        return Inertia::render('Backend/User/Leave/Edit', [
+            'leave' => $leave,
+            'staff' => $staff,
+        ]);
     }
 
     /**
-     * Update the specified resource in storage.
+     * Update the specified leave record in storage.
      *
      * @param  \Illuminate\Http\Request  $request
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id) {
+    public function update(Request $request, $id)
+    {
         $validator = Validator::make($request->all(), [
-            'employee_id'    => 'required',
-            'leave_type'     => 'required',
+            'employee_id' => 'required',
+            'leave_type' => 'required',
             'leave_duration' => 'required',
-            'start_date'     => 'required|date',
-            'end_date'       => 'required|date|after_or_equal:start_date',
-            'status'         => 'required',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+            'total_days' => 'required|numeric',
+            'status' => 'required',
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return redirect()->route('leaves.edit', $id)
-                    ->withErrors($validator)
-                    ->withInput();
-            }
+            return back()->withErrors($validator)->withInput();
         }
 
-        $leave                 = Leave::find($id);
-        $leave->employee_id    = $request->input('employee_id');
-        $leave->leave_type     = $request->input('leave_type');
-        $leave->leave_duration = $request->input('leave_duration');
-        $leave->start_date     = Carbon::parse($request->input('start_date'))->format('Y-m-d');
-        $leave->end_date       = Carbon::parse($request->input('end_date'))->format('Y-m-d');
-        $leave->total_days     = $request->input('total_days');
-        $leave->description    = $request->input('description');
-        $leave->status         = $request->input('status');
-        $leave->user_id        = $request->input('user_id');
-        $leave->business_id    = $request->input('business_id');
+        $leave = Leave::findOrFail($id);
+        
+        // Save old values for audit log
+        $oldValues = $leave->toArray();
 
+        $leave->employee_id = $request->employee_id;
+        $leave->leave_type = $request->leave_type;
+        $leave->leave_duration = $request->leave_duration;
+        $leave->start_date = $request->start_date;
+        $leave->end_date = $request->end_date;
+        $leave->total_days = $request->total_days;
+        $leave->description = $request->description;
+        $leave->status = $request->status;
         $leave->save();
 
         // audit log
@@ -176,11 +211,7 @@ class LeaveController extends Controller {
         $audit->event = 'Updated Leave ' . $leave->leave_type;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('leaves.index')->with('success', _lang('Updated Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $leave, 'table' => '#leaves_table']);
-        }
+        return redirect()->route('leaves.index')->with('success', 'Leave updated successfully.');
     }
 
     /**
@@ -195,11 +226,44 @@ class LeaveController extends Controller {
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Deleted Leave ' . $leave->leave_type;
         $audit->save();
 
         $leave->delete();
+        return redirect()->route('leaves.index')->with('success', _lang('Deleted Successfully'));
+    }
+    
+    /**
+     * Bulk delete selected leaves
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_delete(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'ids' => 'required|array',
+            'ids.*' => 'exists:leaves,id',
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator);
+        }
+
+        // Get leave types for audit log
+        $leaveTypes = Leave::whereIn('id', $request->ids)->pluck('leave_type')->implode(', ');
+        
+        // Delete the leaves
+        Leave::whereIn('id', $request->ids)->delete();
+        
+        // Audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Bulk Deleted Leaves: ' . $leaveTypes;
+        $audit->save();
+        
         return redirect()->route('leaves.index')->with('success', _lang('Deleted Successfully'));
     }
 }

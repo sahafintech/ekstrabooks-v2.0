@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Department;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 use Validator;
+use Illuminate\Support\Facades\Auth;
 
 class DepartmentController extends Controller {
 
@@ -35,10 +37,35 @@ class DepartmentController extends Controller {
      *
      * @return \Illuminate\Http\Response
      */
-    public function index() {
-        $assets      = ['datatable'];
-        $departments = Department::all()->sortByDesc("id");
-        return view('backend.user.department.list', compact('departments', 'assets'));
+    public function index(Request $request) {
+        $search = $request->search;
+        $per_page = $request->per_page ?? 10;
+
+        $query = Department::query()->where('business_id', $request->activeBusiness->id);
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%$search%")
+                  ->orWhere('descriptions', 'like', "%$search%");
+            });
+        }
+
+        $departments = $query->orderByDesc('id')->paginate($per_page);
+
+        return Inertia::render('Backend/User/Department/List', [
+            'departments' => $departments->items(),
+            'meta' => [
+                'current_page' => $departments->currentPage(),
+                'per_page' => $departments->perPage(),
+                'from' => $departments->firstItem(),
+                'to' => $departments->lastItem(),
+                'total' => $departments->total(),
+                'last_page' => $departments->lastPage(),
+            ],
+            'filters' => [
+                'search' => $search,
+            ],
+        ]);
     }
 
     /**
@@ -66,33 +93,25 @@ class DepartmentController extends Controller {
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return redirect()->route('departments.create')
-                    ->withErrors($validator)
-                    ->withInput();
-            }
+            return response()->json(['errors' => $validator->errors()], 422);
         }
 
         $department               = new Department();
         $department->name         = $request->input('name');
         $department->descriptions = $request->input('descriptions');
+        $department->business_id  = $request->activeBusiness->id;
 
         $department->save();
 
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Created Department ' . $department->name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('departments.create')->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'store', 'message' => _lang('Saved Successfully'), 'data' => $department, 'table' => '#departments_table']);
-        }
+        session()->flash('success', 'Department created successfully');
+        return back();
     }
 
     /**
@@ -139,13 +158,7 @@ class DepartmentController extends Controller {
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return redirect()->route('departments.edit', $id)
-                    ->withErrors($validator)
-                    ->withInput();
-            }
+            return response()->json(['errors' => $validator->errors()], 422);
         }
 
         $department               = Department::find($id);
@@ -156,15 +169,12 @@ class DepartmentController extends Controller {
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Updated Department ' . $department->name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('departments.index')->with('success', _lang('Updated Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $department, 'table' => '#departments_table']);
-        }
+        session()->flash('success', 'Department updated successfully');
+        return back();
     }
 
     /**
@@ -179,7 +189,7 @@ class DepartmentController extends Controller {
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Deleted Department ' . $department->name;
         $audit->save();
 
@@ -187,7 +197,35 @@ class DepartmentController extends Controller {
             $department->delete();
             return redirect()->route('departments.index')->with('success', _lang('Deleted Successfully'));
         } catch (\Exception $e) {
-            return redirect()->route('departments.index')->with('error', _lang('This items is already exists in other entity'));
+            return redirect()->route('departments.index')->with('error', _lang('This item is already exists in other entity'));
         }
+    }
+
+    /**
+     * Bulk Delete
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_delete(Request $request) {
+        $ids = $request->ids;
+        $departments = Department::whereIn('id', $ids)->get();
+        
+        foreach($departments as $department) {
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Deleted Department ' . $department->name;
+            $audit->save();
+
+            try {
+                $department->delete();
+            } catch (\Exception $e) {
+                // Continue with the next department
+            }
+        }
+        
+        return back()->with('success', 'Selected departments deleted successfully');
     }
 }

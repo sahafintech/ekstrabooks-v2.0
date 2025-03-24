@@ -5,19 +5,24 @@ namespace App\Http\Controllers\User;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Award;
+use App\Models\Employee;
 use Carbon\Carbon;
 use DataTables;
 use Illuminate\Http\Request;
-use Validator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Inertia\Inertia;
 
-class AwardController extends Controller {
+class AwardController extends Controller
+{
 
     /**
      * Create a new controller instance.
      *
      * @return void
      */
-    public function __construct() {
+    public function __construct()
+    {
         $this->middleware(function ($request, $next) {
 
             if (package()->payroll_module != 1) {
@@ -37,10 +42,55 @@ class AwardController extends Controller {
      *
      * @return \Illuminate\Http\Response
      */
-    public function index() {
-        $awards = Award::select('awards.*')->with('staff')->get();
+    public function index(Request $request)
+    {
+        $query = Award::select('awards.*')->with('staff');
 
-        return view('backend.user.award.list', compact('awards'));
+        // Search functionality
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('award_name', 'like', "%$search%")
+                    ->orWhere('award', 'like', "%$search%")
+                    ->orWhere('award_date', 'like', "%$search%")
+                    ->orWhereHas('staff', function ($q) use ($search) {
+                        $q->where('name', 'like', "%$search%");
+                    });
+            });
+        }
+
+        // Date filter
+        if ($request->has('date') && !empty($request->date)) {
+            $date = $request->date;
+            $query->whereDate('award_date', $date);
+        }
+
+        // Define pagination
+        $per_page = $request->input('per_page', 10);
+
+        // Get awards with pagination
+        $awards = $query->orderBy('award_date', 'desc')->paginate($per_page)->withQueryString();
+        $employees = Employee::select('id', 'name')->get();
+
+        // Return Inertia view
+        return Inertia::render('Backend/User/Award/List', [
+            'awards' => $awards->items(),
+            'employees' => $employees,
+            'meta' => [
+                'current_page' => $awards->currentPage(),
+                'from' => $awards->firstItem(),
+                'last_page' => $awards->lastPage(),
+                'path' => $awards->path(),
+                'per_page' => $awards->perPage(),
+                'to' => $awards->lastItem(),
+                'total' => $awards->total(),
+            ],
+            'filters' => [
+                'search' => $request->search ?? '',
+                'date' => $request->date ?? '',
+                'per_page' => $per_page,
+            ],
+        ]);
     }
 
     /**
@@ -48,13 +98,6 @@ class AwardController extends Controller {
      *
      * @return \Illuminate\Http\Response
      */
-    public function create(Request $request) {
-        if (!$request->ajax()) {
-            return back();
-        } else {
-            return view('backend.user.award.modal.create');
-        }
-    }
 
     /**
      * Store a newly created resource in storage.
@@ -62,23 +105,14 @@ class AwardController extends Controller {
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request) {
+    public function store(Request $request)
+    {
         $validator = Validator::make($request->all(), [
             'employee_id' => 'required',
             'award_date'  => 'required',
             'award_name'  => 'required',
             'award'       => 'required',
         ]);
-
-        if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return redirect()->route('awards.create')
-                    ->withErrors($validator)
-                    ->withInput();
-            }
-        }
 
         $award              = new Award();
         $award->employee_id = $request->input('employee_id');
@@ -96,12 +130,7 @@ class AwardController extends Controller {
         $audit->event = 'Created Award for ' . $award->staff->name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('awards.create')->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'store', 'message' => _lang('Saved Successfully'), 'data' => $award, 'table' => '#awards_table']);
-        }
-
+        return redirect()->route('awards.index')->with('success', _lang('Saved Successfully'));
     }
 
     /**
@@ -110,14 +139,21 @@ class AwardController extends Controller {
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show(Request $request, $id) {
-        $award = Award::find($id);
+    public function show(Request $request, $id)
+    {
+        $award = Award::with('staff')->find($id);
+
+        if ($request->wantsJson() || $request->header('X-Inertia')) {
+            return Inertia::render('Backend/User/Award/View', [
+                'award' => $award
+            ]);
+        }
+
         if (!$request->ajax()) {
             return back();
         } else {
             return view('backend.user.award.modal.view', compact('award', 'id'));
         }
-
     }
 
     /**
@@ -126,14 +162,6 @@ class AwardController extends Controller {
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit(Request $request, $id) {
-        $award = Award::find($id);
-        if (!$request->ajax()) {
-            return back();
-        } else {
-            return view('backend.user.award.modal.edit', compact('award', 'id'));
-        }
-    }
 
     /**
      * Update the specified resource in storage.
@@ -142,7 +170,8 @@ class AwardController extends Controller {
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id) {
+    public function update(Request $request, $id)
+    {
         $validator = Validator::make($request->all(), [
             'employee_id' => 'required',
             'award_date'  => 'required',
@@ -176,12 +205,7 @@ class AwardController extends Controller {
         $audit->event = 'Updated Award for ' . $award->staff->name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('awards.index')->with('success', _lang('Updated Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $award, 'table' => '#awards_table']);
-        }
-
+        return redirect()->route('awards.index')->with('success', _lang('Updated Successfully'));
     }
 
     /**
@@ -190,15 +214,56 @@ class AwardController extends Controller {
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id) {
+    public function destroy($id)
+    {
         $award = Award::find($id);
+
+        // Store the name for the audit log
+        $staffName = $award->staff->name;
+
         $award->delete();
 
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Deleted Award for ' . $award->staff->name;
+        $audit->event = 'Deleted Award for ' . $staffName;
+        $audit->save();
+
+        return redirect()->route('awards.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    /**
+     * Bulk delete selected awards
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulkDelete(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'ids' => 'required|array',
+            'ids.*' => 'exists:awards,id',
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator);
+        }
+
+        // Get award names for audit log
+        $awardNames = Award::whereIn('id', $request->ids)->with('staff')->get()
+            ->map(function ($award) {
+                return $award->award_name . ' (' . $award->staff->name . ')';
+            })->implode(', ');
+
+        // Delete the awards
+        Award::whereIn('id', $request->ids)->delete();
+
+        // Audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Bulk Deleted Awards: ' . $awardNames;
         $audit->save();
 
         return redirect()->route('awards.index')->with('success', _lang('Deleted Successfully'));
