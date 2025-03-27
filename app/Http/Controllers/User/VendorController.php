@@ -3,7 +3,8 @@
 namespace App\Http\Controllers\User;
 
 use App\Exports\SupplierExport;
-use Validator;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 use DataTables;
 use App\Models\Vendor;
 use App\Models\Purchase;
@@ -14,6 +15,7 @@ use App\Http\Controllers\Controller;
 use App\Imports\SupplierImport;
 use App\Models\AuditLog;
 use Maatwebsite\Excel\Facades\Excel;
+use Inertia\Inertia;
 
 class VendorController extends Controller
 {
@@ -23,21 +25,54 @@ class VendorController extends Controller
      *
      * @return void
      */
-    public function __construct()
-    {
-    }
+    public function __construct() {}
 
     /**
      * Display a listing of the resource.
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        $vendors = Vendor::select('vendors.*')
-            ->orderBy("vendors.id", "desc")
-            ->get();
-        return view('backend.user.vendor.list', compact('vendors'));
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
+        $page = $request->get('page', 1);
+
+        $query = Vendor::select('vendors.*')
+            ->orderBy("vendors.id", "desc");
+
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('company_name', 'like', "%{$search}%")
+                    ->orWhere('mobile', 'like', "%{$search}%");
+            });
+        }
+
+        // Get vendors with pagination
+        $vendors = $query->paginate($per_page)->withQueryString();
+
+        // Return Inertia view
+        return Inertia::render('Backend/User/Vendor/List', [
+            'vendors' => $vendors->items(),
+            'meta' => [
+                'current_page' => $vendors->currentPage(),
+                'from' => $vendors->firstItem(),
+                'last_page' => $vendors->lastPage(),
+                'links' => $vendors->linkCollection(),
+                'path' => $vendors->path(),
+                'per_page' => $vendors->perPage(),
+                'to' => $vendors->lastItem(),
+                'total' => $vendors->total(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $request->get('sorting', []),
+            ],
+        ]);
     }
 
     /**
@@ -47,12 +82,7 @@ class VendorController extends Controller
      */
     public function create(Request $request)
     {
-        $alert_col = 'col-lg-10 offset-lg-1';
-        if (!$request->ajax()) {
-            return view('backend.user.vendor.create', compact('alert_col'));
-        } else {
-            return view('backend.user.vendor.modal.create');
-        }
+        return Inertia::render('Backend/User/Vendor/Create');
     }
 
     /**
@@ -77,13 +107,9 @@ class VendorController extends Controller
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return redirect()->route('vendors.create')
-                    ->withErrors($validator)
-                    ->withInput();
-            }
+            return redirect()->route('vendors.create')
+                ->withErrors($validator)
+                ->withInput();
         }
 
         $profile_picture = 'default.png';
@@ -112,15 +138,11 @@ class VendorController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Supplier Created ' . $vendor->name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('vendors.index')->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'store', 'message' => _lang('Saved Successfully'), 'data' => $vendor, 'table' => '#vendors_table']);
-        }
+        return redirect()->route('vendors.index')->with('success', _lang('Saved Successfully'));
     }
 
     /**
@@ -129,37 +151,54 @@ class VendorController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
+    public function show(Request $request, $id)
     {
-        $data           = array();
-        $data['alert_col'] = 'col-lg-10 offset-lg-1';
-        $data['vendor'] = Vendor::find($id);
+        $vendor = Vendor::find($id);
+        $data = ['vendor' => $vendor];
 
-        if (!isset($_GET['tab'])) {
+        if (!isset($request->tab) || $request->tab == 'overview') {
             $data['purchase'] = Purchase::selectRaw('COUNT(id) as total_bill, SUM(grand_total) as total_amount, sum(paid) as total_paid')
                 ->where('vendor_id', $id)
                 ->first();
-        }
 
-        if (isset($_GET['tab']) && $_GET['tab'] == 'purchases') {
+            // Add recent purchases for overview
             $data['purchases'] = Purchase::where('vendor_id', $id)
                 ->orderBy('purchase_date', 'desc')
-                ->paginate(15);
-            $data['purchases']->withPath('?tab=' . $_GET['tab']);
-        }
+                ->take(5)
+                ->get();
 
-        if (isset($_GET['tab']) && $_GET['tab'] == 'transactions') {
+            // Add recent transactions for overview
             $data['transactions'] = Transaction::where('ref_id', '!=', NULL)
                 ->where('vendor_id', $id)
                 ->whereHas('account', function ($query) {
                     $query->where('account_type', '=', 'Cash')
                         ->orWhere('account_type', '=', 'Bank');
                 })
-                ->paginate(15);
-            $data['transactions']->withPath('?tab=' . $_GET['tab']);
+                ->orderBy('trans_date', 'desc')
+                ->take(5)
+                ->get();
         }
 
-        return view('backend.user.vendor.view', $data);
+        if (isset($request->tab) && $request->tab == 'purchases') {
+            $data['purchases'] = Purchase::where('vendor_id', $id)
+                ->orderBy('purchase_date', 'desc')
+                ->get();
+        }
+
+        if (isset($request->tab) && $request->tab == 'transactions') {
+            $data['transactions'] = Transaction::where('ref_id', '!=', NULL)
+                ->where('vendor_id', $id)
+                ->whereHas('account', function ($query) {
+                    $query->where('account_type', '=', 'Cash')
+                        ->orWhere('account_type', '=', 'Bank');
+                })
+                ->orderBy('trans_date', 'desc')
+                ->get();
+        }
+
+        $data['activeTab'] = $request->tab ?? 'overview';
+
+        return Inertia::render('Backend/User/Vendor/View', $data);
     }
 
     /**
@@ -170,9 +209,10 @@ class VendorController extends Controller
      */
     public function edit(Request $request, $id)
     {
-        $alert_col = 'col-lg-10 offset-lg-1';
-        $vendor    = Vendor::find($id);
-        return view('backend.user.vendor.edit', compact('vendor', 'id', 'alert_col'));
+        $vendor = Vendor::find($id);
+        return Inertia::render('Backend/User/Vendor/Edit', [
+            'vendor' => $vendor
+        ]);
     }
 
     /**
@@ -198,13 +238,9 @@ class VendorController extends Controller
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return redirect()->route('vendors.edit', $id)
-                    ->withErrors($validator)
-                    ->withInput();
-            }
+            return redirect()->route('vendors.edit', $id)
+                ->withErrors($validator)
+                ->withInput();
         }
 
         if ($request->hasfile('profile_picture')) {
@@ -230,15 +266,11 @@ class VendorController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Supplier Updated ' . $vendor->name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('vendors.index')->with('success', _lang('Updated Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $vendor, 'table' => '#vendors_table']);
-        }
+        return redirect()->route('vendors.index')->with('success', _lang('Updated Successfully'));
     }
 
     /**
@@ -251,33 +283,88 @@ class VendorController extends Controller
     {
         $vendor = Vendor::find($id);
         $vendor->delete();
-        return redirect()->route('vendors.index')->with('success', _lang('Deleted Successfully'));
-    }
-
-    public function import_vendors(Request $request)
-    {
-        $request->validate([
-            'vendors_file' => 'required|mimes:xls,xlsx',
-        ]);
-
-        try {
-            Excel::import(new SupplierImport, $request->file('vendors_file'));
-        } catch (\Exception $e) {
-            return redirect()->route('vendors.index')->with('error', $e->getMessage());
-        }
 
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Suppliers Imported';
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Supplier Deleted ' . $vendor->name;
         $audit->save();
 
-        return redirect()->route('vendors.index')->with('success', _lang('Suppliers Imported'));
+        return redirect()->route('vendors.index')->with('success', _lang('Deleted Successfully'));
     }
 
-    public function export_vendors()
+    /**
+     * Store Bulk Actions.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_action(Request $request)
     {
+        if ($request->delete_vendors) {
+            $vendors = explode(",", $request->delete_vendors);
+            $vendors = Vendor::whereIn('id', $vendors)->get();
+
+            foreach ($vendors as $v) {
+                $vendor = Vendor::find($v->id);
+                $vendor->delete();
+
+                // audit log
+                $audit = new AuditLog();
+                $audit->date_changed = date('Y-m-d H:i:s');
+                $audit->changed_by = Auth::id();
+                $audit->event = 'Supplier Deleted ' . $vendor->name;
+                $audit->save();
+            }
+
+            return redirect()->route('vendors.index')->with('success', _lang('Deleted Successfully'));
+        }
+
+        return redirect()->route('vendors.index')->with('error', _lang('Action Not Found'));
+    }
+
+    public function import_vendors(Request $request)
+    {
+        if ($request->hasFile('file')) {
+            $paths = $request->file('file')->store('vendor_import', 'uploads');
+
+            try {
+                Excel::import(new SupplierImport, storage_path('uploads/' . $paths));
+
+                // audit log
+                $audit = new AuditLog();
+                $audit->date_changed = date('Y-m-d H:i:s');
+                $audit->changed_by = Auth::id();
+                $audit->event = 'Suppliers Imported';
+                $audit->save();
+
+                return back()->with('success', _lang('Imported Successfully'));
+            } catch (\Exception $e) {
+                // audit log
+                $audit = new AuditLog();
+                $audit->date_changed = date('Y-m-d H:i:s');
+                $audit->changed_by = Auth::id();
+                $audit->event = 'Suppliers Import Failed';
+                $audit->save();
+
+                return back()->with('error', _lang('Error: ' . $e->getMessage()));
+            } catch (\Exception $e) {
+                return back()->with('error', _lang('Error: ' . $e->getMessage()));
+            }
+        }
+    }
+
+    /**
+     * Export Customers
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function export_vendors(Request $request, $type)
+    {
+        $filename = date('Y-m-d') . '_vendors.' . $type;
+
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
@@ -285,7 +372,7 @@ class VendorController extends Controller
         $audit->event = 'Suppliers Exported';
         $audit->save();
 
-        return Excel::download(new SupplierExport, 'suppliers export ' . now()->format('d m Y') . '.xlsx');
+        return Excel::download(new SupplierExport, $filename);
     }
 
     public function vendors_all(Request $request)
@@ -299,7 +386,7 @@ class VendorController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = count($vendors) . 'Suppliers Deleted';
         $audit->save();
 
