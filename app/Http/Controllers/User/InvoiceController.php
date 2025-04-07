@@ -25,6 +25,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
@@ -64,37 +65,25 @@ class InvoiceController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Invoice::select('invoices.*')
-            ->where('is_recurring', 0)
-            ->where('is_deffered', 0)
-            ->with(['customer']);
+        $query = Invoice::with('customer')
+            ->where('is_deffered', 0);
 
-        // Handle search
-        if ($request->has('search')) {
-            $search = $request->get('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                    ->orWhere('invoice_number', 'like', "%{$search}%")
-                    ->orWhere('order_number', 'like', "%{$search}%")
-                    ->orWhereHas('customer', function ($q) use ($search) {
-                        $q->where('name', 'like', "%{$search}%");
-                    });
-            });
-        }
-
-        // Handle filters
+        // Apply filters if any
         if ($request->has('filters')) {
-            $filters = $request->get('filters');
-
-            if (isset($filters['status'])) {
-                $query->whereIn('status', $filters['status']);
+            $filters = $request->filters;
+            
+            // Filter by customer
+            if (!empty($filters['customer_id'])) {
+                $query->where('customer_id', $filters['customer_id']);
             }
-
-            if (isset($filters['customer_id'])) {
-                $query->whereIn('customer_id', $filters['customer_id']);
+            
+            // Filter by status
+            if (isset($filters['status']) && $filters['status'] !== '') {
+                $query->where('status', $filters['status']);
             }
-
-            if (isset($filters['date_range'])) {
+            
+            // Filter by date range
+            if (!empty($filters['date_range'])) {
                 if (!empty($filters['date_range']['start'])) {
                     $query->where('invoice_date', '>=', $filters['date_range']['start']);
                 }
@@ -120,7 +109,10 @@ class InvoiceController extends Controller
                 'per_page' => $invoices->perPage(),
                 'current_page' => $invoices->currentPage(),
                 'last_page' => $invoices->lastPage(),
+                'from' => $invoices->firstItem(),
+                'to' => $invoices->lastItem(),
             ],
+            'filters' => $request->filters ?? []
         ]);
     }
 
@@ -431,9 +423,21 @@ class InvoiceController extends Controller
      */
     public function show(Request $request, $id)
     {
-        $invoice  = Invoice::with(['business', 'items'])->find($id);
-        $attachments = Attachment::where('ref_id', $id)->where('ref_type', 'invoice')->get();
-        return view('backend.user.invoice.view', compact('invoice', 'attachments'));
+        $invoice = Invoice::with([
+            'business', 
+            'items.taxes', 
+            'customer', 
+            'taxes'
+        ])->find($id);
+        
+        $attachments = Attachment::where('ref_id', $id)
+            ->where('ref_type', 'invoice')
+            ->get();
+            
+        return Inertia::render('Backend/User/Invoice/View', [
+            'invoice' => $invoice,
+            'attachments' => $attachments
+        ]);
     }
 
     public function get_invoice_link(Request $request, $id)
@@ -538,7 +542,7 @@ class InvoiceController extends Controller
      */
     public function edit(Request $request, $id)
     {
-        $invoice = Invoice::with('items')
+        $invoice = Invoice::with(['items.taxes', 'taxes', 'customer'])
             ->where('id', $id)
             ->where('status', '!=', 2)
             ->where('is_recurring', 0)
@@ -549,7 +553,19 @@ class InvoiceController extends Controller
             return back()->with('error', _lang('This invoice is already paid'));
         }
 
-        return view('backend.user.invoice.edit', compact('invoice', 'id'));
+        // Get required data for the edit form
+        $customers = Customer::all();
+        $currencies = Currency::all();
+        $products = Product::all();
+        $taxes = Tax::all();
+
+        return Inertia::render('Backend/User/Invoice/Edit', [
+            'invoice' => $invoice,
+            'customers' => $customers,
+            'currencies' => $currencies,
+            'products' => $products,
+            'taxes' => $taxes
+        ]);
     }
 
     /**

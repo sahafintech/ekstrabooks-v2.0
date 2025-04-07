@@ -799,6 +799,10 @@
     "country": "Somalia",
     "dial_code": "252"
   },
+  "SLN": {
+    "country": "Somaliland",
+    "dial_code": "252"
+  },
   "ZA": {
     "country": "South Africa",
     "dial_code": "27"

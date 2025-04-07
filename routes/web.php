@@ -232,7 +232,10 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('business/{id}/store_purchase_return_settings', [BusinessSettingsController::class, 'store_purchase_return_settings'])->name('business.store_purchase_return_settings');
 		Route::post('business/{id}/store_currency_settings', [BusinessSettingsController::class, 'store_currency_settings'])->name('business.store_currency_settings');
 		Route::post('business/{id}/store_general_settings', [BusinessSettingsController::class, 'store_general_settings'])->name('business.store_general_settings');
-		Route::get('business/{id}/settings', [BusinessSettingsController::class, 'settings'])->name('business.settings');
+		
+		// Business Settings Route (with tab parameter)
+		Route::get('business/{id}/settings/{tab?}', [BusinessSettingsController::class, 'settings'])->name('business.settings');
+		
 		Route::get('business/{id}/pos_settings', [BusinessSettingsController::class, 'pos_settings'])->name('business.pos_settings');
 		Route::post('business/{id}/pos_settings', [BusinessSettingsController::class, 'store_pos_settings'])->name('business.store_pos_settings');
 
@@ -660,5 +663,8 @@ Route::get('dashboard/json_package_wise_subscription', 'DashboardController@json
 Route::get('dashboard/json_yearly_reveneu', 'DashboardController@json_yearly_reveneu')->middleware('auth');
 
 //Social Login
+Route::get('/login/{provider}', 'Auth\SocialController@redirect');
+Route::get('/login/{provider}/callback', 'Auth\SocialController@callback');
+
 Route::get('/login/{provider}', 'Auth\SocialController@redirect');
 Route::get('/login/{provider}/callback', 'Auth\SocialController@callback');

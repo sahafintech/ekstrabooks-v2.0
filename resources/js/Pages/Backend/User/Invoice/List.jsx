@@ -1,21 +1,37 @@
-import { Button } from "@/Components/ui/button";
+import React, { useState, useEffect, useMemo } from "react";
+import { Head, Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { Link, usePage, router } from "@inertiajs/react";
-import PageHeader from "@/Components/PageHeader";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit } from "lucide-react";
-import Modal from "@/Components/Modal";
-import { useState, useMemo } from "react";
 import { SidebarInset } from "@/Components/ui/sidebar";
+import { Button } from "@/Components/ui/button";
 import { Checkbox } from "@/Components/ui/checkbox";
-import { DataTable } from "@/Components/ui/data-table/data-table";
-import TableActions from "@/Components/shared/TableActions";
-
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/Components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/Components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
+import { Input } from "@/Components/ui/input";
+import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit } from "lucide-react";
+import { Toaster } from "@/Components/ui/toaster";
+import { useToast } from "@/hooks/use-toast";
+import TableActions from "@/Components/shared/TableActions";
+import PageHeader from "@/Components/PageHeader";
+import Modal from "@/Components/Modal";
 
 const DeleteInvoiceModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
@@ -107,11 +123,11 @@ const ImportInvoicesModal = ({ show, onClose, onSubmit, processing }) => (
   </Modal>
 );
 
-const DeleteAllInvoicesModal = ({ show, onClose, onConfirm, processing }) => (
+const DeleteAllInvoicesModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm} className="p-6">
       <h2 className="text-lg font-medium">
-        Are you sure you want to delete all selected invoices?
+        Are you sure you want to delete {count} selected invoice{count !== 1 ? 's' : ''}?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -120,14 +136,14 @@ const DeleteAllInvoicesModal = ({ show, onClose, onConfirm, processing }) => (
           onClick={onClose}
           className="mr-3"
         >
-          Close
+          Cancel
         </Button>
         <Button
           type="submit"
           variant="destructive"
           disabled={processing}
         >
-          Delete All
+          Delete Selected
         </Button>
       </div>
     </form>
@@ -150,20 +166,114 @@ const InvoiceStatusBadge = ({ status }) => {
   );
 };
 
-export default function List({ invoices = [], meta = {} }) {
-  const { auth } = usePage().props;
+export default function List({ invoices = [], meta = {}, filters = {} }) {
+  const { flash = {} } = usePage().props;
+  const { toast } = useToast();
   const [selectedInvoices, setSelectedInvoices] = useState([]);
+  const [isAllSelected, setIsAllSelected] = useState(false);
+  const [search, setSearch] = useState(filters.search || "");
+  const [perPage, setPerPage] = useState(meta.per_page || 10);
+  const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
+  const [bulkAction, setBulkAction] = useState("");
+  
+  // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState(null);
-  const [tableRef, setTableRef] = useState(null);
   const [processing, setProcessing] = useState(false);
+
+  useEffect(() => {
+    if (flash && flash.success) {
+      toast({
+        title: "Success",
+        description: flash.success,
+      });
+    }
+
+    if (flash && flash.error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: flash.error,
+      });
+    }
+  }, [flash, toast]);
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedInvoices([]);
+    } else {
+      setSelectedInvoices(invoices.map((invoice) => invoice.id));
+    }
+    setIsAllSelected(!isAllSelected);
+  };
+
+  const toggleSelectInvoice = (id) => {
+    if (selectedInvoices.includes(id)) {
+      setSelectedInvoices(selectedInvoices.filter((invoiceId) => invoiceId !== id));
+      setIsAllSelected(false);
+    } else {
+      setSelectedInvoices([...selectedInvoices, id]);
+      if (selectedInvoices.length + 1 === invoices.length) {
+        setIsAllSelected(true);
+      }
+    }
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    router.get(
+      route("invoices.index"),
+      { search, page: 1, per_page: perPage },
+      { preserveState: true }
+    );
+  };
+
+  const handlePerPageChange = (value) => {
+    setPerPage(value);
+    router.get(
+      route("invoices.index"),
+      { search, page: 1, per_page: value },
+      { preserveState: true }
+    );
+  };
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    router.get(
+      route("invoices.index"),
+      { search, page, per_page: perPage },
+      { preserveState: true }
+    );
+  };
+
+  const handleBulkAction = () => {
+    if (bulkAction === "") return;
+
+    if (selectedInvoices.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select at least one invoice",
+      });
+      return;
+    }
+
+    if (bulkAction === "delete") {
+      setShowDeleteAllModal(true);
+    }
+  };
+
+  const handleDeleteConfirm = (id) => {
+    setInvoiceToDelete(id);
+    setShowDeleteModal(true);
+  };
 
   const handleDelete = (e) => {
     e.preventDefault();
     setProcessing(true);
-
+    
     router.delete(route('invoices.destroy', invoiceToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
@@ -178,18 +288,15 @@ export default function List({ invoices = [], meta = {} }) {
 
   const handleDeleteAll = (e) => {
     e.preventDefault();
-    if (!tableRef) return;
-
-    const selectedIds = tableRef.getSelectedRowModel().rows.map(row => row.original.id);
-    if (selectedIds.length === 0) return;
-
     setProcessing(true);
+    
     router.post(route('invoices.destroy-multiple'), {
-      invoices: selectedIds
+      invoices: selectedInvoices
     }, {
       onSuccess: () => {
         setShowDeleteAllModal(false);
-        tableRef.toggleAllRowsSelected(false);
+        setSelectedInvoices([]);
+        setIsAllSelected(false);
         setProcessing(false);
       },
       onError: () => {
@@ -214,212 +321,268 @@ export default function List({ invoices = [], meta = {} }) {
     });
   };
 
-  const handlePagination = (pagination) => {
-    const params = new URLSearchParams(window.location.search);
-    params.set('page', pagination.pageIndex + 1);
-    params.set('per_page', pagination.pageSize);
+  const renderPageNumbers = () => {
+    const totalPages = meta.last_page;
+    const pages = [];
+    const maxPagesToShow = 5;
 
-    router.get(`${route('invoices.index')}?${params.toString()}`, {}, {
-      preserveState: true,
-      preserveScroll: true,
-      only: ['invoices', 'meta']
-    });
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = startPage + maxPagesToShow - 1;
+
+    if (endPage > totalPages) {
+      endPage = totalPages;
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(
+        <Button
+          key={i}
+          variant={i === currentPage ? "default" : "outline"}
+          size="sm"
+          onClick={() => handlePageChange(i)}
+          className="mx-1"
+        >
+          {i}
+        </Button>
+      );
+    }
+
+    return pages;
   };
 
-  const columns = useMemo(
-    () => [
-      {
-        id: "select",
-        header: ({ table }) => (
-          <Checkbox
-            checked={table.getIsAllPageRowsSelected()}
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-            aria-label="Select all"
-          />
-        ),
-        cell: ({ row }) => (
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label="Select row"
-          />
-        ),
-        enableSorting: false,
-        enableHiding: false,
-      },
-      {
-        accessorKey: "invoice_number",
-        header: "Invoice Number",
-      },
-      {
-        accessorKey: "customer",
-        header: "Customer",
-        cell: ({ row }) => row.original.customer.name,
-      },
-      {
-        accessorKey: "invoice_date",
-        header: "Date",
-      },
-      {
-        accessorKey: "due_date",
-        header: "Due Date",
-      },
-      {
-        accessorKey: "grand_total",
-        header: "Grand Total",
-        cell: ({ row }) => (
-          <div className="text-right">{row.original.grand_total}</div>
-        ),
-      },
-      {
-        accessorKey: "paid",
-        header: "Paid",
-        cell: ({ row }) => (
-          <div className="text-right">{row.original.paid}</div>
-        ),
-      },
-      {
-        accessorKey: "due",
-        header: "Due",
-        cell: ({ row }) => (
-          <div className="text-right">{row.original.grand_total - row.original.paid}</div>
-        ),
-      },
-      {
-        accessorKey: "status",
-        header: "Status",
-        cell: ({ row }) => (
-          <div className="text-center">
-            <InvoiceStatusBadge status={row.original.status} />
-          </div>
-        ),
-        filterFn: (row, id, value) => {
-          return value.includes(row.getValue(id))
-        },
-      },
-      {
-        id: "actions",
-        header: "Actions",
-        cell: ({ row }) => (
-          <TableActions
-            actions={[
-              {
-                label: "Edit",
-                icon: Edit,
-                onClick: () => router.visit(route('invoices.edit', row.original.id))
-              },
-              {
-                label: "View",
-                icon: Eye,
-                onClick: () => router.visit(route('invoices.show', row.original.id))
-              },
-              {
-                label: "Delete",
-                icon: Trash2,
-                onClick: () => {
-                  setInvoiceToDelete(row.original.id);
-                  setShowDeleteModal(true);
-                },
-                className: "text-red-600"
-              }
-            ]}
-          />
-        ),
-      },
-    ],
-    []
-  );
+  const formatDate = (dateString) => {
+    if (!dateString) return "-";
+    return dateString;
+  };
 
-  const filterableColumns = [
-    {
-      id: "status",
-      title: "Status",
-      options: [
-        { label: "Draft", value: "0" },
-        { label: "Active", value: "1" },
-        { label: "Paid", value: "2" },
-        { label: "Partially Paid", value: "3" },
-        { label: "Canceled", value: "4" },
-      ],
-    },
-  ];
-
-  const searchableColumns = [
-    {
-      id: "invoice_number",
-      title: "Invoice Number",
-    },
-    {
-      id: "customer.name",
-      title: "Customer Name",
-    },
-  ];
+  const exportInvoices = () => {
+    router.get(route("invoices.export"));
+  };
 
   return (
     <AuthenticatedLayout>
+      <Head title="Invoices" />
+      <Toaster />
       <SidebarInset>
         <div className="main-content">
-          <PageHeader page="Invoices" subpage="list" url="invoices.index" />
-
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-            <div className="flex items-center space-x-2">
-              <Link href={route("invoices.create")}>
-                <Button>Add New Invoice</Button>
-              </Link>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="secondary">
-                    <MoreVertical className="h-4 w-4" />
+          <PageHeader
+            page="Invoices"
+            subpage="List"
+            url="invoices.index"
+          />
+          <div className="p-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                <Link href={route("invoices.create")}>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Invoice
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setShowImportModal(true)}>
-                    <FileUp className="mr-2 h-4 w-4" /> Import
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href={route('invoices.export')}>
+                </Link>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="secondary">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setShowImportModal(true)}>
+                      <FileUp className="mr-2 h-4 w-4" /> Import
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportInvoices}>
                       <FileDown className="mr-2 h-4 w-4" /> Export
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              <div className="flex flex-col md:flex-row gap-4 md:items-center">
+                <form onSubmit={handleSearch} className="flex gap-2">
+                  <Input
+                    placeholder="Search invoices..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full md:w-80"
+                  />
+                  <Button type="submit">Search</Button>
+                </form>
+              </div>
             </div>
 
-            <DataTable
-              columns={columns}
-              data={invoices}
-              filterableColumns={filterableColumns}
-              searchableColumns={searchableColumns}
-              totalRows={meta.total || 0}
-              pageCount={meta.last_page || 1}
-              onPaginationChange={handlePagination}
-              tableRef={setTableRef}
-              meta={meta}
-            />
+            <div className="mb-4 flex flex-col md:flex-row gap-4 justify-between">
+              <div className="flex items-center gap-2">
+                <Select value={bulkAction} onValueChange={setBulkAction}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Bulk actions" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="delete">Delete Selected</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleBulkAction} variant="outline">
+                  Apply
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Show</span>
+                <Select value={perPage.toString()} onValueChange={handlePerPageChange}>
+                  <SelectTrigger className="w-[80px]">
+                    <SelectValue placeholder="10" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-gray-500">entries</span>
+              </div>
+            </div>
+
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px]">
+                      <Checkbox
+                        checked={isAllSelected}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                    </TableHead>
+                    <TableHead>Invoice Number</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Due Date</TableHead>
+                    <TableHead className="text-right">Grand Total</TableHead>
+                    <TableHead className="text-right">Paid</TableHead>
+                    <TableHead className="text-right">Due</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoices.length > 0 ? (
+                    invoices.map((invoice) => (
+                      <TableRow key={invoice.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedInvoices.includes(invoice.id)}
+                            onCheckedChange={() => toggleSelectInvoice(invoice.id)}
+                          />
+                        </TableCell>
+                        <TableCell>{invoice.invoice_number}</TableCell>
+                        <TableCell>{invoice.customer ? invoice.customer.name : "-"}</TableCell>
+                        <TableCell>{formatDate(invoice.invoice_date)}</TableCell>
+                        <TableCell>{formatDate(invoice.due_date)}</TableCell>
+                        <TableCell className="text-right">{invoice.grand_total}</TableCell>
+                        <TableCell className="text-right">{invoice.paid}</TableCell>
+                        <TableCell className="text-right">{invoice.grand_total - invoice.paid}</TableCell>
+                        <TableCell>
+                          <InvoiceStatusBadge status={invoice.status} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <TableActions
+                            actions={[
+                              {
+                                label: "View",
+                                icon: <Eye className="h-4 w-4" />,
+                                href: route("invoices.show", invoice.id),
+                              },
+                              {
+                                label: "Edit",
+                                icon: <Edit className="h-4 w-4" />,
+                                href: route("invoices.edit", invoice.id),
+                              },
+                              {
+                                label: "Delete",
+                                icon: <Trash2 className="h-4 w-4" />,
+                                onClick: () => handleDeleteConfirm(invoice.id),
+                                destructive: true,
+                              },
+                            ]}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={10} className="h-24 text-center">
+                        No invoices found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {invoices.length > 0 && meta.total > 0 && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-gray-500">
+                  Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, meta.total)} of {meta.total} entries
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                  >
+                    First
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  {renderPageNumbers()}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === meta.last_page}
+                  >
+                    Next
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(meta.last_page)}
+                    disabled={currentPage === meta.last_page}
+                  >
+                    Last
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
-
-          <DeleteInvoiceModal
-            show={showDeleteModal}
-            onClose={() => setShowDeleteModal(false)}
-            onConfirm={handleDelete}
-            processing={processing}
-          />
-
-          <ImportInvoicesModal
-            show={showImportModal}
-            onClose={() => setShowImportModal(false)}
-            onSubmit={handleImport}
-            processing={processing}
-          />
-
-          <DeleteAllInvoicesModal
-            show={showDeleteAllModal}
-            onClose={() => setShowDeleteAllModal(false)}
-            onConfirm={handleDeleteAll}
-            processing={processing}
-          />
         </div>
       </SidebarInset>
+
+      <DeleteInvoiceModal
+        show={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDelete}
+        processing={processing}
+      />
+
+      <DeleteAllInvoicesModal
+        show={showDeleteAllModal}
+        onClose={() => setShowDeleteAllModal(false)}
+        onConfirm={handleDeleteAll}
+        processing={processing}
+        count={selectedInvoices.length}
+      />
+
+      <ImportInvoicesModal
+        show={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSubmit={handleImport}
+        processing={processing}
+      />
     </AuthenticatedLayout>
   );
 }

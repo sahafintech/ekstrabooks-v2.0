@@ -36,7 +36,6 @@ class VendorController extends Controller
     {
         $per_page = $request->get('per_page', 10);
         $search = $request->get('search', '');
-        $page = $request->get('page', 1);
 
         $query = Vendor::select('vendors.*')
             ->orderBy("vendors.id", "desc");

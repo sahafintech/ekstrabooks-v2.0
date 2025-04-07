@@ -29,9 +29,14 @@ export default function Create({ customers = [], products = [], currencies = [],
     unit_cost: 0,
     taxes: []
   }]);
-  
+
   const [exchangeRate, setExchangeRate] = useState(1);
   const [baseCurrencyInfo, setBaseCurrencyInfo] = useState(null);
+
+  // Debug log the products data
+  useEffect(() => {
+    console.log("Available products:", products);
+  }, [products]);
 
   const { data, setData, post, processing, errors, reset } = useForm({
     customer_id: "",
@@ -49,7 +54,12 @@ export default function Create({ customers = [], products = [], currencies = [],
     note: "",
     footer: "",
     attachment: null,
-    items: invoiceItems
+    product_id: [],
+    product_name: [],
+    description: [],
+    quantity: [],
+    unit_cost: [],
+    taxes: []
   });
 
   const addInvoiceItem = () => {
@@ -61,20 +71,23 @@ export default function Create({ customers = [], products = [], currencies = [],
       unit_cost: 0,
       taxes: []
     }]);
-    setData("items", [...invoiceItems, {
-      product_id: "",
-      product_name: "",
-      description: "",
-      quantity: 1,
-      unit_cost: 0,
-      taxes: []
-    }]);
+    setData("product_id", [...data.product_id, ""]);
+    setData("product_name", [...data.product_name, ""]);
+    setData("description", [...data.description, ""]);
+    setData("quantity", [...data.quantity, 1]);
+    setData("unit_cost", [...data.unit_cost, 0]);
+    setData("taxes", [...data.taxes, []]);
   };
 
   const removeInvoiceItem = (index) => {
     const updatedItems = invoiceItems.filter((_, i) => i !== index);
     setInvoiceItems(updatedItems);
-    setData("items", updatedItems);
+    setData("product_id", updatedItems.map(item => item.product_id));
+    setData("product_name", updatedItems.map(item => item.product_name));
+    setData("description", updatedItems.map(item => item.description));
+    setData("quantity", updatedItems.map(item => item.quantity));
+    setData("unit_cost", updatedItems.map(item => item.unit_cost));
+    setData("taxes", updatedItems.map(item => item.taxes));
   };
 
   const updateInvoiceItem = (index, field, value) => {
@@ -82,15 +95,28 @@ export default function Create({ customers = [], products = [], currencies = [],
     updatedItems[index][field] = value;
 
     if (field === "product_id") {
-      const product = products.find(p => p.id === value);
+      const product = products.find(p => p.id === parseInt(value, 10));
       if (product) {
+        console.log("Selected product:", product);
         updatedItems[index].product_name = product.name;
         updatedItems[index].unit_cost = product.selling_price;
+        
+        // Also update the description if it's empty
+        if (!updatedItems[index].description) {
+          updatedItems[index].description = product.description || "";
+        }
+      } else {
+        console.warn("Product not found for ID:", value);
       }
     }
 
     setInvoiceItems(updatedItems);
-    setData("items", updatedItems);
+    setData("product_id", updatedItems.map(item => item.product_id));
+    setData("product_name", updatedItems.map(item => item.product_name));
+    setData("description", updatedItems.map(item => item.description));
+    setData("quantity", updatedItems.map(item => item.quantity));
+    setData("unit_cost", updatedItems.map(item => item.unit_cost));
+    setData("taxes", updatedItems.map(item => item.taxes));
   };
 
   const calculateSubtotal = () => {
@@ -122,49 +148,77 @@ export default function Create({ customers = [], products = [], currencies = [],
 
   const convertCurrency = (amount) => {
     if (!exchangeRate || exchangeRate === 0) return amount;
-    
+
     // Convert from selected currency to base currency
     // According to the ISO 4217 standard:
     // If selected is EUR with rate 0.92 and base is USD with rate 1
     // then 100 EUR = (100 / 0.92) = 108.70 USD
-    return amount / exchangeRate;
+    console.log(`Converting ${amount} with exchange rate ${exchangeRate}`);
+    
+    // Ensure we're using floating point math with proper decimal precision
+    return parseFloat((amount / parseFloat(exchangeRate)).toFixed(4));
+  };
+
+  // Format currency with proper currency code
+  const formatCurrency = (amount, currencyCode) => {
+    return `${currencyCode} ${amount.toFixed(2)}`;
   };
 
   // Find and set base currency on component mount
   useEffect(() => {
-    const baseC = currencies.find(c => c.exchange_rate === 1);
+    // First try to find a currency with exchange_rate exactly equal to 1
+    let baseC = currencies.find(c => parseFloat(c.exchange_rate) === 1);
+    
+    // If none found, check if there's a currency with base_currency = 1 flag
+    if (!baseC) {
+      baseC = currencies.find(c => c.base_currency === 1);
+    }
+    
+    // If still none found, just take the first currency as a fallback
+    if (!baseC && currencies.length > 0) {
+      baseC = currencies[0];
+      console.warn("No base currency found with exchange_rate=1 or base_currency=1, using first currency as fallback:", baseC);
+    }
+    
     if (baseC) {
+      console.log("Base currency set to:", baseC);
       setBaseCurrencyInfo(baseC);
+    } else {
+      console.error("No currencies available to set as base currency");
     }
   }, [currencies]);
 
-  // Fetch exchange rate when currency changes
-  useEffect(() => {
-    if (data.currency) {
-      const selectedCurrency = currencies.find(c => c.id === data.currency);
-      if (selectedCurrency) {
-        // Fetch real-time exchange rate from API
-        fetch(`/user/find_currency/${selectedCurrency.name}`)
-          .then(response => response.json())
-          .then(currencyData => {
-            if (currencyData && currencyData.exchange_rate) {
-              setExchangeRate(currencyData.exchange_rate);
-              setData('exchange_rate', currencyData.exchange_rate);
-            } else {
-              // Fallback to the rate from props
-              setExchangeRate(selectedCurrency.exchange_rate);
-              setData('exchange_rate', selectedCurrency.exchange_rate);
-            }
-          })
-          .catch(error => {
-            console.error("Error fetching currency rate:", error);
-            // Fallback to the rate from props
-            setExchangeRate(selectedCurrency.exchange_rate);
-            setData('exchange_rate', selectedCurrency.exchange_rate);
-          });
-      }
+  // Update exchange rate whenever the selected currency changes
+  const handleCurrencyChange = (currencyName) => {
+    // Find currency object by name
+    const currencyObj = currencies.find(currency => currency.name === currencyName);
+    
+    if (currencyObj) {
+      console.log("Selected currency:", currencyObj);
+      
+      // Set the exchange rate directly from the selected currency object first as a fallback
+      const currentRate = parseFloat(currencyObj.exchange_rate);
+      setExchangeRate(currentRate);
+      setData('exchange_rate', currentRate);
+      
+      // Then try to fetch the updated exchange rate from the API
+      fetch(`/user/find_currency/${currencyObj.name}`)
+        .then(response => response.json())
+        .then(apiData => {
+          console.log("API response for currency rate:", apiData);
+          if (apiData && apiData.exchange_rate) {
+            const apiRate = parseFloat(apiData.exchange_rate);
+            console.log("Setting exchange rate from API:", apiRate);
+            setExchangeRate(apiRate);
+            setData('exchange_rate', apiRate);
+          }
+        })
+        .catch(error => {
+          console.error("Error fetching currency rate:", error);
+          // Already set the fallback exchange rate above
+        });
     }
-  }, [data.currency]);
+  };
 
   // Update converted_total whenever relevant values change
   useEffect(() => {
@@ -175,28 +229,45 @@ export default function Create({ customers = [], products = [], currencies = [],
 
   const renderTotal = () => {
     const total = calculateTotal();
-    const convertedTotal = convertCurrency(total);
-    const selectedCurrency = currencies.find(c => c.id === data.currency);
-
+    const selectedCurrency = currencies.find(c => c.name === data.currency);
+    
+    console.log("RENDERING TOTAL:", {
+      baseCurrencyInfo,
+      selectedCurrency,
+      exchangeRate,
+      total
+    });
+    
     if (!selectedCurrency) {
       return (
-        <div className="text-lg font-bold">
-          Total: {total.toFixed(2)}
+        <div>
+          <h2 className="text-xl font-bold">Total: 0.00</h2>
         </div>
       );
     }
-
-    return (
-      <div className="flex flex-col">
-        <div className="text-lg font-bold">
-          Total: {selectedCurrency.name} {total.toFixed(2)}
+    
+    // If we have a base currency AND the selected currency is different from base
+    if (baseCurrencyInfo && 
+        selectedCurrency.name !== baseCurrencyInfo.name && 
+        exchangeRate && 
+        exchangeRate !== 1) {
+      
+      // Calculate the base currency equivalent
+      const baseCurrencyTotal = total / exchangeRate;
+      
+      return (
+        <div>
+          <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name)}</h2>
+          <p className="text-sm text-gray-600">
+            Equivalent to {formatCurrency(baseCurrencyTotal, baseCurrencyInfo.name)}
+          </p>
         </div>
-        {baseCurrencyInfo && selectedCurrency.id !== baseCurrencyInfo.id && (
-          <div className="text-sm text-muted-foreground">
-            Converted: {baseCurrencyInfo.name} {convertedTotal.toFixed(2)} 
-            <span className="text-xs ml-1">(Rate: {exchangeRate})</span>
-          </div>
-        )}
+      );
+    }
+    
+    return (
+      <div>
+        <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name)}</h2>
       </div>
     );
   };
@@ -228,10 +299,19 @@ export default function Create({ customers = [], products = [], currencies = [],
 
   const submit = (e) => {
     e.preventDefault();
+
+    // Find the selected currency object to get its name
+    const selectedCurrency = currencies.find(c => c.name === data.currency);
     
-    // Prepare form data to match the expected controller format
-    setData({
+    if (!selectedCurrency) {
+      toast.error("Please select a valid currency");
+      return;
+    }
+
+    // Create a new data object with all the required fields
+    const formData = {
       ...data,
+      currency: selectedCurrency.name,
       exchange_rate: exchangeRate,
       product_id: invoiceItems.map(item => item.product_id),
       product_name: invoiceItems.map(item => item.product_name),
@@ -244,9 +324,13 @@ export default function Create({ customers = [], products = [], currencies = [],
           item.taxes.map(tax => tax.id)
         ])
       )
-    });
-    
-    post(route("invoices.store"), {
+    };
+
+    // Log the data being sent to help debug
+    console.log("Submitting form with data:", formData);
+
+    // Post the form data directly instead of using setData first
+    post(route("invoices.store"), formData, {
       preserveScroll: true,
       onSuccess: () => {
         toast.success("Invoice created successfully");
@@ -404,12 +488,19 @@ export default function Create({ customers = [], products = [], currencies = [],
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <div className="md:w-1/2 w-full">
                   <SearchableCombobox
+                    className="mt-1"
                     options={currencies.map(currency => ({
-                      id: currency.id,
+                      id: currency.name,
+                      value: currency.name,
+                      label: currency.name,
                       name: `${currency.name} - ${currency.description} (${currency.exchange_rate})`
                     }))}
                     value={data.currency}
-                    onChange={(value) => setData("currency", value)}
+                    onChange={(selectedValue) => {
+                      console.log("Currency selected:", selectedValue);
+                      setData("currency", selectedValue);
+                      handleCurrencyChange(selectedValue);
+                    }}
                     placeholder="Select currency"
                   />
                 </div>
@@ -429,70 +520,78 @@ export default function Create({ customers = [], products = [], currencies = [],
               </div>
 
               {invoiceItems.map((item, index) => (
-                <div key={index} className="grid grid-cols-12 gap-4 p-4 border rounded-lg">
-                  <div className="col-span-12 md:col-span-3">
-                    <Label>Product *</Label>
-                    <SearchableCombobox
-                      options={products.map(product => ({
-                        id: product.id,
-                        name: product.name
-                      }))}
-                      value={item.product_id}
-                      onChange={(value) => updateInvoiceItem(index, "product_id", value)}
-                      placeholder="Select product"
-                    />
-                  </div>
-
-                  <div className="col-span-12 md:col-span-3">
-                    <Label>Description</Label>
-                    <Textarea
-                      value={item.description}
-                      onChange={(e) => updateInvoiceItem(index, "description", e.target.value)}
-                      rows={1}
-                    />
-                  </div>
-
-                  <div className="col-span-6 md:col-span-2">
-                    <Label>Quantity *</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={item.quantity}
-                      onChange={(e) => updateInvoiceItem(index, "quantity", parseInt(e.target.value))}
-                    />
-                  </div>
-
-                  <TaxSelector index={index} />
-
-                  <div className="col-span-6 md:col-span-2">
-                    <Label>Unit Cost *</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={item.unit_cost}
-                      onChange={(e) => updateInvoiceItem(index, "unit_cost", parseFloat(e.target.value))}
-                    />
-                  </div>
-
-                  <div className="col-span-10 md:col-span-1">
-                    <Label>Subtotal</Label>
-                    <div className="p-2 bg-gray-50 rounded mt-2">
-                      {(item.quantity * item.unit_cost).toFixed(2)}
+                <div key={index} className="border rounded-lg p-4 space-y-4 bg-gray-50">
+                  {/* First Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label>Product *</Label>
+                      <SearchableCombobox
+                        options={products.map(product => ({
+                          id: product.id,
+                          name: product.name
+                        }))}
+                        value={item.product_id}
+                        onChange={(value) => updateInvoiceItem(index, "product_id", value)}
+                        placeholder="Select product"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label>Quantity *</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(e) => updateInvoiceItem(index, "quantity", parseInt(e.target.value))}
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label>Unit Cost *</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={item.unit_cost}
+                        onChange={(e) => updateInvoiceItem(index, "unit_cost", parseFloat(e.target.value))}
+                      />
                     </div>
                   </div>
 
-                  <div className="col-span-2 md:col-span-1 flex items-end justify-end">
-                    {invoiceItems.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="text-red-500"
-                        onClick={() => removeInvoiceItem(index)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
+                  {/* Second Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <div className="md:col-span-6">
+                      <Label>Description</Label>
+                      <Textarea
+                        value={item.description}
+                        onChange={(e) => updateInvoiceItem(index, "description", e.target.value)}
+                        rows={1}
+                      />
+                    </div>
+                    
+                    <div className="md:col-span-3">
+                      <TaxSelector index={index} />
+                    </div>
+                    
+                    <div className="md:col-span-2">
+                      <Label>Subtotal</Label>
+                      <div className="p-2 bg-white rounded mt-2 text-right">
+                        {(item.quantity * item.unit_cost).toFixed(2)}
+                      </div>
+                    </div>
+                    
+                    <div className="md:col-span-1 flex items-end justify-end">
+                      {invoiceItems.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-500"
+                          onClick={() => removeInvoiceItem(index)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

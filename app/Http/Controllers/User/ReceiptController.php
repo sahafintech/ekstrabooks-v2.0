@@ -26,6 +26,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ReceiptController extends Controller
@@ -53,40 +54,108 @@ class ReceiptController extends Controller
 
     public function index()
     {
-        $receipts = Receipt::select('receipts.*')
+        $query = Receipt::select('receipts.*')
             ->with('customer')
-            ->orderBy("receipts.id", "desc")
-            ->get();
+            ->orderBy("receipts.id", "desc");
 
-        return view('backend.user.receipt.list', compact('receipts'));
+        // Handle search
+        if (request()->has('search') && !empty(request('search'))) {
+            $searchTerm = request('search');
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('title', 'like', "%{$searchTerm}%")
+                  ->orWhere('receipt_number', 'like', "%{$searchTerm}%")
+                  ->orWhere('order_number', 'like', "%{$searchTerm}%")
+                  ->orWhereHas('customer', function ($q) use ($searchTerm) {
+                      $q->where('name', 'like', "%{$searchTerm}%");
+                  });
+            });
+        }
+
+        // Pagination
+        $perPage = request('per_page', 10);
+        $receipts = $query->paginate($perPage)->withQueryString();
+
+        return Inertia::render('Backend/User/Receipt/List', [
+            'receipts' => $receipts->items(),
+            'meta' => [
+                'current_page' => $receipts->currentPage(),
+                'per_page' => $receipts->perPage(),
+                'from' => $receipts->firstItem(),
+                'to' => $receipts->lastItem(),
+                'total' => $receipts->total(),
+                'last_page' => $receipts->lastPage(),
+            ],
+            'filters' => request()->only(['search', 'per_page']),
+        ]);
     }
 
     public function create()
     {
-        return view('backend.user.receipt.create');
+        $customers = \App\Models\Customer::all();
+        $products = Product::all();
+        $currencies = Currency::all();
+        $taxes = Tax::all();
+        $accounts = Account::where(function($query) {
+            $query->where('account_type', 'Bank')
+                ->orWhere('account_type', 'Cash');
+        })->get();
+
+        return Inertia::render('Backend/User/Receipt/Create', [
+            'customers' => $customers,
+            'products' => $products,
+            'currencies' => $currencies,
+            'taxes' => $taxes,
+            'accounts' => $accounts
+        ]);
     }
 
     public function show(Request $request, $id)
     {
-        $receipt   = Receipt::with(['business', 'items'])->find($id);
-        return view('backend.user.receipt.view', compact('receipt'));
+        $receipt = Receipt::with(['business', 'items.taxes', 'customer'])
+            ->where('id', $id)
+            ->first();
+            
+        $business = Business::find($receipt->business_id);
+        
+        return Inertia::render('Backend/User/Receipt/View', [
+            'receipt' => $receipt,
+            'business' => $business
+        ]);
     }
 
     public function edit(Request $request, $id)
     {
-        $receipt = Receipt::with('items')
+        $receipt = Receipt::with(['items.taxes', 'customer'])
             ->where('id', $id)
             ->first();
 
-        $transaction = Transaction::where('ref_id', $receipt->id)->where('ref_type', 'receipt')
+        $transaction = Transaction::where('ref_id', $receipt->id)
+            ->where('ref_type', 'receipt')
             ->whereHas('account', function ($query) {
                 $query->where('account_type', 'Bank')
                     ->orWhere('account_type', 'Cash');
             })
             ->with('account')
             ->first();
+            
+        $customers = \App\Models\Customer::all();
+        $products = Product::all();
+        $currencies = Currency::all();
+        $taxes = Tax::all();
+        $accounts = Account::where(function($query) {
+            $query->where('account_type', 'Bank')
+                ->orWhere('account_type', 'Cash');
+        })->get();
 
-        return view('backend.user.receipt.edit', compact('receipt', 'id', 'transaction'));
+        return Inertia::render('Backend/User/Receipt/Edit', [
+            'receipt' => $receipt,
+            'transaction' => $transaction,
+            'customers' => $customers,
+            'products' => $products,
+            'currencies' => $currencies,
+            'taxes' => $taxes,
+            'accounts' => $accounts
+        ]);
     }
 
     public function store(Request $request)
@@ -103,19 +172,19 @@ class ReceiptController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return redirect()->route('receipts.create')
-                ->withErrors($validator)
-                ->withInput();
+            return response()->json([
+                'errors' => $validator->errors()
+            ]);
         }
 
         // if quantity is less than 1 or null then return with error
         if (in_array(null, $request->quantity) || in_array('', $request->quantity) || in_array(0, $request->quantity)) {
-            return redirect()->back()->withInput()->with('error', _lang('Quantity is required'));
+            return redirect()->route('receipts.create')->withInput()->with('error', _lang('Quantity is required'));
         }
 
         // if unit cost is less than 0 or null then return with error
         if (in_array(null, $request->unit_cost) || in_array('', $request->unit_cost)) {
-            return redirect()->back()->withInput()->with('error', _lang('Unit Cost is required'));
+            return redirect()->route('receipts.create')->withInput()->with('error', _lang('Unit Cost is required'));
         }
 
         $default_accounts = ['Accounts Receivable', 'Sales Tax Payable', 'Sales Discount Allowed', 'Inventory'];
@@ -148,12 +217,12 @@ class ReceiptController extends Controller
                 } elseif ($account == 'Sales Tax Payable') {
                     $account_obj->dr_cr   = 'cr';
                 } elseif ($account == 'Sales Discount Allowed') {
-                    $account_obj->dr_cr   = 'dr';
+                    $account_obj->dr_cr   = 'cr';
                 } elseif ($account == 'Inventory') {
                     $account_obj->dr_cr   = 'dr';
                 }
                 $account_obj->business_id = $request->activeBusiness->id;
-                $account_obj->user_id     = $request->activeBusiness->user->id;
+                $account_obj->user_id     = auth()->id();
                 $account_obj->opening_date   = now()->format('Y-m-d');
                 $account_obj->save();
             }
@@ -196,7 +265,7 @@ class ReceiptController extends Controller
         $receipt->discount_value  = $request->input('discount_value') ?? 0;
         $receipt->note            = $request->input('note');
         $receipt->footer          = $request->input('footer');
-        $receipt->user_id         = auth()->user()->id;
+        $receipt->user_id         = auth()->id();
         $receipt->business_id     = request()->activeBusiness->id;
         $receipt->short_code      = rand(100000, 9999999) . uniqid();
 
@@ -213,7 +282,7 @@ class ReceiptController extends Controller
                 'quantity'     => $request->quantity[$i],
                 'unit_cost'    => $request->unit_cost[$i],
                 'sub_total'    => ($request->unit_cost[$i] * $request->quantity[$i]),
-                'user_id'      => auth()->user()->id,
+                'user_id'      => auth()->id(),
                 'business_id'  => request()->activeBusiness->id,
             ]));
 
@@ -348,7 +417,7 @@ class ReceiptController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = auth()->id();
         $audit->event = 'Cash Invoice Created' . ' ' . $receipt->receipt_number;
         $audit->save();
 
@@ -462,12 +531,12 @@ class ReceiptController extends Controller
                 } elseif ($account == 'Sales Tax Payable') {
                     $account_obj->dr_cr   = 'cr';
                 } elseif ($account == 'Sales Discount Allowed') {
-                    $account_obj->dr_cr   = 'dr';
+                    $account_obj->dr_cr   = 'cr';
                 } elseif ($account == 'Inventory') {
                     $account_obj->dr_cr   = 'dr';
                 }
                 $account_obj->business_id = $request->activeBusiness->id;
-                $account_obj->user_id     = $request->activeBusiness->user->id;
+                $account_obj->user_id     = auth()->id();
                 $account_obj->opening_date   = now()->format('Y-m-d');
                 $account_obj->save();
             }
@@ -495,7 +564,7 @@ class ReceiptController extends Controller
         $receipt->discount_value  = $request->input('discount_value') ?? 0;
         $receipt->note            = $request->input('note');
         $receipt->footer          = $request->input('footer');
-        $receipt->user_id         = auth()->user()->id;
+        $receipt->user_id         = auth()->id();
         $receipt->business_id     = request()->activeBusiness->id;
 
         $receipt->save();
@@ -546,7 +615,7 @@ class ReceiptController extends Controller
                 'quantity'     => $request->quantity[$i],
                 'unit_cost'    => $request->unit_cost[$i],
                 'sub_total'    => ($request->unit_cost[$i] * $request->quantity[$i]),
-                'user_id'      => auth()->user()->id,
+                'user_id'      => auth()->id(),
                 'business_id'  => request()->activeBusiness->id,
             ]));
 
@@ -714,7 +783,7 @@ class ReceiptController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = auth()->id();
         $audit->event = 'Cash Invoice Updated' . ' ' . $receipt->receipt_number;
         $audit->save();
 
@@ -732,7 +801,7 @@ class ReceiptController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = auth()->id();
         $audit->event = 'Cash Invoice Deleted' . ' ' . $receipt->receipt_number;
         $audit->save();
 
@@ -775,7 +844,7 @@ class ReceiptController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = auth()->id();
         $audit->event = 'Cash Invoices Imported';
         $audit->save();
 
@@ -804,7 +873,11 @@ class ReceiptController extends Controller
         $customer_id = $request->customer_id;
         $date_range = $request->date_range;
 
-        return view('backend.user.receipt.list', compact('receipts', 'customer_id', 'date_range'));
+        return Inertia::render('Backend/User/Receipt/List', [
+            'receipts' => $receipts,
+            'customer_id' => $customer_id,
+            'date_range' => $date_range,
+        ]);
     }
 
     private function calculatePosTotal(Request $request)
@@ -862,7 +935,7 @@ class ReceiptController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = auth()->id();
         $audit->event = 'Cash Invoice PDF Exported' . ' ' . $receipt->receipt_number;
         $audit->save();
 
@@ -932,7 +1005,7 @@ class ReceiptController extends Controller
                     $account_obj->dr_cr   = 'dr';
                 }
                 $account_obj->business_id = $request->activeBusiness->id;
-                $account_obj->user_id     = $request->activeBusiness->user->id;
+                $account_obj->user_id     = auth()->id();
                 $account_obj->opening_date   = now()->format('Y-m-d');
                 $account_obj->save();
             }
@@ -972,9 +1045,9 @@ class ReceiptController extends Controller
             $receipt->converted_total = $request->input('converted_total');
             $receipt->exchange_rate   = $request->input('exchange_rate');
             $receipt->discount        = $summary['discountAmount'];
-            $receipt->discount_type   = $request->input('discount_type') ?? 0;
+            $receipt->discount_type   = $request->input('discount_type');
             $receipt->discount_value  = $request->input('discount_value') ?? 0;
-            $receipt->user_id         = auth()->user()->id;
+            $receipt->user_id         = auth()->id();
             $receipt->business_id     = request()->activeBusiness->id;
             $receipt->short_code      = rand(100000, 9999999) . uniqid();
             if ($request->appointment == 1) {
@@ -991,7 +1064,7 @@ class ReceiptController extends Controller
                     'quantity'     => $request->quantity[$i],
                     'unit_cost'    => $request->unit_cost[$i],
                     'sub_total'    => ($request->unit_cost[$i] * $request->quantity[$i]),
-                    'user_id'      => auth()->user()->id,
+                    'user_id'      => auth()->id(),
                     'business_id'  => request()->activeBusiness->id,
                 ]));
 
@@ -1518,7 +1591,7 @@ class ReceiptController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = auth()->id();
         if ($request->credit_cash == 'credit') {
             $audit->event = 'Created Credit Invoice #' . $invoice->invoice_number;
         } elseif ($request->credit_cash == 'provider') {
@@ -1579,7 +1652,7 @@ class ReceiptController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = auth()->id();
         $audit->event = 'Deleted Cash Invoices #' . $receipts->pluck('receipt_number')->implode(', ');
         $audit->save();
 
@@ -1610,7 +1683,7 @@ class ReceiptController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = auth()->id();
         $audit->event = 'Exported Cash Invoices';
         $audit->save();
 

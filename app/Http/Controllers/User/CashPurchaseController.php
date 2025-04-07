@@ -13,21 +13,49 @@ use App\Models\PurchaseItem;
 use App\Models\PurchaseItemTax;
 use App\Models\Tax;
 use App\Models\Transaction;
+use App\Models\Vendor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 use Validator;
 
 class CashPurchaseController extends Controller
 {
-	public function index()
+	public function index(Request $request)
 	{
-		$purchases = Purchase::with('vendor')
-			->orderBy("id", "desc")
-			->where('cash', 1)
-			->get();
+        $search = $request->get('search', '');
+        $perPage = $request->get('per_page', 10);
+        
+        $query = Purchase::with('vendor')
+            ->where('cash', 1)
+            ->orderBy('id', 'desc');
+            
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('bill_no', 'like', "%$search%")
+                  ->orWhere('title', 'like', "%$search%")
+                  ->orWhereHas('vendor', function ($q) use ($search) {
+                      $q->where('name', 'like', "%$search%");
+                  });
+            });
+        }
+        
+        $purchases = $query->paginate($perPage)->withQueryString();
 
-		return view('backend.user.cash_purchase.list', compact('purchases'));
+        return Inertia::render('Backend/User/CashPurchase/List', [
+            'purchases' => $purchases->items(),
+            'meta' => [
+                'current_page' => $purchases->currentPage(),
+                'per_page' => $purchases->perPage(),
+                'last_page' => $purchases->lastPage(),
+                'total' => $purchases->total(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'per_page' => $perPage,
+            ],
+        ]);
 	}
 
 	/**
@@ -37,7 +65,35 @@ class CashPurchaseController extends Controller
 	 */
 	public function create(Request $request)
 	{
-		return view('backend.user.cash_purchase.create');
+        $vendors = Vendor::where('business_id', $request->activeBusiness->id)
+            ->orderBy('name', 'asc')
+            ->get();
+            
+        $products = \App\Models\Product::where('business_id', $request->activeBusiness->id)
+            ->orderBy('name', 'asc')
+            ->get();
+            
+        $currencies = \App\Models\Currency::where('business_id', $request->activeBusiness->id)
+            ->orderBy('name', 'asc')
+            ->get();
+            
+        $taxes = Tax::where('business_id', $request->activeBusiness->id)
+            ->orderBy('name', 'asc')
+            ->get();
+            
+        $accounts = Account::where('business_id', $request->activeBusiness->id)
+            ->where('account_type', 'Bank Account')
+            ->orWhere('account_type', 'Cash Account')
+            ->orderBy('account_name', 'asc')
+            ->get();
+            
+		return Inertia::render('Backend/User/CashPurchase/Create', [
+            'vendors' => $vendors,
+            'products' => $products,
+            'currencies' => $currencies,
+            'taxes' => $taxes,
+            'accounts' => $accounts,
+        ]);
 	}
 
 	/**
@@ -288,7 +344,7 @@ class CashPurchaseController extends Controller
 					$transaction              = new Transaction();
 					$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
 					$transaction->account_id  = $request->input('account_id')[$i];
-					$transaction->dr_cr       = Account::find($request->input('account_id')[$i])->dr_cr;
+					$transaction->dr_cr       = 'dr';
 					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, ($purchaseItem->sub_total / $purchase->exchange_rate) + $purchaseItem->taxes->sum('amount'));
 					$transaction->transaction_currency    = $request->currency;
 					$transaction->currency_rate = $purchase->exchange_rate;
@@ -646,6 +702,7 @@ class CashPurchaseController extends Controller
 		$purchase->grand_total = $summary['grandTotal'];
 		$purchase->converted_total = $request->input('converted_total');
 		$purchase->exchange_rate   = $request->input('exchange_rate');
+		$purchase->currency   = $request->input('currency');
 		$purchase->discount = $summary['discountAmount'];
 		$purchase->discount_type = $request->input('discount_type');
 		$purchase->discount_value = $request->input('discount_value') ?? 0;
@@ -846,7 +903,8 @@ class CashPurchaseController extends Controller
 			}
 
 			if (has_permission('cash_purchases.approve') || request()->isOwner && $purchase->approval_status == 1) {
-				if (isset($request->taxes[$purchaseItem->product_name]) && isset($request->withholding_tax) && $request->withholding_tax == 1) {
+
+				if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
 					$transaction              = new Transaction();
 					$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
 					$transaction->account_id  = $request->input('account_id')[$i];
@@ -931,7 +989,7 @@ class CashPurchaseController extends Controller
 				$transaction->delete();
 			}
 
-			if (isset($request->taxes[$purchaseItem->product_name]) && isset($request->withholding_tax) && $request->withholding_tax == 1) {
+			if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
 				$transaction              = new Transaction();
 				$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
 				$transaction->account_id  = $request->input('credit_account_id');
@@ -1003,7 +1061,7 @@ class CashPurchaseController extends Controller
 				$transaction->delete();
 			}
 
-			if (isset($request->taxes[$purchaseItem->product_name]) && isset($request->withholding_tax) && $request->withholding_tax == 1) {
+			if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
 				$transaction              = new PendingTransaction();
 				$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
 				$transaction->account_id  = $request->input('credit_account_id');
@@ -1130,7 +1188,6 @@ class CashPurchaseController extends Controller
 	public function destroy($id)
 	{
 		$bill = Purchase::find($id);
-
 		// audit log
 		$audit = new AuditLog();
 		$audit->date_changed = date('Y-m-d H:i:s');

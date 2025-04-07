@@ -1,7 +1,6 @@
 import GuestLayout from "@/Layouts/GuestLayout";
 import { Head, Link, useForm } from "@inertiajs/react";
 import { Button } from "@/Components/ui/button";
-import { Card, CardContent } from "@/Components/ui/card";
 import FormInput from "@/Components/shared/FormInput";
 import { SocialLoginButton, SocialLoginIcons } from "@/Components/auth/SocialLogin";
 
@@ -90,8 +89,8 @@ export default function Login({ status, canResetPassword }) {
                 <div className="mb-4 text-sm font-medium text-green-600">{status}</div>
             )}
             <div className="flex flex-col gap-6">
-                <Card className="overflow-hidden">
-                    <CardContent className="grid p-0 md:grid-cols-2">
+                <div className="overflow-hidden bg-white">
+                    <div className="grid p-0 md:grid-cols-2">
                         <LoginForm
                             onSubmit={handleSubmit}
                             data={data}
@@ -107,8 +106,8 @@ export default function Login({ status, canResetPassword }) {
                                 alt=""
                             />
                         </div>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
                 <div className="text-balance text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 hover:[&_a]:text-primary">
                     By clicking continue, you agree to our{" "}
                     <a href="#">Terms of Service</a> and{" "}

@@ -514,6 +514,29 @@ if (!function_exists('create_timezone_option')) {
 	}
 }
 
+if (!function_exists('get_timezone_list')) {
+
+	function get_timezone_list()
+	{
+		$timezones = [];
+		$timestamp = time();
+		foreach (timezone_identifiers_list() as $zone) {
+			date_default_timezone_set($zone);
+			$timezones[] = [
+				'id' => $zone,
+				'value' => $zone,
+				'label' => $zone,
+				'name' => 'GMT ' . date('P', $timestamp) . ' ' . $zone
+			];
+		}
+		
+		// Reset to default timezone
+		date_default_timezone_set(config('app.timezone'));
+		
+		return $timezones;
+	}
+}
+
 if (!function_exists('load_language')) {
 	function load_language($active = '')
 	{

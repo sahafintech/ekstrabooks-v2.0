@@ -14,27 +14,26 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Inertia\Inertia;
 use Validator;
 
-class SystemUserController extends Controller {
+class SystemUserController extends Controller
+{
 
 	/**
 	 * Create a new controller instance.
 	 *
 	 * @return void
 	 */
-	public function __construct() {
+	public function __construct()
+	{
 		$this->middleware(function ($request, $next) {
 
 			$route_name = request()->route()->getName();
 			if ($route_name == 'system_users.send_invitation') {
 				$user = request()->activeBusiness->user;
 				if (has_limit('business_users', 'user_limit', true, "owner_id = $user->id AND user_id != $user->id") <= 0) {
-					if (!$request->ajax()) {
-						return back()->with('error', _lang('Sorry, Your have already reached your package quota !'));
-					} else {
-						return response()->json(['result' => 'error', 'message' => _lang('Sorry, Your have already reached your package quota !')]);
-					}
+					return back()->with('error', _lang('Sorry, Your have already reached your package quota !'));
 				}
 			}
 
@@ -42,8 +41,11 @@ class SystemUserController extends Controller {
 		});
 	}
 
-	public function change_role(Request $request, $userId, $businessId) {
-		if (!$request->ajax()) {return back();}
+	public function change_role(Request $request, $userId, $businessId)
+	{
+		if (!$request->ajax()) {
+			return back();
+		}
 
 		if ($request->isMethod('get')) {
 			$business = Business::owner()->find($businessId);
@@ -81,7 +83,6 @@ class SystemUserController extends Controller {
 			$audit->save();
 
 			return response()->json(['result' => 'success', 'message' => _lang('Role Updated Successfully')]);
-
 		}
 	}
 
@@ -90,12 +91,12 @@ class SystemUserController extends Controller {
 	 *
 	 * @return \Illuminate\Http\Response
 	 */
-	public function invite(Request $request, $businessId) {
-		if (!$request->ajax()) {
-			return back();
-		} else {
-			return view('backend.user.system_user.modal.create', compact('businessId'));
-		}
+	public function invite($businessId)
+	{
+		return Inertia::render('Backend/User/Business/SystemUser/Create', [
+			'businessId' => $businessId,
+			'roles' => Role::all(),
+		]);
 	}
 
 	/**
@@ -104,7 +105,8 @@ class SystemUserController extends Controller {
 	 * @param  \Illuminate\Http\Request  $request
 	 * @return \Illuminate\Http\Response
 	 */
-	public function send_invitation(Request $request) {
+	public function send_invitation(Request $request)
+	{
 		$validator = Validator::make($request->all(), [
 			'email' => 'required|email|max:191',
 			'business_id' => 'required',
@@ -112,28 +114,24 @@ class SystemUserController extends Controller {
 		]);
 
 		if ($validator->fails()) {
-			if ($request->ajax()) {
-				return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-			} else {
-				return redirect()->route('system_users.create')
-					->withErrors($validator)
-					->withInput();
-			}
+			return redirect()->route('system_users.create')
+				->withErrors($validator)
+				->withInput();
 		}
 
 		$business = Business::find($request->business_id);
 		if ($business->users->where('email', $request->email)->first()) {
-			return response()->json(['result' => 'error', 'message' => _lang('User is already assigned to your business')]);
+			return redirect()->back()->with('error', _lang('User is already assigned to your business'));
 		}
 
 		$template = EmailTemplate::where('slug', 'INVITE_USER')->where('email_status', 1)->first();
 		if (!$template) {
-			return response()->json(['result' => 'error', 'message' => _lang('Sorry, Email template is disabled ! Contact with your administrator.')]);
+			return redirect()->back()->with('error', _lang('Sorry, Email template is disabled ! Contact with your administrator.'));
 		}
 
 		$user = User::where('email', $request->email)->first();
 
-		if(User::where('email', $request->email)->exists()) {
+		if (User::where('email', $request->email)->exists()) {
 			return redirect()->back()->with('error', _lang('User already exists'));
 		}
 
@@ -164,28 +162,24 @@ class SystemUserController extends Controller {
 		}
 
 		// audit log
-        $audit = new AuditLog();
-        $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+		$audit = new AuditLog();
+		$audit->date_changed = date('Y-m-d H:i:s');
+		$audit->changed_by = auth()->user()->id;
 		$audit->event = 'Invitation Sent to ' . $invite->email;
-        $audit->save();
+		$audit->save();
 
 		try {
 			//Send Email Notification
 			Notification::send($invite, new InviteUser($invite));
 		} catch (\Exception $e) {
-			return response()->json(['result' => 'error', 'message' => $e->getMessage()]);
+			return redirect()->back()->with('error', $e->getMessage());
 		}
 
-		if (!$request->ajax()) {
-			return redirect()->back()->with('success', _lang('Invitations have been sent'));
-		} else {
-			return response()->json(['result' => 'success', 'action' => 'store', 'message' => _lang('Invitations have been sent'), 'data' => $user, 'table' => '#users_table']);
-		}
-
+		return redirect()->back()->with('success', _lang('Invitations have been sent'));
 	}
 
-	public function accept_invitation($id) {
+	public function accept_invitation($id)
+	{
 		$id = decrypt($id);
 
 		DB::beginTransaction();
@@ -226,11 +220,11 @@ class SystemUserController extends Controller {
 		Auth::login($user, true);
 
 		// audit log
-        $audit = new AuditLog();
-        $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+		$audit = new AuditLog();
+		$audit->date_changed = date('Y-m-d H:i:s');
+		$audit->changed_by = auth()->user()->id;
 		$audit->event = 'Invitation Accepted by ' . $user->name;
-        $audit->save();
+		$audit->save();
 
 		if ($user->password == NULL) {
 			return redirect()->route('profile.change_password')->with('success', _lang('Invitation Accepted. Please create your password for further login'));
@@ -239,21 +233,23 @@ class SystemUserController extends Controller {
 		}
 	}
 
-	public function invitation_history($businessId) {
+	public function invitation_history($businessId)
+	{
 		$assets = ['datatable'];
 		$invitation_list = Invite::where('business_id', $businessId)->orderBy('id', 'desc')->get();
 		return view('backend.user.business.invitation_history', compact('invitation_list', 'businessId', 'assets'));
 	}
 
-	public function destroy_invitation($id) {
+	public function destroy_invitation($id)
+	{
 		$invite = Invite::find($id);
 
 		// audit log
-        $audit = new AuditLog();
-        $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+		$audit = new AuditLog();
+		$audit->date_changed = date('Y-m-d H:i:s');
+		$audit->changed_by = auth()->user()->id;
 		$audit->event = 'Invitation Deleted' . ' ' . $invite->email;
-        $audit->save();
+		$audit->save();
 
 		$invite->delete();
 		return back()->with('success', _lang('Deleted Sucessfully'));
@@ -265,17 +261,19 @@ class SystemUserController extends Controller {
 	 * @param  int  $id
 	 * @return \Illuminate\Http\Response
 	 */
-	public function destroy($id) {
+	public function destroy($id)
+	{
 		$user = User::staff()->find($id);
 
 		// audit log
-        $audit = new AuditLog();
-        $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+		$audit = new AuditLog();
+		$audit->date_changed = date('Y-m-d H:i:s');
+		$audit->changed_by = auth()->user()->id;
 		$audit->event = 'User Deleted' . ' ' . $user->name;
-        $audit->save();
+		$audit->save();
 
 		$user->business()->detach();
-		return back()->with('success', _lang('Deleted Sucessfully'));
+		$user->delete();
+		return back()->with('success', _lang('Deleted Successfully'));
 	}
 }

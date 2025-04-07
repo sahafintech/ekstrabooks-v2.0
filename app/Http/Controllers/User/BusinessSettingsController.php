@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+use Inertia\Inertia;
 
 class BusinessSettingsController extends Controller
 {
@@ -23,20 +24,88 @@ class BusinessSettingsController extends Controller
      *
      * @return void
      */
-    public function __construct()
-    {
-    }
+    public function __construct() {}
 
     /**
      * Display the specified resource.
      *
      * @param  int  $id
+     * @param  string  $tab
      * @return \Illuminate\Http\Response
      */
-    public function settings(Request $request, $id)
+    public function settings($id, $tab = 'general')
     {
         $business = Business::with('systemSettings')->find($id);
-        return view('backend.user.business.settings', compact('business', 'id'));
+
+        // Provide common data for all settings pages
+        $timezonesList = timezone_list();
+        $timezones = [];
+        foreach ($timezonesList as $timezone) {
+            $timezones[] = ['id' => $timezone['ZONE'], 'value' => $timezone['ZONE'], 'label' => $timezone['GMT'], 'name' => $timezone['GMT'] . ' ' . $timezone['ZONE']];
+        }
+
+        $dateFormats = [
+            ['format' => 'Y-m-d',   'example' => date('Y-m-d')],
+            ['format' => 'd-m-Y',   'example' => date('d-m-Y')],
+            ['format' => 'd/m/Y',   'example' => date('d/m/Y')],
+            ['format' => 'm-d-Y',   'example' => date('m-d-Y')],
+            ['format' => 'm.d.Y',   'example' => date('m.d.Y')],
+            ['format' => 'm/d/Y',   'example' => date('m/d/Y')],
+            ['format' => 'd.m.Y',   'example' => date('d.m.Y')],
+            ['format' => 'd/M/Y',   'example' => date('d/M/Y')],
+            ['format' => 'M/d/Y',   'example' => date('M/d/Y')],
+            ['format' => 'd M, Y',  'example' => date('d M, Y')],
+        ];
+
+        $languages = load_language();
+
+        $financial_years = [
+            ['id' => 'January,December', 'value' => 'January - December'],
+            ['id' => 'February,January', 'value' => 'February - January'],
+            ['id' => 'March,February', 'value' => 'March - February'],
+            ['id' => 'April,March', 'value' => 'April - March'],
+            ['id' => 'May,April', 'value' => 'May - April'],
+            ['id' => 'June,May', 'value' => 'June - May'],
+            ['id' => 'July,June', 'value' => 'July - June'],
+            ['id' => 'August,July', 'value' => 'August - July'],
+            ['id' => 'September,August', 'value' => 'September - August'],
+            ['id' => 'October,September', 'value' => 'October - September'],
+            ['id' => 'November,October', 'value' => 'November - October'],
+            ['id' => 'December,November', 'value' => 'December - November'],
+        ];
+
+        $invoiceColumns = json_decode(get_setting($business->systemSettings, 'invoice_column', null, $id));
+
+        $data = [
+            'business' => $business,
+            'id' => $id,
+            'timezones' => $timezones,
+            'dateFormats' => $dateFormats,
+            'languages' => $languages,
+            'financial_years' => $financial_years,
+            'activeTab' => $tab,
+            'invoiceColumns' => $invoiceColumns
+        ];
+
+        // Render the appropriate component based on the active tab
+        switch ($tab) {
+            case 'currency':
+                return Inertia::render('Backend/User/Business/Settings/Currency', $data);
+            case 'invoice':
+                return Inertia::render('Backend/User/Business/Settings/Invoice', $data);
+            case 'credit_invoice':
+                return Inertia::render('Backend/User/Business/Settings/CreditInvoice', $data);
+            case 'cash_invoice':
+                return Inertia::render('Backend/User/Business/Settings/CashInvoice', $data);
+            case 'bill_invoice':
+                return Inertia::render('Backend/User/Business/Settings/Bill', $data);
+            case 'sales_return':
+                return Inertia::render('Backend/User/Business/Settings/SalesReturn', $data);
+            case 'purchase_return':
+                return Inertia::render('Backend/User/Business/Settings/PurchaseReturn', $data);
+            default:
+                return Inertia::render('Backend/User/Business/Settings/General', $data);
+        }
     }
 
     public function store_general_settings(Request $request, $businessId)
@@ -55,11 +124,7 @@ class BusinessSettingsController extends Controller
         $audit->event = 'Updated Business Settings for ' . $request->activeBusiness->name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return back()->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Saved Successfully')]);
-        }
+        return back()->with('success', _lang('Saved Successfully'));
     }
 
     public function store_currency_settings(Request $request, $businessId)
@@ -72,11 +137,7 @@ class BusinessSettingsController extends Controller
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return back()->withErrors($validator)->withInput();
-            }
+            return back()->withErrors($validator)->withInput();
         }
 
         $settingsData = $request->except($this->ignoreRequests);
@@ -92,28 +153,18 @@ class BusinessSettingsController extends Controller
         $audit->event = 'Updated Currency Settings for ' . get_option('currency');
         $audit->save();
 
-        if (!$request->ajax()) {
-            return back()->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Saved Successfully')]);
-        }
+        return back()->with('success', _lang('Saved Successfully'));
     }
 
     public function store_invoice_settings(Request $request, $businessId)
     {
         $validator = Validator::make($request->all(), [
             'invoice_title'    => 'required',
-            'quotation_number' => 'required',
             'invoice_number'   => 'required|integer',
-            'quotation_number' => 'required|integer',
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return back()->withErrors($validator)->withInput();
-            }
+            return back()->withErrors($validator)->withInput();
         }
 
         $settingsData = $request->except($this->ignoreRequests);
@@ -127,14 +178,10 @@ class BusinessSettingsController extends Controller
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Updated Invoice Settings for ' . get_option('invoice_title');
+        $audit->event = 'Updated Invoice Settings for ' . $request->invoice_title;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return back()->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Saved Successfully')]);
-        }
+        return back()->with('success', _lang('Saved Successfully'));
     }
 
     public function store_receipt_settings(Request $request, $businessId)
@@ -145,11 +192,7 @@ class BusinessSettingsController extends Controller
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return back()->withErrors($validator)->withInput();
-            }
+            return back()->withErrors($validator)->withInput();
         }
 
         $settingsData = $request->except($this->ignoreRequests);
@@ -163,14 +206,10 @@ class BusinessSettingsController extends Controller
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Updated Cash Invoice Settings for ' . get_option('receipt_title');
+        $audit->event = 'Updated Cash Invoice Settings for ' . $request->receipt_title;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return back()->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Saved Successfully')]);
-        }
+        return back()->with('success', _lang('Saved Successfully'));
     }
 
     public function store_purchase_settings(Request $request, $businessId)
@@ -181,11 +220,7 @@ class BusinessSettingsController extends Controller
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return back()->withErrors($validator)->withInput();
-            }
+            return back()->withErrors($validator)->withInput();
         }
 
         $settingsData = $request->except($this->ignoreRequests);
@@ -199,14 +234,10 @@ class BusinessSettingsController extends Controller
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Updated Purchase Settings for ' . get_option('purchase_title');
+        $audit->event = 'Updated Purchase Settings for ' . $request->purchase_title;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return back()->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Saved Successfully')]);
-        }
+        return back()->with('success', _lang('Saved Successfully'));
     }
 
     public function store_sales_return_settings(Request $request, $businessId)
@@ -217,11 +248,7 @@ class BusinessSettingsController extends Controller
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return back()->withErrors($validator)->withInput();
-            }
+            return back()->withErrors($validator)->withInput();
         }
 
         $settingsData = $request->except($this->ignoreRequests);
@@ -235,14 +262,10 @@ class BusinessSettingsController extends Controller
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Updated Sales Return Settings for ' . get_option('sales_return_title');
+        $audit->event = 'Updated Sales Return Settings for ' . $request->sales_return_title;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return back()->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Saved Successfully')]);
-        }
+        return back()->with('success', _lang('Saved Successfully'));
     }
 
     public function store_purchase_return_settings(Request $request, $businessId)
@@ -253,11 +276,7 @@ class BusinessSettingsController extends Controller
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return back()->withErrors($validator)->withInput();
-            }
+            return back()->withErrors($validator)->withInput();
         }
 
         $settingsData = $request->except($this->ignoreRequests);
@@ -271,14 +290,10 @@ class BusinessSettingsController extends Controller
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Updated Purchase Return Settings for ' . get_option('purchase_return_title');
+        $audit->event = 'Updated Purchase Return Settings for ' . $request->purchase_return_title;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return back()->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Saved Successfully')]);
-        }
+        return back()->with('success', _lang('Saved Successfully'));
     }
 
     public function store_payment_gateway_settings(Request $request, $businessId)
@@ -297,11 +312,7 @@ class BusinessSettingsController extends Controller
         $validator = Validator::make($request->all(), $rules, $messages);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return back()->withErrors($validator)->withInput();
-            }
+            return back()->withErrors($validator)->withInput();
         }
 
         $settingsData = $request->except($this->ignoreRequests);
@@ -318,11 +329,7 @@ class BusinessSettingsController extends Controller
         $audit->event = 'Updated Payment Gateway Settings for ' . $request->slug;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return back()->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Saved Successfully')]);
-        }
+        return back()->with('success', _lang('Saved Successfully'));
     }
 
     public function store_email_settings(Request $request, $businessId)
@@ -338,16 +345,13 @@ class BusinessSettingsController extends Controller
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return back()->withErrors($validator)->withInput();
-            }
+            return back()->withErrors($validator)->withInput();
         }
 
         $settingsData = $request->except($this->ignoreRequests);
 
         foreach ($settingsData as $key => $value) {
+            $value = is_array($value) ? json_encode($value) : $value;
             update_business_option($key, $value, $businessId);
         }
 
@@ -358,11 +362,7 @@ class BusinessSettingsController extends Controller
         $audit->event = 'Updated Email Settings for ' . $request->activeBusiness->name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return back()->with('success', _lang('Saved Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Saved Successfully')]);
-        }
+        return back()->with('success', _lang('Saved Successfully'));
     }
 
     public function send_test_email(Request $request, $businessId)
@@ -394,18 +394,146 @@ class BusinessSettingsController extends Controller
 
         try {
             Mail::to($email)->send(new GeneralMail($mail));
-            if (!$request->ajax()) {
-                return back()->with('success', _lang('Test Message send sucessfully'));
-            } else {
-                return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Test Message send sucessfully')]);
-            }
+            return back()->with('success', _lang('Test Message send sucessfully'));
         } catch (\Exception $e) {
-            if (!$request->ajax()) {
-                return back()->with('error', $e->getMessage());
-            } else {
-                return response()->json(['result' => 'error', 'action' => 'update', 'message' => $e->getMessage()]);
-            }
+            return back()->with('error', $e->getMessage());
         }
+    }
+
+    /**
+     * Display currency settings.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function currencySettings(Request $request, $id)
+    {
+        $business = Business::with('systemSettings')->find($id);
+
+        return Inertia::render('Backend/User/Business/Settings/Currency', [
+            'business' => $business,
+            'id' => $id,
+            'activeTab' => 'currency'
+        ]);
+    }
+
+    /**
+     * Display invoice settings.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function invoiceSettings(Request $request, $id)
+    {
+        $business = Business::with('systemSettings')->find($id);
+
+        return Inertia::render('Backend/User/Business/Settings/Invoice', [
+            'business' => $business,
+            'id' => $id,
+            'activeTab' => 'invoice'
+        ]);
+    }
+
+    /**
+     * Display credit invoice settings.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function creditInvoiceSettings(Request $request, $id)
+    {
+        $business = Business::with('systemSettings')->find($id);
+
+        return Inertia::render('Backend/User/Business/Settings/CreditInvoice', [
+            'business' => $business,
+            'id' => $id,
+            'activeTab' => 'credit-invoice'
+        ]);
+    }
+
+    /**
+     * Display cash invoice settings.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function cashInvoiceSettings(Request $request, $id)
+    {
+        $business = Business::with('systemSettings')->find($id);
+
+        return Inertia::render('Backend/User/Business/Settings/CashInvoice', [
+            'business' => $business,
+            'id' => $id,
+            'activeTab' => 'cash-invoice'
+        ]);
+    }
+
+    /**
+     * Display bill invoice settings.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function billSettings(Request $request, $id)
+    {
+        $business = Business::with('systemSettings')->find($id);
+
+        return Inertia::render('Backend/User/Business/Settings/Bill', [
+            'business' => $business,
+            'id' => $id,
+            'activeTab' => 'bill'
+        ]);
+    }
+
+    /**
+     * Display sales return settings.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function salesReturnSettings(Request $request, $id)
+    {
+        $business = Business::with('systemSettings')->find($id);
+
+        return Inertia::render('Backend/User/Business/Settings/SalesReturn', [
+            'business' => $business,
+            'id' => $id,
+            'activeTab' => 'sales-return'
+        ]);
+    }
+
+    /**
+     * Display purchase return settings.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function purchaseReturnSettings(Request $request, $id)
+    {
+        $business = Business::with('systemSettings')->find($id);
+
+        return Inertia::render('Backend/User/Business/Settings/PurchaseReturn', [
+            'business' => $business,
+            'id' => $id,
+            'activeTab' => 'purchase-return'
+        ]);
+    }
+
+    /**
+     * Display email settings.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function emailSettings(Request $request, $id)
+    {
+        $business = Business::with('systemSettings')->find($id);
+
+        return Inertia::render('Backend/User/Business/Settings/Email', [
+            'business' => $business,
+            'id' => $id,
+            'activeTab' => 'email'
+        ]);
     }
 
     public function pos_settings($id)
@@ -429,7 +557,7 @@ class BusinessSettingsController extends Controller
                 $business_setting->name        = $key;
                 $business_setting->value       = $value;
                 $business_setting->save();
-            }else{
+            } else {
                 $business_setting->value = $value;
                 $business_setting->save();
             }

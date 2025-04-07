@@ -2,7 +2,6 @@ import InputError from "@/Components/InputError";
 import GuestLayout from "@/Layouts/GuestLayout";
 import { Head, Link, useForm } from "@inertiajs/react";
 import { Button } from "@/Components/ui/button";
-import { Card, CardContent } from "@/Components/ui/card";
 import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
@@ -142,8 +141,8 @@ export default function Register() {
         <GuestLayout>
             <Head title="Register" />
             <div className="flex flex-col gap-6">
-                <Card className="overflow-hidden">
-                    <CardContent className="grid p-0 md:grid-cols-2">
+                <div className="overflow-hidden bg-white">
+                    <div className="grid p-0 md:grid-cols-2">
                         <RegisterForm
                             onSubmit={handleSubmit}
                             data={data}
@@ -158,8 +157,8 @@ export default function Register() {
                                 className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
                             />
                         </div>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
                 <div className="text-balance text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 hover:[&_a]:text-primary">
                     By clicking continue, you agree to our{" "}
                     <Link href="#">Terms of Service</Link> and{" "}

@@ -7,12 +7,14 @@ use App\Models\AuditLog;
 use App\Models\Business;
 use App\Models\BusinessBankAccount;
 use App\Models\BusinessSetting;
+use App\Models\BusinessType;
 use App\Models\Currency;
 use Database\Seeders\BusinessSettingSeeder;
 use Database\Seeders\CurrencySeeder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Validator;
+use Inertia\Inertia;
 
 class BusinessController extends Controller
 {
@@ -46,11 +48,42 @@ class BusinessController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        $assets    = ['datatable'];
-        $businesss = Business::with('role')->get()->sortByDesc("id");
-        return view('backend.user.business.list', compact('businesss', 'assets'));
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
+
+        $query = Business::select('business.*')
+            ->orderBy("business.id", "desc")
+            ->with('business_type', 'user');
+
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('company_name', 'like', "%{$search}%")
+                    ->orWhere('mobile', 'like', "%{$search}%");
+            });
+        }
+
+        $businesses = $query->paginate($per_page)->withQueryString();
+        return Inertia::render('Backend/User/Business/List', [
+            'businesses' => $businesses->items(),
+            'meta' => [
+                'current_page' => $businesses->currentPage(),
+                'from' => $businesses->firstItem(),
+                'last_page' => $businesses->lastPage(),
+                'per_page' => $per_page,
+                'to' => $businesses->lastItem(),
+                'total' => $businesses->total(),
+                'links' => $businesses->linkCollection(),
+                'path' => $businesses->path(),
+            ],
+            'filters' => [
+                'search' => $search,
+            ],
+        ]);
     }
 
     /**
@@ -60,8 +93,26 @@ class BusinessController extends Controller
      */
     public function create(Request $request)
     {
-        $alert_col = 'col-lg-8 offset-lg-2';
-        return view('backend.user.business.create', compact('alert_col'));
+        $business_types = BusinessType::all();
+        $currencies = Currency::all();
+        $countriesJson = file_get_contents(app_path() . '/Helpers/country.json');
+        $countriesData = json_decode($countriesJson, true);
+
+        // Convert to array format suitable for frontend mapping
+        $countries = [];
+        foreach ($countriesData as $code => $data) {
+            $countries[] = [
+                'id' => $code,
+                'code' => $code,
+                'name' => $data['country'],
+                'dial_code' => $data['dial_code']
+            ];
+        }
+        return Inertia::render('Backend/User/Business/Create', [
+            'business_types' => $business_types,
+            'currencies' => $currencies,
+            'countries' => $countries
+        ]);
     }
 
     /**
@@ -80,16 +131,13 @@ class BusinessController extends Controller
             'logo'             => 'nullable|image|max:2048',
             'status'           => 'required',
             'default'          => 'required',
+            'email'            => 'required'
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return redirect()->route('business.create')
-                    ->withErrors($validator)
-                    ->withInput();
-            }
+            return redirect()->route('business.create')
+                ->withErrors($validator)
+                ->withInput();
         }
 
         $logo = 'default/default-company-logo.png';
@@ -140,7 +188,7 @@ class BusinessController extends Controller
         }
 
         DB::commit();
-        
+
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
@@ -161,9 +209,43 @@ class BusinessController extends Controller
      */
     public function users(Request $request, $id)
     {
-        $assets   = ['datatable'];
-        $business = Business::with('users')->find($id);
-        return view('backend.user.business.system_users', compact('business', 'id', 'assets'));
+        // Find the business first
+        $business = Business::findOrFail($id);
+        
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
+
+        // Get users related to this business with roles and pagination
+        $usersQuery = $business->users()->with('roles');
+        
+        // Apply search if provided
+        if (!empty($search)) {
+            $usersQuery->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+        
+        // Get paginated results
+        $users = $usersQuery->paginate($per_page)->withQueryString();
+        
+        return Inertia::render('Backend/User/Business/SystemUser/List', [
+            'business' => $business->only(['id', 'name']),
+            'users' => $users->items(),
+            'meta' => [
+                'current_page' => $users->currentPage(),
+                'from' => $users->firstItem(),
+                'last_page' => $users->lastPage(),
+                'per_page' => $per_page,
+                'to' => $users->lastItem(),
+                'total' => $users->total(),
+                'links' => $users->linkCollection(),
+                'path' => $users->path(),
+            ],
+            'filters' => [
+                'search' => $search
+            ]
+        ]);
     }
 
     /**
@@ -176,10 +258,25 @@ class BusinessController extends Controller
     {
         $business  = Business::owner()->with('bank_accounts')->find($id);
 
-        $currency = Currency::all();
+        $currencies = Currency::all();
+        $countriesJson = file_get_contents(app_path() . '/Helpers/country.json');
+        $countriesData = json_decode($countriesJson, true);
+
+        // Convert to array format suitable for frontend mapping
+        $countries = [];
+        foreach ($countriesData as $code => $data) {
+            $countries[] = [
+                'id' => $code,
+                'code' => $code,
+                'name' => $data['country'],
+                'dial_code' => $data['dial_code']
+            ];
+        }
+
+        $business_types = BusinessType::all();
         $businessSettings = BusinessSetting::where('business_id', request()->activeBusiness->id)->get();
 
-        if ($currency->count() <= 0 && $businessSettings->count() <= 0) {
+        if ($currencies->count() <= 0 && $businessSettings->count() <= 0) {
             // Instantiate the seeder with arguments
             $cseeder = new CurrencySeeder(auth()->user()->id, request()->activeBusiness->id);
 
@@ -193,7 +290,13 @@ class BusinessController extends Controller
             $bseeder->run();
         }
 
-        return view('backend.user.business.edit', compact('business', 'id'));
+        return Inertia::render('Backend/User/Business/Edit', [
+            'business' => $business,
+            'id' => $id,
+            'currencies' => $currencies,
+            'countries' => $countries,
+            'business_types' => $business_types,
+        ]);
     }
 
     /**
@@ -209,20 +312,14 @@ class BusinessController extends Controller
             'name'             => 'required',
             'business_type_id' => 'required',
             'country'          => 'required',
-            //'currency'         => 'required',
-            'logo'             => 'nullable|image|max:2048',
             'status'           => 'required',
             'default'          => 'required',
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            } else {
-                return redirect()->route('business.edit', $id)
-                    ->withErrors($validator)
-                    ->withInput();
-            }
+            return redirect()->route('business.edit', $id)
+                ->withErrors($validator)
+                ->withInput();
         }
 
         DB::beginTransaction();
@@ -294,11 +391,7 @@ class BusinessController extends Controller
         $audit->event = 'Updated Business ' . $business->name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('business.index')->with('success', _lang('Updated Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $business, 'table' => '#business_table']);
-        }
+        return redirect()->route('business.index')->with('success', _lang('Updated Successfully'));
     }
 
     /**

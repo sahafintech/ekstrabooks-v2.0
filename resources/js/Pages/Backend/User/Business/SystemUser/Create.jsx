@@ -1,0 +1,106 @@
+import { useForm } from "@inertiajs/react";
+import { Label } from "@/Components/ui/label";
+import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import { SidebarInset } from "@/Components/ui/sidebar";
+import PageHeader from "@/Components/PageHeader";
+import { Input } from "@/Components/ui/input";
+import { Textarea } from "@/Components/ui/textarea";
+import InputError from "@/Components/InputError";
+import { Button } from "@/Components/ui/button";
+import { toast } from "sonner";
+import { Head } from "@inertiajs/react";
+import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+
+export default function Create({ roles, businessId }) {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        email: "",
+        role_id: "",
+        business_id: businessId,
+        message: "",
+    });
+
+    const submit = (e) => {
+        e.preventDefault();
+        post(route("system_users.send_invitation"), {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success("Invitation sent successfully");
+                reset();
+            },
+        });
+    };
+
+    return (
+        <AuthenticatedLayout>
+            <Head title="Invite New User" />
+            <SidebarInset>
+                <PageHeader page="Users" subpage="Invite New" url="business.users" params={businessId} />
+
+                <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+                    <form onSubmit={submit} encType="multipart/form-data">
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label htmlFor="email" className="md:col-span-2 col-span-12">
+                                Email *
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                <Input
+                                    id="email"
+                                    type="email"
+                                    value={data.email}
+                                    onChange={(e) => setData("email", e.target.value)}
+                                    className="md:w-1/2 w-full"
+                                    required
+                                    placeholder="Enter email"
+                                />
+                                <InputError message={errors.email} className="text-sm" />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label htmlFor="role_id" className="md:col-span-2 col-span-12">
+                                Role *
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                <SearchableCombobox
+                                    id="role_id"
+                                    label="Role"
+                                    options={roles}
+                                    value={data.role_id}
+                                    onChange={(value) => setData("role_id", value)}
+                                    className="md:w-1/2 w-full"
+                                    required
+                                    placeholder="Select Role"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label htmlFor="message" className="md:col-span-2 col-span-12">
+                                Message
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                <Textarea
+                                    id="message"
+                                    value={data.message}
+                                    onChange={(e) => setData("message", e.target.value)}
+                                    className="md:w-1/2 w-full"
+                                    placeholder="Enter message"
+                                />
+                                <InputError message={errors.message} className="text-sm" />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-12 mt-4">
+                            <div className="md:col-span-2 col-span-12"></div>
+                            <div className="md:col-span-10 col-span-12">
+                                <Button type="submit" disabled={processing}>
+                                    {processing ? "Sending..." : "Send Invitation"}
+                                </Button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </SidebarInset >
+        </AuthenticatedLayout >
+    );
+}

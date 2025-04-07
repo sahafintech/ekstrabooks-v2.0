@@ -1,0 +1,401 @@
+import { Head, Link, router, usePage } from "@inertiajs/react";
+import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
+import { SidebarInset, SidebarSeparator } from "@/Components/ui/sidebar";
+import { Button } from "@/Components/ui/button";
+import { Card } from "@/Components/ui/card";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/Components/ui/dropdown-menu";
+import PageHeader from "@/Components/PageHeader";
+import { 
+  PrinterIcon, 
+  MailIcon, 
+  DownloadIcon, 
+  MoreVertical, 
+  ShareIcon,
+  Edit
+} from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { Table, TableBody, TableHeader, TableRow, TableHead, TableCell } from "@/Components/ui/table";
+
+export default function View() {
+  const { invoice, attachments } = usePage().props;
+  const [isLoading, setIsLoading] = useState({
+    print: false,
+    email: false,
+    pdf: false
+  });
+
+  // Format currency with proper currency code
+  const formatCurrency = (amount, currencyCode = "USD") => {
+    if (amount === null || amount === undefined) return `${currencyCode} 0.00`;
+    // Format with 2 decimal places
+    const formattedAmount = parseFloat(amount).toFixed(2);
+    // Return formatted string with currency code
+    return `${currencyCode} ${formattedAmount}`;
+  };
+
+  // Format a date string into a readable format
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return dateString;
+    }
+  };
+
+  const handlePrint = () => {
+    setIsLoading(prev => ({ ...prev, print: true }));
+    setTimeout(() => {
+      window.print();
+      setIsLoading(prev => ({ ...prev, print: false }));
+    }, 300);
+  };
+
+  const handleEmailInvoice = () => {
+    setIsLoading(prev => ({ ...prev, email: true }));
+    router.visit(route('invoices.send_email', invoice.id), {
+      preserveScroll: true,
+      onSuccess: () => {
+        toast.success('Email form opened successfully');
+        setIsLoading(prev => ({ ...prev, email: false }));
+      },
+      onError: () => {
+        toast.error('Failed to open email form');
+        setIsLoading(prev => ({ ...prev, email: false }));
+      }
+    });
+  };
+
+  const handleDownloadPDF = () => {
+    setIsLoading(prev => ({ ...prev, pdf: true }));
+    window.open(route('invoices.pdf', invoice.id), '_blank');
+    setTimeout(() => {
+      setIsLoading(prev => ({ ...prev, pdf: false }));
+    }, 1000);
+  };
+
+  const handleShareLink = () => {
+    router.visit(route('invoices.link', invoice.id), {
+      preserveScroll: true
+    });
+  };
+
+  // Calculate totals
+  const subtotal = invoice.items.reduce(
+    (sum, item) => sum + parseFloat(item.quantity) * parseFloat(item.unit_cost),
+    0
+  );
+  
+  // Calculate taxes
+  const taxGroups = {};
+  invoice.items.forEach(item => {
+    if (item.taxes && item.taxes.length > 0) {
+      item.taxes.forEach(tax => {
+        const taxAmount = (parseFloat(item.quantity) * parseFloat(item.unit_cost) * parseFloat(tax.rate)) / 100;
+        if (taxGroups[tax.name]) {
+          taxGroups[tax.name].amount += taxAmount;
+        } else {
+          taxGroups[tax.name] = {
+            rate: parseFloat(tax.rate),
+            amount: taxAmount
+          };
+        }
+      });
+    }
+  });
+
+  const totalTax = Object.values(taxGroups).reduce((sum, tax) => sum + tax.amount, 0);
+
+  // Calculate discount
+  let discountAmount = 0;
+  if (invoice.discount_value > 0) {
+    if (invoice.discount_type === 'percentage') {
+      discountAmount = subtotal * (parseFloat(invoice.discount_value) / 100);
+    } else {
+      discountAmount = parseFloat(invoice.discount_value);
+    }
+  }
+
+  // Calculate total
+  const total = subtotal + totalTax - discountAmount;
+
+  return (
+    <AuthenticatedLayout>
+      <Head title={`Invoice #${invoice.invoice_number}`} />
+      
+      <SidebarInset>
+        <div className="space-y-4">
+          <PageHeader
+            page="Invoices"
+            subpage={`Invoice #${invoice.invoice_number}`}
+            url="invoices.index"
+          />
+          
+          <div className="flex items-center justify-end space-x-2 mb-4">
+            <Button
+              variant="outline"
+              onClick={handlePrint}
+              disabled={isLoading.print}
+              className="flex items-center"
+            >
+              <PrinterIcon className="mr-2 h-4 w-4" />
+              {isLoading.print ? "Printing..." : "Print"}
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={handleEmailInvoice}
+              disabled={isLoading.email}
+              className="flex items-center"
+            >
+              <MailIcon className="mr-2 h-4 w-4" />
+              {isLoading.email ? "Sending..." : "Email"}
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={handleDownloadPDF}
+              disabled={isLoading.pdf}
+              className="flex items-center"
+            >
+              <DownloadIcon className="mr-2 h-4 w-4" />
+              {isLoading.pdf ? "Downloading..." : "Download PDF"}
+            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleShareLink}>
+                  <ShareIcon className="mr-2 h-4 w-4" />
+                  <span>Share Link</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={route("invoices.edit", invoice.id)} className="flex items-center">
+                    <Edit className="mr-2 h-4 w-4" />
+                    <span>Edit Invoice</span>
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          <div className="print-container">
+            <div className="p-6 sm:p-8">
+              {/* Invoice Header */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div>
+                  <h2 className="text-2xl font-bold text-primary">
+                    {invoice.business.business_name}
+                  </h2>
+                  <div className="mt-2 text-sm">
+                    <p>{invoice.business.address}</p>
+                    <p>{invoice.business.email}</p>
+                    <p>{invoice.business.phone}</p>
+                  </div>
+                </div>
+                <div className="md:text-right">
+                  <h1 className="text-2xl font-bold">INVOICE</h1>
+                  <div className="mt-2 text-sm">
+                    <p><span className="font-medium">Invoice #:</span> {invoice.invoice_number}</p>
+                    <p><span className="font-medium">Invoice Date:</span> {formatDate(invoice.invoice_date)}</p>
+                    <p><span className="font-medium">Due Date:</span> {formatDate(invoice.due_date)}</p>
+                    {invoice.order_number && (
+                      <p><span className="font-medium">Order Number:</span> {invoice.order_number}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <SidebarSeparator className="my-6" />
+
+              {/* Customer Information */}
+              <div className="mb-8">
+                <h3 className="font-medium text-lg mb-2">Bill To:</h3>
+                <div className="text-sm">
+                  <p className="font-medium">{invoice.customer.contact_name}</p>
+                  {invoice.customer.company_name && <p>{invoice.customer.company_name}</p>}
+                  <p>{invoice.customer.address}</p>
+                  <p>{invoice.customer.email}</p>
+                  <p>{invoice.customer.phone}</p>
+                </div>
+              </div>
+
+              {/* Invoice Items */}
+              <div className="mb-8">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Quantity</TableHead>
+                      <TableHead className="text-right">Unit Cost</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invoice.items.map((item, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium">{item.product_name}</TableCell>
+                        <TableCell>{item.description}</TableCell>
+                        <TableCell className="text-right">{item.quantity}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(item.unit_cost, invoice.currency)}</TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(item.quantity * item.unit_cost, invoice.currency)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Invoice Summary */}
+              <div className="flex justify-end">
+                <div className="w-full md:w-1/2 lg:w-1/3 space-y-2">
+                  <div className="flex justify-between py-2 border-t">
+                    <span className="font-medium">Subtotal:</span>
+                    <span>{formatCurrency(subtotal, invoice.currency)}</span>
+                  </div>
+
+                  {/* Tax details */}
+                  {Object.entries(taxGroups).map(([taxName, tax], index) => (
+                    <div key={index} className="flex justify-between py-2">
+                      <span>
+                        {taxName} ({tax.rate}%):
+                      </span>
+                      <span>{formatCurrency(tax.amount, invoice.currency)}</span>
+                    </div>
+                  ))}
+
+                  {/* Discount */}
+                  {invoice.discount_value > 0 && (
+                    <div className="flex justify-between py-2">
+                      <span>
+                        Discount {invoice.discount_type === "percentage"
+                          ? `(${invoice.discount_value}%)`
+                          : ""}
+                        :
+                      </span>
+                      <span>-{formatCurrency(discountAmount, invoice.currency)}</span>
+                    </div>
+                  )}
+
+                  {/* Base currency equivalent if different currency */}
+                  {invoice.currency !== invoice.business.currency && (
+                    <div className="flex justify-between py-2 text-gray-500 text-sm">
+                      <span>Exchange Rate:</span>
+                      <span>
+                        1 {invoice.currency} = {invoice.exchange_rate}{" "}
+                        {invoice.business.currency}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Total */}
+                  <div className="flex justify-between py-3 border-t border-b font-bold text-lg">
+                    <span>Total:</span>
+                    <span>{formatCurrency(total, invoice.currency)}</span>
+                  </div>
+
+                  {/* Base currency equivalent total */}
+                  {invoice.currency !== invoice.business.currency && (
+                    <div className="flex justify-between py-2 text-sm text-gray-600">
+                      <span>Equivalent to:</span>
+                      <span>
+                        {formatCurrency(
+                          total / invoice.exchange_rate,
+                          invoice.business.currency
+                        )}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Notes & Terms */}
+              {(invoice.note || invoice.footer) && (
+                <div className="mt-8 space-y-4">
+                  {invoice.note && (
+                    <div>
+                      <h3 className="font-medium mb-1">Notes:</h3>
+                      <p className="text-sm">{invoice.note}</p>
+                    </div>
+                  )}
+
+                  {invoice.footer && (
+                    <div>
+                      <h3 className="font-medium mb-1">Terms & Conditions:</h3>
+                      <p className="text-sm">{invoice.footer}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Attachments */}
+              {attachments && attachments.length > 0 && (
+                <div className="mt-8">
+                  <h3 className="font-medium mb-2">Attachments:</h3>
+                  <ul className="list-disc pl-5">
+                    {attachments.map((attachment, index) => (
+                      <li key={index}>
+                        <a
+                          href={`/storage/app/${attachment.file_path}`}
+                          target="_blank"
+                          className="text-blue-600 hover:underline"
+                        >
+                          {attachment.file_name}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </SidebarInset>
+
+      {/* Print Styles */}
+      <style jsx global>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          .print-container,
+          .print-container * {
+            visibility: visible;
+          }
+          .print-container {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+          }
+
+          /* Hide action buttons when printing */
+          button,
+          .dropdown,
+          .flex.space-x-2 {
+            display: none !important;
+          }
+        }
+      `}</style>
+    </AuthenticatedLayout>
+  );
+}
