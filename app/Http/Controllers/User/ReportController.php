@@ -14,6 +14,7 @@ use App\Exports\TrialBalanceExport;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\Attendance;
+use App\Models\Customer;
 use App\Models\Employee;
 use App\Models\Holiday;
 use App\Models\InventoryAdjustment;
@@ -30,6 +31,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
@@ -279,86 +281,23 @@ class ReportController extends Controller
 
 	public function income_by_customer(Request $request)
 	{
-		if ($request->isMethod('get')) {
+		// Get search term
+		$search = $request->search ?? '';
+		
+		// Set default pagination
+		$per_page = $request->per_page ?? 10;
 
-			$data = array();
-			$date1 = Carbon::now()->startOfMonth();
-			$date2 = Carbon::now();
+		if ($request->isMethod('get')) {
+			$date1 = Carbon::now()->startOfMonth()->format('Y-m-d');
+			$date2 = Carbon::now()->format('Y-m-d');
 			$customer_id = isset($request->customer_id) ? $request->customer_id : '';
 
-			$data['report_data'] = array();
-
-			$credit_invoices = Invoice::with('customer')
-				->selectRaw('customer_id, SUM(grand_total) as total_income, sum(paid) as total_paid')
-				->when($customer_id, function ($query, $customer_id) {
-					return $query->where('customer_id', $customer_id);
-				})
-				->whereRaw("date(invoices.invoice_date) >= '$date1' AND date(invoices.invoice_date) <= '$date2'")
-				->where('is_recurring', 0)
-				->where('status', '!=', 0)
-				->groupBy('customer_id')
-				->get();
-
-			$cash_invoices = Receipt::with('customer')
-				->selectRaw('customer_id, SUM(grand_total) as total_income, SUM(grand_total) as total_paid')
-				->when($customer_id, function ($query, $customer_id) {
-					return $query->where('customer_id', $customer_id);
-				})
-				->whereRaw("date(receipts.receipt_date) >= '$date1' AND date(receipts.receipt_date) <= '$date2'")
-				->groupBy('customer_id')
-				->get();
-
-			foreach ($credit_invoices as $invoice) {
-				$data['report_data'][$invoice->customer_id] = [
-					'customer_id' => $invoice->customer_id,
-					'customer_name' => $invoice->customer->name,
-					'total_income' => $invoice->total_income,
-					'total_paid' => $invoice->total_paid,
-					'total_due' => $invoice->total_income - $invoice->total_paid,
-				];
-			}
-
-			foreach ($cash_invoices as $invoice) {
-				if (isset($data['report_data'][$invoice->customer_id])) {
-					$data['report_data'][$invoice->customer_id]['total_income'] += $invoice->total_income;
-					$data['report_data'][$invoice->customer_id]['total_paid'] += $invoice->total_paid;
-					$data['report_data'][$invoice->customer_id]['total_due'] = $data['report_data'][$invoice->customer_id]['total_income'] - $data['report_data'][$invoice->customer_id]['total_paid'];
-				} else {
-					$data['report_data'][$invoice->customer_id] = [
-						'customer_id' => $invoice->customer_id,
-						'customer_name' => $invoice->customer->name,
-						'total_income' => $invoice->total_income,
-						'total_paid' => $invoice->total_paid,
-						'total_due' => $invoice->total_income - $invoice->total_paid,
-					];
-				}
-			}
-
-			$grand_total_income = 0;
-			$grand_total_paid = 0;
-			$grand_total_due = 0;
-
-			foreach ($data['report_data'] as $key => $value) {
-				$grand_total_income += $value['total_income'];
-				$grand_total_paid += $value['total_paid'];
-				$grand_total_due += $value['total_due'];
-			}
-
-			$data['date1'] = $date1;
-			$data['date2'] = $date2;
-			$data['customer_id'] = $request->customer_id;
-			$data['currency'] = request()->activeBusiness->currency;
-			$data['page_title'] = _lang('Income By Customers');
-			$data['grand_total_income'] = $grand_total_income;
-			$data['grand_total_paid'] = $grand_total_paid;
-			$data['grand_total_due'] = $grand_total_due;
-
-			return view('backend.user.reports.income_by_customer', $data);
+			// Return Inertia view with initial date values
+			return $this->generate_customer_income_report($date1, $date2, $customer_id, $search, $per_page);
 		} else if ($request->isMethod('post')) {
 			@ini_set('max_execution_time', 0);
 			@set_time_limit(0);
 
-			$data = array();
 			$date1 = Carbon::parse($request->date1)->format('Y-m-d');
 			$date2 = Carbon::parse($request->date2)->format('Y-m-d');
 			$customer_id = isset($request->customer_id) ? $request->customer_id : '';
@@ -367,30 +306,65 @@ class ReportController extends Controller
 				$customer_id = '';
 			}
 
-			$data['report_data'] = array();
+			// Return Inertia view with filter date values
+			return $this->generate_customer_income_report($date1, $date2, $customer_id, $search, $per_page);
+		}
+	}
 
-			$credit_invoices = Invoice::with('customer')
-				->selectRaw('customer_id, SUM(grand_total) as total_income, sum(paid) as total_paid')
-				->when($customer_id, function ($query, $customer_id) {
-					return $query->where('customer_id', $customer_id);
-				})
-				->whereRaw("date(invoices.invoice_date) >= '$date1' AND date(invoices.invoice_date) <= '$date2'")
-				->where('is_recurring', 0)
-				->where('status', '!=', 0)
-				->groupBy('customer_id')
-				->get();
+	private function generate_customer_income_report($date1, $date2, $customer_id, $search, $per_page)
+	{
+		// Get customers list for dropdown
+		$customers = Customer::select('id', 'name', 'mobile', 'email')
+			->orderBy('name')
+			->get();
+		// Get credit invoices data
+		$credit_invoices_query = Invoice::with('customer')
+			->selectRaw('customer_id, SUM(grand_total) as total_income, sum(paid) as total_paid')
+			->when($customer_id, function ($query, $customer_id) {
+				return $query->where('customer_id', $customer_id);
+			})
+			->whereRaw("date(invoices.invoice_date) >= '$date1' AND date(invoices.invoice_date) <= '$date2'")
+			->where('is_recurring', 0)
+			->where('status', '!=', 0)
+			->groupBy('customer_id');
 
-			$cash_invoices = Receipt::with('customer')
-				->selectRaw('customer_id, SUM(grand_total) as total_income, SUM(grand_total) as total_paid')
-				->when($customer_id, function ($query, $customer_id) {
-					return $query->where('customer_id', $customer_id);
-				})
-				->whereRaw("date(receipts.receipt_date) >= '$date1' AND date(receipts.receipt_date) <= '$date2'")
-				->groupBy('customer_id')
-				->get();
+		// Get cash invoices data
+		$cash_invoices_query = Receipt::with('customer')
+			->selectRaw('customer_id, SUM(grand_total) as total_income, SUM(grand_total) as total_paid')
+			->when($customer_id, function ($query, $customer_id) {
+				return $query->where('customer_id', $customer_id);
+			})
+			->whereRaw("date(receipts.receipt_date) >= '$date1' AND date(receipts.receipt_date) <= '$date2'")
+			->groupBy('customer_id');
 
-			foreach ($credit_invoices as $invoice) {
-				$data['report_data'][$invoice->customer_id] = [
+		// Get the data from both queries
+		$credit_invoices = $credit_invoices_query->get();
+		$cash_invoices = $cash_invoices_query->get();
+
+		// Process data for the report
+		$report_data = [];
+
+		// Process credit invoices
+		foreach ($credit_invoices as $invoice) {
+			$report_data[$invoice->customer_id] = [
+				'id' => $invoice->customer_id,
+				'customer_id' => $invoice->customer_id,
+				'customer_name' => $invoice->customer->name,
+				'total_income' => $invoice->total_income,
+				'total_paid' => $invoice->total_paid,
+				'total_due' => $invoice->total_income - $invoice->total_paid,
+			];
+		}
+
+		// Process cash invoices
+		foreach ($cash_invoices as $invoice) {
+			if (isset($report_data[$invoice->customer_id])) {
+				$report_data[$invoice->customer_id]['total_income'] += $invoice->total_income;
+				$report_data[$invoice->customer_id]['total_paid'] += $invoice->total_paid;
+				$report_data[$invoice->customer_id]['total_due'] = $report_data[$invoice->customer_id]['total_income'] - $report_data[$invoice->customer_id]['total_paid'];
+			} else {
+				$report_data[$invoice->customer_id] = [
+					'id' => $invoice->customer_id,
 					'customer_id' => $invoice->customer_id,
 					'customer_name' => $invoice->customer->name,
 					'total_income' => $invoice->total_income,
@@ -398,102 +372,220 @@ class ReportController extends Controller
 					'total_due' => $invoice->total_income - $invoice->total_paid,
 				];
 			}
-
-			foreach ($cash_invoices as $invoice) {
-				if (isset($data['report_data'][$invoice->customer_id])) {
-					$data['report_data'][$invoice->customer_id]['total_income'] += $invoice->total_income;
-					$data['report_data'][$invoice->customer_id]['total_paid'] += $invoice->total_paid;
-					$data['report_data'][$invoice->customer_id]['total_due'] = $data['report_data'][$invoice->customer_id]['total_income'] - $data['report_data'][$invoice->customer_id]['total_paid'];
-				} else {
-					$data['report_data'][$invoice->customer_id] = [
-						'customer_id' => $invoice->customer_id,
-						'customer_name' => $invoice->customer->name,
-						'total_income' => $invoice->total_income,
-						'total_paid' => $invoice->total_paid,
-						'total_due' => $invoice->total_income - $invoice->total_paid,
-					];
-				}
-			}
-
-			$grand_total_income = 0;
-			$grand_total_paid = 0;
-			$grand_total_due = 0;
-
-			foreach ($data['report_data'] as $key => $value) {
-				$grand_total_income += $value['total_income'];
-				$grand_total_paid += $value['total_paid'];
-				$grand_total_due += $value['total_due'];
-			}
-
-			$data['date1'] = Carbon::parse($request->date1);
-			$data['date2'] = Carbon::parse($request->date2);
-			$data['customer_id'] = $request->customer_id;
-			$data['currency'] = request()->activeBusiness->currency;
-			$data['page_title'] = _lang('Income By Customers');
-			$data['grand_total_income'] = $grand_total_income;
-			$data['grand_total_paid'] = $grand_total_paid;
-			$data['grand_total_due'] = $grand_total_due;
-
-			return view('backend.user.reports.income_by_customer', $data);
 		}
+
+		// Calculate totals
+		$grand_total_income = 0;
+		$grand_total_paid = 0;
+		$grand_total_due = 0;
+
+		// Convert to array and apply search filter
+		$data_array = array_values($report_data);
+		
+		// Apply search filter if provided
+		if (!empty($search)) {
+			$data_array = array_filter($data_array, function($item) use ($search) {
+				return stripos($item['customer_name'], $search) !== false;
+			});
+		}
+
+		// Calculate grand totals
+		foreach ($data_array as $item) {
+			$grand_total_income += $item['total_income'];
+			$grand_total_paid += $item['total_paid'];
+			$grand_total_due += $item['total_due'];
+		}
+		
+		// Get currency information
+		$currency = request()->activeBusiness->currency;
+		$currency_symbol = currency_symbol($currency);
+		
+		// Format each customer's amounts
+		foreach ($data_array as &$item) {
+			$item['total_income'] = formatAmount($item['total_income'], $currency_symbol);
+			$item['total_paid'] = formatAmount($item['total_paid'], $currency_symbol);
+			$item['total_due'] = formatAmount($item['total_due'], $currency_symbol);
+		}
+
+		// Create paginator from filtered array
+		$page = request('page', 1);
+		$total = count($data_array);
+		$paginator = new \Illuminate\Pagination\LengthAwarePaginator(
+			array_slice($data_array, ($page - 1) * $per_page, $per_page),
+			$total,
+			$per_page,
+			$page,
+			['path' => request()->url(), 'query' => request()->query()]
+		);
+
+		// Get business information for the header
+		$business_name = request()->activeBusiness->name;
+
+		// Return Inertia render with paginated data
+		return Inertia::render('Backend/User/Reports/IncomeByCustomer', [
+			'report_data' => $paginator->items(),
+			'date1' => $date1,
+			'date2' => $date2,
+			'business_name' => $business_name,
+			'currency' => $currency,
+			'customer_id' => $customer_id,
+			'customers' => $customers,
+			'grand_total_income' => formatAmount($grand_total_income, currency_symbol($currency)),
+			'grand_total_paid' => formatAmount($grand_total_paid, currency_symbol($currency)),
+			'grand_total_due' => formatAmount($grand_total_due, currency_symbol($currency)),
+			'meta' => [
+				'current_page' => $paginator->currentPage(),
+				'from' => $paginator->firstItem(),
+				'last_page' => $paginator->lastPage(),
+				'links' => $paginator->links()->toHtml(),
+				'path' => $paginator->path(),
+				'per_page' => $paginator->perPage(),
+				'to' => $paginator->lastItem(),
+				'total' => $paginator->total(),
+			],
+			'filters' => [
+				'search' => $search,
+			],
+		]);
 	}
 
 	public function receivables(Request $request)
 	{
-		if ($request->isMethod('get')) {
+		// Get request parameters
+		$date1 = $request->date1 ?? Carbon::now()->startOfMonth()->format('Y-m-d');
+		$date2 = $request->date2 ?? Carbon::now()->format('Y-m-d');
+		$customer_id = $request->customer_id ?? '';
+		$search = $request->search ?? '';
+		$per_page = $request->per_page ?? 10;
 
-			$data = array();
-			$date1 = Carbon::now()->startOfMonth();
-			$date2 = Carbon::now();
-			$customer_id = isset($request->customer_id) ? $request->customer_id : '';
+		// Session storage (keep for backwards compatibility)
+		session(['start_date' => $date1]);
+		session(['end_date' => $date2]);
+		session(['customer_id' => $customer_id]);
+		
+		return $this->generate_receivables_report($date1, $date2, $customer_id, $search, $per_page);
+	}
 
-			session(['start_date' => $date1]);
-			session(['end_date' => $date2]);
-			session(['customer_id' => $customer_id]);
+	private function generate_receivables_report($date1, $date2, $customer_id, $search, $per_page)
+	{
+		// Get customers list for dropdown
+		$customers = Customer::select('id', 'name', 'mobile', 'email')
+			->orderBy('name')
+			->get();
 
-			$data['report_data'] = Invoice::with('customer')
-				->when($customer_id, function ($query, $customer_id) {
-					return $query->where('customer_id', $customer_id);
-				})
-				->whereRaw("date(invoices.invoice_date) >= '$date1' AND date(invoices.invoice_date) <= '$date2'")
-				->where('is_recurring', 0)
-				->get();
+		// Get receivables data
+		$invoices = Invoice::with('customer', 'client')
+			->when($customer_id, function ($query, $customer_id) {
+				return $query->where('customer_id', $customer_id);
+			})
+			->whereRaw("date(invoices.invoice_date) >= '$date1' AND date(invoices.invoice_date) <= '$date2'")
+			->where('is_recurring', 0)
+			->where('grand_total', '>', 'paid')  // Only show invoices with amounts due
+			->get();
 
-			$data['date1'] = $date1;
-			$data['date2'] = $date2;
-			$data['customer_id'] = $request->customer_id;
-			$data['currency'] = request()->activeBusiness->currency;
-			$data['page_title'] = _lang('Receivables');
-
-			return view('backend.user.reports.receivables', $data);
-		} else if ($request->isMethod('post')) {
-			@ini_set('max_execution_time', 0);
-			@set_time_limit(0);
-
-			$data = array();
-			$date1 = Carbon::parse($request->date1)->format('Y-m-d');
-			$date2 = Carbon::parse($request->date2)->format('Y-m-d');
-			$customer_id = isset($request->customer_id) ? $request->customer_id : '';
-
-			session(['start_date' => $date1]);
-			session(['end_date' => $date2]);
-			session(['customer_id' => $customer_id]);
-
-			$data['report_data'] = Invoice::with('customer')
-				->when($customer_id, function ($query, $customer_id) {
-					return $query->where('customer_id', $customer_id);
-				})
-				->whereRaw("date(invoices.invoice_date) >= '$date1' AND date(invoices.invoice_date) <= '$date2'")
-				->where('is_recurring', 0)
-				->get();
-
-			$data['date1'] = Carbon::parse($request->date1);
-			$data['date2'] = Carbon::parse($request->date2);
-			$data['customer_id'] = $request->customer_id;
-			$data['currency'] = request()->activeBusiness->currency;
-			$data['page_title'] = _lang('Receivables');
-			return view('backend.user.reports.receivables', $data);
+		// Prepare data array for report
+		$data_array = [];
+		
+		foreach($invoices as $invoice) {
+			$due_amount = $invoice->grand_total - $invoice->paid;
+			
+			// Skip invoices that are fully paid
+			if ($due_amount <= 0) {
+				continue;
+			}
+			
+			$data_array[] = [
+				'id' => $invoice->id,
+				'invoice_number' => $invoice->invoice_number,
+				'customer_id' => $invoice->customer_id,
+				'customer_name' => $invoice->customer->name,
+				'client_name' => $invoice->client->name,
+				'invoice_date' => $invoice->invoice_date,
+				'due_date' => $invoice->due_date,
+				'grand_total' => $invoice->grand_total,
+				'paid_amount' => $invoice->paid,
+				'due_amount' => $due_amount,
+				'status' => $invoice->status,
+				'payment_status' => $invoice->payment_status,
+			];
 		}
+		
+		// Apply search filter if provided
+		if (!empty($search)) {
+			$data_array = array_filter($data_array, function($item) use ($search) {
+				return stripos($item['customer_name'], $search) !== false || 
+					stripos($item['invoice_number'], $search) !== false ||
+					stripos($item['client_name'], $search) !== false;
+			});
+			// Re-index array after filtering
+			$data_array = array_values($data_array);
+		}
+
+		// Calculate total receivables
+		$total_grand = 0;
+		$total_paid = 0;
+		$total_due = 0;
+		
+		foreach ($data_array as $item) {
+			$total_grand += $item['grand_total'];
+			$total_paid += $item['paid_amount'];
+			$total_due += $item['due_amount'];
+		}
+		
+		// Get currency information
+		$currency = request()->activeBusiness->currency;
+		$currency_symbol = currency_symbol($currency);
+		
+		// Format currency amounts
+		foreach ($data_array as &$item) {
+			$item['grand_total_formatted'] = formatAmount($item['grand_total'], $currency_symbol);
+			$item['paid_amount_formatted'] = formatAmount($item['paid_amount'], $currency_symbol);
+			$item['due_amount_formatted'] = formatAmount($item['due_amount'], $currency_symbol);
+		}
+		
+		// Create paginator from array
+		$page = request('page', 1);
+		$total = count($data_array);
+		$paginator = new \Illuminate\Pagination\LengthAwarePaginator(
+			array_slice($data_array, ($page - 1) * $per_page, $per_page),
+			$total,
+			$per_page,
+			$page,
+			['path' => request()->url(), 'query' => request()->query()]
+		);
+		
+		// Format total amounts
+		$total_grand_formatted = formatAmount($total_grand, $currency_symbol);
+		$total_paid_formatted = formatAmount($total_paid, $currency_symbol);
+		$total_due_formatted = formatAmount($total_due, $currency_symbol);
+		
+		// Get business information
+		$business_name = request()->activeBusiness->name;
+		
+		return Inertia::render('Backend/User/Reports/Receivables', [
+			'report_data' => $paginator->items(),
+			'customers' => $customers,
+			'currency' => $currency,
+			'grand_total' => $total_grand_formatted,
+			'paid_amount' => $total_paid_formatted,
+			'due_amount' => $total_due_formatted,
+			'business_name' => $business_name,
+			'date1' => $date1,
+			'date2' => $date2,
+			'customer_id' => $customer_id,
+			'pagination' => [
+				'current_page' => $paginator->currentPage(),
+				'last_page' => $paginator->lastPage(),
+				'from' => $paginator->firstItem(),
+				'path' => $paginator->path(),
+				'per_page' => $paginator->perPage(),
+				'to' => $paginator->lastItem(),
+				'total' => $paginator->total(),
+			],
+			'filters' => [
+				'search' => $search,
+			],
+		]);
 	}
 
 	public function payables(Request $request)
@@ -624,193 +716,101 @@ class ReportController extends Controller
 	public function journal(Request $request)
 	{
 		if ($request->isMethod('get')) {
-			$data = array();
-			$date1 = Carbon::now()->startOfMonth();
-			$date2 = Carbon::now();
+			$date1 = Carbon::now()->startOfMonth()->format('Y-m-d');
+			$date2 = Carbon::now()->format('Y-m-d');
 
 			session(['start_date' => $date1]);
 			session(['end_date' => $date2]);
 
-			$normal_transactions = Transaction::with('account')
-				->whereRaw("date(transactions.trans_date) >= '$date1' AND date(transactions.trans_date) <= '$date2'")
-				->whereNotIn('ref_type', ['invoice payment', 'bill payment', 'd invoice payment', 'payslip', 'd invoice income', 'd invoice tax'])
-				->get();
+			$per_page = $request->get('per_page', 10);
+			$search = $request->get('search', '');
 
-			$get_payment_income_transactions = Transaction::with('account')
-				->whereRaw("date(transactions.trans_date) >= '$date1' AND date(transactions.trans_date) <= '$date2'")
-				->whereIn('ref_type', ['invoice payment', 'bill payment', 'd invoice payment', 'd invoice income', 'd invoice tax'])
-				->get(); // Fetch the transactions as a collection
+			$query = Transaction::with('account')
+				->whereRaw("date(transactions.trans_date) >= '$date1' AND date(transactions.trans_date) <= '$date2'");
 
-			$payment_income_transactions = $get_payment_income_transactions->groupBy(function ($transaction) {
-				// Check if the ref_id contains a comma
-				if (strpos($transaction->ref_id, ',') !== false) {
-					// Extract the second part of ref_id
-					return explode(',', $transaction->ref_id)[1];
-				}
-				// Otherwise, return the ref_id as is
-				return $transaction->ref_id;
-			});
+			// Apply search if provided
+			if (!empty($search)) {
+				$query->where(function ($q) use ($search) {
+					$q->where('account.account_name', 'like', "%{$search}%")
+						->orWhere('payee_name', 'like', "%{$search}%");
+				});
+			}
 
-			$payslip_transactions = Transaction::with('account')
-				->whereRaw("date(transactions.trans_date) >= '$date1' AND date(transactions.trans_date) <= '$date2'")
-				->where('ref_type', 'payslip')
-				->get()
-				->groupBy('trans_date');
+			$transactions = $query->paginate($per_page);
 
-			$data['report_data'] = $this->combine($payment_income_transactions, $payslip_transactions, $normal_transactions);
+			$base_currency = $request->activeBusiness->currency;
+			$business_name = $request->activeBusiness->name;
 
-			$data['date1'] = $date1;
-			$data['date2'] = $date2;
-			$data['page_title'] = _lang('Journal');
-
-			return view('backend.user.reports.gen_journal', $data);
+			return Inertia::render('Backend/User/Reports/GeneralJournal', [
+				'transactions' => $transactions->items(),
+				'date1' => $date1,
+				'date2' => $date2,
+				'base_currency' => $base_currency,
+				'business_name' => $business_name,
+				'meta' => [
+					'current_page' => $transactions->currentPage(),
+					'from' => $transactions->firstItem(),
+					'last_page' => $transactions->lastPage(),
+					'per_page' => $per_page,
+					'to' => $transactions->lastItem(),
+					'total' => $transactions->total(),
+					'links' => $transactions->linkCollection(),
+					'path' => $transactions->path(),
+				],
+				'filters' => [
+					'search' => $search,
+				],
+			]);
 		} else if ($request->isMethod('post')) {
 			@ini_set('max_execution_time', 0);
 			@set_time_limit(0);
 
-			$data = array();
 			$date1 = Carbon::parse($request->date1)->format('Y-m-d');
 			$date2 = Carbon::parse($request->date2)->format('Y-m-d');
 
 			session(['start_date' => $date1]);
 			session(['end_date' => $date2]);
 
-			$normal_transactions = Transaction::with('account')
-				->whereRaw("date(transactions.trans_date) >= '$date1' AND date(transactions.trans_date) <= '$date2'")
-				->whereNotIn('ref_type', ['invoice payment', 'bill payment', 'd invoice payment', 'payslip', 'd invoice income', 'd invoice tax'])
-				->get();
+			$per_page = $request->get('per_page', 10);
+			$search = $request->get('search', '');
 
-			$get_payment_income_transactions = Transaction::with('account')
-				->whereRaw("date(transactions.trans_date) >= '$date1' AND date(transactions.trans_date) <= '$date2'")
-				->whereIn('ref_type', ['invoice payment', 'bill payment', 'd invoice payment', 'd invoice income', 'd invoice tax'])
-				->get(); // Fetch the transactions as a collection
+			$query = Transaction::with('account')
+				->whereRaw("date(transactions.trans_date) >= '$date1' AND date(transactions.trans_date) <= '$date2'");
 
-			$payment_income_transactions = $get_payment_income_transactions->groupBy(function ($transaction) {
-				// Check if the ref_id contains a comma
-				if (strpos($transaction->ref_id, ',') !== false) {
-					// Extract the second part of ref_id
-					return explode(',', $transaction->ref_id)[1];
-				}
-				// Otherwise, return the ref_id as is
-				return $transaction->ref_id;
-			});
-
-			$payslip_transactions = Transaction::with('account')
-				->whereRaw("date(transactions.trans_date) >= '$date1' AND date(transactions.trans_date) <= '$date2'")
-				->where('ref_type', 'payslip')
-				->get()
-				->groupBy('trans_date');
-
-			$data['report_data'] = $this->combine($payment_income_transactions, $payslip_transactions, $normal_transactions);
-
-			$data['date1'] = Carbon::parse($request->date1);
-			$data['date2'] = Carbon::parse($request->date2);
-			$data['page_title'] = _lang('Journal');
-			return view('backend.user.reports.gen_journal', $data);
-		}
-	}
-
-	function combine($payment_income_transactions, $payslip_transactions, $normal_transactions)
-	{
-		// Step 1: Aggregate payment transactions
-		$aggregated_payment_income_transactions = $payment_income_transactions->map(function ($group, $key) {
-			$totalAmount = $group->sum('base_currency_amount');
-			$totalTransAmount = $group->sum('transaction_amount');
-			$trans_date  = $group[0]->trans_date;
-			$dr_cr  = $group[0]->dr_cr;
-			$ref_type = $group[0]->ref_type;
-			$ref_id = $group[0]->ref_id;
-			$count = $group->count();
-			if ($ref_type == 'invoice payment' || $ref_type == 'd invoice payment') {
-				$description = $count . ' Invoices Payment';
-			} else if ($ref_type == 'bill payment') {
-				$description = $count . ' Bills Payment';
-			} else if ($ref_type == 'd invoice income') {
-				$description = 'Deffered Earnings Income From Invoice #' . Invoice::find($ref_id)->invoice_number;
-			} else if ($ref_type == 'd invoice tax') {
-				$description = 'Deffered Tax From Invoice #' . Invoice::find($ref_id)?->invoice_number;
+			// Apply search if provided
+			if (!empty($search)) {
+				$query->where(function ($q) use ($search) {
+					$q->where('account.account_name', 'like', "%{$search}%")
+						->orWhere('payee_name', 'like', "%{$search}%");
+				});
 			}
-			return (object) [
-				'trans_date' => $trans_date,
-				'description' => "{$description}",
-				'base_currency_amount' => $totalAmount,
-				'transaction_currency' => $group[0]->transaction_currency,
-				'transaction_amount' => $totalTransAmount,
-				'currency_rate' => $group[0]->currency_rate,
-				'dr_cr' => $dr_cr,
-				'ref_type' => $ref_type,
-				'ref_id' => $ref_id,
-				'payee_name' => $group[0]->payee_name,
-				'group_key' => $key, // Optional: Keep the group key for reference if needed
-				'account' => (object) [
-					'id' => $group[0]->account->id,
-					'account_name' => $group[0]->account->account_name,
-					'account_number' => $group[0]->account->account_number,
+
+			$transactions = $query->paginate($per_page);
+
+			$base_currency = $request->activeBusiness->currency;
+			$business_name = $request->activeBusiness->name;
+
+			return Inertia::render('Backend/User/Reports/GeneralJournal', [
+				'transactions' => $transactions->items(),
+				'date1' => $date1,
+				'date2' => $date2,
+				'business_name' => $business_name,
+				'base_currency' => $base_currency,
+				'meta' => [
+					'current_page' => $transactions->currentPage(),
+					'from' => $transactions->firstItem(),
+					'last_page' => $transactions->lastPage(),
+					'per_page' => $per_page,
+					'to' => $transactions->lastItem(),
+					'total' => $transactions->total(),
+					'links' => $transactions->linkCollection(),
+					'path' => $transactions->path(),
 				],
-			];
-		})->values(); // Flatten the results into a list
-
-		// Step 5: Aggregate payslip transactions
-		$aggregated_payslip_transactions = $payslip_transactions->map(function ($group, $key) {
-			$totalAmount = $group->sum('base_currency_amount');
-			$totalTransAmount = $group->sum('transaction_amount');
-			$trans_date  = $group[0]->trans_date;
-			$dr_cr  = $group[0]->dr_cr;
-			$ref_type = $group[0]->ref_type;
-			$ref_id = $group[0]->ref_id;
-			$count = $group->count();
-			return (object) [
-				'trans_date' => $trans_date,
-				'description' => "{$count}, Staffs Salary",
-				'base_currency_amount' => $totalAmount,
-				'transaction_currency' => $group[0]->transaction_currency,
-				'transaction_amount' => $totalTransAmount,
-				'currency_rate' => $group[0]->currency_rate,
-				'dr_cr' => $dr_cr,
-				'ref_type' => $ref_type,
-				'ref_id' => $ref_id,
-				'payee_name' => $group[0]->payee_name,
-				'group_key' => $key, // Optional: Keep the group key for reference if needed
-				'account' => (object) [
-					'id' => $group[0]->account->id,
-					'account_name' => $group[0]->account->account_name,
-					'account_number' => $group[0]->account->account_number,
+				'filters' => [
+					'search' => $search,
 				],
-			];
-		})->values(); // Flatten the results into a list
-
-		// Step 6: Combine all aggregated transactions
-		$combined_transactions = collect()
-			->merge($aggregated_payment_income_transactions)
-			->merge($aggregated_payslip_transactions);
-
-		// Step 7: Include normal transactions as is
-		$normal_transactions_summary = $normal_transactions->map(function ($transaction) {
-			return (object) [
-				'trans_date' => $transaction->trans_date,
-				'description' => $transaction->description,
-				'base_currency_amount' => $transaction->base_currency_amount,
-				'transaction_currency' => $transaction->transaction_currency,
-				'transaction_amount' => $transaction->transaction_amount,
-				'currency_rate' => $transaction->currency_rate,
-				'ref_type' => $transaction->ref_type,
-				'ref_id' => $transaction->ref_id,
-				'payee_name' => $transaction->payee_name,
-				'currency' => $transaction->transaction_currency,
-				'dr_cr' => $transaction->dr_cr,
-				'account' => (object) [
-					'id' => $transaction->account->id,
-					'account_name' => $transaction->account->account_name,
-					'account_number' => $transaction->account->account_number,
-				],
-			];
-		});
-
-		// Step 8: Combine everything into a single collection
-		$final_collection = $combined_transactions->merge($normal_transactions_summary);
-
-		// Output or use the $final_collection
-		return $final_collection;
+			]);
+		}
 	}
 
 	public function trial_balance(Request $request)
@@ -853,9 +853,6 @@ class ReportController extends Controller
 				$query->where('account_type', '=', 'Bank')
 					->orWhere('account_type', '=', 'Cash')
 					->orWhere('account_type', '=', 'Other Current Asset');
-			})->where(function ($query) {
-				$query->where('business_id', '=', request()->activeBusiness->id)
-					->orWhere('business_id', '=', null);
 			})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
@@ -880,10 +877,6 @@ class ReportController extends Controller
 			$data['report_data']['current_liability'] = Account::where(function ($query) {
 				$query->where('account_type', 'Current Liability');
 			})
-				->where(function ($query) {
-					$query->where('business_id', '=', request()->activeBusiness->id)
-						->orWhere('business_id', '=', null);
-				})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -907,10 +900,6 @@ class ReportController extends Controller
 			$data['report_data']['long_term_liability'] = Account::where(function ($query) {
 				$query->where('account_type', 'Long Term Liability');
 			})
-				->where(function ($query) {
-					$query->where('business_id', '=', request()->activeBusiness->id)
-						->orWhere('business_id', '=', null);
-				})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -934,10 +923,6 @@ class ReportController extends Controller
 			$data['report_data']['equity'] = Account::where(function ($query) {
 				$query->where('account_type', 'Equity');
 			})
-				->where(function ($query) {
-					$query->where('business_id', '=', request()->activeBusiness->id)
-						->orWhere('business_id', '=', null);
-				})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -962,10 +947,6 @@ class ReportController extends Controller
 				$query->where('account_type', 'Other Income')
 					->orWhere('account_type', 'Sales');
 			})
-				->where(function ($query) {
-					$query->where('business_id', '=', request()->activeBusiness->id)
-						->orWhere('business_id', '=', null);
-				})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -987,10 +968,6 @@ class ReportController extends Controller
 				->get();
 
 			$data['report_data']['cost_of_sale'] = Account::where('account_type', 'Cost Of Sale')
-				->where(function ($query) {
-					$query->where('business_id', '=', request()->activeBusiness->id)
-						->orWhere('business_id', '=', null);
-				})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -1012,10 +989,6 @@ class ReportController extends Controller
 				->get();
 
 			$data['report_data']['direct_expenses'] = Account::where('account_type', 'Direct Expenses')
-				->where(function ($query) {
-					$query->where('business_id', '=', request()->activeBusiness->id)
-						->orWhere('business_id', '=', null);
-				})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -1037,10 +1010,6 @@ class ReportController extends Controller
 				->get();
 
 			$data['report_data']['other_expenses'] = Account::where('account_type', 'Other Expenses')
-				->where(function ($query) {
-					$query->where('business_id', '=', request()->activeBusiness->id)
-						->orWhere('business_id', '=', null);
-				})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -1155,9 +1124,6 @@ class ReportController extends Controller
 				$query->where('account_type', '=', 'Bank')
 					->orWhere('account_type', '=', 'Cash')
 					->orWhere('account_type', '=', 'Other Current Asset');
-			})->where(function ($query) {
-				$query->where('business_id', '=', request()->activeBusiness->id)
-					->orWhere('business_id', '=', null);
 			})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
@@ -1182,10 +1148,6 @@ class ReportController extends Controller
 			$data['report_data']['current_liability'] = Account::where(function ($query) {
 				$query->where('account_type', 'Current Liability');
 			})
-				->where(function ($query) {
-					$query->where('business_id', '=', request()->activeBusiness->id)
-						->orWhere('business_id', '=', null);
-				})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -1209,10 +1171,6 @@ class ReportController extends Controller
 			$data['report_data']['long_term_liability'] = Account::where(function ($query) {
 				$query->where('account_type', 'Long Term Liability');
 			})
-				->where(function ($query) {
-					$query->where('business_id', '=', request()->activeBusiness->id)
-						->orWhere('business_id', '=', null);
-				})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -1236,10 +1194,6 @@ class ReportController extends Controller
 			$data['report_data']['equity'] = Account::where(function ($query) {
 				$query->where('account_type', 'Equity');
 			})
-				->where(function ($query) {
-					$query->where('business_id', '=', request()->activeBusiness->id)
-						->orWhere('business_id', '=', null);
-				})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -1264,10 +1218,6 @@ class ReportController extends Controller
 				$query->where('account_type', 'Other Income')
 					->orWhere('account_type', 'Sales');
 			})
-				->where(function ($query) {
-					$query->where('business_id', '=', request()->activeBusiness->id)
-						->orWhere('business_id', '=', null);
-				})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -1289,10 +1239,6 @@ class ReportController extends Controller
 				->get();
 
 			$data['report_data']['cost_of_sale'] = Account::where('account_type', 'Cost Of Sale')
-				->where(function ($query) {
-					$query->where('business_id', '=', request()->activeBusiness->id)
-						->orWhere('business_id', '=', null);
-				})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -1314,10 +1260,6 @@ class ReportController extends Controller
 				->get();
 
 			$data['report_data']['direct_expenses'] = Account::where('account_type', 'Direct Expenses')
-				->where(function ($query) {
-					$query->where('business_id', '=', request()->activeBusiness->id)
-						->orWhere('business_id', '=', null);
-				})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -1339,10 +1281,6 @@ class ReportController extends Controller
 				->get();
 
 			$data['report_data']['other_expenses'] = Account::where('account_type', 'Other Expenses')
-				->where(function ($query) {
-					$query->where('business_id', '=', request()->activeBusiness->id)
-						->orWhere('business_id', '=', null);
-				})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -3090,25 +3028,30 @@ class ReportController extends Controller
 			$page_title = _lang('Inventory Stock');
 			$data = array();
 
-			$category = 'all';
+			$sub_category = 'all';
+			$main_category = 'all';
 
 			$date1 = Carbon::now()->subDays(30)->format('Y-m-d');
 			$date2 = Carbon::now()->format('Y-m-d');
 
 			session(['start_date' => $date1]);
 			session(['end_date' => $date2]);
-			session(['category' => $category]);
+			session(['sub_category' => $sub_category]);
+			session(['main_category' => $main_category]);
 
 			// Step 1: Retrieve products with necessary joins and calculated fields
 			$products = Product::select(
 				'products.*',
-				'categories.id as category_id',
-				'categories.name as category_name',
+				'main_categories.id as main_category_id',
+				'main_categories.name as main_category_name',
+				'sub_categories.id as category_id',
+				'sub_categories.name as category_name',
 				'product_brands.id as brand_id',
 				'product_brands.name as brand_name'
 			)
-				->join('categories', 'categories.id', '=', 'products.category_id')
-				->join('product_brands', 'product_brands.id', '=', 'products.brand_id')
+				->leftjoin('sub_categories', 'sub_categories.id', '=', 'products.sub_category_id')
+				->leftJoin('main_categories', 'main_categories.id', '=', 'sub_categories.main_category_id')
+				->leftJoin('product_brands', 'product_brands.id', '=', 'products.brand_id')
 				->addSelect([
 					'total_sold_invoices' => InvoiceItem::selectRaw('SUM(quantity)')
 						->whereColumn('product_id', 'products.id')
@@ -3256,26 +3199,26 @@ class ReportController extends Controller
 			@set_time_limit(0);
 
 			$data = array();
-			$category = $request->category;
+			$sub_category = $request->sub_category;
 
 			$date1 = Carbon::parse($request->date1)->format('Y-m-d');
 			$date2 = Carbon::parse($request->date2)->format('Y-m-d');
 
 			session(['start_date' => $date1]);
 			session(['end_date' => $date2]);
-			session(['category' => $category]);
+			session(['sub_category' => $sub_category]);
 
-			if ($category == 'all') {
+			if ($sub_category == 'all') {
 				// Step 1: Retrieve products with necessary joins and calculated fields
 				$products = Product::select(
 					'products.*',
-					'categories.id as category_id',
-					'categories.name as category_name',
+					'sub_categories.id as category_id',
+					'sub_categories.name as category_name',
 					'product_brands.id as brand_id',
 					'product_brands.name as brand_name'
 				)
-					->join('categories', 'categories.id', '=', 'products.category_id')
-					->join('product_brands', 'product_brands.id', '=', 'products.brand_id')
+					->leftJoin('sub_categories', 'sub_categories.id', '=', 'products.sub_category_id')
+					->leftJoin('product_brands', 'product_brands.id', '=', 'products.brand_id')
 					->addSelect([
 						'total_sold_invoices' => InvoiceItem::selectRaw('SUM(quantity)')
 							->whereColumn('product_id', 'products.id')
@@ -3418,13 +3361,13 @@ class ReportController extends Controller
 				// Step 1: Retrieve products with necessary joins and calculated fields
 				$products = Product::select(
 					'products.*',
-					'categories.id as category_id',
-					'categories.name as category_name',
+					'sub_categories.id as sub_category_id',
+					'sub_categories.name as sub_category_name',
 					'product_brands.id as brand_id',
 					'product_brands.name as brand_name'
 				)
-					->join('categories', 'categories.id', '=', 'products.category_id')
-					->join('product_brands', 'product_brands.id', '=', 'products.brand_id')
+					->leftJoin('sub_categories', 'sub_categories.id', '=', 'products.sub_category_id')
+					->leftJoin('product_brands', 'product_brands.id', '=', 'products.brand_id')
 					->addSelect([
 						'total_sold_invoices' => InvoiceItem::selectRaw('SUM(quantity)')
 							->whereColumn('product_id', 'products.id')
@@ -3454,7 +3397,7 @@ class ReportController extends Controller
 									->whereDate('receipt_date', '<=', $date2);
 							}),
 					])
-					->where('categories.name', $category)
+					->where('sub_categories.name', $sub_category)
 					->get()
 					->map(function ($product) {
 						// Calculate the total sold by summing invoices and receipts
@@ -3570,7 +3513,7 @@ class ReportController extends Controller
 			$data['date2'] = Carbon::parse($request->date2);
 
 			$data['page_title'] = _lang('Inventory Stock');
-			$data['category'] = $category;
+			$data['sub_category'] = $sub_category;
 
 			return view('backend.user.reports.sales_by_product', $data);
 		}

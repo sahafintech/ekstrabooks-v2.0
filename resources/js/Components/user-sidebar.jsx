@@ -67,17 +67,17 @@ export function UserSidebar({ businesses, active_business, ...props }) {
         if (route().current(name)) {
             return true;
         }
-        
+
         // Extract the base path from the current URL
         const currentPath = window.location.pathname;
-        
+
         // Get the route base
         const routeBase = route(name).split('?')[0]; // Remove any query parameters
-        
+
         // Create a pattern that matches the route base followed by any parameters
         // This will match routes like /invoices/* or /customers/*
         const pattern = new RegExp(`^${routeBase}(\\/|$)`);
-        
+
         return pattern.test(currentPath);
     };
 
@@ -135,8 +135,8 @@ export function UserSidebar({ businesses, active_business, ...props }) {
             title: "Suppliers",
             url: "#",
             icon: Users,
-            isActive: isRoute("vendors.index") || isRoute("purchase_orders.index") || isRoute("cash_purchases.index") || 
-                     isRoute("bill_invoices.index") || isRoute("billI_invoices.pay_bill") || isRoute("purchase_returns.index"),
+            isActive: isRoute("vendors.index") || isRoute("purchase_orders.index") || isRoute("cash_purchases.index") ||
+                isRoute("bill_invoices.index") || isRoute("billI_invoices.pay_bill") || isRoute("purchase_returns.index"),
             items: [
                 {
                     title: "All Suppliers",
@@ -174,9 +174,9 @@ export function UserSidebar({ businesses, active_business, ...props }) {
             title: "Customers",
             url: "#",
             icon: Users,
-            isActive: isRoute("customers.index") || isRoute("receipts.index") || isRoute("invoices.index") || 
-                     isRoute("medical_records.index") || isRoute("quotations.index") || isRoute("deffered_invoices.index") || 
-                     isRoute("sales_returns.index") || isRoute("prescriptions.index") || isRoute("receive_payments.index"),
+            isActive: isRoute("customers.index") || isRoute("receipts.index") || isRoute("invoices.index") ||
+                isRoute("medical_records.index") || isRoute("quotations.index") || isRoute("deffered_invoices.index") ||
+                isRoute("sales_returns.index") || isRoute("prescriptions.index") || isRoute("receive_payments.index"),
             items: [
                 {
                     title: "All Customers",
@@ -232,10 +232,10 @@ export function UserSidebar({ businesses, active_business, ...props }) {
             title: "HR & Payroll",
             url: "#",
             icon: GroupIcon,
-            isActive: isRoute("staffs.index") || isRoute("attendance.index") || isRoute("departments.index") || 
-                     isRoute("designations.index") || isRoute("payslips.index") || isRoute("payslips.accrue") || 
-                     isRoute("payslips.make_payment") || isRoute("holidays.index") || isRoute("leaves.index") || 
-                     isRoute("awards.index"),
+            isActive: isRoute("staffs.index") || isRoute("attendance.index") || isRoute("departments.index") ||
+                isRoute("designations.index") || isRoute("payslips.index") || isRoute("payslips.accrue") ||
+                isRoute("payslips.make_payment") || isRoute("holidays.index") || isRoute("leaves.index") ||
+                isRoute("awards.index"),
             items: [
                 {
                     title: "Staff Management",
@@ -316,9 +316,9 @@ export function UserSidebar({ businesses, active_business, ...props }) {
             title: "Business",
             url: "#",
             icon: Building2Icon,
-            isActive: isRoute("business.index") || isRoute("roles.index") || 
-                     isRoute("taxes.index") || isRoute("currency.index") || isRoute("audit_logs.index") ||
-                     url.includes('/business/settings/'),
+            isActive: isRoute("business.index") || isRoute("roles.index") ||
+                isRoute("taxes.index") || isRoute("currency.index") || isRoute("audit_logs.index") ||
+                url.includes('/business/settings/'),
             items: [
                 {
                     title: "Manage Businesses",
@@ -355,10 +355,63 @@ export function UserSidebar({ businesses, active_business, ...props }) {
         {
             title: "Reports",
             url: "#",
-            icon: FileText,
-            isActive: false, // Will need to be updated when report routes are added
-            items: []
-        }
+            icon: Building2Icon,
+            isActive: isRoute("reports.journal") || isRoute("reports.ledger") || isRoute("reports.income_statement") ||
+                isRoute("reports.trial_balance") || isRoute("reports.balance_sheet") || isRoute("reports.receivables") ||
+                isRoute("reports.payables") || isRoute("reports.payroll_summary") || isRoute("reports.payroll_report") || isRoute("reports.income_by_customer"),
+            items: [
+                {
+                    title: "General Journal",
+                    url: route("reports.journal"),
+                    isActive: isRoute("reports.journal"),
+                },
+                {
+                    title: "General Ledger",
+                    url: route("reports.ledger"),
+                    isActive: isRoute("reports.ledger"),
+                },
+                {
+                    title: "Income Statement",
+                    url: route("reports.income_statement"),
+                    isActive: isRoute("reports.income_statement"),
+                },
+                {
+                    title: "Trial Balance",
+                    url: route("reports.trial_balance"),
+                    isActive: isRoute("reports.trial_balance"),
+                },
+                {
+                    title: "Balance Sheet",
+                    url: route("reports.balance_sheet"),
+                    isActive: isRoute("reports.balance_sheet"),
+                },
+                {
+                    title: "Income By Customer",
+                    url: route("reports.income_by_customer"),
+                    isActive: isRoute("reports.income_by_customer"),
+                },
+                {
+                    title: "Receivables",
+                    url: route("reports.receivables"),
+                    isActive: isRoute("reports.receivables"),
+                },
+                {
+                    title: "Payables",
+                    url: route("reports.payables"),
+                    isActive: isRoute("reports.payables"),
+                },
+                {
+                    title: "Payroll Summary",
+                    url: route("reports.payroll_summary"),
+                    isActive: isRoute("reports.payroll_summary"),
+                },
+                {
+                    title: "Monthly Payroll Cost",
+                    url: route("reports.payroll_report"),
+                    isActive: isRoute("reports.payroll_report"),
+                }
+            ]
+        },
     ];
 
     return (
