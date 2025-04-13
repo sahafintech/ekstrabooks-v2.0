@@ -31,23 +31,34 @@ import {
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 
-export default function Receivables({ report_data, date1, date2, meta = {}, filters = {}, business_name, currency, grand_total, paid_amount, due_amount, customers = [], customer_id = '' }) {
+export default function Ledger({
+    report_data,
+    date1,
+    date2,
+    meta = {},
+    filters = {},
+    business_name,
+    currency,
+    grand_total_debit,
+    grand_total_credit,
+    grand_total_balance
+}) {
     const [search, setSearch] = useState(filters.search || "");
     const [perPage, setPerPage] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
     
+
+
     const { data, setData, post, processing, errors, reset } = useForm({
         date1: date1,
-        date2: date2,
-        customer_id: customer_id,
+        date2: date2
     });
 
     const handleSearch = (e) => {
         e.preventDefault();
         router.get(
-            route("reports.receivables"),
+            route("reports.ledger"),
             {
                 search: search,
                 per_page: perPage,
@@ -60,10 +71,9 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
 
     const handleGenerate = (e) => {
         e.preventDefault();
-        post(route("reports.receivables"), {
+        post(route("reports.ledger"), {
             date1: data.date1,
             date2: data.date2,
-            customer_id: data.customer_id,
             search: search,
             per_page: perPage,
             page: 1,
@@ -79,7 +89,7 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
     const handlePerPageChange = (value) => {
         setPerPage(value);
         router.get(
-            route("reports.receivables"),
+            route("reports.ledger"),
             { search, page: 1, per_page: value },
             { preserveState: true }
         );
@@ -88,11 +98,13 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
     const handlePageChange = (page) => {
         setCurrentPage(page);
         router.get(
-            route("reports.receivables"),
+            route("reports.ledger"),
             { search, page, per_page: perPage },
             { preserveState: true }
         );
     };
+
+
 
     const renderPageNumbers = () => {
         const totalPages = meta.last_page;
@@ -124,109 +136,152 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
         return pages;
     };
 
-    const ItemStatusBadge = ({ status }) => {
-        const statusMap = {
-          0: { label: "Draft", className: "text-gray-500" },
-          1: { label: "Unpaid", className: "text-red-500" },
-          2: { label: "Paid", className: "text-green-500" },
-          3: { label: "Partial Paid", className: "text-blue-500" },
-        };
-    
-        return (
-          <span className={statusMap[status].className}>
-            {statusMap[status].label}
-          </span>
-        );
-      };
-
     const handlePrint = () => {
         // Create a new window for printing
         const printWindow = window.open('', '_blank', 'width=800,height=600');
-        
+
         // Generate CSS for the print window
         const style = `
             <style>
                 body { font-family: Arial, sans-serif; }
-                table { width: 100%; border-collapse: collapse; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
                 th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
                 th { background-color: #f2f2f2; }
                 h2, h1 { text-align: center; margin-bottom: 20px; }
                 .text-right { text-align: right; }
                 .total-row { font-weight: bold; background-color: #f9f9f9; }
+                .account-type { margin-top: 20px; font-weight: bold; font-size: 16px; }
+                .account { margin-left: 20px; margin-top: 10px; }
+                .transaction { margin-left: 40px; }
             </style>
         `;
-        
+
         // Start building the HTML content for the print window
         let printContent = `
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Receivables</title>
+                <title>Ledger Report</title>
                 ${style}
             </head>
             <body>
                 <h1>${business_name}</h1>
-                <h2>Receivables (${data.date1} - ${data.date2})</h2>
+                <h2>Ledger Report (${data.date1} - ${data.date2})</h2>
+        `;
+
+        // Add table for each account type
+        if (report_data.length > 0) {
+            printContent += `
                 <table>
                     <thead>
                         <tr>
-                            <th>Customer</th>
-                            <th class="text-right">Invoice Amount (${currency})</th>
-                            <th class="text-right">Paid Amount (${currency})</th>
-                            <th class="text-right">Due Amount (${currency})</th>
+                            <th>Account</th>
+                            <th class="text-right">Debit (${currency})</th>
+                            <th class="text-right">Credit (${currency})</th>
+                            <th class="text-right">Balance (${currency})</th>
                         </tr>
                     </thead>
                     <tbody>
-        `;
-        
-        // Add table rows from report_data
-        if (report_data.length > 0) {
-            report_data.forEach(item => {
+            `;
+
+            // Add accounts
+            report_data.forEach(account => {
                 printContent += `
                     <tr>
-                        <td>${item.customer_name || 'N/A'}</td>
-                        <td class="text-right">${item.total_income}</td>
-                        <td class="text-right">${item.total_paid}</td>
-                        <td class="text-right">${item.total_due}</td>
+                        <td>${account.account_number} - ${account.account_name}</td>
+                        <td class="text-right">${account.debit_amount_formatted}</td>
+                        <td class="text-right">${account.credit_amount_formatted}</td>
+                        <td class="text-right">${account.balance_formatted}</td>
                     </tr>
                 `;
-            });
-            
-            // Add totals row
+
+                // Add transactions
+                    if (account.transactions.length > 0) {
+                        printContent += `
+                            <tr>
+                                <td colspan="4">
+                                    <table class="transaction" style="width: 100%;">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Description</th>
+                                                <th>Reference</th>
+                                                <th class="text-right">Debit</th>
+                                                <th class="text-right">Credit</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                        `;
+
+                        account.transactions.forEach(transaction => {
+                            printContent += `
+                                <tr>
+                                    <td>${transaction.trans_date}</td>
+                                    <td>${transaction.description}</td>
+                                    <td>${transaction.reference || 'N/A'}</td>
+                                    <td class="text-right">${transaction.debit_amount_formatted}</td>
+                                    <td class="text-right">${transaction.credit_amount_formatted}</td>
+                                </tr>
+                            `;
+                        });
+
+                        printContent += `
+                                        </tbody>
+                                    </table>
+                                </td>
+                            </tr>
+                        `;
+                    }
+                });
+
+                // Add account type totals
+                printContent += `
+                    <tr class="total-row">
+                        <td>Total for ${accountType.type}</td>
+                        <td class="text-right">${accountType.total_debit_formatted}</td>
+                        <td class="text-right">${accountType.total_credit_formatted}</td>
+                        <td class="text-right">${accountType.balance_formatted}</td>
+                    </tr>
+                `;
+
+                printContent += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            // Add grand totals row for the main table
             printContent += `
                 <tr class="total-row">
-                    <td>Total</td>
-                    <td class="text-right">${grand_total}</td>
-                    <td class="text-right">${paid_amount}</td>
-                    <td class="text-right">${due_amount}</td>
+                    <td>Grand Total</td>
+                    <td class="text-right">${grand_total_debit}</td>
+                    <td class="text-right">${grand_total_credit}</td>
+                    <td class="text-right">${grand_total_balance}</td>
                 </tr>
+                </tbody>
+                </table>
             `;
         } else {
             printContent += `
-                <tr>
-                    <td colspan="4" style="text-align: center;">No data found.</td>
-                </tr>
+                <p style="text-align: center;">No data found.</p>
             `;
         }
-        
+
         // Complete the HTML content
         printContent += `
-                    </tbody>
-                </table>
             </body>
             </html>
         `;
-        
+
         // Write the content to the print window and trigger print
         printWindow.document.open();
         printWindow.document.write(printContent);
         printWindow.document.close();
-        
+
         // Wait for content to load before printing
         setTimeout(() => {
             printWindow.print();
             // Close the window after printing
-            printWindow.onafterprint = function() {
+            printWindow.onafterprint = function () {
                 printWindow.close();
             };
         }, 300);
@@ -234,14 +289,14 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
 
     return (
         <AuthenticatedLayout>
-            <Head title="Receivables Report" />
+            <Head title="Ledger Report" />
             <Toaster />
             <SidebarInset>
                 <div className="main-content">
                     <PageHeader
-                        page="Receivables"
+                        page="Ledger"
                         subpage="Report"
-                        url="reports.receivables"
+                        url="reports.ledger"
                     />
                     <div className="p-4">
                         <div className="flex flex-col justify-between items-start mb-6 gap-4">
@@ -293,23 +348,6 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                                                 />
                                             </PopoverContent>
                                         </Popover>
-                                    </div>
-                                    
-                                    <div className="flex items-center gap-2 w-full md:w-72">
-                                        <SearchableCombobox
-                                            options={[
-                                                { id: '', name: 'All Customers' },
-                                                ...customers.map(customer => ({
-                                                    id: customer.id.toString(),
-                                                    name: customer.name,
-                                                    details: customer.mobile || customer.email
-                                                }))
-                                            ]}
-                                            value={data.customer_id}
-                                            onChange={(value) => setData('customer_id', value)}
-                                            className="w-full"
-                                            placeholder="Select Customer"
-                                        />
                                         <Button type="submit" disabled={processing}>{processing ? 'Generating...' : 'Generate'}</Button>
                                     </div>
                                 </form>
@@ -317,7 +355,7 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                             <div className="flex flex-col md:flex-row gap-4 md:items-center">
                                 <form onSubmit={handleSearch} className="flex gap-2">
                                     <Input
-                                        placeholder="Search customer..."
+                                        placeholder="Search account name or number..."
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
                                         className="w-full md:w-80"
@@ -332,7 +370,7 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                                 <Button variant="outline" onClick={handlePrint}>
                                     Print
                                 </Button>
-                                <a download href="">
+                                <a download href={route('reports.ledger_export')}>
                                     <Button variant="outline">Export</Button>
                                 </a>
                             </div>
@@ -353,59 +391,94 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                             </div>
                         </div>
 
-                        <div className="rounded-md border printable-table">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Invoice Date</TableHead>
-                                        <TableHead>Customer(Provider)</TableHead>
-                                        <TableHead>Client</TableHead>
-                                        <TableHead>Invoice Number</TableHead>
-                                        <TableHead className="text-right">Invoice Amount ({currency})</TableHead>
-                                        <TableHead className="text-right">Paid Amount ({currency})</TableHead>
-                                        <TableHead className="text-right">Due Amount ({currency})</TableHead>
-                                        <TableHead>Due Date</TableHead>
-                                        <TableHead>Status</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {report_data.length > 0 ? (
-                                        <>
-                                            {report_data.map((item) => (
-                                                <TableRow key={item.customer_id}>
-                                                    <TableCell>{item.invoice_date}</TableCell>
-                                                    <TableCell>{item.customer_name || 'N/A'}</TableCell>
-                                                    <TableCell>{item.client_name || 'N/A'}</TableCell>
-                                                    <TableCell>{item.invoice_number || 'N/A'}</TableCell>
-                                                    <TableCell className="text-right">{item.grand_total_formatted}</TableCell>
-                                                    <TableCell className="text-right">{item.paid_amount_formatted}</TableCell>
-                                                    <TableCell className="text-right">{item.due_amount_formatted}</TableCell>
-                                                    <TableCell>{item.due_date}</TableCell>
-                                                    <TableCell>{<ItemStatusBadge status={item.status} />}</TableCell>
-                                                </TableRow>
-                                            ))}
-                                            <TableRow className="bg-muted/50 font-medium">
-                                                <TableCell>Total</TableCell>
-                                                <TableCell></TableCell>
-                                                <TableCell></TableCell>
-                                                <TableCell></TableCell>
-                                                <TableCell className="text-right">{grand_total}</TableCell>
-                                                <TableCell className="text-right">{paid_amount}</TableCell>
-                                                <TableCell className="text-right">{due_amount}</TableCell>
-                                                <TableCell></TableCell>
-                                                <TableCell></TableCell>
-                                            </TableRow>
-                                        </>
-                                    ) : (
+                        {report_data.length > 0 ? (
+                            <div className="p-4">
+                                <Table>
+                                    <TableHeader>
                                         <TableRow>
-                                            <TableCell colSpan={9} className="h-24 text-center">
-                                                No data found.
-                                            </TableCell>
+                                            <TableHead>Account</TableHead>
+                                            <TableHead className="text-right">Debit ({currency})</TableHead>
+                                            <TableHead className="text-right">Credit ({currency})</TableHead>
+                                            <TableHead className="text-right">Balance ({currency})</TableHead>
                                         </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {report_data.map((account) => (
+                                            <React.Fragment key={account.id}>
+                                                <TableRow>
+                                                    <TableCell>
+                                                        <div className="font-medium">
+                                                            {account.account_number} - {account.account_name}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-right">{account.debit_amount_formatted}</TableCell>
+                                                    <TableCell className="text-right">{account.credit_amount_formatted}</TableCell>
+                                                    <TableCell className="text-right">{account.balance_formatted}</TableCell>
+                                                </TableRow>
+
+                                                {account.transactions.length > 0 && (
+                                                    <TableRow>
+                                                        <TableCell colSpan={4} className="p-0">
+                                                            <div className="pl-8 pb-4">
+                                                                <Table>
+                                                                    <TableHeader>
+                                                                        <TableRow>
+                                                                            <TableHead>Date</TableHead>
+                                                                            <TableHead>Description</TableHead>
+                                                                            <TableHead>Type</TableHead>
+                                                                            <TableHead>Name</TableHead>
+                                                                            <TableHead>Transaction Currency</TableHead>
+                                                                            <TableHead className="text-right">Transaction Currency[Debit]</TableHead>
+                                                                            <TableHead className="text-right">Transaction Currency[Credit]</TableHead>
+                                                                            <TableHead>Currency Rate</TableHead>
+                                                                            <TableHead>Rate</TableHead>
+                                                                            <TableHead>Base Currency</TableHead>
+                                                                            <TableHead className="text-right">Base Currency[Debit]</TableHead>
+                                                                            <TableHead className="text-right">Base Currency[Credit]</TableHead>
+                                                                        </TableRow>
+                                                                    </TableHeader>
+                                                                    <TableBody>
+                                                                        {account.transactions.map((transaction) => (
+                                                                            <TableRow key={transaction.id}>
+                                                                                <TableCell>{transaction.trans_date}</TableCell>
+                                                                                <TableCell>{transaction.description}</TableCell>
+                                                                                <TableCell>{transaction.ref_type === 'receipt' ? 'Cash Invoice' : transaction.ref_type}</TableCell>
+                                                                                <TableCell className="text-right">{transaction.payee_name || 'N/A'}</TableCell>
+                                                                                <TableCell>{transaction.transaction_currency}</TableCell>
+                                                                                <TableCell className="text-right">{transaction.dr_cr === 'dr' ? transaction.transaction_amount_formatted : 0 }</TableCell>
+                                                                                <TableCell className="text-right">{transaction.dr_cr === 'cr' ? transaction.transaction_amount_formatted : 0 }</TableCell>
+                                                                                <TableCell className="text-right">{transaction.currency}</TableCell>
+                                                                                <TableCell className="text-right">{transaction.currency_rate}</TableCell>
+                                                                                <TableCell>{currency}</TableCell>
+                                                                                <TableCell className="text-right">{transaction.dr_cr === 'dr' ? transaction.base_currency_amount_formatted : 0 }</TableCell>
+                                                                                <TableCell className="text-right">{transaction.dr_cr === 'cr' ? transaction.base_currency_amount_formatted : 0 }</TableCell>
+                                                                            </TableRow>
+                                                                        ))}
+                                                                    </TableBody>
+                                                                </Table>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </React.Fragment>
+                                        ))}
+                                        
+                                        <TableRow className="bg-muted/50 font-medium">
+                                            <TableCell>Grand Total</TableCell>
+                                            <TableCell className="text-right">{grand_total_debit}</TableCell>
+                                            <TableCell className="text-right">{grand_total_credit}</TableCell>
+                                            <TableCell className="text-right">{grand_total_balance}</TableCell>
+                                        </TableRow>
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        ) : (
+                            <div className="rounded-md border">
+                                <div className="py-24 text-center text-muted-foreground">
+                                    No data found. Please adjust your search criteria.
+                                </div>
+                            </div>
+                        )}
 
                         {report_data.length > 0 && meta.total > 0 && (
                             <div className="flex items-center justify-between mt-4">

@@ -13,6 +13,7 @@ use App\Exports\SalesByProductExport;
 use App\Exports\TrialBalanceExport;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
+use App\Models\AccountType;
 use App\Models\Attendance;
 use App\Models\Customer;
 use App\Models\Employee;
@@ -27,8 +28,10 @@ use App\Models\PurchaseItem;
 use App\Models\Receipt;
 use App\Models\ReceiptItem;
 use App\Models\Transaction;
+use App\Models\Vendor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -283,7 +286,7 @@ class ReportController extends Controller
 	{
 		// Get search term
 		$search = $request->search ?? '';
-		
+
 		// Set default pagination
 		$per_page = $request->per_page ?? 10;
 
@@ -381,10 +384,10 @@ class ReportController extends Controller
 
 		// Convert to array and apply search filter
 		$data_array = array_values($report_data);
-		
+
 		// Apply search filter if provided
 		if (!empty($search)) {
-			$data_array = array_filter($data_array, function($item) use ($search) {
+			$data_array = array_filter($data_array, function ($item) use ($search) {
 				return stripos($item['customer_name'], $search) !== false;
 			});
 		}
@@ -395,11 +398,11 @@ class ReportController extends Controller
 			$grand_total_paid += $item['total_paid'];
 			$grand_total_due += $item['total_due'];
 		}
-		
+
 		// Get currency information
 		$currency = request()->activeBusiness->currency;
 		$currency_symbol = currency_symbol($currency);
-		
+
 		// Format each customer's amounts
 		foreach ($data_array as &$item) {
 			$item['total_income'] = formatAmount($item['total_income'], $currency_symbol);
@@ -462,7 +465,7 @@ class ReportController extends Controller
 		session(['start_date' => $date1]);
 		session(['end_date' => $date2]);
 		session(['customer_id' => $customer_id]);
-		
+
 		return $this->generate_receivables_report($date1, $date2, $customer_id, $search, $per_page);
 	}
 
@@ -479,21 +482,19 @@ class ReportController extends Controller
 				return $query->where('customer_id', $customer_id);
 			})
 			->whereRaw("date(invoices.invoice_date) >= '$date1' AND date(invoices.invoice_date) <= '$date2'")
-			->where('is_recurring', 0)
-			->where('grand_total', '>', 'paid')  // Only show invoices with amounts due
 			->get();
 
 		// Prepare data array for report
 		$data_array = [];
-		
-		foreach($invoices as $invoice) {
+
+		foreach ($invoices as $invoice) {
 			$due_amount = $invoice->grand_total - $invoice->paid;
-			
+
 			// Skip invoices that are fully paid
 			if ($due_amount <= 0) {
 				continue;
 			}
-			
+
 			$data_array[] = [
 				'id' => $invoice->id,
 				'invoice_number' => $invoice->invoice_number,
@@ -509,11 +510,11 @@ class ReportController extends Controller
 				'payment_status' => $invoice->payment_status,
 			];
 		}
-		
+
 		// Apply search filter if provided
 		if (!empty($search)) {
-			$data_array = array_filter($data_array, function($item) use ($search) {
-				return stripos($item['customer_name'], $search) !== false || 
+			$data_array = array_filter($data_array, function ($item) use ($search) {
+				return stripos($item['customer_name'], $search) !== false ||
 					stripos($item['invoice_number'], $search) !== false ||
 					stripos($item['client_name'], $search) !== false;
 			});
@@ -525,24 +526,24 @@ class ReportController extends Controller
 		$total_grand = 0;
 		$total_paid = 0;
 		$total_due = 0;
-		
+
 		foreach ($data_array as $item) {
 			$total_grand += $item['grand_total'];
 			$total_paid += $item['paid_amount'];
 			$total_due += $item['due_amount'];
 		}
-		
+
 		// Get currency information
 		$currency = request()->activeBusiness->currency;
 		$currency_symbol = currency_symbol($currency);
-		
+
 		// Format currency amounts
 		foreach ($data_array as &$item) {
 			$item['grand_total_formatted'] = formatAmount($item['grand_total'], $currency_symbol);
 			$item['paid_amount_formatted'] = formatAmount($item['paid_amount'], $currency_symbol);
 			$item['due_amount_formatted'] = formatAmount($item['due_amount'], $currency_symbol);
 		}
-		
+
 		// Create paginator from array
 		$page = request('page', 1);
 		$total = count($data_array);
@@ -553,15 +554,15 @@ class ReportController extends Controller
 			$page,
 			['path' => request()->url(), 'query' => request()->query()]
 		);
-		
+
 		// Format total amounts
 		$total_grand_formatted = formatAmount($total_grand, $currency_symbol);
 		$total_paid_formatted = formatAmount($total_paid, $currency_symbol);
 		$total_due_formatted = formatAmount($total_due, $currency_symbol);
-		
+
 		// Get business information
 		$business_name = request()->activeBusiness->name;
-		
+
 		return Inertia::render('Backend/User/Reports/Receivables', [
 			'report_data' => $paginator->items(),
 			'customers' => $customers,
@@ -590,127 +591,308 @@ class ReportController extends Controller
 
 	public function payables(Request $request)
 	{
-		if ($request->isMethod('get')) {
+		// Get request parameters
+		$date1 = $request->date1 ?? Carbon::now()->startOfMonth()->format('Y-m-d');
+		$date2 = $request->date2 ?? Carbon::now()->format('Y-m-d');
+		$vendor_id = $request->vendor_id ?? '';
+		$search = $request->search ?? '';
+		$per_page = $request->per_page ?? 10;
 
-			$data = array();
-			$date1 = Carbon::now()->startOfMonth();
-			$date2 = Carbon::now();
-			$vendor_id = isset($request->vendor_id) ? $request->vendor_id : '';
+		// Session storage (keep for backwards compatibility)
+		session(['start_date' => $date1]);
+		session(['end_date' => $date2]);
+		session(['vendor_id' => $vendor_id]);
 
-			$data['report_data'] = Purchase::with('vendor')
-				->when($vendor_id, function ($query, $vendor_id) {
-					return $query->where('vendor_id', $vendor_id);
-				})
-				->whereRaw("date(purchases.purchase_date) >= '$date1' AND date(purchases.purchase_date) <= '$date2'")
-				->get();
+		return $this->generate_payables_report($date1, $date2, $vendor_id, $search, $per_page);
+	}
 
-			$data['date1'] = $date1;
-			$data['date2'] = $date2;
-			$data['vendor_id'] = $request->vendor_id;
-			$data['currency'] = request()->activeBusiness->currency;
-			$data['page_title'] = _lang('Paybles');
+	public function generate_payables_report($date1, $date2, $vendor_id, $search, $per_page) {
+		// Get vendors list for dropdown
+		$vendors = Vendor::select('id', 'name', 'mobile', 'email')
+			->orderBy('name')
+			->get();
 
-			return view('backend.user.reports.payables', $data);
-		} else if ($request->isMethod('post')) {
-			@ini_set('max_execution_time', 0);
-			@set_time_limit(0);
+		// Get receivables data
+		$purchases = Purchase::with('vendor')
+			->when($vendor_id, function ($query, $vendor_id) {
+				return $query->where('vendor_id', $vendor_id);
+			})
+			->whereRaw("date(purchases.purchase_date) >= '$date1' AND date(purchases.purchase_date) <= '$date2'")
+			->get();
 
-			$data = array();
-			$date1 = Carbon::parse($request->date1)->format('Y-m-d');
-			$date2 = Carbon::parse($request->date2)->format('Y-m-d');
-			$vendor_id = isset($request->vendor_id) ? $request->vendor_id : '';
+		// Prepare data array for report
+		$data_array = [];
 
-			$data['report_data'] = Purchase::with('vendor')
-				->when($vendor_id, function ($query, $vendor_id) {
-					return $query->where('vendor_id', $vendor_id);
-				})
-				->whereRaw("date(purchases.purchase_date) >= '$date1' AND date(purchases.purchase_date) <= '$date2'")
-				->get();
+		foreach ($purchases as $purchase) {
+			$due_amount = $purchase->grand_total - $purchase->paid;
 
-			$data['date1'] = Carbon::parse($request->date1);
-			$data['date2'] = Carbon::parse($request->date2);
-			$data['customer_id'] = $request->customer_id;
-			$data['currency'] = request()->activeBusiness->currency;
-			$data['page_title'] = _lang('Payables');
-			return view('backend.user.reports.payables', $data);
+			// Skip purchases that are fully paid
+			if ($due_amount <= 0) {
+				continue;
+			}
+
+			$data_array[] = [
+				'id' => $purchase->id,
+				'purchase_number' => $purchase->bill_no,
+				'vendor_id' => $purchase->vendor_id,
+				'vendor_name' => $purchase->vendor->name,
+				'purchase_date' => $purchase->purchase_date,
+				'due_date' => $purchase->due_date,
+				'grand_total' => $purchase->grand_total,
+				'paid_amount' => $purchase->paid,
+				'due_amount' => $due_amount,
+				'status' => $purchase->status,
+			];
 		}
+
+		// Apply search filter if provided
+		if (!empty($search)) {
+			$data_array = array_filter($data_array, function ($item) use ($search) {
+				return stripos($item['vendor_name'], $search) !== false ||
+					stripos($item['purchase_number'], $search) !== false;
+			});
+			// Re-index array after filtering
+			$data_array = array_values($data_array);
+		}
+
+		// Calculate total receivables
+		$total_grand = 0;
+		$total_paid = 0;
+		$total_due = 0;
+
+		foreach ($data_array as $item) {
+			$total_grand += $item['grand_total'];
+			$total_paid += $item['paid_amount'];
+			$total_due += $item['due_amount'];
+		}
+
+		// Get currency information
+		$currency = request()->activeBusiness->currency;
+		$currency_symbol = currency_symbol($currency);
+
+		// Format currency amounts
+		foreach ($data_array as &$item) {
+			$item['grand_total_formatted'] = formatAmount($item['grand_total'], $currency_symbol);
+			$item['paid_amount_formatted'] = formatAmount($item['paid_amount'], $currency_symbol);
+			$item['due_amount_formatted'] = formatAmount($item['due_amount'], $currency_symbol);
+		}
+
+		// Create paginator from array
+		$page = request('page', 1);
+		$total = count($data_array);
+		$paginator = new LengthAwarePaginator(
+			array_slice($data_array, ($page - 1) * $per_page, $per_page),
+			$total,
+			$per_page,
+			$page,
+			['path' => request()->url(), 'query' => request()->query()]
+		);
+
+		// Format total amounts
+		$total_grand_formatted = formatAmount($total_grand, $currency_symbol);
+		$total_paid_formatted = formatAmount($total_paid, $currency_symbol);
+		$total_due_formatted = formatAmount($total_due, $currency_symbol);
+
+		// Get business information
+		$business_name = request()->activeBusiness->name;
+
+		return Inertia::render('Backend/User/Reports/Payables', [
+			'report_data' => $paginator->items(),
+			'vendors' => $vendors,
+			'currency' => $currency,
+			'grand_total' => $total_grand_formatted,
+			'paid_amount' => $total_paid_formatted,
+			'due_amount' => $total_due_formatted,
+			'business_name' => $business_name,
+			'date1' => $date1,
+			'date2' => $date2,
+			'vendor_id' => $vendor_id,
+			'pagination' => [
+				'current_page' => $paginator->currentPage(),
+				'last_page' => $paginator->lastPage(),
+				'from' => $paginator->firstItem(),
+				'path' => $paginator->path(),
+				'per_page' => $paginator->perPage(),
+				'to' => $paginator->lastItem(),
+				'total' => $paginator->total(),
+			],
+			'filters' => [
+				'search' => $search,
+			],
+		]);
 	}
 
 	public function ledger(Request $request)
 	{
-		if ($request->isMethod('get')) {
-			$data = array();
-			$date1 = Carbon::now()->startOfMonth();
-			$date2 = Carbon::now();
+		// Get request parameters
+		$date1 = $request->date1 ?? Carbon::now()->startOfMonth()->format('Y-m-d');
+		$date2 = $request->date2 ?? Carbon::now()->format('Y-m-d');
+		$search = $request->search ?? '';
+		$per_page = $request->per_page ?? 10;
 
-			session(['start_date' => $date1]);
-			session(['end_date' => $date2]);
+		// Session storage (keep for backwards compatibility)
+		session(['start_date' => $date1]);
+		session(['end_date' => $date2]);
 
-			$data['report_data'] = Account::with(['transactions' => function ($query) use ($date1, $date2) {
+		return $this->generate_ledger_report($date1, $date2, $search, $per_page);
+	}
+
+	private function generate_ledger_report($date1, $date2, $search, $per_page)
+	{
+		// Query accounts with transactions in the date range
+		$accounts_query = Account::with(['transactions' => function ($query) use ($date1, $date2) {
+			$query->whereDate('trans_date', '>=', $date1)
+				->whereDate('trans_date', '<=', $date2)
+				->orderBy('trans_date', 'desc');
+		}])
+			->whereHas('transactions', function ($query) use ($date1, $date2) {
 				$query->whereDate('trans_date', '>=', $date1)
 					->whereDate('trans_date', '<=', $date2)
 					->orderBy('trans_date', 'desc');
-			}])
-				->whereHas('transactions', function ($query) use ($date1, $date2) {
-					$query->whereDate('trans_date', '>=', $date1)
-						->whereDate('trans_date', '<=', $date2)
-						->orderBy('trans_date', 'desc');
-				})
-				->withSum(['transactions as cr_amount' => function ($query) use ($date1, $date2) {
-					$query->where('dr_cr', 'cr')
-						->whereDate('trans_date', '>=', $date1)
-						->whereDate('trans_date', '<=', $date2);
-				}], 'base_currency_amount')
-				->withSum(['transactions as dr_amount' => function ($query) use ($date1, $date2) {
-					$query->where('dr_cr', 'dr')
-						->whereDate('trans_date', '>=', $date1)
-						->whereDate('trans_date', '<=', $date2);
-				}], 'base_currency_amount')
-				->get();
+			})
+			->withSum(['transactions as cr_amount' => function ($query) use ($date1, $date2) {
+				$query->where('dr_cr', 'cr')
+					->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			}], 'base_currency_amount')
+			->withSum(['transactions as dr_amount' => function ($query) use ($date1, $date2) {
+				$query->where('dr_cr', 'dr')
+					->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			}], 'base_currency_amount');
 
-			$data['date1'] = $date1;
-			$data['date2'] = $date2;
-			$data['page_title'] = _lang('Ledger');
+		// Get accounts
+		$accounts = $accounts_query->get();
 
-			return view('backend.user.reports.ledger', $data);
-		} else if ($request->isMethod('post')) {
-			@ini_set('max_execution_time', 0);
-			@set_time_limit(0);
+		// Process data array - flat list of accounts
+		$data_array = [];
+		$grand_total_debit = 0;
+		$grand_total_credit = 0;
 
-			$data = array();
-			$date1 = Carbon::parse($request->date1)->format('Y-m-d');
-			$date2 = Carbon::parse($request->date2)->format('Y-m-d');
+		// Process each account
+		foreach ($accounts as $account) {
+			// Skip accounts with no transactions
+			if ($account->transactions->isEmpty()) {
+				continue;
+			}
 
-			session(['start_date' => $date1]);
-			session(['end_date' => $date2]);
+			// Calculate account balance
+			$debit_amount = $account->dr_amount ?? 0;
+			$credit_amount = $account->cr_amount ?? 0;
+			$balance = 0;
 
-			$data['report_data'] = Account::with(['transactions' => function ($query) use ($date1, $date2) {
-				$query->whereDate('trans_date', '>=', $date1)
-					->whereDate('trans_date', '<=', $date2)
-					->orderBy('trans_date', 'desc');
-			}])
-				->whereHas('transactions', function ($query) use ($date1, $date2) {
-					$query->whereDate('trans_date', '>=', $date1)
-						->whereDate('trans_date', '<=', $date2)
-						->orderBy('trans_date', 'desc');
-				})
-				->withSum(['transactions as cr_amount' => function ($query) use ($date1, $date2) {
-					$query->where('dr_cr', 'cr')
-						->whereDate('trans_date', '>=', $date1)
-						->whereDate('trans_date', '<=', $date2);
-				}], 'base_currency_amount')
-				->withSum(['transactions as dr_amount' => function ($query) use ($date1, $date2) {
-					$query->where('dr_cr', 'dr')
-						->whereDate('trans_date', '>=', $date1)
-						->whereDate('trans_date', '<=', $date2);
-				}], 'base_currency_amount')
-				->get();
+			// Calculate balance based on dr_cr
+			if ($account->dr_cr == 'dr') {
+				$balance = $debit_amount - $credit_amount;
+			} else {
+				$balance = $credit_amount - $debit_amount;
+			}
 
-			$data['date1'] = Carbon::parse($request->date1);
-			$data['date2'] = Carbon::parse($request->date2);
-			$data['page_title'] = _lang('Ledger');
-			return view('backend.user.reports.ledger', $data);
+			// Create account data array
+			$account_data = [
+				'id' => $account->id,
+				'account_name' => $account->account_name,
+				'account_number' => $account->account_code,
+				'debit_amount' => $debit_amount,
+				'credit_amount' => $credit_amount,
+				'balance' => $balance,
+				'dr_cr' => $account->dr_cr,
+				'transactions' => []
+			];
+
+			// Add transactions to account data
+			foreach ($account->transactions as $transaction) {
+				$account_data['transactions'][] = [
+					'id' => $transaction->id,
+					'trans_date' => $transaction->trans_date,
+					'description' => $transaction->description,
+					'transaction_amount' => $transaction->transaction_amount,
+					'base_currency_amount' => $transaction->base_currency_amount,
+					'ref_type' => $transaction->ref_type,
+					'payee_name' => $transaction->payee_name,
+					'transaction_currency' => $transaction->transaction_currency,
+					'currency_rate' => $transaction->currency_rate,
+					'dr_cr' => $transaction->dr_cr,
+				];
+			}
+
+			// Add account to data array
+			$data_array[] = $account_data;
+
+			// Update grand totals
+			$grand_total_debit += $debit_amount;
+			$grand_total_credit += $credit_amount;
 		}
+
+		// Apply search filter if provided
+		if (!empty($search)) {
+			$data_array = array_filter($data_array, function ($account) use ($search) {
+				return stripos($account['account_name'], $search) !== false ||
+					stripos($account['account_number'], $search) !== false;
+			});
+
+			// Re-index the array to ensure consistent numeric keys.
+			$data_array = array_values($data_array);
+		}
+
+		// Get currency information
+		$currency = request()->activeBusiness->currency;
+		$currency_symbol = currency_symbol($currency);
+
+		// Format currency amounts
+		foreach ($data_array as &$account) {
+			$account['debit_amount_formatted'] = formatAmount($account['debit_amount'], $currency_symbol);
+			$account['credit_amount_formatted'] = formatAmount($account['credit_amount'], $currency_symbol);
+			$account['balance_formatted'] = formatAmount($account['balance'], $currency_symbol);
+
+			foreach ($account['transactions'] as &$transaction) {
+				$transaction['transaction_amount_formatted'] = formatAmount($transaction['transaction_amount'], $currency_symbol);
+				$transaction['base_currency_amount_formatted'] = formatAmount($transaction['base_currency_amount'], $currency_symbol);
+			}
+		}
+
+		// Create paginator from filtered array
+		$page = request('page', 1);
+		$total = count($data_array);
+		$paginator = new LengthAwarePaginator(
+			array_slice($data_array, ($page - 1) * $per_page, $per_page),
+			$total,
+			$per_page,
+			$page,
+			['path' => request()->url(), 'query' => request()->query()]
+		);
+
+		// Format grand total amounts
+		$grand_total_debit_formatted = formatAmount($grand_total_debit, $currency_symbol);
+		$grand_total_credit_formatted = formatAmount($grand_total_credit, $currency_symbol);
+		$grand_total_balance_formatted = formatAmount($grand_total_debit - $grand_total_credit, $currency_symbol);
+
+		// Get business information
+		$business_name = request()->activeBusiness->name;
+
+		// Return Inertia render with data
+		return Inertia::render('Backend/User/Reports/Ledger', [
+			'report_data' => $paginator->items(),
+			'currency' => $currency,
+			'grand_total_debit' => $grand_total_debit_formatted,
+			'grand_total_credit' => $grand_total_credit_formatted,
+			'grand_total_balance' => $grand_total_balance_formatted,
+			'business_name' => $business_name,
+			'date1' => $date1,
+			'date2' => $date2,
+			'pagination' => [
+				'current_page' => $paginator->currentPage(),
+				'last_page' => $paginator->lastPage(),
+				'from' => $paginator->firstItem(),
+				'path' => $paginator->path(),
+				'per_page' => $paginator->perPage(),
+				'to' => $paginator->lastItem(),
+				'total' => $paginator->total(),
+			],
+			'filters' => [
+				'search' => $search,
+			],
+		]);
 	}
 
 	public function journal(Request $request)

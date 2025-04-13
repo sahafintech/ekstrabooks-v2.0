@@ -42,7 +42,12 @@ class JournalController extends Controller
         $journals = $query->paginate($perPage);
         
         return Inertia::render('Backend/User/Journal/List', [
-            'journals' => $journals->items(),
+            'journals' => collect($journals->items())->map(function ($journal) {
+                $journal->transaction_amount = formatAmount($journal->transaction_amount, currency_symbol($journal->transaction_currency));
+                $journal->currency_rate = formatAmount($journal->currency_rate, currency_symbol($journal->transaction_currency));
+                $journal->base_currency_amount = formatAmount($journal->base_currency_amount, currency_symbol($journal->base_currency));
+                return $journal;
+            }),
             'meta' => [
                 'total' => $journals->total(),
                 'per_page' => $journals->perPage(),
@@ -63,12 +68,14 @@ class JournalController extends Controller
         $currencies = Currency::all();
         $customers = Customer::all();
         $vendors = Vendor::all();
+        $journal_number = get_business_option('journal_number');
         
         return Inertia::render('Backend/User/Journal/Create', [
             'accounts' => $accounts,
             'currencies' => $currencies,
             'customers' => $customers,
-            'vendors' => $vendors
+            'vendors' => $vendors,
+            'journal_number' => $journal_number
         ]);
     }
 
@@ -78,7 +85,6 @@ class JournalController extends Controller
             'date' => 'required',
             'journal_number' => 'required',
             'trans_currency' => 'required',
-            'journal_entry.account_id' => 'required',
         ]);
 
         $month = Carbon::parse($request->date)->format('F');
@@ -100,7 +106,7 @@ class JournalController extends Controller
 
         $currentTime = Carbon::now();
 
-        if ($request->journal_entry['account_id'][0] == 0) {
+        if ($request->journal_entries[0]['account_id'] == 0) {
             return redirect()->back()->with('error', _lang('Choose At Least one account'));
         }
 
@@ -109,8 +115,8 @@ class JournalController extends Controller
         $journal->journal_number = $request->journal_number;
         $journal->transaction_currency = $request->trans_currency;
         $journal->currency_rate = Currency::where('name', $request->trans_currency)->first()->exchange_rate;
-        $journal->transaction_amount      = array_sum($request->journal_entry['debit']);
-        $journal->base_currency_amount    = convert_currency($request->trans_currency, $request->activeBusiness->currency, array_sum($request->journal_entry['debit']));
+        $journal->transaction_amount      = array_sum(array_map(function ($entry) { return floatval($entry['debit']); }, $request->journal_entries));
+        $journal->base_currency_amount    = convert_currency($request->trans_currency, $request->activeBusiness->currency, $journal->transaction_amount);
         $journal->user_id = auth()->user()->id;
         $journal->business_id = request()->activeBusiness->id;
         $journal->created_by = auth()->user()->id;
@@ -124,11 +130,11 @@ class JournalController extends Controller
         //increment journal number
         BusinessSetting::where('name', 'journal_number')->increment('value');
 
-        for ($i = 0; $i < count($request->journal_entry['account_id']); $i++) {
+        for ($i = 0; $i < count($request->journal_entries); $i++) {
             DB::beginTransaction();
 
-            $month = Carbon::parse($request->journal_entry['date'][$i])->format('F');
-            $year = Carbon::parse($request->journal_entry['date'][$i])->format('Y');
+            $month = Carbon::parse($request->journal_entries[$i]['date'])->format('F');
+            $year = Carbon::parse($request->journal_entries[$i]['date'])->format('Y');
             $today = now()->format('d');
 
             // financial year
@@ -146,47 +152,47 @@ class JournalController extends Controller
 
             if (has_permission('journals.approve') || request()->isOwner == true) {
                 $transaction                              = new Transaction();
-                $transaction->trans_date                  = Carbon::parse($request->journal_entry['date'][$i])->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                $transaction->account_id  = $request->journal_entry['account_id'][$i];
+                $transaction->trans_date                  = Carbon::parse($request->journal_entries[$i]['date'])->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                $transaction->account_id  = $request->journal_entries[$i]['account_id'];
                 $transaction->transaction_method          = $request->method;
                 $transaction->transaction_currency        = $request->trans_currency;
                 $transaction->currency_rate               = Currency::where('name', $request->trans_currency)->first()->exchange_rate;
-                if ($request->journal_entry['debit'][$i] > 0) {
+                if ($request->journal_entries[$i]['debit'] > 0) {
                     $transaction->dr_cr       = 'dr';
-                    $transaction->transaction_amount      = $request->journal_entry['debit'][$i];
-                    $transaction->base_currency_amount    = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entry['debit'][$i]);
+                    $transaction->transaction_amount      = $request->journal_entries[$i]['debit'];
+                    $transaction->base_currency_amount    = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entries[$i]['debit']);
                 } else {
                     $transaction->dr_cr       = 'cr';
-                    $transaction->transaction_amount      = $request->journal_entry['credit'][$i];
-                    $transaction->base_currency_amount = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entry['credit'][$i]);
+                    $transaction->transaction_amount      = $request->journal_entries[$i]['credit'];
+                    $transaction->base_currency_amount = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entries[$i]['credit']);
                 }
-                $transaction->description = $request->journal_entry['description'][$i];
+                $transaction->description = $request->journal_entries[$i]['description'];
                 $transaction->ref_id      = $journal->id;
                 $transaction->ref_type    = 'journal';
-                $transaction->customer_id = $request->journal_entry['customer_id'][$i] ?? NULL;
-                $transaction->vendor_id = $request->journal_entry['vendor_id'][$i] ?? NULL;
+                $transaction->customer_id = $request->journal_entries[$i]['customer_id'] ?? NULL;
+                $transaction->vendor_id = $request->journal_entries[$i]['vendor_id'] ?? NULL;
                 $transaction->save();
             } else {
                 $transaction                              = new PendingTransaction();
-                $transaction->trans_date                  = Carbon::parse($request->journal_entry['date'][$i])->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                $transaction->account_id  = $request->journal_entry['account_id'][$i];
+                $transaction->trans_date                  = Carbon::parse($request->journal_entries[$i]['date'])->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                $transaction->account_id  = $request->journal_entries[$i]['account_id'];
                 $transaction->transaction_method          = $request->method;
                 $transaction->transaction_currency        = $request->trans_currency;
                 $transaction->currency_rate               = Currency::where('name', $request->trans_currency)->first()->exchange_rate;
-                if ($request->journal_entry['debit'][$i] > 0) {
+                if ($request->journal_entries[$i]['debit'] > 0) {
                     $transaction->dr_cr       = 'dr';
-                    $transaction->transaction_amount      = $request->journal_entry['debit'][$i];
-                    $transaction->base_currency_amount    = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entry['debit'][$i]);
+                    $transaction->transaction_amount      = $request->journal_entries[$i]['debit'];
+                    $transaction->base_currency_amount    = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entries[$i]['debit']);
                 } else {
                     $transaction->dr_cr       = 'cr';
-                    $transaction->transaction_amount      = $request->journal_entry['credit'][$i];
-                    $transaction->base_currency_amount = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entry['credit'][$i]);
+                    $transaction->transaction_amount      = $request->journal_entries[$i]['credit'];
+                    $transaction->base_currency_amount = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entries[$i]['credit']);
                 }
-                $transaction->description = $request->journal_entry['description'][$i];
+                $transaction->description = $request->journal_entries[$i]['description'];
                 $transaction->ref_id      = $journal->id;
                 $transaction->ref_type    = 'journal';
-                $transaction->customer_id = $request->customer_id ?? NULL;
-                $transaction->vendor_id = $request->vendor_id ?? NULL;
+                $transaction->customer_id = $request->journal_entries[$i]['customer_id'] ?? NULL;
+                $transaction->vendor_id = $request->journal_entries[$i]['vendor_id'] ?? NULL;
                 $transaction->save();
             }
 
@@ -265,8 +271,8 @@ class JournalController extends Controller
         $journal->date = Carbon::createFromFormat(get_date_format(), $journal->date)->format('Y-m-d');
         $journal->transaction_currency = $request->trans_currency;
         $journal->currency_rate = Currency::where('name', $request->trans_currency)->first()->exchange_rate;
-        $journal->transaction_amount      = array_sum($request->journal_entry['debit']);
-        $journal->base_currency_amount    = convert_currency($request->trans_currency, $request->activeBusiness->currency, array_sum($request->journal_entry['debit']));
+        $journal->transaction_amount      = array_sum(array_map(function ($entry) { return floatval($entry['debit']); }, $request->journal_entries));
+        $journal->base_currency_amount    = convert_currency($request->trans_currency, $request->activeBusiness->currency, $journal->transaction_amount);
         $journal->save();
 
         $transactions = Transaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->get();
@@ -280,11 +286,11 @@ class JournalController extends Controller
             $trans->delete();
         }
 
-        for ($i = 0; $i < count($request->journal_entry['account_id']); $i++) {
+        for ($i = 0; $i < count($request->journal_entries); $i++) {
             DB::beginTransaction();
 
-            $month = Carbon::parse($request->journal_entry['date'][$i])->format('F');
-            $year = Carbon::parse($request->journal_entry['date'][$i])->format('Y');
+            $month = Carbon::parse($request->journal_entries[$i]['date'])->format('F');
+            $year = Carbon::parse($request->journal_entries[$i]['date'])->format('Y');
             $today = now()->format('d');
 
             // financial year
@@ -302,47 +308,47 @@ class JournalController extends Controller
 
             if (has_permission('journals.approve') || (request()->isOwner == true && $journal->status == 1)) {
                 $transaction                              = new Transaction();
-                $transaction->trans_date                  = Carbon::parse($request->journal_entry['date'][$i])->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                $transaction->account_id  = $request->journal_entry['account_id'][$i];
+                $transaction->trans_date                  = Carbon::parse($request->journal_entries[$i]['date'])->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                $transaction->account_id  = $request->journal_entries[$i]['account_id'];
                 $transaction->transaction_method          = $request->method;
                 $transaction->transaction_currency        = $request->trans_currency;
                 $transaction->currency_rate               = Currency::where('name', $request->trans_currency)->first()->exchange_rate;
-                if ($request->journal_entry['debit'][$i] > 0) {
+                if ($request->journal_entries[$i]['debit'] > 0) {
                     $transaction->dr_cr       = 'dr';
-                    $transaction->transaction_amount      = $request->journal_entry['debit'][$i];
-                    $transaction->base_currency_amount    = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entry['debit'][$i]);
+                    $transaction->transaction_amount      = $request->journal_entries[$i]['debit'];
+                    $transaction->base_currency_amount    = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entries[$i]['debit']);
                 } else {
                     $transaction->dr_cr       = 'cr';
-                    $transaction->transaction_amount      = $request->journal_entry['credit'][$i];
-                    $transaction->base_currency_amount = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entry['credit'][$i]);
+                    $transaction->transaction_amount      = $request->journal_entries[$i]['credit'];
+                    $transaction->base_currency_amount = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entries[$i]['credit']);
                 }
-                $transaction->description = $request->journal_entry['description'][$i];
+                $transaction->description = $request->journal_entries[$i]['description'];
                 $transaction->ref_id      = $journal->id;
                 $transaction->ref_type    = 'journal';
-                $transaction->customer_id = $request->journal_entry['customer_id'][$i] ?? NULL;
-                $transaction->vendor_id = $request->journal_entry['vendor_id'][$i] ?? NULL;
+                $transaction->customer_id = $request->journal_entries[$i]['customer_id'] ?? NULL;
+                $transaction->vendor_id = $request->journal_entries[$i]['vendor_id'] ?? NULL;
                 $transaction->save();
             } else {
                 $transaction                              = new PendingTransaction();
-                $transaction->trans_date                  = Carbon::parse($request->journal_entry['date'][$i])->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                $transaction->account_id  = $request->journal_entry['account_id'][$i];
+                $transaction->trans_date                  = Carbon::parse($request->journal_entries[$i]['date'])->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                $transaction->account_id  = $request->journal_entries[$i]['account_id'];
                 $transaction->transaction_method          = $request->method;
                 $transaction->transaction_currency        = $request->trans_currency;
                 $transaction->currency_rate               = Currency::where('name', $request->trans_currency)->first()->exchange_rate;
-                if ($request->journal_entry['debit'][$i] > 0) {
+                if ($request->journal_entries[$i]['debit'] > 0) {
                     $transaction->dr_cr       = 'dr';
-                    $transaction->transaction_amount      = $request->journal_entry['debit'][$i];
-                    $transaction->base_currency_amount    = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entry['debit'][$i]);
+                    $transaction->transaction_amount      = $request->journal_entries[$i]['debit'];
+                    $transaction->base_currency_amount    = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entries[$i]['debit']);
                 } else {
                     $transaction->dr_cr       = 'cr';
-                    $transaction->transaction_amount      = $request->journal_entry['credit'][$i];
-                    $transaction->base_currency_amount = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entry['credit'][$i]);
+                    $transaction->transaction_amount      = $request->journal_entries[$i]['credit'];
+                    $transaction->base_currency_amount = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entries[$i]['credit']);
                 }
-                $transaction->description = $request->journal_entry['description'][$i];
+                $transaction->description = $request->journal_entries[$i]['description'];
                 $transaction->ref_id      = $journal->id;
                 $transaction->ref_type    = 'journal';
-                $transaction->customer_id = $request->journal_entry['customer_id'][$i] ?? NULL;
-                $transaction->vendor_id = $request->journal_entry['vendor_id'][$i] ?? NULL;
+                $transaction->customer_id = $request->journal_entries[$i]['customer_id'] ?? NULL;
+                $transaction->vendor_id = $request->journal_entries[$i]['vendor_id'] ?? NULL;
                 $transaction->save();
             }
 

@@ -38,69 +38,34 @@ class AccountController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Account::query();
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
 
-        // Apply search filter if provided
-        if ($request->has('search') && !empty($request->search)) {
-            $search = $request->search;
+        $query = Account::orderBy("id", "desc");
+
+        // Apply search if provided
+        if (!empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->where('account_name', 'like', "%{$search}%")
-                  ->orWhere('account_code', 'like', "%{$search}%")
-                  ->orWhere('account_type', 'like', "%{$search}%");
+                    ->orWhere('account_code', 'like', "%{$search}%");
             });
         }
 
-        // Apply column filters if provided
-        if ($request->has('columnFilters') && !empty($request->columnFilters)) {
-            $columnFilters = json_decode($request->columnFilters, true);
-            
-            foreach ($columnFilters as $filter) {
-                $id = $filter['id'];
-                $value = $filter['value'];
-                
-                if ($id === 'account_type' && !empty($value)) {
-                    $query->where('account_type', $value);
-                }
-            }
-        }
-
-        // Apply sorting if provided
-        if ($request->has('sorting') && !empty($request->sorting)) {
-            $sorting = json_decode($request->sorting, true);
-            
-            foreach ($sorting as $sort) {
-                $id = $sort['id'];
-                $desc = $sort['desc'];
-                
-                $direction = $desc ? 'desc' : 'asc';
-                $query->orderBy($id, $direction);
-            }
-        } else {
-            // Default sorting
-            $query->orderBy('account_name', 'asc');
-        }
-
-        // Get pagination parameters
-        $perPage = $request->has('per_page') ? (int)$request->per_page : 10;
-        $page = $request->has('page') ? (int)$request->page : 1;
-
-        // Get paginated results
-        $accounts = $query->paginate($perPage, ['*'], 'page', $page);
-
+        $accounts = $query->paginate($per_page)->withQueryString();
         return Inertia::render('Backend/User/Account/List', [
             'accounts' => $accounts->items(),
             'meta' => [
                 'current_page' => $accounts->currentPage(),
-                'per_page' => $accounts->perPage(),
-                'total' => $accounts->total(),
-                'last_page' => $accounts->lastPage(),
                 'from' => $accounts->firstItem(),
+                'last_page' => $accounts->lastPage(),
+                'per_page' => $per_page,
                 'to' => $accounts->lastItem(),
+                'total' => $accounts->total(),
+                'links' => $accounts->linkCollection(),
+                'path' => $accounts->path(),
             ],
             'filters' => [
-                'search' => $request->search ?? '',
-                'columnFilters' => !empty($request->columnFilters) ? json_decode($request->columnFilters, true) : [],
-                'sorting' => !empty($request->sorting) ? json_decode($request->sorting, true) : [],
+                'search' => $search,
             ],
         ]);
     }

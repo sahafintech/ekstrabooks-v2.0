@@ -1,16 +1,14 @@
-import React, { useState, useEffect } from "react";
-import { Link, router, usePage, useForm } from "@inertiajs/react";
+import { Link, usePage, useForm } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
-import { Card, CardContent } from "@/Components/ui/card";
 import InputError from "@/Components/InputError";
 import { Label } from "@/Components/ui/label";
 import { Input } from "@/Components/ui/input";
 import { Textarea } from "@/Components/ui/textarea";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { format } from "date-fns";
-import { CalendarIcon, MinusCircle, PlusCircle, Trash } from "lucide-react";
+import { CalendarIcon, PlusCircle, Trash } from "lucide-react";
 import { Calendar } from "@/Components/ui/calendar";
 import {
   Popover,
@@ -26,17 +24,15 @@ export default function Create({
   accounts = [],
   customers = [],
   vendors = [],
-  journal_number = ""
+  journal_number,
 }) {
-  const { auth, flash, errors } = usePage().props;
-  const { toast } = useToast();
-  const activeBusinessCurrency = auth.active_business?.currency || "USD";
 
-  const { data, setData, post, processing, reset } = useForm({
+  const { toast } = useToast();
+
+  const { data, setData, post, processing, errors } = useForm({
     date: new Date(),
     journal_number: journal_number,
-    trans_currency: activeBusinessCurrency,
-    description: "",
+    trans_currency: "",
     journal_entries: [
       {
         account_id: "",
@@ -84,18 +80,6 @@ export default function Create({
   const submit = (e) => {
     e.preventDefault();
 
-    // Format dates before submitting
-    const formattedData = {
-      ...data,
-      date: format(new Date(data.date), "yyyy-MM-dd"),
-      journal_entries: data.journal_entries.map(entry => ({
-        ...entry,
-        date: format(new Date(entry.date), "yyyy-MM-dd"),
-        debit: entry.debit || "0",
-        credit: entry.credit || "0"
-      }))
-    };
-
     post(route("journals.store"), {
       onSuccess: () => {
         toast({
@@ -130,17 +114,6 @@ export default function Create({
       .reduce((acc, val) => acc + val, 0);
 
     return { totalDebit, totalCredit, difference: totalDebit - totalCredit };
-  };
-
-  // Format currency
-  const formatCurrency = (amount, currency = "USD") => {
-    // Ensure we use proper ISO 4217 currency code
-    const currencyCode = (currency || "USD").split(' ')[0];
-
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currencyCode,
-    }).format(amount);
   };
 
   // Handle field change (ensure debit/credit are mutually exclusive)
@@ -178,22 +151,26 @@ export default function Create({
             subpage="Create new journal entry"
             url="journals.index"
           />
-          <div className="p-4">
+          <div>
+            {/* foreach errors */}
+            {errors && Object.entries(errors).map(([key, value]) => (
+              <p key={key} className="text-red-500 text-sm mt-2">
+                {value}
+              </p>
+            ))}
+          </div>
+          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
             <form onSubmit={submit} className="space-y-6">
-              <div className="grid grid-cols-12 gap-4">
-                {/* Journal Date */}
+              <div className="grid grid-cols-12 mt-2">
                 <Label htmlFor="date" className="md:col-span-2 col-span-12">
-                  Journal Date
+                  Journal Date *
                 </Label>
                 <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant={"outline"}
-                        className={cn(
-                          "w-full md:w-[240px] pl-3 text-left font-normal",
-                          !data.date && "text-muted-foreground"
-                        )}
+                        className="md:w-1/2 w-full"
                       >
                         {data.date ? (
                           format(new Date(data.date), "PP")
@@ -214,38 +191,47 @@ export default function Create({
                   </Popover>
                   <InputError message={errors.date} className="mt-2" />
                 </div>
+              </div>
 
-                {/* Journal Number */}
+              <div className="grid grid-cols-12 mt-2">
                 <Label htmlFor="journal_number" className="md:col-span-2 col-span-12">
-                  Journal Number
+                  Journal Number *
                 </Label>
                 <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                   <Input
                     id="journal_number"
                     value={data.journal_number}
                     onChange={(e) => setData("journal_number", e.target.value)}
-                    className="md:w-[240px] w-full"
+                    className="md:w-1/2 w-full"
                     readOnly
                   />
                   <InputError message={errors.journal_number} className="mt-2" />
                 </div>
+              </div>
 
-                {/* Currency */}
+              <div className="grid grid-cols-12 mt-2">
                 <Label htmlFor="trans_currency" className="md:col-span-2 col-span-12">
-                  Currency
+                  Currency *
                 </Label>
                 <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                  <SearchableCombobox
-                    value={data.trans_currency}
-                    onValueChange={(value) => setData("trans_currency", value)}
-                    placeholder="Select a currency"
-                    items={currencies.map((currency) => ({
-                      value: currency.code,
-                      label: `${currency.code} - ${currency.name}`
-                    }))}
-                    className="md:w-[240px] w-full"
-                  />
-                  <InputError message={errors.trans_currency} className="mt-2" />
+                  <div className="md:w-1/2 w-full">
+                    <SearchableCombobox
+                      className="mt-1"
+                      options={currencies.map(currency => ({
+                        id: currency.name,
+                        value: currency.name,
+                        label: currency.name,
+                        name: `${currency.name} - ${currency.description} (${currency.exchange_rate})`
+                      }))}
+                      value={data.trans_currency}
+                      onChange={(selectedValue) => {
+                        setData("trans_currency", selectedValue);
+                        handleCurrencyChange(selectedValue);
+                      }}
+                      placeholder="Select currency"
+                    />
+                  </div>
+                  <InputError message={errors.trans_currency} className="text-sm" />
                 </div>
               </div>
 
@@ -305,11 +291,11 @@ export default function Create({
                         <div className="col-span-3">
                           <SearchableCombobox
                             value={entry.account_id}
-                            onValueChange={(value) => handleFieldChange(index, "account_id", value)}
+                            onChange={(value) => handleFieldChange(index, "account_id", value)}
                             placeholder="Select an account"
-                            items={accounts.map((account) => ({
-                              value: account.id.toString(),
-                              label: account.account_name
+                            options={accounts.map((account) => ({
+                              id: account.id,
+                              name: account.account_name
                             }))}
                             className="max-w-full"
                           />
@@ -361,7 +347,7 @@ export default function Create({
                           <div className="space-y-2">
                             <SearchableCombobox
                               value={entry.customer_id || ""}
-                              onValueChange={(value) => {
+                              onChange={(value) => {
                                 // If selecting a customer, clear vendor
                                 const updatedEntries = [...data.journal_entries];
                                 updatedEntries[index].customer_id = value;
@@ -369,9 +355,9 @@ export default function Create({
                                 setData("journal_entries", updatedEntries);
                               }}
                               placeholder="Customer"
-                              items={customers.map((customer) => ({
-                                value: customer.id.toString(),
-                                label: customer.display_name
+                              options={customers.map((customer) => ({
+                                id: customer.id,
+                                name: customer.name
                               }))}
                               className="max-w-full"
                             />
@@ -379,7 +365,7 @@ export default function Create({
 
                             <SearchableCombobox
                               value={entry.vendor_id || ""}
-                              onValueChange={(value) => {
+                              onChange={(value) => {
                                 // If selecting a vendor, clear customer
                                 const updatedEntries = [...data.journal_entries];
                                 updatedEntries[index].vendor_id = value;
@@ -387,9 +373,9 @@ export default function Create({
                                 setData("journal_entries", updatedEntries);
                               }}
                               placeholder="Vendor"
-                              items={vendors.map((vendor) => ({
-                                value: vendor.id.toString(),
-                                label: vendor.display_name
+                              options={vendors.map((vendor) => ({
+                                id: vendor.id,
+                                name: vendor.name
                               }))}
                               className="max-w-full"
                             />
@@ -410,11 +396,6 @@ export default function Create({
                             <span className="sr-only">Remove row</span>
                           </Button>
                         </div>
-                      </div>
-
-                      {/* Entry number indicator */}
-                      <div className="absolute -top-3 -left-3 bg-primary text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-                        {index + 1}
                       </div>
                     </div>
                   ))}
@@ -463,15 +444,15 @@ export default function Create({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="font-medium text-right">Total Debit:</div>
                     <div className="text-right font-medium">
-                      {formatCurrency(totals.totalDebit, data.trans_currency)}
+                      {totals.totalDebit}
                     </div>
                     <div className="font-medium text-right">Total Credit:</div>
                     <div className="text-right font-medium">
-                      {formatCurrency(totals.totalCredit, data.trans_currency)}
+                      {totals.totalCredit}
                     </div>
                     <div className="font-medium text-right">Difference:</div>
                     <div className={`text-right font-medium ${isFormBalanced ? "text-green-600" : "text-red-600"}`}>
-                      {formatCurrency(totals.difference, data.trans_currency)}
+                      {totals.difference}
                     </div>
                   </div>
                 </div>

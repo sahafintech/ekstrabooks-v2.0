@@ -33,7 +33,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 
-export default function Receivables({ report_data, date1, date2, meta = {}, filters = {}, business_name, currency, grand_total, paid_amount, due_amount, customers = [], customer_id = '' }) {
+export default function Payables({ report_data, date1, date2, meta = {}, filters = {}, business_name, currency, grand_total, paid_amount, due_amount, vendors = [], vendor_id = '' }) {
     const [search, setSearch] = useState(filters.search || "");
     const [perPage, setPerPage] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
@@ -41,13 +41,13 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
     const { data, setData, post, processing, errors, reset } = useForm({
         date1: date1,
         date2: date2,
-        customer_id: customer_id,
+        vendor_id: vendor_id,
     });
 
     const handleSearch = (e) => {
         e.preventDefault();
         router.get(
-            route("reports.receivables"),
+            route("reports.payables"),
             {
                 search: search,
                 per_page: perPage,
@@ -60,10 +60,10 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
 
     const handleGenerate = (e) => {
         e.preventDefault();
-        post(route("reports.receivables"), {
+        post(route("reports.payables"), {
             date1: data.date1,
             date2: data.date2,
-            customer_id: data.customer_id,
+            vendor_id: data.vendor_id,
             search: search,
             per_page: perPage,
             page: 1,
@@ -79,7 +79,7 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
     const handlePerPageChange = (value) => {
         setPerPage(value);
         router.get(
-            route("reports.receivables"),
+            route("reports.payables"),
             { search, page: 1, per_page: value },
             { preserveState: true }
         );
@@ -88,7 +88,7 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
     const handlePageChange = (page) => {
         setCurrentPage(page);
         router.get(
-            route("reports.receivables"),
+            route("reports.payables"),
             { search, page, per_page: perPage },
             { preserveState: true }
         );
@@ -126,10 +126,9 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
 
     const ItemStatusBadge = ({ status }) => {
         const statusMap = {
-          0: { label: "Draft", className: "text-gray-500" },
-          1: { label: "Unpaid", className: "text-red-500" },
+          0: { label: "Unpaid", className: "text-red-500" },
           2: { label: "Paid", className: "text-green-500" },
-          3: { label: "Partial Paid", className: "text-blue-500" },
+          1: { label: "Partial Paid", className: "text-blue-500" },
         };
     
         return (
@@ -161,17 +160,17 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Receivables</title>
+                <title>Payables</title>
                 ${style}
             </head>
             <body>
                 <h1>${business_name}</h1>
-                <h2>Receivables (${data.date1} - ${data.date2})</h2>
+                <h2>Payables (${data.date1} - ${data.date2})</h2>
                 <table>
                     <thead>
                         <tr>
                             <th>Customer</th>
-                            <th class="text-right">Invoice Amount (${currency})</th>
+                            <th class="text-right">Purchase Amount (${currency})</th>
                             <th class="text-right">Paid Amount (${currency})</th>
                             <th class="text-right">Due Amount (${currency})</th>
                         </tr>
@@ -184,8 +183,8 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
             report_data.forEach(item => {
                 printContent += `
                     <tr>
-                        <td>${item.customer_name || 'N/A'}</td>
-                        <td class="text-right">${item.total_income}</td>
+                        <td>${item.vendor_name || 'N/A'}</td>
+                        <td class="text-right">${item.total_purchase}</td>
                         <td class="text-right">${item.total_paid}</td>
                         <td class="text-right">${item.total_due}</td>
                     </tr>
@@ -234,14 +233,14 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
 
     return (
         <AuthenticatedLayout>
-            <Head title="Receivables Report" />
+            <Head title="Payables Report" />
             <Toaster />
             <SidebarInset>
                 <div className="main-content">
                     <PageHeader
-                        page="Receivables"
+                        page="Payables"
                         subpage="Report"
-                        url="reports.receivables"
+                        url="reports.payables"
                     />
                     <div className="p-4">
                         <div className="flex flex-col justify-between items-start mb-6 gap-4">
@@ -298,17 +297,17 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                                     <div className="flex items-center gap-2 w-full md:w-72">
                                         <SearchableCombobox
                                             options={[
-                                                { id: '', name: 'All Customers' },
-                                                ...customers.map(customer => ({
-                                                    id: customer.id.toString(),
-                                                    name: customer.name,
-                                                    details: customer.mobile || customer.email
+                                                { id: '', name: 'All Vendors' },
+                                                ...vendors.map(vendor => ({
+                                                    id: vendor.id.toString(),
+                                                    name: vendor.name,
+                                                    details: vendor.mobile || vendor.email
                                                 }))
                                             ]}
-                                            value={data.customer_id}
-                                            onChange={(value) => setData('customer_id', value)}
+                                            value={data.vendor_id}
+                                            onChange={(value) => setData('vendor_id', value)}
                                             className="w-full"
-                                            placeholder="Select Customer"
+                                            placeholder="Select Vendor"
                                         />
                                         <Button type="submit" disabled={processing}>{processing ? 'Generating...' : 'Generate'}</Button>
                                     </div>
@@ -317,7 +316,7 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                             <div className="flex flex-col md:flex-row gap-4 md:items-center">
                                 <form onSubmit={handleSearch} className="flex gap-2">
                                     <Input
-                                        placeholder="Search customer..."
+                                        placeholder="Search vendor..."
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
                                         className="w-full md:w-80"
@@ -357,11 +356,10 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Invoice Date</TableHead>
-                                        <TableHead>Customer(Provider)</TableHead>
-                                        <TableHead>Client</TableHead>
-                                        <TableHead>Invoice Number</TableHead>
-                                        <TableHead className="text-right">Invoice Amount ({currency})</TableHead>
+                                        <TableHead>Purchase Date</TableHead>
+                                        <TableHead>Vendor</TableHead>
+                                        <TableHead>Purchase Number</TableHead>
+                                        <TableHead className="text-right">Purchase Amount ({currency})</TableHead>
                                         <TableHead className="text-right">Paid Amount ({currency})</TableHead>
                                         <TableHead className="text-right">Due Amount ({currency})</TableHead>
                                         <TableHead>Due Date</TableHead>
@@ -372,11 +370,10 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                                     {report_data.length > 0 ? (
                                         <>
                                             {report_data.map((item) => (
-                                                <TableRow key={item.customer_id}>
-                                                    <TableCell>{item.invoice_date}</TableCell>
-                                                    <TableCell>{item.customer_name || 'N/A'}</TableCell>
-                                                    <TableCell>{item.client_name || 'N/A'}</TableCell>
-                                                    <TableCell>{item.invoice_number || 'N/A'}</TableCell>
+                                                <TableRow key={item.vendor_id}>
+                                                    <TableCell>{item.purchase_date}</TableCell>
+                                                    <TableCell>{item.vendor_name || 'N/A'}</TableCell>
+                                                    <TableCell>{item.purchase_number || 'N/A'}</TableCell>
                                                     <TableCell className="text-right">{item.grand_total_formatted}</TableCell>
                                                     <TableCell className="text-right">{item.paid_amount_formatted}</TableCell>
                                                     <TableCell className="text-right">{item.due_amount_formatted}</TableCell>
@@ -398,7 +395,7 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                                         </>
                                     ) : (
                                         <TableRow>
-                                            <TableCell colSpan={9} className="h-24 text-center">
+                                            <TableCell colSpan={8} className="h-24 text-center">
                                                 No data found.
                                             </TableCell>
                                         </TableRow>

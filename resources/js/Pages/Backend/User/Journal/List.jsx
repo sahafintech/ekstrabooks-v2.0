@@ -20,8 +20,7 @@ import {
   SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { format, parse, isValid } from "date-fns";
-import { Download, Edit, EyeIcon, Plus, Trash } from "lucide-react";
+import { Download, Edit, Eye, Plus, Trash } from "lucide-react";
 import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -135,59 +134,16 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
     window.location.href = route("journals.export_journal", id);
   };
 
-  const formatCurrency = (amount, currency = "USD") => {
-    // Ensure we use proper ISO 4217 currency code
-    // Extract just the currency code if it contains additional text
-    const currencyCode = (currency || "USD").split(' ')[0];
+  const JournalStatusBadge = ({ status }) => {
+    const statusMap = {
+      1: { label: "Approved", className: "text-green-500" },
+      0: { label: "Pending", className: "text-yellow-500" },
+    };
 
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currencyCode,
-    }).format(amount);
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-
-    // Try different date parsing approaches
-    let date;
-
-    // First try direct Date parsing
-    date = new Date(dateString);
-
-    // If that fails, try parsing common formats
-    if (!isValid(date)) {
-      // Try parsing yyyy-mm-dd format
-      if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        const [year, month, day] = dateString.split('-').map(Number);
-        date = new Date(year, month - 1, day);
-      }
-      // Try parsing dd/mm/yyyy format
-      else if (dateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
-        date = parse(dateString, 'dd/MM/yyyy', new Date());
-      }
-    }
-
-    // If still invalid, return the original string
-    if (!isValid(date)) {
-      return dateString;
-    }
-
-    return format(date, "dd MMM yyyy");
-  };
-
-  const getStatusBadge = (status) => {
-    if (status === 1) {
-      return (
-        <p className="text-green-500">
-          Approved
-        </p>
-      );
-    }
     return (
-      <p className="text-yellow-500">
-        Pending
-      </p>
+      <span className={statusMap[status].className}>
+        {statusMap[status].label}
+      </span>
     );
   };
 
@@ -308,12 +264,13 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
                         aria-label="Select all"
                       />
                     </TableHead>
-                    <TableHead className="w-[100px]">Date</TableHead>
-                    <TableHead className="w-[120px]">Journal #</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="w-[100px] text-center">Status</TableHead>
-                    <TableHead className="w-[100px] text-right">Actions</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Journal #</TableHead>
+                    <TableHead className="text-right">Transaction Amount</TableHead>
+                    <TableHead>Currency Rate</TableHead>
+                    <TableHead className="text-right">Base Currency Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -334,7 +291,7 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
                           />
                         </TableCell>
                         <TableCell>
-                          {formatDate(journal.date)}
+                          {journal.date}
                         </TableCell>
                         <TableCell>
                           <Link
@@ -344,41 +301,39 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
                             {journal.journal_number}
                           </Link>
                         </TableCell>
-                        <TableCell className="max-w-[300px] truncate">
-                          {journal.description || "Journal entry"}
+                        <TableCell className="text-right">
+                          {journal.transaction_amount}
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatCurrency(journal.transaction_amount, journal.transaction_currency)}
-                          {journal.transaction_currency !== journal.base_currency && (
-                            <div className="text-xs text-gray-500">
-                              {formatCurrency(journal.base_currency_amount, journal.base_currency || "USD")}
-                            </div>
-                          )}
+                          {journal.currency_rate}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {journal.base_currency_amount}
                         </TableCell>
                         <TableCell className="text-center">
-                          {getStatusBadge(journal.status)}
+                          <JournalStatusBadge status={journal.status} />
                         </TableCell>
                         <TableCell className="text-right">
                           <TableActions
                             actions={[
                               {
                                 label: "View",
-                                icon: EyeIcon,
+                                icon: <Eye className="h-4 w-4" />,
                                 onClick: () => router.visit(route("journals.show", journal.id))
                               },
                               {
                                 label: "Edit",
-                                icon: Edit,
+                                icon: <Edit className="h-4 w-4" />,
                                 onClick: () => router.visit(route("journals.edit", journal.id))
                               },
                               {
                                 label: "Export",
-                                icon: Download,
+                                icon: <Download className="h-4 w-4" />,
                                 onClick: () => handleExport(journal.id)
                               },
                               {
                                 label: "Delete",
-                                icon: Trash,
+                                icon: <Trash className="h-4 w-4" />,
                                 onClick: () => {
                                   if (confirm("Are you sure you want to delete this journal entry? This action cannot be undone.")) {
                                     handleDelete(journal.id);

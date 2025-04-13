@@ -1,27 +1,33 @@
-import React, { useState, useMemo } from "react";
-import { Link, router, usePage } from "@inertiajs/react";
+import React, { useState, useEffect } from "react";
+import { Head, Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
-import PageHeader from "@/Components/PageHeader";
 import { Button } from "@/Components/ui/button";
-import { DataTable } from "@/Components/ui/data-table/data-table";
-import TableActions from "@/Components/shared/TableActions";
 import { Checkbox } from "@/Components/ui/checkbox";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/Components/ui/dropdown-menu";
-import { Plus, Trash2, Edit, BarChart, MoreVertical } from "lucide-react";
-import { Badge } from "@/Components/ui/badge";
-import Modal from "@/Components/Modal";
-import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogFooter } from "@/Components/ui/dialog";
-import { Label } from "@/Components/ui/label";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/Components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { format, subDays } from "date-fns";
+import { Edit, Eye, Plus, Settings, Trash, Users } from "lucide-react";
+import { Toaster } from "@/Components/ui/toaster";
+import { useToast } from "@/hooks/use-toast";
+import TableActions from "@/Components/shared/TableActions";
+import PageHeader from "@/Components/PageHeader";
+import Modal from "@/Components/Modal";
 
-// Delete Account Modal Component
+// Delete Confirmation Modal Component
 const DeleteAccountModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm} className="p-6">
@@ -42,19 +48,19 @@ const DeleteAccountModal = ({ show, onClose, onConfirm, processing }) => (
           variant="destructive"
           disabled={processing}
         >
-          Delete Account
+          Delete
         </Button>
       </div>
     </form>
   </Modal>
 );
 
-// Delete Multiple Accounts Modal Component
-const DeleteAllAccountsModal = ({ show, onClose, onConfirm, processing }) => (
+// Bulk Delete Confirmation Modal Component
+const DeleteAllAccountModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm} className="p-6">
       <h2 className="text-lg font-medium">
-        Are you sure you want to delete all selected accounts?
+        Are you sure you want to delete {count} selected account{count !== 1 ? 's' : ''}?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -63,46 +69,125 @@ const DeleteAllAccountsModal = ({ show, onClose, onConfirm, processing }) => (
           onClick={onClose}
           className="mr-3"
         >
-          Close
+          Cancel
         </Button>
         <Button
           type="submit"
           variant="destructive"
           disabled={processing}
         >
-          Delete All
+          Delete Selected
         </Button>
       </div>
     </form>
   </Modal>
 );
 
+
 export default function List({ accounts = [], meta = {}, filters = {} }) {
-  const { auth } = usePage().props;
+  const { flash = {} } = usePage().props;
+  const { toast } = useToast();
   const [selectedAccounts, setSelectedAccounts] = useState([]);
+  const [isAllSelected, setIsAllSelected] = useState(false);
+  const [search, setSearch] = useState(filters.search || "");
+  const [perPage, setPerPage] = useState(meta.per_page || 10);
+  const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
+  const [bulkAction, setBulkAction] = useState("");
+  
+  // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState(null);
-  const [tableRef, setTableRef] = useState(null);
   const [processing, setProcessing] = useState(false);
-  
-  // For the dialog when viewing or editing an account
-  const [openDialog, setOpenDialog] = useState(false);
-  const [dialogContent, setDialogContent] = useState(null);
-  const [dialogTitle, setDialogTitle] = useState("");
-  
-  // For the account statement report
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState(null);
-  const [fromDate, setFromDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
-  const [toDate, setToDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
-  // Format currency with proper ISO 4217 code
-  const formatCurrency = (amount, currencyCode = 'USD') => {
-    return new Intl.NumberFormat('en-US', { 
-      style: 'currency', 
-      currency: currencyCode.split(' ')[0] // Extract ISO code if it has a description
-    }).format(amount);
+  useEffect(() => {
+    if (flash && flash.success) {
+      toast({
+        title: "Success",
+        description: flash.success,
+      });
+    }
+
+    if (flash && flash.error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: flash.error,
+      });
+    }
+  }, [flash, toast]);
+
+  const { auth } = usePage().props;
+  const userId = auth.user.id;
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedAccounts([]);
+    } else {
+      setSelectedAccounts(accounts.map((account) => account.id));
+    }
+    setIsAllSelected(!isAllSelected);
+  };
+
+  const toggleSelectAccount = (id) => {
+    if (selectedAccounts.includes(id)) {
+      setSelectedAccounts(selectedAccounts.filter((accountId) => accountId !== id));
+      setIsAllSelected(false);
+    } else {
+      setSelectedAccounts([...selectedAccounts, id]);
+      if (selectedAccounts.length + 1 === accounts.length) {
+        setIsAllSelected(true);
+      }
+    }
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    router.get(
+      route("accounts.index"),
+      { search, page: 1, per_page: perPage },
+      { preserveState: true }
+    );
+  };
+
+  const handlePerPageChange = (value) => {
+    setPerPage(value);
+    router.get(
+      route("accounts.index"),
+      { search, page: 1, per_page: value },
+      { preserveState: true }
+    );
+  };
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    router.get(
+      route("accounts.index"),
+      { search, page, per_page: perPage },
+      { preserveState: true }
+    );
+  };
+
+  const handleBulkAction = () => {
+    if (bulkAction === "") return;
+
+    if (selectedAccounts.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select at least one account",
+      });
+      return;
+    }
+
+    if (bulkAction === "delete") {
+      setShowDeleteAllModal(true);
+    }
+  };
+
+  const handleDeleteConfirm = (id) => {
+    setAccountToDelete(id);
+    setShowDeleteModal(true);
   };
 
   const handleDelete = (e) => {
@@ -123,18 +208,15 @@ export default function List({ accounts = [], meta = {}, filters = {} }) {
 
   const handleDeleteAll = (e) => {
     e.preventDefault();
-    if (!tableRef) return;
-    
-    const selectedIds = tableRef.getSelectedRowModel().rows.map(row => row.original.id);
-    if (selectedIds.length === 0) return;
-
     setProcessing(true);
-    router.post(route('accounts.destroy-multiple'), {
-      accounts: selectedIds
+    
+    router.post(route('accounts.bulk_action'), {
+      delete_accounts: selectedAccounts.join(',')
     }, {
       onSuccess: () => {
         setShowDeleteAllModal(false);
-        tableRef.toggleAllRowsSelected(false);
+        setSelectedAccounts([]);
+        setIsAllSelected(false);
         setProcessing(false);
       },
       onError: () => {
@@ -143,307 +225,229 @@ export default function List({ accounts = [], meta = {}, filters = {} }) {
     });
   };
 
-  const handlePagination = (pagination) => {
-    // Ensure we have valid numeric values for page and page size
-    const pageIndex = isNaN(pagination.pageIndex) ? 0 : pagination.pageIndex;
-    const pageSize = isNaN(pagination.pageSize) ? 10 : pagination.pageSize;
-    
-    // Create query parameters object (only include non-empty values)
-    const params = {
-      page: pageIndex + 1, // Convert 0-indexed to 1-indexed
-      per_page: pageSize,
-    };
-    
-    // Only add search if it's non-empty
-    if (pagination.globalFilter || filters.search) {
-      params.search = pagination.globalFilter || filters.search || '';
+  const renderPageNumbers = () => {
+    const totalPages = meta.last_page;
+    const pages = [];
+    const maxPagesToShow = 5;
+
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = startPage + maxPagesToShow - 1;
+
+    if (endPage > totalPages) {
+      endPage = totalPages;
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
     }
-    
-    // Only add column filters if they exist
-    const columnFiltersArray = pagination.columnFilters || filters.columnFilters || [];
-    if (columnFiltersArray.length > 0) {
-      params.columnFilters = JSON.stringify(columnFiltersArray);
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(
+        <Button
+          key={i}
+          variant={i === currentPage ? "default" : "outline"}
+          size="sm"
+          onClick={() => handlePageChange(i)}
+          className="mx-1"
+        >
+          {i}
+        </Button>
+      );
     }
-    
-    // Only add sorting if it exists
-    const sortingArray = pagination.sorting || filters.sorting || [];
-    if (sortingArray.length > 0) {
-      params.sorting = JSON.stringify(sortingArray);
-    }
-    
-    // Update URL and fetch data
-    router.get(route('accounts.index'), params, {
-      preserveState: true,
-      preserveScroll: true,
-      only: ['accounts', 'meta', 'filters'],
-      replace: false, // Use false to update browser history
-    });
+
+    return pages;
   };
-
-  const handleRunReport = (account) => {
-    // Navigate directly to the AccountStatement page with the default date range
-    router.get(route('accounts.account_statement', account.id));
-  };
-
-  const handleDataTableChange = (updatedState) => {
-    // Ensure we have valid numeric values for page and page size
-    const pageIndex = isNaN(updatedState.pagination.pageIndex) ? 0 : updatedState.pagination.pageIndex;
-    const pageSize = isNaN(updatedState.pagination.pageSize) ? 10 : updatedState.pagination.pageSize;
-    
-    // Create query parameters object (only include non-empty values)
-    const params = {
-      page: pageIndex + 1, // Convert 0-indexed to 1-indexed
-      per_page: pageSize,
-    };
-    
-    // Only add search if it's non-empty
-    if (updatedState.globalFilter) {
-      params.search = updatedState.globalFilter;
-    }
-    
-    // Only add column filters if they exist
-    const columnFiltersArray = updatedState.columnFilters || [];
-    if (columnFiltersArray.length > 0) {
-      params.columnFilters = JSON.stringify(columnFiltersArray);
-    }
-    
-    // Only add sorting if it exists
-    const sortingArray = updatedState.sorting || [];
-    if (sortingArray.length > 0) {
-      params.sorting = JSON.stringify(sortingArray);
-    }
-    
-    // Update URL and fetch data
-    router.get(route('accounts.index'), params, {
-      preserveState: true,
-      preserveScroll: true,
-      only: ['accounts', 'meta', 'filters'],
-      replace: false, // Use false to update browser history
-    });
-  };
-
-  const handleEditAccount = (account) => {
-    // Navigate to the Edit.jsx page instead of showing a dialog
-    router.get(route('accounts.edit', account.id));
-  };
-
-  const getAssetTypeColor = (type) => {
-    switch (type) {
-      case "Bank":
-      case "Cash":
-      case "Other Current Asset":
-      case "Fixed Asset":
-        return "bg-green-100 text-green-800";
-      case "Accounts Receivable":
-        return "bg-blue-100 text-blue-800";
-      case "Accounts Payable":
-      case "Credit Card":
-      case "Other Current Liability":
-      case "Long Term Liability":
-        return "bg-red-100 text-red-800";
-      case "Equity":
-        return "bg-purple-100 text-purple-800";
-      case "Income":
-      case "Other Income":
-        return "bg-emerald-100 text-emerald-800";
-      case "Cost of Goods Sold":
-      case "Expense":
-      case "Other Expense":
-        return "bg-amber-100 text-amber-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const columns = useMemo(
-    () => [
-      {
-        id: "select",
-        header: ({ table }) => (
-          <Checkbox
-            checked={table.getIsAllPageRowsSelected()}
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-            aria-label="Select all"
-          />
-        ),
-        cell: ({ row }) => (
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label="Select row"
-          />
-        ),
-        enableSorting: false,
-        enableHiding: false,
-      },
-      {
-        accessorKey: "account_code",
-        header: "Account Code",
-      },
-      {
-        accessorKey: "account_name",
-        header: "Account Name",
-      },
-      {
-        accessorKey: "account_type",
-        header: "Account Type",
-        cell: ({ row }) => (
-          <Badge className={`${getAssetTypeColor(row.original.account_type)} hover:bg-transparent hover:text-current`}>
-            {row.original.account_type}
-          </Badge>
-        ),
-        filterFn: (row, id, value) => {
-          return value.includes(row.getValue(id))
-        },
-      },
-      {
-        accessorKey: "currency",
-        header: "Currency",
-        cell: ({ row }) => (
-          <div>{row.original.currency || "---"}</div>
-        ),
-      },
-      {
-        accessorKey: "opening_balance",
-        header: "Opening Balance",
-        cell: ({ row }) => (
-          <div className="text-right">
-            {row.original.opening_balance ? 
-              formatCurrency(row.original.opening_balance, row.original.currency || 'USD') : 
-              formatCurrency(0, 'USD')}
-          </div>
-        ),
-      },
-      {
-        id: "actions",
-        header: "Actions",
-        cell: ({ row }) => (
-          <TableActions
-            actions={[
-              {
-                label: "Edit",
-                icon: Edit,
-                onClick: () => handleEditAccount(row.original)
-              },
-              {
-                label: "Run Report",
-                icon: BarChart,
-                onClick: () => handleRunReport(row.original)
-              },
-              {
-                label: "Delete",
-                icon: Trash2,
-                onClick: () => {
-                  setAccountToDelete(row.original.id);
-                  setShowDeleteModal(true);
-                },
-                className: "text-red-600"
-              }
-            ]}
-          />
-        ),
-      },
-    ],
-    []
-  );
-
-  const filterableColumns = [
-    {
-      id: "account_type",
-      title: "Account Type",
-      options: Array.from(new Set(accounts.map(a => a.account_type)))
-        .filter(Boolean)
-        .map(type => ({ label: type, value: type })),
-    },
-  ];
-
-  const searchableColumns = [
-    {
-      id: "account_name",
-      title: "Account Name",
-    },
-    {
-      id: "account_code",
-      title: "Account Code",
-    },
-  ];
 
   return (
     <AuthenticatedLayout>
+      <Head title="Account" />
+      <Toaster />
       <SidebarInset>
         <div className="main-content">
-          <PageHeader page="Chart of Accounts" subpage="Accounts List" url="accounts.index" />
-
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-            <div className="flex items-center space-x-2">
-              <Link href={route("accounts.create")}>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add New Account
-                </Button>
-              </Link>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="secondary">
-                    <MoreVertical className="h-4 w-4" />
+          <PageHeader
+            page="Account"
+            subpage="List"
+            url="accounts.index"
+          />
+          <div className="p-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                <Link href={route("accounts.create")}>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Account
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setShowDeleteAllModal(true)}>
-                    <Trash2 className="mr-2 h-4 w-4" /> Delete Selected
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </Link>
+              </div>
+              <div className="flex flex-col md:flex-row gap-4 md:items-center">
+                <form onSubmit={handleSearch} className="flex gap-2">
+                  <Input
+                    placeholder="Search accounts..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full md:w-80"
+                  />
+                  <Button type="submit">Search</Button>
+                </form>
+              </div>
             </div>
 
-            <DataTable
-              columns={columns}
-              data={accounts}
-              filterableColumns={filterableColumns}
-              searchableColumns={searchableColumns}
-              totalRows={meta.total || 0}
-              pageCount={meta.last_page || 1}
-              onPaginationChange={handlePagination}
-              onTableStateChange={handleDataTableChange}
-              serverSide={true}
-              initialState={{
-                pagination: {
-                  pageIndex: (meta.current_page || 1) - 1,
-                  pageSize: meta.per_page || 10,
-                },
-                globalFilter: filters.search || '',
-                columnFilters: filters.columnFilters || [],
-                sorting: filters.sorting || [],
-              }}
-              tableRef={setTableRef}
-              meta={meta}
-            />
+            <div className="mb-4 flex flex-col md:flex-row gap-4 justify-between">
+              <div className="flex items-center gap-2">
+                <Select value={bulkAction} onValueChange={setBulkAction}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Bulk actions" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="delete">Delete Selected</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleBulkAction} variant="outline">
+                  Apply
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Show</span>
+                <Select value={perPage.toString()} onValueChange={handlePerPageChange}>
+                  <SelectTrigger className="w-[80px]">
+                    <SelectValue placeholder="10" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-gray-500">entries</span>
+              </div>
+            </div>
+
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px]">
+                      <Checkbox
+                        checked={isAllSelected}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                    </TableHead>
+                    <TableHead>Account Code</TableHead>
+                    <TableHead>Account Name</TableHead>
+                    <TableHead>Account Type</TableHead>
+                    <TableHead>Opening Date</TableHead>
+                    <TableHead>Currency</TableHead> 
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {accounts.length > 0 ? (
+                    accounts.map((account) => (
+                      <TableRow key={account.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedAccounts.includes(account.id)}
+                            onCheckedChange={() => toggleSelectAccount(account.id)}
+                          />
+                        </TableCell>
+                        <TableCell>{account.account_code}</TableCell>
+                        <TableCell>{account.account_name}</TableCell>
+                        <TableCell>{account.account_type}</TableCell>
+                        <TableCell>{account.opening_date}</TableCell>
+                        <TableCell>{account.currency || "-"}</TableCell>
+                        <TableCell className="text-right">
+                          <TableActions
+                            actions={[
+                              {
+                                label: "View",
+                                icon: <Eye className="h-4 w-4" />,
+                                href: route("accounts.show", account.id),
+                              },
+                              {
+                                label: "Edit",
+                                icon: <Edit className="h-4 w-4" />,
+                                href: route("accounts.edit", account.id),
+                              },
+                              {
+                                label: "Delete",
+                                icon: <Trash className="h-4 w-4" />,
+                                onClick: () => handleDeleteConfirm(account.id),
+                                destructive: true,
+                              },
+                            ]}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={8} className="h-24 text-center">
+                        No accounts found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {accounts.length > 0 && meta.total > 0 && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-gray-500">
+                  Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, meta.total)} of {meta.total} entries
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                  >
+                    First
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  {renderPageNumbers()}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === meta.last_page}
+                  >
+                    Next
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(meta.last_page)}
+                    disabled={currentPage === meta.last_page}
+                  >
+                    Last
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
-
-          <DeleteAccountModal
-            show={showDeleteModal}
-            onClose={() => setShowDeleteModal(false)}
-            onConfirm={handleDelete}
-            processing={processing}
-          />
-
-          <DeleteAllAccountsModal
-            show={showDeleteAllModal}
-            onClose={() => setShowDeleteAllModal(false)}
-            onConfirm={handleDeleteAll}
-            processing={processing}
-          />
-
-          <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-            <DialogContent className="sm:max-w-[80%] max-h-[90vh]">
-              <DialogHeader>
-                <DialogTitle>{dialogTitle}</DialogTitle>
-              </DialogHeader>
-              {dialogContent}
-            </DialogContent>
-          </Dialog>
         </div>
       </SidebarInset>
+
+      <DeleteAccountModal
+        show={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDelete}
+        processing={processing}
+      />
+
+      <DeleteAllAccountModal
+        show={showDeleteAllModal}
+        onClose={() => setShowDeleteAllModal(false)}
+        onConfirm={handleDeleteAll}
+        processing={processing}
+        count={selectedAccounts.length}
+      />
     </AuthenticatedLayout>
   );
 }
