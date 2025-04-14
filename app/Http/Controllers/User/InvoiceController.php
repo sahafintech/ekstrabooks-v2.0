@@ -46,11 +46,7 @@ class InvoiceController extends Controller
             $route_name = request()->route()->getName();
             if ($route_name == 'invoices.store' || $route_name == 'invoices.duplicate') {
                 if (has_limit('invoices', 'invoice_limit', false) <= 0) {
-                    if (!$request->ajax()) {
-                        return back()->with('error', _lang('Sorry, Your have already reached your package quota !'));
-                    } else {
-                        return response()->json(['result' => 'error', 'message' => _lang('Sorry, Your have already reached your package quota !')]);
-                    }
+                    return back()->with('error', _lang('Sorry, Your have already reached your package quota !'));
                 }
             }
 
@@ -71,17 +67,17 @@ class InvoiceController extends Controller
         // Apply filters if any
         if ($request->has('filters')) {
             $filters = $request->filters;
-            
+
             // Filter by customer
             if (!empty($filters['customer_id'])) {
                 $query->where('customer_id', $filters['customer_id']);
             }
-            
+
             // Filter by status
             if (isset($filters['status']) && $filters['status'] !== '') {
                 $query->where('status', $filters['status']);
             }
-            
+
             // Filter by date range
             if (!empty($filters['date_range'])) {
                 if (!empty($filters['date_range']['start'])) {
@@ -123,12 +119,13 @@ class InvoiceController extends Controller
      */
     public function create(Request $request)
     {
+        $invoice_title = get_business_option('invoice_title', 'Invoice');
         $customers = Customer::all();
         $currencies = Currency::all();
         $products = Product::all();
         $taxes = Tax::all();
 
-        return Inertia::render('Backend/User/Invoice/Create', compact('customers', 'currencies', 'products', 'taxes'));
+        return Inertia::render('Backend/User/Invoice/Create', compact('customers', 'currencies', 'products', 'taxes', 'invoice_title'));
     }
 
     /**
@@ -424,19 +421,23 @@ class InvoiceController extends Controller
     public function show(Request $request, $id)
     {
         $invoice = Invoice::with([
-            'business', 
-            'items.taxes', 
-            'customer', 
+            'business',
+            'items',
+            'taxes',
+            'customer',
             'taxes'
         ])->find($id);
-        
+
         $attachments = Attachment::where('ref_id', $id)
             ->where('ref_type', 'invoice')
             ->get();
-            
+
+        $decimalPlaces = get_business_option('decimal_places', 2);
+
         return Inertia::render('Backend/User/Invoice/View', [
             'invoice' => $invoice,
-            'attachments' => $attachments
+            'attachments' => $attachments,
+            'decimalPlaces' => $decimalPlaces
         ]);
     }
 
@@ -706,7 +707,7 @@ class InvoiceController extends Controller
         $invoice->template        = 'default';
         $invoice->note            = $request->input('note');
         $invoice->footer          = $request->input('footer');
-        if($attachment != ''){
+        if ($attachment != '') {
             $invoice->attachments     = $attachment;
         }
 
@@ -914,11 +915,7 @@ class InvoiceController extends Controller
         $audit->event = 'Updated Invoice ' . $invoice->invoice_number;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('invoices.show', $invoice->id)->with('success', _lang('Updated Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $invoice, 'table' => '#invoices_table']);
-        }
+        return redirect()->route('invoices.show', $invoice->id)->with('success', _lang('Updated Successfully'));
     }
 
     /** Duplicate Invoice */
@@ -1003,11 +1000,11 @@ class InvoiceController extends Controller
         }
         // delete transactions
         Transaction::where('ref_id', $invoice->id)
-			->where(function ($query) {
-				$query->where('ref_type', 'invoice')
-					->orWhere('ref_type', 'invoice tax');
-			})
-			->delete();
+            ->where(function ($query) {
+                $query->where('ref_type', 'invoice')
+                    ->orWhere('ref_type', 'invoice tax');
+            })
+            ->delete();
 
         $invoice_payments = InvoicePayment::where('invoice_id', $invoice->id)->get();
 

@@ -33,11 +33,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
   const [exchangeRate, setExchangeRate] = useState(1);
   const [baseCurrencyInfo, setBaseCurrencyInfo] = useState(null);
 
-  // Debug log the products data
-  useEffect(() => {
-    console.log("Available products:", products);
-  }, [products]);
-
   const { data, setData, put, processing, errors, reset } = useForm({
     customer_id: invoice.customer_id || "",
     title: invoice.title || "",
@@ -74,7 +69,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
         taxes: item.taxes || []
       }));
       setInvoiceItems(formattedItems);
-      console.log("Loaded invoice items:", formattedItems);
     }
 
     // Set the initial currency and exchange rate
@@ -83,17 +77,16 @@ export default function Edit({ customers = [], products = [], currencies = [], t
       setExchangeRate(invoice.exchange_rate);
     }
 
-    // Handle the dates in dd/mm/yyyy format
-    if (invoice.invoice_date) {
-      setData('invoice_date', invoice.invoice_date);
-    }
-    
-    if (invoice.due_date) {
-      setData('due_date', invoice.due_date);
-    }
+    setData({
+      ...data,
+      product_id: invoice.items.map(item => item.product_id),
+      product_name: invoice.items.map(item => item.product_name),
+      description: invoice.items.map(item => item.description),
+      quantity: invoice.items.map(item => item.quantity),
+      unit_cost: invoice.items.map(item => item.unit_cost),
+      taxes: invoice.items.map(item => item.taxes)
+    })
 
-    // Log the invoice data for debugging
-    console.log("Invoice data:", invoice);
   }, [invoice]);
 
   const addInvoiceItem = () => {
@@ -131,7 +124,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     if (field === "product_id") {
       const product = products.find(p => p.id === parseInt(value, 10));
       if (product) {
-        console.log("Selected product:", product);
         updatedItems[index].product_name = product.name;
         updatedItems[index].unit_cost = product.selling_price;
         
@@ -139,8 +131,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
         if (!updatedItems[index].description) {
           updatedItems[index].description = product.description || "";
         }
-      } else {
-        console.warn("Product not found for ID:", value);
       }
     }
 
@@ -187,7 +177,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     // According to the ISO 4217 standard:
     // If selected is EUR with rate 0.92 and base is USD with rate 1
     // then 100 EUR = (100 / 0.92) = 108.70 USD
-    console.log(`Converting ${amount} with exchange rate ${exchangeRate}`);
     
     // Ensure we're using floating point math with proper decimal precision
     return parseFloat((amount / parseFloat(exchangeRate)).toFixed(4));
@@ -200,25 +189,16 @@ export default function Edit({ customers = [], products = [], currencies = [], t
 
   // Find and set base currency on component mount
   useEffect(() => {
-    // First try to find a currency with exchange_rate exactly equal to 1
-    let baseC = currencies.find(c => parseFloat(c.exchange_rate) === 1);
-    
-    // If none found, check if there's a currency with base_currency = 1 flag
-    if (!baseC) {
-      baseC = currencies.find(c => c.base_currency === 1);
-    }
+    // First try to find a currency with base_currency flag set to 1
+    let baseC = currencies.find(c => c.base_currency === 1);
     
     // If still none found, just take the first currency as a fallback
     if (!baseC && currencies.length > 0) {
       baseC = currencies[0];
-      console.warn("No base currency found with exchange_rate=1 or base_currency=1, using first currency as fallback:", baseC);
     }
     
     if (baseC) {
-      console.log("Base currency set to:", baseC);
       setBaseCurrencyInfo(baseC);
-    } else {
-      console.error("No currencies available to set as base currency");
     }
   }, [currencies]);
 
@@ -228,8 +208,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     const currencyObj = currencies.find(currency => currency.name === currencyName);
     
     if (currencyObj) {
-      console.log("Selected currency:", currencyObj);
-      
       // Set the exchange rate directly from the selected currency object first as a fallback
       const currentRate = parseFloat(currencyObj.exchange_rate);
       setExchangeRate(currentRate);
@@ -239,10 +217,8 @@ export default function Edit({ customers = [], products = [], currencies = [], t
       fetch(`/user/find_currency/${currencyObj.name}`)
         .then(response => response.json())
         .then(apiData => {
-          console.log("API response for currency rate:", apiData);
           if (apiData && apiData.exchange_rate) {
             const apiRate = parseFloat(apiData.exchange_rate);
-            console.log("Setting exchange rate from API:", apiRate);
             setExchangeRate(apiRate);
             setData('exchange_rate', apiRate);
           }
@@ -257,7 +233,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
   // Update converted_total whenever relevant values change
   useEffect(() => {
     const total = calculateTotal();
-    const convertedTotal = convertCurrency(total);
+    const convertedTotal = total;
     setData('converted_total', convertedTotal);
   }, [data.currency, invoiceItems, data.discount_type, data.discount_value, exchangeRate]);
 
@@ -307,28 +283,9 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     }
   };
 
-  // Format date to yyyy-MM-dd for form submission
-  const formatDateForSubmission = (date) => {
-    if (!date) return "";
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return "";
-    
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
   const renderTotal = () => {
     const total = calculateTotal();
     const selectedCurrency = currencies.find(c => c.name === data.currency);
-    
-    console.log("RENDERING TOTAL:", {
-      baseCurrencyInfo,
-      selectedCurrency,
-      exchangeRate,
-      total
-    });
     
     if (!selectedCurrency) {
       return (

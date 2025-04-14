@@ -7,7 +7,9 @@ use App\Models\Account;
 use App\Models\Attachment;
 use App\Models\AuditLog;
 use App\Models\BusinessSetting;
+use App\Models\Currency;
 use App\Models\PendingTransaction;
+use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
 use App\Models\PurchaseItemTax;
@@ -69,11 +71,11 @@ class CashPurchaseController extends Controller
             ->orderBy('name', 'asc')
             ->get();
             
-        $products = \App\Models\Product::where('business_id', $request->activeBusiness->id)
+        $products = Product::where('business_id', $request->activeBusiness->id)
             ->orderBy('name', 'asc')
             ->get();
             
-        $currencies = \App\Models\Currency::where('business_id', $request->activeBusiness->id)
+        $currencies = Currency::where('business_id', $request->activeBusiness->id)
             ->orderBy('name', 'asc')
             ->get();
             
@@ -81,11 +83,11 @@ class CashPurchaseController extends Controller
             ->orderBy('name', 'asc')
             ->get();
             
-        $accounts = Account::where('business_id', $request->activeBusiness->id)
-            ->where('account_type', 'Bank Account')
-            ->orWhere('account_type', 'Cash Account')
-            ->orderBy('account_name', 'asc')
-            ->get();
+        $accounts = Account::all();
+
+		$purchase_title = get_business_option('purchase_title', 'Cash Purchase');
+
+		$decimalPlace = get_business_option('decimal_place', 2);
             
 		return Inertia::render('Backend/User/CashPurchase/Create', [
             'vendors' => $vendors,
@@ -93,6 +95,8 @@ class CashPurchaseController extends Controller
             'currencies' => $currencies,
             'taxes' => $taxes,
             'accounts' => $accounts,
+            'purchase_title' => $purchase_title,
+            'decimalPlace' => $decimalPlace,
         ]);
 	}
 
@@ -562,12 +566,15 @@ class CashPurchaseController extends Controller
 		);
 	}
 
-	public function show(Request $request, $id)
+	public function show($id)
 	{
-		$bill = Purchase::with(['business', 'items'])->find($id);
+		$bill = Purchase::with(['business', 'items', 'taxes'])->find($id);
 		$attachments = Attachment::where('ref_type', 'cash purchase')->where('ref_id', $id)->get();
 
-		return view('backend.user.cash_purchase.view', compact('bill', 'id', 'attachments'));
+		return Inertia::render('Backend/User/CashPurchase/View', [
+			'bill' => $bill,
+			'attachments' => $attachments,
+		]);
 	}
 
 	/**
@@ -593,8 +600,24 @@ class CashPurchaseController extends Controller
 		}
 
 		$attachments = Attachment::where('ref_id', $id)->where('ref_type', 'cash purchase')->get();
+		$accounts = Account::all();
+		$currencies = Currency::all();
+		$decimalPlace = get_business_option('decimal_place', 2);
+		$vendors = Vendor::all();
+		$products = Product::all();
+		$taxes = Tax::all();
 
-		return view('backend.user.cash_purchase.edit', compact('bill', 'id', 'credit_account', 'attachments'));
+		return Inertia::render('Backend/User/CashPurchase/Edit', [
+			'bill' => $bill,
+			'attachments' => $attachments,
+			'credit_account' => $credit_account->account_id,
+			'decimalPlace' => $decimalPlace,
+			'accounts' => $accounts,
+			'currencies' => $currencies,
+			'vendors' => $vendors,
+			'products' => $products,
+			'taxes' => $taxes,
+		]);
 	}
 
 	/**
@@ -1133,15 +1156,7 @@ class CashPurchaseController extends Controller
 		$audit->event = 'Updated Cash Purchase ' . $purchase->bill_no;
 		$audit->save();
 
-		if (!$request->ajax()) {
-			if ($purchase->status == 0) {
-				return redirect()->route('cash_purchases.show', $purchase->id)->with('success', _lang('Updated Successfully'));
-			} else {
-				return redirect()->route('cash_purchases.index')->with('success', _lang('Updated Successfully'));
-			}
-		} else {
-			return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $purchase, 'table' => '#invoices_table']);
-		}
+		return redirect()->route('cash_purchases.show', $purchase->id)->with('success', _lang('Updated Successfully'));
 	}
 
 	public function cash_purchases_filter(Request $request)

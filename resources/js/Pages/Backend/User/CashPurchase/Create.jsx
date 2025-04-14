@@ -17,10 +17,10 @@ import {
 } from "@/Components/ui/popover";
 import { CalendarIcon, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, convertCurrency, formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
 
-export default function Create({ vendors = [], products = [], currencies = [], taxes = [], accounts = [] }) {
+export default function Create({ vendors = [], products = [], currencies = [], taxes = [], accounts = [], purchase_title, decimalPlace }) {
   const [purchaseItems, setPurchaseItems] = useState([{
     product_id: "",
     product_name: "",
@@ -34,16 +34,11 @@ export default function Create({ vendors = [], products = [], currencies = [], t
   const [exchangeRate, setExchangeRate] = useState(1);
   const [baseCurrencyInfo, setBaseCurrencyInfo] = useState(null);
 
-  // Debug log the products data
-  useEffect(() => {
-    console.log("Available products:", products);
-  }, [products]);
-
   const { data, setData, post, processing, errors, reset } = useForm({
     vendor_id: "",
-    title: "",
-    invoice_number: "",
-    order_number: "",
+    title: purchase_title,
+    bill_no: "",
+    po_so_number: "",
     purchase_date: format(new Date(), "yyyy-MM-dd"),
     currency: "",
     exchange_rate: 1,
@@ -61,7 +56,8 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     unit_cost: [],
     taxes: [],
     account_id: [],
-    amount: []
+    benificiary: "",
+    credit_account_id: null
   });
 
   const addPurchaseItem = () => {
@@ -85,35 +81,35 @@ export default function Create({ vendors = [], products = [], currencies = [], t
   const addPurchaseAccount = () => {
     setPurchaseAccounts([...purchaseAccounts, {
       account_id: "",
-      amount: 0,
+      unit_cost: 0,
       quantity: 1,
       description: "",
       taxes: [],
       product_name: "" // Initialize product_name for account entries
     }]);
     setData("account_id", [...data.account_id || [], ""]);
-    setData("amount", [...data.amount || [], 0]);
-    
+    setData("unit_cost", [...data.unit_cost || [], 0]);
+
     // Update quantity and description arrays to include new account entries
     const updatedQuantities = [
       ...purchaseItems.map(item => item.quantity),
       ...purchaseAccounts.map(account => account.quantity || 1),
       1  // for the new account
     ];
-    
+
     const updatedDescriptions = [
       ...purchaseItems.map(item => item.description),
       ...purchaseAccounts.map(account => account.description || ""),
       ""  // for the new account
     ];
-    
+
     // Update product_name array to include new account entry
     const updatedProductNames = [
       ...purchaseItems.map(item => item.product_name),
       ...purchaseAccounts.map(account => account.product_name || ""),
       ""  // for the new account
     ];
-    
+
     setData("quantity", updatedQuantities);
     setData("description", updatedDescriptions);
     setData("product_name", updatedProductNames);
@@ -123,19 +119,19 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     const updatedAccounts = purchaseAccounts.filter((_, i) => i !== index);
     setPurchaseAccounts(updatedAccounts);
     setData("account_id", updatedAccounts.map(account => account.account_id));
-    setData("amount", updatedAccounts.map(account => account.amount));
-    
+    setData("unit_cost", updatedAccounts.map(account => account.unit_cost));
+
     // Update quantity and description arrays after removing an account
     setData("quantity", [
       ...purchaseItems.map(item => item.quantity),
       ...updatedAccounts.map(account => account.quantity || 1)
     ]);
-    
+
     setData("description", [
       ...purchaseItems.map(item => item.description),
       ...updatedAccounts.map(account => account.description || "")
     ]);
-    
+
     // Update product_name array after removing an account
     setData("product_name", [
       ...purchaseItems.map(item => item.product_name),
@@ -170,7 +166,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
         console.log("Selected product:", product);
         updatedItems[index].product_name = product.name;
         updatedItems[index].unit_cost = product.selling_price;
-        
+
         // Also update the description if it's empty
         if (!updatedItems[index].description) {
           updatedItems[index].description = product.description || "";
@@ -191,7 +187,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
 
   const calculateSubtotal = () => {
     const productSubtotal = purchaseItems.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
-    const accountSubtotal = purchaseAccounts.reduce((sum, account) => sum + parseFloat(account.quantity * account.amount || 0), 0);
+    const accountSubtotal = purchaseAccounts.reduce((sum, account) => sum + parseFloat(account.quantity * account.unit_cost || 0), 0);
     return productSubtotal + accountSubtotal;
   };
 
@@ -218,45 +214,18 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     return (subtotal + taxes) - discount;
   };
 
-  const convertCurrency = (amount) => {
-    if (!exchangeRate || exchangeRate === 0) return amount;
-
-    // Convert from selected currency to base currency
-    // According to the ISO 4217 standard:
-    // If selected is EUR with rate 0.92 and base is USD with rate 1
-    // then 100 EUR = (100 / 0.92) = 108.70 USD
-    console.log(`Converting ${amount} with exchange rate ${exchangeRate}`);
-    
-    // Ensure we're using floating point math with proper decimal precision
-    return parseFloat((amount / parseFloat(exchangeRate)).toFixed(4));
-  };
-
-  // Format currency with proper currency code
-  const formatCurrency = (amount, currencyCode) => {
-    return `${currencyCode} ${amount.toFixed(2)}`;
-  };
-
   // Find and set base currency on component mount
   useEffect(() => {
-    // First try to find a currency with exchange_rate exactly equal to 1
-    let baseC = currencies.find(c => parseFloat(c.exchange_rate) === 1);
-    
-    // If none found, check if there's a currency with base_currency = 1 flag
-    if (!baseC) {
-      baseC = currencies.find(c => c.base_currency === 1);
-    }
-    
+    // First try to find a currency with base_currency flag
+    let baseC = currencies.find(c => c.base_currency === 1);
+
     // If still none found, just take the first currency as a fallback
     if (!baseC && currencies.length > 0) {
       baseC = currencies[0];
-      console.warn("No base currency found with exchange_rate=1 or base_currency=1, using first currency as fallback:", baseC);
     }
-    
+
     if (baseC) {
-      console.log("Base currency set to:", baseC);
       setBaseCurrencyInfo(baseC);
-    } else {
-      console.error("No currencies available to set as base currency");
     }
   }, [currencies]);
 
@@ -264,23 +233,18 @@ export default function Create({ vendors = [], products = [], currencies = [], t
   const handleCurrencyChange = (currencyName) => {
     // Find currency object by name
     const currencyObj = currencies.find(currency => currency.name === currencyName);
-    
+
     if (currencyObj) {
-      console.log("Selected currency:", currencyObj);
-      
-      // Set the exchange rate directly from the selected currency object first as a fallback
       const currentRate = parseFloat(currencyObj.exchange_rate);
       setExchangeRate(currentRate);
       setData('exchange_rate', currentRate);
-      
+
       // Then try to fetch the updated exchange rate from the API
       fetch(`/user/find_currency/${currencyObj.name}`)
         .then(response => response.json())
         .then(apiData => {
-          console.log("API response for currency rate:", apiData);
           if (apiData && apiData.exchange_rate) {
             const apiRate = parseFloat(apiData.exchange_rate);
-            console.log("Setting exchange rate from API:", apiRate);
             setExchangeRate(apiRate);
             setData('exchange_rate', apiRate);
           }
@@ -295,21 +259,14 @@ export default function Create({ vendors = [], products = [], currencies = [], t
   // Update converted_total whenever relevant values change
   useEffect(() => {
     const total = calculateTotal();
-    const convertedTotal = convertCurrency(total);
+    const convertedTotal = convertCurrency(total, exchangeRate);
     setData('converted_total', convertedTotal);
   }, [data.currency, purchaseItems, data.discount_type, data.discount_value, exchangeRate]);
 
   const renderTotal = () => {
     const total = calculateTotal();
     const selectedCurrency = currencies.find(c => c.name === data.currency);
-    
-    console.log("RENDERING TOTAL:", {
-      baseCurrencyInfo,
-      selectedCurrency,
-      exchangeRate,
-      total
-    });
-    
+
     if (!selectedCurrency) {
       return (
         <div>
@@ -317,36 +274,36 @@ export default function Create({ vendors = [], products = [], currencies = [], t
         </div>
       );
     }
-    
+
     // If we have a base currency AND the selected currency is different from base
-    if (baseCurrencyInfo && 
-        selectedCurrency.name !== baseCurrencyInfo.name && 
-        exchangeRate && 
-        exchangeRate !== 1) {
-      
+    if (baseCurrencyInfo &&
+      selectedCurrency.name !== baseCurrencyInfo.name &&
+      exchangeRate &&
+      exchangeRate !== 1) {
+
       // Calculate the base currency equivalent
       const baseCurrencyTotal = total / exchangeRate;
-      
+
       return (
         <div>
-          <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name)}</h2>
+          <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
           <p className="text-sm text-gray-600">
-            Equivalent to {formatCurrency(baseCurrencyTotal, baseCurrencyInfo.name)}
+            Equivalent to {formatCurrency(baseCurrencyTotal, baseCurrencyInfo.name, decimalPlace)}
           </p>
         </div>
       );
     }
-    
+
     return (
       <div>
-        <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name)}</h2>
+        <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
       </div>
     );
   };
 
   const TaxSelector = ({ index, isAccount = false }) => {
     const item = isAccount ? purchaseAccounts[index] : purchaseItems[index];
-    
+
     // Handle undefined taxes array (safety check)
     if (!item || !item.taxes) {
       console.warn(`Item at index ${index} has no taxes array`);
@@ -357,7 +314,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
         </div>
       );
     }
-    
+
     return (
       <div className="col-span-12 md:col-span-2">
         <Label>Taxes</Label>
@@ -394,7 +351,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
 
     // Find the selected currency object to get its name
     const selectedCurrency = currencies.find(c => c.name === data.currency);
-    
+
     if (!selectedCurrency) {
       toast.error("Please select a valid currency");
       return;
@@ -428,9 +385,9 @@ export default function Create({ vendors = [], products = [], currencies = [], t
         ...purchaseItems.map(item => item.account_id || "Inventory"),
         ...purchaseAccounts.map(account => account.account_id)
       ],
-      amount: [
+      unit_cost: [
         ...purchaseItems.map(item => item.unit_cost * item.quantity),
-        ...purchaseAccounts.map(account => account.amount)
+        ...purchaseAccounts.map(account => account.unit_cost)
       ]
     };
 
@@ -502,18 +459,18 @@ export default function Create({ vendors = [], products = [], currencies = [], t
             </div>
 
             <div className="grid grid-cols-12 mt-2">
-              <Label htmlFor="order_number" className="md:col-span-2 col-span-12">
+              <Label htmlFor="po_so_number" className="md:col-span-2 col-span-12">
                 Order Number
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <Input
-                  id="order_number"
+                  id="po_so_number"
                   type="text"
-                  value={data.order_number}
-                  onChange={(e) => setData("order_number", e.target.value)}
+                  value={data.po_so_number}
+                  onChange={(e) => setData("po_so_number", e.target.value)}
                   className="md:w-1/2 w-full"
                 />
-                <InputError message={errors.order_number} className="text-sm" />
+                <InputError message={errors.po_so_number} className="text-sm" />
               </div>
             </div>
 
@@ -581,6 +538,46 @@ export default function Create({ vendors = [], products = [], currencies = [], t
               </div>
             </div>
 
+            <div className="grid grid-cols-12 mt-2">
+              <Label htmlFor="credit_account_id" className="md:col-span-2 col-span-12">
+                Credit Account *
+              </Label>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                <div className="md:w-1/2 w-full">
+                  <SearchableCombobox
+                    className="mt-1"
+                    options={accounts.map(account => ({
+                      id: account.id,
+                      name: account.account_name
+                    }))}
+                    value={data.credit_account_id}
+                    onChange={(value) => {
+                      setData("credit_account_id", value);
+                    }}
+                    placeholder="Select account"
+                  />
+                </div>
+                <InputError message={errors.credit_account_id} className="text-sm" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-12 mt-2">
+              <Label htmlFor="benificiary" className="md:col-span-2 col-span-12">
+                Benificiary *
+              </Label>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                <div className="md:w-1/2 w-full">
+                  <Textarea
+                    className="mt-1"
+                    value={data.benificiary}
+                    onChange={(e) => setData("benificiary", e.target.value)}
+                    placeholder="Enter benificiary details"
+                  />
+                </div>
+                <InputError message={errors.benificiary} className="text-sm" />
+              </div>
+            </div>
+
             <SidebarSeparator className="my-4" />
 
             <div className="space-y-4">
@@ -622,7 +619,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                         placeholder="Select product"
                       />
                     </div>
-                    
+
                     <div>
                       <Label>Quantity *</Label>
                       <Input
@@ -632,7 +629,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                         onChange={(e) => updateInvoiceItem(index, "quantity", parseInt(e.target.value))}
                       />
                     </div>
-                    
+
                     <div>
                       <Label>Unit Cost *</Label>
                       <Input
@@ -654,18 +651,18 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                         rows={1}
                       />
                     </div>
-                    
+
                     <div className="md:col-span-3">
                       <TaxSelector index={index} />
                     </div>
-                    
+
                     <div className="md:col-span-2">
                       <Label>Subtotal</Label>
                       <div className="p-2 bg-white rounded mt-2 text-right">
                         {(item.quantity * item.unit_cost).toFixed(2)}
                       </div>
                     </div>
-                    
+
                     <div className="md:col-span-1 flex items-end justify-end">
                       <Button
                         type="button"
@@ -690,7 +687,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                       <SearchableCombobox
                         options={accounts.map(account => ({
                           id: account.id,
-                          name: account.name
+                          name: account.account_name
                         }))}
                         value={accountItem.account_id}
                         onChange={(value) => {
@@ -702,7 +699,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                         placeholder="Select account"
                       />
                     </div>
-                    
+
                     <div>
                       <Label>Product Name *</Label>
                       <Input
@@ -720,19 +717,19 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                         placeholder="Enter product name"
                       />
                     </div>
-                    
+
                     <div>
                       <Label>Amount *</Label>
                       <Input
                         type="number"
                         step="0.01"
                         min="0"
-                        value={accountItem.amount}
+                        value={accountItem.unit_cost}
                         onChange={(e) => {
                           const updatedAccounts = [...purchaseAccounts];
-                          updatedAccounts[index].amount = parseFloat(e.target.value);
+                          updatedAccounts[index].unit_cost = parseFloat(e.target.value);
                           setPurchaseAccounts(updatedAccounts);
-                          setData("amount", updatedAccounts.map(account => account.amount));
+                          setData("unit_cost", updatedAccounts.map(account => account.unit_cost));
                         }}
                       />
                     </div>
@@ -757,7 +754,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                         }}
                       />
                     </div>
-                    
+
                     <div className="md:col-span-6">
                       <Label>Description</Label>
                       <Textarea
@@ -774,11 +771,11 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                         rows={1}
                       />
                     </div>
-                    
+
                     <div className="md:col-span-2">
                       <TaxSelector index={index} isAccount={true} />
                     </div>
-                    
+
                     <div className="md:col-span-1 flex items-end justify-end">
                       <Button
                         type="button"
@@ -796,7 +793,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                     <div className="text-right">
                       <Label>Subtotal</Label>
                       <div className="p-2 bg-white rounded mt-1 text-right">
-                        {(accountItem.quantity * accountItem.amount).toFixed(2)}
+                        {(accountItem.quantity * accountItem.unit_cost).toFixed(2)}
                       </div>
                     </div>
                   </div>

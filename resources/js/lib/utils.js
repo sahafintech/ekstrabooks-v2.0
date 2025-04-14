@@ -9,16 +9,23 @@ export function cn(...inputs) {
  * Format a number as currency with the given currency code
  * @param {number} amount - The amount to format
  * @param {string} currencyCode - ISO 4217 currency code (e.g., USD, EUR, GBP)
+ * @param {number} decimalPlaces - Number of decimal places
  * @returns {string} Formatted currency string
  */
-export function formatCurrency(amount, currencyCode = 'USD') {
+export function formatCurrency(amount, currencyCode = 'USD', decimalPlaces = 2) {
   if (amount === null || amount === undefined) return `${currencyCode} 0.00`;
   
   // Format with 2 decimal places
-  const formattedAmount = parseFloat(amount).toFixed(2);
+  const formattedAmount = parseFloat(amount).toFixed(decimalPlaces);
   
   // Return formatted string with currency code
   return `${currencyCode} ${formattedAmount}`;
+}
+
+export function convertCurrency(amount, exchangeRate) {
+  if (!exchangeRate || exchangeRate === 0) return amount;
+
+  return parseFloat((amount * parseFloat(exchangeRate)));
 }
 
 /**
