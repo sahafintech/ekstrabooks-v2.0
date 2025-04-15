@@ -63,11 +63,11 @@ class ReceiptController extends Controller
             $searchTerm = request('search');
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('title', 'like', "%{$searchTerm}%")
-                  ->orWhere('receipt_number', 'like', "%{$searchTerm}%")
-                  ->orWhere('order_number', 'like', "%{$searchTerm}%")
-                  ->orWhereHas('customer', function ($q) use ($searchTerm) {
-                      $q->where('name', 'like', "%{$searchTerm}%");
-                  });
+                    ->orWhere('receipt_number', 'like', "%{$searchTerm}%")
+                    ->orWhere('order_number', 'like', "%{$searchTerm}%")
+                    ->orWhereHas('customer', function ($q) use ($searchTerm) {
+                        $q->where('name', 'like', "%{$searchTerm}%");
+                    });
             });
         }
 
@@ -75,7 +75,7 @@ class ReceiptController extends Controller
         $perPage = request('per_page', 10);
         $receipts = $query->paginate($perPage)->withQueryString();
 
-        return Inertia::render('Backend/User/Receipt/List', [
+        return Inertia::render('Backend/User/CashInvoice/List', [
             'receipts' => $receipts->items(),
             'meta' => [
                 'current_page' => $receipts->currentPage(),
@@ -95,29 +95,39 @@ class ReceiptController extends Controller
         $products = Product::all();
         $currencies = Currency::all();
         $taxes = Tax::all();
-        $accounts = Account::where(function($query) {
+        $accounts = Account::where(function ($query) {
             $query->where('account_type', 'Bank')
                 ->orWhere('account_type', 'Cash');
         })->get();
 
-        return Inertia::render('Backend/User/Receipt/Create', [
+        $receipt_title = get_business_option('receipt_title', 'Cash Invoice');
+        $decimalPlace = get_business_option('decimal_place', 2);
+        $accounts = Account::where(function ($query) {
+            $query->where('account_type', 'Bank')
+                ->orWhere('account_type', 'Cash');
+        })->get();
+
+        return Inertia::render('Backend/User/CashInvoice/Create', [
             'customers' => $customers,
             'products' => $products,
             'currencies' => $currencies,
             'taxes' => $taxes,
+            'accounts' => $accounts,
+            'receipt_title' => $receipt_title,
+            'decimalPlace' => $decimalPlace,
             'accounts' => $accounts
         ]);
     }
 
-    public function show(Request $request, $id)
+    public function show($id)
     {
-        $receipt = Receipt::with(['business', 'items.taxes', 'customer'])
+        $receipt = Receipt::with(['business', 'items', 'taxes', 'customer'])
             ->where('id', $id)
             ->first();
-            
+
         $business = Business::find($receipt->business_id);
-        
-        return Inertia::render('Backend/User/Receipt/View', [
+
+        return Inertia::render('Backend/User/CashInvoice/View', [
             'receipt' => $receipt,
             'business' => $business
         ]);
@@ -137,24 +147,26 @@ class ReceiptController extends Controller
             })
             ->with('account')
             ->first();
-            
+
         $customers = \App\Models\Customer::all();
         $products = Product::all();
         $currencies = Currency::all();
         $taxes = Tax::all();
-        $accounts = Account::where(function($query) {
+        $accounts = Account::where(function ($query) {
             $query->where('account_type', 'Bank')
                 ->orWhere('account_type', 'Cash');
         })->get();
+        $decimalPlace = get_business_option('decimal_place', 2);
 
-        return Inertia::render('Backend/User/Receipt/Edit', [
+        return Inertia::render('Backend/User/CashInvoice/Edit', [
             'receipt' => $receipt,
             'transaction' => $transaction,
             'customers' => $customers,
             'products' => $products,
             'currencies' => $currencies,
             'taxes' => $taxes,
-            'accounts' => $accounts
+            'accounts' => $accounts,
+            'decimalPlace' => $decimalPlace
         ]);
     }
 
@@ -583,7 +595,7 @@ class ReceiptController extends Controller
                 ->where('account_id', $product->income_account_id)
                 ->first();
 
-            if($transaction != null) {
+            if ($transaction != null) {
                 $transaction->delete();
             }
 
@@ -787,11 +799,7 @@ class ReceiptController extends Controller
         $audit->event = 'Cash Invoice Updated' . ' ' . $receipt->receipt_number;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('receipts.show', $receipt->id)->with('success', _lang('Updated Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $receipt, 'table' => '#invoices_table']);
-        }
+        return redirect()->route('receipts.show', $receipt->id)->with('success', _lang('Updated Successfully'));
     }
 
     public function destroy($id)
@@ -826,7 +834,7 @@ class ReceiptController extends Controller
 
     public function pos()
     {
-        return view('backend.user.pos.pos');
+        return Inertia::render('Backend/User/Pos/Pos');
     }
 
     public function import_receipts(Request $request)
@@ -873,7 +881,7 @@ class ReceiptController extends Controller
         $customer_id = $request->customer_id;
         $date_range = $request->date_range;
 
-        return Inertia::render('Backend/User/Receipt/List', [
+        return Inertia::render('Backend/User/CashInvoice/List', [
             'receipts' => $receipts,
             'customer_id' => $customer_id,
             'date_range' => $date_range,
@@ -899,7 +907,7 @@ class ReceiptController extends Controller
             //Calculate Taxes
             if (isset($request->tax_amount)) {
                 foreach ($request->tax_amount as $index => $amount) {
-                    if($amount == 0) {
+                    if ($amount == 0) {
                         continue;
                     }
                     $tax         = Tax::find($index);

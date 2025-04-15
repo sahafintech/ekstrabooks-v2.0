@@ -125,7 +125,9 @@ class InvoiceController extends Controller
         $products = Product::all();
         $taxes = Tax::all();
 
-        return Inertia::render('Backend/User/Invoice/Create', compact('customers', 'currencies', 'products', 'taxes', 'invoice_title'));
+        $decimalPlace = get_business_option('decimal_place', 2);
+
+        return Inertia::render('Backend/User/Invoice/Create', compact('customers', 'currencies', 'products', 'taxes', 'invoice_title', 'decimalPlace'));
     }
 
     /**
@@ -560,12 +562,15 @@ class InvoiceController extends Controller
         $products = Product::all();
         $taxes = Tax::all();
 
+        $decimalPlace = get_business_option('decimal_place', 2);
+
         return Inertia::render('Backend/User/Invoice/Edit', [
             'invoice' => $invoice,
             'customers' => $customers,
             'currencies' => $currencies,
             'products' => $products,
-            'taxes' => $taxes
+            'taxes' => $taxes,
+            'decimalPlace' => $decimalPlace
         ]);
     }
 

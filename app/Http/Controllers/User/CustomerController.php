@@ -50,50 +50,39 @@ class CustomerController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Customer::select('customers.*');
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
 
-        // handle search
-        if ($request->has('search') && !empty($request->get('search'))) {
-            $search = $request->get('search');
+        $query = Customer::orderBy("id", "desc");
+
+        // Apply search if provided
+        if (!empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('company_name', 'like', "%{$search}%")
+                    ->orWhere('mobile', 'like', "%{$search}%");
             });
         }
 
-        // handle column filters
-        if ($request->has('columnFilters')) {
-            $columnFilters = $request->get('columnFilters');
-            if (is_string($columnFilters)) {
-                $columnFilters = json_decode($columnFilters, true);
-            }
-            if (is_array($columnFilters)) {
-                foreach ($columnFilters as $column => $value) {
-                    if ($value !== null && $value !== '') {
-                        $query->where($column, $value);
-                    }
-                }
-            }
-        }
+        // Get vendors with pagination
+        $customers = $query->paginate($per_page)->withQueryString();
 
-        // handle sorting
-        if ($request->has('sort') && $request->has('direction')) {
-            $query->orderBy($request->get('sort'), $request->get('direction'));
-        }
-
-        // handle pagination
-        $perPage = $request->get('per_page', 10);
-        $customers = $query->paginate($perPage);
+        // Return Inertia view
         return Inertia::render('Backend/User/Customer/List', [
             'customers' => $customers->items(),
             'meta' => [
-                'total' => $customers->total(),
-                'per_page' => $customers->perPage(),
                 'current_page' => $customers->currentPage(),
+                'from' => $customers->firstItem(),
                 'last_page' => $customers->lastPage(),
+                'links' => $customers->linkCollection(),
+                'path' => $customers->path(),
+                'per_page' => $customers->perPage(),
+                'to' => $customers->lastItem(),
+                'total' => $customers->total(),
             ],
             'filters' => [
-                'search' => $request->get('search', ''),
+                'search' => $search,
                 'columnFilters' => $request->get('columnFilters', []),
                 'sorting' => $request->get('sorting', []),
             ],

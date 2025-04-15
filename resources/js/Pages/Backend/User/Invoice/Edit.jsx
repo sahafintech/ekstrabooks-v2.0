@@ -17,10 +17,10 @@ import {
 } from "@/Components/ui/popover";
 import { CalendarIcon, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
 
-export default function Edit({ customers = [], products = [], currencies = [], taxes = [], invoice }) {
+export default function Edit({ customers = [], products = [], currencies = [], taxes = [], invoice, decimalPlace }) {
   const [invoiceItems, setInvoiceItems] = useState([{
     product_id: "",
     product_name: "",
@@ -43,7 +43,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     currency: invoice.currency || "",
     exchange_rate: invoice.exchange_rate || 1,
     converted_total: invoice.converted_total || 0,
-    discount_type: invoice.discount_type || "percentage",
+    discount_type: invoice.discount_type || "0",
     discount_value: invoice.discount_value || 0,
     template: invoice.template || "",
     note: invoice.note || "",
@@ -157,7 +157,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
 
   const calculateDiscount = () => {
     const subtotal = calculateSubtotal();
-    if (data.discount_type === "percentage") {
+    if (data.discount_type === "0") {
       return (subtotal * data.discount_value) / 100;
     }
     return data.discount_value;
@@ -168,23 +168,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     const taxes = calculateTaxes();
     const discount = calculateDiscount();
     return (subtotal + taxes) - discount;
-  };
-
-  const convertCurrency = (amount) => {
-    if (!exchangeRate || exchangeRate === 0) return amount;
-
-    // Convert from selected currency to base currency
-    // According to the ISO 4217 standard:
-    // If selected is EUR with rate 0.92 and base is USD with rate 1
-    // then 100 EUR = (100 / 0.92) = 108.70 USD
-    
-    // Ensure we're using floating point math with proper decimal precision
-    return parseFloat((amount / parseFloat(exchangeRate)).toFixed(4));
-  };
-
-  // Format currency with proper currency code
-  const formatCurrency = (amount, currencyCode) => {
-    return `${currencyCode} ${amount.toFixed(2)}`;
   };
 
   // Find and set base currency on component mount
@@ -306,9 +289,9 @@ export default function Edit({ customers = [], products = [], currencies = [], t
       
       return (
         <div>
-          <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name)}</h2>
+          <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
           <p className="text-sm text-gray-600">
-            Equivalent to {formatCurrency(baseCurrencyTotal, baseCurrencyInfo.name)}
+            Equivalent to {formatCurrency(baseCurrencyTotal, baseCurrencyInfo.name, decimalPlace)}
           </p>
         </div>
       );
@@ -316,7 +299,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     
     return (
       <div>
-        <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name)}</h2>
+        <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
       </div>
     );
   };
@@ -679,8 +662,8 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                 <div className="md:w-1/2 w-full">
                   <SearchableCombobox
                     options={[
-                      { id: "percentage", name: "Percentage (%)" },
-                      { id: "fixed", name: "Fixed Amount" }
+                      { id: "0", name: "Percentage (%)" },
+                      { id: "1", name: "Fixed Amount" }
                     ]}
                     value={data.discount_type}
                     onChange={(value) => setData("discount_type", value)}

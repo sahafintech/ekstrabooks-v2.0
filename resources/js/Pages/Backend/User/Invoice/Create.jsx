@@ -17,10 +17,10 @@ import {
 } from "@/Components/ui/popover";
 import { CalendarIcon, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
 
-export default function Create({ customers = [], products = [], currencies = [], taxes = [], invoice_title }) {
+export default function Create({ customers = [], products = [], currencies = [], taxes = [], invoice_title, decimalPlace }) {
   const [invoiceItems, setInvoiceItems] = useState([{
     product_id: "",
     product_name: "",
@@ -43,7 +43,7 @@ export default function Create({ customers = [], products = [], currencies = [],
     currency: "",
     exchange_rate: 1,
     converted_total: 0,
-    discount_type: "percentage",
+    discount_type: "0",
     discount_value: 0,
     template: "",
     note: "",
@@ -125,7 +125,7 @@ export default function Create({ customers = [], products = [], currencies = [],
 
   const calculateDiscount = () => {
     const subtotal = calculateSubtotal();
-    if (data.discount_type === "percentage") {
+    if (data.discount_type === "0") {
       return (subtotal * data.discount_value) / 100;
     }
     return data.discount_value;
@@ -136,11 +136,6 @@ export default function Create({ customers = [], products = [], currencies = [],
     const taxes = calculateTaxes();
     const discount = calculateDiscount();
     return (subtotal + taxes) - discount;
-  };
-
-  // Format currency with proper currency code
-  const formatCurrency = (amount, currencyCode) => {
-    return `${currencyCode} ${amount.toFixed(2)}`;
   };
 
   // Find and set base currency on component mount
@@ -217,9 +212,9 @@ export default function Create({ customers = [], products = [], currencies = [],
       
       return (
         <div>
-          <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name)}</h2>
+          <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
           <p className="text-sm text-gray-600">
-            Equivalent to {formatCurrency(baseCurrencyTotal, baseCurrencyInfo.name)}
+            Equivalent to {formatCurrency(baseCurrencyTotal, baseCurrencyInfo.name, decimalPlace)}
           </p>
         </div>
       );
@@ -227,7 +222,7 @@ export default function Create({ customers = [], products = [], currencies = [],
     
     return (
       <div>
-        <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name)}</h2>
+        <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
       </div>
     );
   };
@@ -567,8 +562,8 @@ export default function Create({ customers = [], products = [], currencies = [],
                 <div className="md:w-1/2 w-full">
                   <SearchableCombobox
                     options={[
-                      { id: "percentage", name: "Percentage (%)" },
-                      { id: "fixed", name: "Fixed Amount" }
+                      { id: "0", name: "Percentage (%)" },
+                      { id: "1", name: "Fixed Amount" }
                     ]}
                     value={data.discount_type}
                     onChange={(value) => setData("discount_type", value)}

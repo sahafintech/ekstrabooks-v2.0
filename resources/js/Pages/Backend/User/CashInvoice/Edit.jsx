@@ -17,11 +17,11 @@ import {
 } from "@/Components/ui/popover";
 import { CalendarIcon, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
 
-export default function Edit({ customers = [], products = [], currencies = [], taxes = [], invoice }) {
-  const [invoiceItems, setInvoiceItems] = useState([{
+export default function Edit({ customers = [], products = [], currencies = [], taxes = [], receipt, decimalPlace, accounts, transaction }) {
+  const [receiptItems, setReceiptItems] = useState([{
     product_id: "",
     product_name: "",
     description: "",
@@ -33,39 +33,34 @@ export default function Edit({ customers = [], products = [], currencies = [], t
   const [exchangeRate, setExchangeRate] = useState(1);
   const [baseCurrencyInfo, setBaseCurrencyInfo] = useState(null);
 
-  // Debug log the products data
-  useEffect(() => {
-    console.log("Available products:", products);
-  }, [products]);
-
   const { data, setData, put, processing, errors, reset } = useForm({
-    customer_id: invoice.customer_id || "",
-    title: invoice.title || "",
-    invoice_number: invoice.invoice_number || "",
-    order_number: invoice.order_number || "",
-    invoice_date: invoice.invoice_date || "",
-    due_date: invoice.due_date || "",
-    currency: invoice.currency || "",
-    exchange_rate: invoice.exchange_rate || 1,
-    converted_total: invoice.converted_total || 0,
-    discount_type: invoice.discount_type || "percentage",
-    discount_value: invoice.discount_value || 0,
-    template: invoice.template || "",
-    note: invoice.note || "",
-    footer: invoice.footer || "",
+    customer_id: receipt.customer_id || "",
+    title: receipt.title || "",
+    receipt_number: receipt.receipt_number || "",
+    order_number: receipt.order_number || "",
+    receipt_date: receipt.receipt_date || "",
+    currency: receipt.currency || "",
+    exchange_rate: receipt.exchange_rate || 1,
+    converted_total: receipt.converted_total || 0,
+    discount_type: receipt.discount_type || "0",
+    discount_value: receipt.discount_value || 0,
+    template: receipt.template || "",
+    note: receipt.note || "",
+    footer: receipt.footer || "",
     attachment: null,
     product_id: [],
     product_name: [],
     description: [],
     quantity: [],
     unit_cost: [],
-    taxes: []
+    taxes: [],
+    account_id: transaction.account_id || "",
   });
 
   // Initialize invoice items from existing invoice
   useEffect(() => {
-    if (invoice && invoice.items && invoice.items.length > 0) {
-      const formattedItems = invoice.items.map(item => ({
+    if (receipt && receipt.items && receipt.items.length > 0) {
+      const formattedItems = receipt.items.map(item => ({
         product_id: item.product_id,
         product_name: item.product_name,
         description: item.description,
@@ -73,31 +68,29 @@ export default function Edit({ customers = [], products = [], currencies = [], t
         unit_cost: item.unit_cost,
         taxes: item.taxes || []
       }));
-      setInvoiceItems(formattedItems);
-      console.log("Loaded invoice items:", formattedItems);
+      setReceiptItems(formattedItems);
     }
 
     // Set the initial currency and exchange rate
-    if (invoice && invoice.currency) {
-      setData('currency', invoice.currency);
-      setExchangeRate(invoice.exchange_rate);
+    if (receipt && receipt.currency) {
+      setData('currency', receipt.currency);
+      setExchangeRate(receipt.exchange_rate);
     }
 
-    // Handle the dates in dd/mm/yyyy format
-    if (invoice.invoice_date) {
-      setData('invoice_date', invoice.invoice_date);
-    }
-    
-    if (invoice.due_date) {
-      setData('due_date', invoice.due_date);
-    }
+    setData({
+      ...data,
+      product_id: receipt.items.map(item => item.product_id),
+      product_name: receipt.items.map(item => item.product_name),
+      description: receipt.items.map(item => item.description),
+      quantity: receipt.items.map(item => item.quantity),
+      unit_cost: receipt.items.map(item => item.unit_cost),
+      taxes: receipt.items.map(item => item.taxes)
+    })
 
-    // Log the invoice data for debugging
-    console.log("Invoice data:", invoice);
-  }, [invoice]);
+  }, [receipt]);
 
-  const addInvoiceItem = () => {
-    setInvoiceItems([...invoiceItems, {
+  const addReceiptItem = () => {
+    setReceiptItems([...receiptItems, {
       product_id: "",
       product_name: "",
       description: "",
@@ -113,9 +106,9 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     setData("taxes", [...data.taxes, []]);
   };
 
-  const removeInvoiceItem = (index) => {
-    const updatedItems = invoiceItems.filter((_, i) => i !== index);
-    setInvoiceItems(updatedItems);
+  const removeReceiptItem = (index) => {
+    const updatedItems = receiptItems.filter((_, i) => i !== index);
+    setReceiptItems(updatedItems);
     setData("product_id", updatedItems.map(item => item.product_id));
     setData("product_name", updatedItems.map(item => item.product_name));
     setData("description", updatedItems.map(item => item.description));
@@ -124,27 +117,24 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     setData("taxes", updatedItems.map(item => item.taxes));
   };
 
-  const updateInvoiceItem = (index, field, value) => {
-    const updatedItems = [...invoiceItems];
+  const updateReceiptItem = (index, field, value) => {
+    const updatedItems = [...receiptItems];
     updatedItems[index][field] = value;
 
     if (field === "product_id") {
       const product = products.find(p => p.id === parseInt(value, 10));
       if (product) {
-        console.log("Selected product:", product);
         updatedItems[index].product_name = product.name;
         updatedItems[index].unit_cost = product.selling_price;
-        
+
         // Also update the description if it's empty
         if (!updatedItems[index].description) {
           updatedItems[index].description = product.description || "";
         }
-      } else {
-        console.warn("Product not found for ID:", value);
       }
     }
 
-    setInvoiceItems(updatedItems);
+    setReceiptItems(updatedItems);
     setData("product_id", updatedItems.map(item => item.product_id));
     setData("product_name", updatedItems.map(item => item.product_name));
     setData("description", updatedItems.map(item => item.description));
@@ -154,11 +144,11 @@ export default function Edit({ customers = [], products = [], currencies = [], t
   };
 
   const calculateSubtotal = () => {
-    return invoiceItems.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
+    return receiptItems.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
   };
 
   const calculateTaxes = () => {
-    return invoiceItems.reduce((sum, item) => {
+    return receiptItems.reduce((sum, item) => {
       return sum + item.taxes.reduce((taxSum, tax) => {
         return taxSum + (item.quantity * item.unit_cost * tax.rate) / 100;
       }, 0);
@@ -167,7 +157,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
 
   const calculateDiscount = () => {
     const subtotal = calculateSubtotal();
-    if (data.discount_type === "percentage") {
+    if (data.discount_type === "0") {
       return (subtotal * data.discount_value) / 100;
     }
     return data.discount_value;
@@ -180,45 +170,18 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     return (subtotal + taxes) - discount;
   };
 
-  const convertCurrency = (amount) => {
-    if (!exchangeRate || exchangeRate === 0) return amount;
-
-    // Convert from selected currency to base currency
-    // According to the ISO 4217 standard:
-    // If selected is EUR with rate 0.92 and base is USD with rate 1
-    // then 100 EUR = (100 / 0.92) = 108.70 USD
-    console.log(`Converting ${amount} with exchange rate ${exchangeRate}`);
-    
-    // Ensure we're using floating point math with proper decimal precision
-    return parseFloat((amount / parseFloat(exchangeRate)).toFixed(4));
-  };
-
-  // Format currency with proper currency code
-  const formatCurrency = (amount, currencyCode) => {
-    return `${currencyCode} ${amount.toFixed(2)}`;
-  };
-
   // Find and set base currency on component mount
   useEffect(() => {
-    // First try to find a currency with exchange_rate exactly equal to 1
-    let baseC = currencies.find(c => parseFloat(c.exchange_rate) === 1);
-    
-    // If none found, check if there's a currency with base_currency = 1 flag
-    if (!baseC) {
-      baseC = currencies.find(c => c.base_currency === 1);
-    }
-    
+    // First try to find a currency with base_currency flag set to 1
+    let baseC = currencies.find(c => c.base_currency === 1);
+
     // If still none found, just take the first currency as a fallback
     if (!baseC && currencies.length > 0) {
       baseC = currencies[0];
-      console.warn("No base currency found with exchange_rate=1 or base_currency=1, using first currency as fallback:", baseC);
     }
-    
+
     if (baseC) {
-      console.log("Base currency set to:", baseC);
       setBaseCurrencyInfo(baseC);
-    } else {
-      console.error("No currencies available to set as base currency");
     }
   }, [currencies]);
 
@@ -226,23 +189,19 @@ export default function Edit({ customers = [], products = [], currencies = [], t
   const handleCurrencyChange = (currencyName) => {
     // Find currency object by name
     const currencyObj = currencies.find(currency => currency.name === currencyName);
-    
+
     if (currencyObj) {
-      console.log("Selected currency:", currencyObj);
-      
       // Set the exchange rate directly from the selected currency object first as a fallback
       const currentRate = parseFloat(currencyObj.exchange_rate);
       setExchangeRate(currentRate);
       setData('exchange_rate', currentRate);
-      
+
       // Then try to fetch the updated exchange rate from the API
       fetch(`/user/find_currency/${currencyObj.name}`)
         .then(response => response.json())
         .then(apiData => {
-          console.log("API response for currency rate:", apiData);
           if (apiData && apiData.exchange_rate) {
             const apiRate = parseFloat(apiData.exchange_rate);
-            console.log("Setting exchange rate from API:", apiRate);
             setExchangeRate(apiRate);
             setData('exchange_rate', apiRate);
           }
@@ -257,35 +216,35 @@ export default function Edit({ customers = [], products = [], currencies = [], t
   // Update converted_total whenever relevant values change
   useEffect(() => {
     const total = calculateTotal();
-    const convertedTotal = convertCurrency(total);
+    const convertedTotal = total;
     setData('converted_total', convertedTotal);
-  }, [data.currency, invoiceItems, data.discount_type, data.discount_value, exchangeRate]);
+  }, [data.currency, receiptItems, data.discount_type, data.discount_value, exchangeRate]);
 
   // Parse date strings safely for the date picker
   const parseDate = (dateString) => {
     if (!dateString) return undefined;
-    
+
     try {
       // Handle dd/mm/yyyy format
       if (typeof dateString === 'string' && dateString.includes('/')) {
         const [day, month, year] = dateString.split('/');
         const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-        
+
         if (!isNaN(parsedDate.getTime())) {
           console.log("Successfully parsed date:", dateString, "to", parsedDate);
           return parsedDate;
         }
       }
-      
+
       // Try to parse the date directly
       const date = new Date(dateString);
-      
+
       // Check if date is valid
       if (isNaN(date.getTime())) {
         console.warn("Invalid date:", dateString);
         return undefined;
       }
-      
+
       console.log("Parsed date:", dateString, "to", date);
       return date;
     } catch (error) {
@@ -307,29 +266,10 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     }
   };
 
-  // Format date to yyyy-MM-dd for form submission
-  const formatDateForSubmission = (date) => {
-    if (!date) return "";
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return "";
-    
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
   const renderTotal = () => {
     const total = calculateTotal();
     const selectedCurrency = currencies.find(c => c.name === data.currency);
-    
-    console.log("RENDERING TOTAL:", {
-      baseCurrencyInfo,
-      selectedCurrency,
-      exchangeRate,
-      total
-    });
-    
+
     if (!selectedCurrency) {
       return (
         <div>
@@ -337,29 +277,29 @@ export default function Edit({ customers = [], products = [], currencies = [], t
         </div>
       );
     }
-    
+
     // If we have a base currency AND the selected currency is different from base
-    if (baseCurrencyInfo && 
-        selectedCurrency.name !== baseCurrencyInfo.name && 
-        exchangeRate && 
-        exchangeRate !== 1) {
-      
+    if (baseCurrencyInfo &&
+      selectedCurrency.name !== baseCurrencyInfo.name &&
+      exchangeRate &&
+      exchangeRate !== 1) {
+
       // Calculate the base currency equivalent
       const baseCurrencyTotal = total / exchangeRate;
-      
+
       return (
         <div>
-          <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name)}</h2>
+          <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
           <p className="text-sm text-gray-600">
-            Equivalent to {formatCurrency(baseCurrencyTotal, baseCurrencyInfo.name)}
+            Equivalent to {formatCurrency(baseCurrencyTotal, baseCurrencyInfo.name, decimalPlace)}
           </p>
         </div>
       );
     }
-    
+
     return (
       <div>
-        <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name)}</h2>
+        <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
       </div>
     );
   };
@@ -374,13 +314,13 @@ export default function Edit({ customers = [], products = [], currencies = [], t
             id: tax.id,
             name: `${tax.name} (${tax.rate}%)`
           })) || []}
-          value={invoiceItems[index].taxes.map(t => t.id)}
+          value={receiptItems[index].taxes.map(t => t.id)}
           onChange={(values) => {
-            const updatedItems = [...invoiceItems];
+            const updatedItems = [...receiptItems];
             updatedItems[index].taxes = taxes
               .filter(tax => values.includes(tax.id))
               .map(tax => ({ id: tax.id, rate: tax.rate }));
-            setInvoiceItems(updatedItems);
+            setReceiptItems(updatedItems);
             setData("items", updatedItems);
           }}
           placeholder="Select taxes"
@@ -394,51 +334,38 @@ export default function Edit({ customers = [], products = [], currencies = [], t
 
     // Find the selected currency object to get its name
     const selectedCurrency = currencies.find(c => c.name === data.currency);
-    
+
     if (!selectedCurrency) {
       toast.error("Please select a valid currency");
       return;
     }
 
     // Format dates properly for submission
-    let invoice_date = data.invoice_date;
-    let due_date = data.due_date;
-    
+    let receipt_date = data.receipt_date;
+
     // If they're already in dd/mm/yyyy format, don't change them
-    if (typeof invoice_date === 'string' && invoice_date.includes('/')) {
-      console.log("Invoice date already in correct format:", invoice_date);
+    if (typeof receipt_date === 'string' && receipt_date.includes('/')) {
     } else {
       // Otherwise, ensure they're in the right format
-      const parsedInvoiceDate = parseDate(invoice_date);
-      if (parsedInvoiceDate) {
-        invoice_date = format(parsedInvoiceDate, "dd/MM/yyyy");
-      }
-    }
-    
-    if (typeof due_date === 'string' && due_date.includes('/')) {
-      console.log("Due date already in correct format:", due_date);
-    } else {
-      // Otherwise, ensure they're in the right format
-      const parsedDueDate = parseDate(due_date);
-      if (parsedDueDate) {
-        due_date = format(parsedDueDate, "dd/MM/yyyy");
+      const parsedReceiptDate = parseDate(receipt_date);
+      if (parsedReceiptDate) {
+        receipt_date = format(parsedReceiptDate, "dd/MM/yyyy");
       }
     }
 
     // Create a new data object with all the required fields
     const formData = {
       ...data,
-      invoice_date,
-      due_date,
+      receipt_date,
       currency: selectedCurrency.name,
       exchange_rate: exchangeRate,
-      product_id: invoiceItems.map(item => item.product_id),
-      product_name: invoiceItems.map(item => item.product_name),
-      description: invoiceItems.map(item => item.description),
-      quantity: invoiceItems.map(item => item.quantity),
-      unit_cost: invoiceItems.map(item => item.unit_cost),
+      product_id: receiptItems.map(item => item.product_id),
+      product_name: receiptItems.map(item => item.product_name),
+      description: receiptItems.map(item => item.description),
+      quantity: receiptItems.map(item => item.quantity),
+      unit_cost: receiptItems.map(item => item.unit_cost),
       taxes: Object.fromEntries(
-        invoiceItems.map(item => [
+        receiptItems.map(item => [
           item.product_id,
           item.taxes.map(tax => tax.id)
         ])
@@ -449,14 +376,13 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     console.log("Submitting form with data:", formData);
 
     // Put the form data instead of post for updating
-    put(route("invoices.update", invoice.id), formData, {
+    put(route("receipts.update", receipt.id), formData, {
       preserveScroll: true,
       onSuccess: () => {
         toast.success("Invoice updated successfully");
         // Don't reset the form after updating
       },
       onError: (errors) => {
-        console.error("Error updating invoice:", errors);
         toast.error("Failed to update invoice");
       }
     });
@@ -465,7 +391,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
   return (
     <AuthenticatedLayout>
       <SidebarInset>
-        <PageHeader page="Invoices" subpage="Edit Invoice" url="invoices.index" />
+        <PageHeader page="Cash Invoices" subpage="Edit Cash Invoice" url="receipts.index" />
 
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           <form onSubmit={submit}>
@@ -523,7 +449,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
             </div>
 
             <div className="grid grid-cols-12 mt-2">
-              <Label htmlFor="invoice_date" className="md:col-span-2 col-span-12">
+              <Label htmlFor="receipt_date" className="md:col-span-2 col-span-12">
                 Invoice Date *
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
@@ -533,12 +459,12 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                       variant={"outline"}
                       className={cn(
                         "md:w-1/2 w-full justify-start text-left font-normal",
-                        !data.invoice_date && "text-muted-foreground"
+                        !data.receipt_date && "text-muted-foreground"
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {data.invoice_date ? (
-                        formatDateDisplay(data.invoice_date)
+                      {data.receipt_date ? (
+                        formatDateDisplay(data.receipt_date)
                       ) : (
                         <span>Pick a date</span>
                       )}
@@ -547,52 +473,15 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={parseDate(data.invoice_date)}
+                      selected={parseDate(data.receipt_date)}
                       onSelect={(date) =>
-                        setData("invoice_date", date ? format(date, "yyyy-MM-dd") : "")
+                        setData("receipt_date", date ? format(date, "yyyy-MM-dd") : "")
                       }
                       initialFocus
                     />
                   </PopoverContent>
                 </Popover>
-                <InputError message={errors.invoice_date} className="text-sm" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-12 mt-2">
-              <Label htmlFor="due_date" className="md:col-span-2 col-span-12">
-                Due Date *
-              </Label>
-              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "md:w-1/2 w-full justify-start text-left font-normal",
-                        !data.due_date && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {data.due_date ? (
-                        formatDateDisplay(data.due_date)
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={parseDate(data.due_date)}
-                      onSelect={(date) =>
-                        setData("due_date", date ? format(date, "yyyy-MM-dd") : "")
-                      }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                <InputError message={errors.due_date} className="text-sm" />
+                <InputError message={errors.receipt_date} className="text-sm" />
               </div>
             </div>
 
@@ -623,18 +512,39 @@ export default function Edit({ customers = [], products = [], currencies = [], t
               </div>
             </div>
 
+            <div className="grid grid-cols-12 mt-2">
+              <Label htmlFor="customer_id" className="md:col-span-2 col-span-12">
+                Payment Account *
+              </Label>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                <div className="md:w-1/2 w-full">
+                  <SearchableCombobox
+                    options={accounts.map(account => ({
+                      id: account.id,
+                      name: account.account_name
+                    }))}
+                    value={data.account_id}
+                    onChange={(value) => setData("account_id", value)}
+                    placeholder="Select account"
+                    required
+                  />
+                </div>
+                <InputError message={errors.account_id} className="text-sm" />
+              </div>
+            </div>
+
             <SidebarSeparator className="my-4" />
 
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium">Invoice Items</h3>
-                <Button variant="secondary" type="button" onClick={addInvoiceItem}>
+                <Button variant="secondary" type="button" onClick={addReceiptItem}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Item
                 </Button>
               </div>
 
-              {invoiceItems.map((item, index) => (
+              {receiptItems.map((item, index) => (
                 <div key={index} className="border rounded-lg p-4 space-y-4 bg-gray-50">
                   {/* First Row */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -646,28 +556,28 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                           name: product.name
                         }))}
                         value={item.product_id}
-                        onChange={(value) => updateInvoiceItem(index, "product_id", value)}
+                        onChange={(value) => updateReceiptItem(index, "product_id", value)}
                         placeholder="Select product"
                       />
                     </div>
-                    
+
                     <div>
                       <Label>Quantity *</Label>
                       <Input
                         type="number"
                         min="1"
                         value={item.quantity}
-                        onChange={(e) => updateInvoiceItem(index, "quantity", parseInt(e.target.value))}
+                        onChange={(e) => updateReceiptItem(index, "quantity", parseInt(e.target.value))}
                       />
                     </div>
-                    
+
                     <div>
                       <Label>Unit Cost *</Label>
                       <Input
                         type="number"
                         step="0.01"
                         value={item.unit_cost}
-                        onChange={(e) => updateInvoiceItem(index, "unit_cost", parseFloat(e.target.value))}
+                        onChange={(e) => updateReceiptItem(index, "unit_cost", parseFloat(e.target.value))}
                       />
                     </div>
                   </div>
@@ -678,30 +588,30 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                       <Label>Description</Label>
                       <Textarea
                         value={item.description}
-                        onChange={(e) => updateInvoiceItem(index, "description", e.target.value)}
+                        onChange={(e) => updateReceiptItem(index, "description", e.target.value)}
                         rows={1}
                       />
                     </div>
-                    
+
                     <div className="md:col-span-3">
                       <TaxSelector index={index} />
                     </div>
-                    
+
                     <div className="md:col-span-2">
                       <Label>Subtotal</Label>
                       <div className="p-2 bg-white rounded mt-2 text-right">
                         {(item.quantity * item.unit_cost).toFixed(2)}
                       </div>
                     </div>
-                    
+
                     <div className="md:col-span-1 flex items-end justify-end">
-                      {invoiceItems.length > 1 && (
+                      {receiptItems.length > 1 && (
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
                           className="text-red-500"
-                          onClick={() => removeInvoiceItem(index)}
+                          onClick={() => removeReceiptItem(index)}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -722,8 +632,8 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                 <div className="md:w-1/2 w-full">
                   <SearchableCombobox
                     options={[
-                      { id: "percentage", name: "Percentage (%)" },
-                      { id: "fixed", name: "Fixed Amount" }
+                      { id: "0", name: "Percentage (%)" },
+                      { id: "1", name: "Fixed Amount" }
                     ]}
                     value={data.discount_type}
                     onChange={(value) => setData("discount_type", value)}
@@ -813,7 +723,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                   variant="secondary"
                   onClick={() => {
                     reset();
-                    setInvoiceItems([{
+                    setReceiptItems([{
                       product_id: "",
                       product_name: "",
                       description: "",

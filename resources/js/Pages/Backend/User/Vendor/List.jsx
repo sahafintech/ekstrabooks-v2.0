@@ -338,14 +338,7 @@ export default function List({ vendors = [], meta = {}, filters = {} }) {
 
     return pages;
   };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "-";
-    const parsed = parse(dateString, "yyyy-MM-dd", new Date());
-    if (!isValid(parsed)) return dateString;
-    return format(parsed, "dd MMM yyyy");
-  };
-
+  
   const exportVendors = () => {
     router.get(route("vendors.export_vendors"));
   };

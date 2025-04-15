@@ -37,7 +37,7 @@ const DeleteReceiptModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm} className="p-6">
       <h2 className="text-lg font-medium">
-        Are you sure you want to delete this receipt?
+        Are you sure you want to delete this cash invoice?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -70,9 +70,9 @@ const ImportReceiptsModal = ({ show, onClose, onSubmit, processing }) => (
         <div className="col-span-12">
           <div className="flex items-center justify-between">
             <label className="block font-medium text-sm text-gray-700">
-              Receipts File
+              Cash Invoices File
             </label>
-            <Link href="/uploads/media/default/sample_receipts.xlsx">
+            <Link href="/uploads/media/default/sample_cash_invoices.xlsx">
               <Button variant="secondary" size="sm">
                 Use This Sample File
               </Button>
@@ -128,7 +128,7 @@ const DeleteAllReceiptsModal = ({ show, onClose, onConfirm, processing, count })
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm} className="p-6">
       <h2 className="text-lg font-medium">
-        Are you sure you want to delete {count} selected receipt{count !== 1 ? 's' : ''}?
+        Are you sure you want to delete {count} selected cash invoice{count !== 1 ? 's' : ''}?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -151,29 +151,9 @@ const DeleteAllReceiptsModal = ({ show, onClose, onConfirm, processing, count })
   </Modal>
 );
 
-const ReceiptStatusBadge = ({ status }) => {
-  const statusClasses = {
-    0: "bg-amber-100 text-amber-800",
-    1: "bg-green-100 text-green-800",
-    2: "bg-red-100 text-red-800",
-  };
-
-  const statusText = {
-    0: "Draft",
-    1: "Paid",
-    2: "Cancelled",
-  };
-
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClasses[status]}`}>
-      {statusText[status]}
-    </span>
-  );
-};
 
 export default function List({ receipts = [], meta = {}, filters = {} }) {
   const { toast } = useToast();
-  const { auth } = usePage().props;
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -190,15 +170,6 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
     router.get(
       route("receipts.index"),
       { search, page: 1, per_page: perPage },
-      { preserveState: true }
-    );
-  };
-
-  const handlePerPageChange = (value) => {
-    setPerPage(parseInt(value));
-    router.get(
-      route("receipts.index"),
-      { search, page: 1, per_page: value },
       { preserveState: true }
     );
   };
@@ -263,10 +234,6 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
     });
   };
 
-  const openImportModal = () => {
-    setShowImportModal(true);
-  };
-
   const closeImportModal = () => {
     setShowImportModal(false);
   };
@@ -280,8 +247,8 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
     router.post(route("receipts.import"), formData, {
       onSuccess: () => {
         toast({
-          title: "Receipts Imported",
-          description: "Receipts have been imported successfully.",
+          title: "Cash Invoices Imported",
+          description: "Cash Invoices have been imported successfully.",
         });
         closeImportModal();
         setProcessing(false);
@@ -289,7 +256,7 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
       onError: (errors) => {
         toast({
           title: "Error",
-          description: "Failed to import receipts.",
+          description: "Failed to import cash invoices.",
           variant: "destructive",
         });
         setProcessing(false);
@@ -312,8 +279,8 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
     router.delete(route("receipts.delete_all"), {
       onSuccess: () => {
         toast({
-          title: "All Receipts Deleted",
-          description: "All receipts have been deleted successfully.",
+          title: "All Cash Invoices Deleted",
+          description: "All cash invoices have been deleted successfully.",
         });
         closeDeleteAllModal();
         setProcessing(false);
@@ -323,7 +290,7 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
       onError: (errors) => {
         toast({
           title: "Error",
-          description: "Failed to delete all receipts.",
+          description: "Failed to delete all cash invoices.",
           variant: "destructive",
         });
         setProcessing(false);
@@ -367,12 +334,12 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Receipts" />
+      <Head title="Cash Invoices" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">
           <PageHeader
-            page="Receipts"
+            page="Cash Invoices"
             subpage="List"
             url="receipts.index"
           />
@@ -382,7 +349,7 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
                 <Link href={route("receipts.create")}>
                   <Button>
                     <Plus className="w-4 h-4 mr-2" />
-                    Add Receipt
+                    Add Cash Invoice
                   </Button>
                 </Link>
                 <DropdownMenu>
@@ -475,12 +442,10 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
                         aria-label="Select all"
                       />
                     </TableHead>
-                    <TableHead>Receipt Number</TableHead>
+                    <TableHead>Invoice Number</TableHead>
                     <TableHead>Customer</TableHead>
-                    <TableHead>Receipt Date</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Currency</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Grand Total</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -500,19 +465,10 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
                           {receipt.customer ? receipt.customer.name : "N/A"}
                         </TableCell>
                         <TableCell>
-                          {receipt.receipt_date ? new Date(receipt.receipt_date).toLocaleDateString() : "N/A"}
-                        </TableCell>
-                        <TableCell>{receipt.title}</TableCell>
-                        <TableCell>
-                          {receipt.grand_total ? receipt.grand_total.toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
-                          }) : "0.00"} {receipt.currency}
+                          {receipt.receipt_date}
                         </TableCell>
                         <TableCell>
-                          {receipt.currency} {parseFloat(receipt.exchange_rate) === 1 ? 
-                            <span className="text-xs text-green-600">(Base)</span> : 
-                            <span className="text-xs">({parseFloat(receipt.exchange_rate).toFixed(6)})</span>}
+                          {receipt.grand_total}
                         </TableCell>
                         <TableCell>
                           <TableActions

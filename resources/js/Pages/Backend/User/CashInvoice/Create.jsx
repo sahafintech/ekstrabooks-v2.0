@@ -17,10 +17,10 @@ import {
 } from "@/Components/ui/popover";
 import { CalendarIcon, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
 
-export default function Create({ customers = [], products = [], currencies = [], taxes = [], accounts = [] }) {
+export default function Create({ customers = [], products = [], currencies = [], taxes = [], receipt_title, decimalPlace, accounts }) {
   const [receiptItems, setReceiptItems] = useState([{
     product_id: "",
     product_name: "",
@@ -33,31 +33,28 @@ export default function Create({ customers = [], products = [], currencies = [],
   const [exchangeRate, setExchangeRate] = useState(1);
   const [baseCurrencyInfo, setBaseCurrencyInfo] = useState(null);
 
-  // Debug log the products data
-  useEffect(() => {
-    console.log("Available products:", products);
-  }, [products]);
-
   const { data, setData, post, processing, errors, reset } = useForm({
     customer_id: "",
-    title: "",
+    title: receipt_title,
     receipt_number: "",
     order_number: "",
     receipt_date: format(new Date(), "yyyy-MM-dd"),
     currency: "",
     exchange_rate: 1,
     converted_total: 0,
-    discount_type: "percentage",
+    discount_type: "0",
     discount_value: 0,
+    template: "",
     note: "",
     footer: "",
-    account_id: "",
+    attachment: null,
     product_id: [],
     product_name: [],
     description: [],
     quantity: [],
     unit_cost: [],
-    taxes: []
+    taxes: [],
+    account_id: ""
   });
 
   const addReceiptItem = () => {
@@ -69,24 +66,17 @@ export default function Create({ customers = [], products = [], currencies = [],
       unit_cost: 0,
       taxes: []
     }]);
-    setData("product_id", [...(Array.isArray(data.product_id) ? data.product_id : []), ""]);
-    setData("product_name", [...(Array.isArray(data.product_name) ? data.product_name : []), ""]);
-    setData("description", [...(Array.isArray(data.description) ? data.description : []), ""]);
-    setData("quantity", [...(Array.isArray(data.quantity) ? data.quantity : []), 1]);
-    setData("unit_cost", [...(Array.isArray(data.unit_cost) ? data.unit_cost : []), 0]);
-    setData("taxes", [...(Array.isArray(data.taxes) ? data.taxes : []), []]);
+    setData("product_id", [...data.product_id, ""]);
+    setData("product_name", [...data.product_name, ""]);
+    setData("description", [...data.description, ""]);
+    setData("quantity", [...data.quantity, 1]);
+    setData("unit_cost", [...data.unit_cost, 0]);
+    setData("taxes", [...data.taxes, []]);
   };
 
   const removeReceiptItem = (index) => {
-    if (receiptItems.length === 1) {
-      toast.error("You must have at least one item");
-      return;
-    }
-
-    const updatedItems = [...receiptItems];
-    updatedItems.splice(index, 1);
+    const updatedItems = receiptItems.filter((_, i) => i !== index);
     setReceiptItems(updatedItems);
-
     setData("product_id", updatedItems.map(item => item.product_id));
     setData("product_name", updatedItems.map(item => item.product_name));
     setData("description", updatedItems.map(item => item.description));
@@ -102,16 +92,13 @@ export default function Create({ customers = [], products = [], currencies = [],
     if (field === "product_id") {
       const product = products.find(p => p.id === parseInt(value, 10));
       if (product) {
-        console.log("Selected product:", product);
         updatedItems[index].product_name = product.name;
-        updatedItems[index].unit_cost = product.selling_price || product.price;
-
+        updatedItems[index].unit_cost = product.selling_price;
+        
         // Also update the description if it's empty
         if (!updatedItems[index].description) {
           updatedItems[index].description = product.description || "";
         }
-      } else {
-        console.warn("Product not found for ID:", value);
       }
     }
 
@@ -138,7 +125,7 @@ export default function Create({ customers = [], products = [], currencies = [],
 
   const calculateDiscount = () => {
     const subtotal = calculateSubtotal();
-    if (data.discount_type === "percentage") {
+    if (data.discount_type === "0") {
       return (subtotal * data.discount_value) / 100;
     }
     return data.discount_value;
@@ -151,69 +138,31 @@ export default function Create({ customers = [], products = [], currencies = [],
     return (subtotal + taxes) - discount;
   };
 
-  const convertCurrency = (amount) => {
-    if (!exchangeRate || exchangeRate === 0) return amount;
-
-    // Convert from selected currency to base currency
-    // According to the ISO 4217 standard:
-    // If selected is EUR with rate 0.92 and base is USD with rate 1
-    // then 100 EUR = (100 / 0.92) = 108.70 USD
-    console.log(`Converting ${amount} with exchange rate ${exchangeRate}`);
-
-    // Ensure we're using floating point math with proper decimal precision
-    return parseFloat((amount / parseFloat(exchangeRate)).toFixed(4));
-  };
-
-  // Format currency with proper currency code
-  const formatCurrency = (amount, currencyCode) => {
-    return `${currencyCode} ${amount.toFixed(2)}`;
-  };
-
-  // Find and set base currency on component mount
   useEffect(() => {
-    // First try to find a currency with exchange_rate exactly equal to 1
-    let baseC = currencies.find(c => parseFloat(c.exchange_rate) === 1);
-
-    // If none found, check if there's a currency with base_currency = 1 flag
-    if (!baseC) {
-      baseC = currencies.find(c => c.base_currency === 1);
-    }
-
-    // If still none found, just take the first currency as a fallback
+    let baseC = currencies.find(c => c.base_currency === 1);
+    
     if (!baseC && currencies.length > 0) {
       baseC = currencies[0];
-      console.warn("No base currency found with exchange_rate=1 or base_currency=1, using first currency as fallback:", baseC);
     }
-
+    
     if (baseC) {
-      console.log("Base currency set to:", baseC);
       setBaseCurrencyInfo(baseC);
-    } else {
-      console.error("No currencies available to set as base currency");
     }
   }, [currencies]);
 
-  // Update exchange rate whenever the selected currency changes
   const handleCurrencyChange = (currencyName) => {
-    // Find currency object by name
     const currencyObj = currencies.find(currency => currency.name === currencyName);
-
+    
     if (currencyObj) {
-      console.log("Selected currency:", currencyObj);
-
-      // Set the exchange rate directly from the selected currency object first as a fallback
       const currentRate = parseFloat(currencyObj.exchange_rate);
       setExchangeRate(currentRate);
       setData('exchange_rate', currentRate);
-
-      // Then try to fetch the updated exchange rate from the API
+      
       fetch(`/user/find_currency/${currencyObj.name}`)
         .then(response => response.json())
         .then(apiData => {
-          console.log("API response for currency rate:", apiData);
           if (apiData && apiData.exchange_rate) {
             const apiRate = parseFloat(apiData.exchange_rate);
-            console.log("Setting exchange rate from API:", apiRate);
             setExchangeRate(apiRate);
             setData('exchange_rate', apiRate);
           }
@@ -225,41 +174,46 @@ export default function Create({ customers = [], products = [], currencies = [],
     }
   };
 
-  // Update converted_total whenever relevant values change
   useEffect(() => {
     const total = calculateTotal();
-    const convertedTotal = convertCurrency(total);
+    const convertedTotal = total;
     setData('converted_total', convertedTotal);
   }, [data.currency, receiptItems, data.discount_type, data.discount_value, exchangeRate]);
 
   const renderTotal = () => {
     const total = calculateTotal();
     const selectedCurrency = currencies.find(c => c.name === data.currency);
-
-    console.log("RENDERING TOTAL:", {
-      total,
-      selectedCurrency,
-      baseCurrencyInfo
-    });
-
-    if (!selectedCurrency || !baseCurrencyInfo) {
+    
+    if (!selectedCurrency) {
       return (
         <div>
-          <div>Total: {total.toFixed(2)}</div>
+          <h2 className="text-xl font-bold">Total: 0.00</h2>
         </div>
       );
     }
-
-    const convertedTotal = convertCurrency(total);
-
+    
+    // If we have a base currency AND the selected currency is different from base
+    if (baseCurrencyInfo && 
+        selectedCurrency.name !== baseCurrencyInfo.name && 
+        exchangeRate && 
+        exchangeRate !== 1) {
+      
+      // Calculate the base currency equivalent
+      const baseCurrencyTotal = total / exchangeRate;
+      
+      return (
+        <div>
+          <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
+          <p className="text-sm text-gray-600">
+            Equivalent to {formatCurrency(baseCurrencyTotal, baseCurrencyInfo.name, decimalPlace)}
+          </p>
+        </div>
+      );
+    }
+    
     return (
       <div>
-        <div>Total: {formatCurrency(total, selectedCurrency.name)}</div>
-        {selectedCurrency.name !== baseCurrencyInfo.name && (
-          <div className="text-sm text-gray-500">
-            Equivalent: {formatCurrency(convertedTotal, baseCurrencyInfo.name)}
-          </div>
-        )}
+        <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
       </div>
     );
   };
@@ -281,7 +235,7 @@ export default function Create({ customers = [], products = [], currencies = [],
               .filter(tax => values.includes(tax.id))
               .map(tax => ({ id: tax.id, rate: tax.rate }));
             setReceiptItems(updatedItems);
-            setData("taxes", updatedItems.map(item => item.taxes));
+            setData("items", updatedItems);
           }}
           placeholder="Select taxes"
         />
@@ -292,47 +246,15 @@ export default function Create({ customers = [], products = [], currencies = [],
   const submit = (e) => {
     e.preventDefault();
 
-    // Validate required fields
-    if (!data.title) {
-      toast.error("Title is required");
-      return;
-    }
-
-    if (!data.receipt_date) {
-      toast.error("Receipt date is required");
-      return;
-    }
-
-    if (!data.currency) {
-      toast.error("Currency is required");
-      return;
-    }
-
-    if (!data.account_id) {
-      toast.error("Payment account is required");
-      return;
-    }
-
-    // Check if any items have no product_id or quantity
-    for (let i = 0; i < receiptItems.length; i++) {
-      if (!receiptItems[i].product_id) {
-        toast.error(`Product is required for item ${i + 1}`);
-        return;
-      }
-      if (receiptItems[i].quantity <= 0) {
-        toast.error(`Quantity must be greater than 0 for item ${i + 1}`);
-        return;
-      }
-    }
-
-    // Make sure we have the selected currency
+    // Find the selected currency object to get its name
     const selectedCurrency = currencies.find(c => c.name === data.currency);
+    
     if (!selectedCurrency) {
-      toast.error("Invalid currency selected");
+      toast.error("Please select a valid currency");
       return;
     }
 
-    // Prepare form data
+    // Create a new data object with all the required fields
     const formData = {
       ...data,
       currency: selectedCurrency.name,
@@ -350,13 +272,14 @@ export default function Create({ customers = [], products = [], currencies = [],
       )
     };
 
+    // Log the data being sent to help debug
     console.log("Submitting form with data:", formData);
 
     // Post the form data directly instead of using setData first
     post(route("receipts.store"), formData, {
       preserveScroll: true,
       onSuccess: () => {
-        toast.success("Receipt created successfully");
+        toast.success('Cash invoice created successfully');
         reset();
         setReceiptItems([{
           product_id: "",
@@ -367,36 +290,16 @@ export default function Create({ customers = [], products = [], currencies = [],
           taxes: []
         }]);
       },
-      onError: (errors) => {
-        console.error("Form submission errors:", errors);
-        // Toast will be shown from the Inertia's error handling
-      },
     });
   };
 
   return (
     <AuthenticatedLayout>
       <SidebarInset>
-        <PageHeader page="Receipts" subpage="Create New" url="receipts.index" />
+        <PageHeader page="Cash Invoices" subpage="Create New" url="receipts.index" />
 
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           <form onSubmit={submit}>
-            <div className="grid grid-cols-12 mt-2">
-              <Label htmlFor="title" className="md:col-span-2 col-span-12">
-                Title *
-              </Label>
-              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Input
-                  id="title"
-                  type="text"
-                  value={data.title}
-                  onChange={(e) => setData("title", e.target.value)}
-                  className="md:w-1/2 w-full"
-                />
-                <InputError message={errors.title} className="text-sm" />
-              </div>
-            </div>
-
             <div className="grid grid-cols-12 mt-2">
               <Label htmlFor="customer_id" className="md:col-span-2 col-span-12">
                 Customer
@@ -418,18 +321,19 @@ export default function Create({ customers = [], products = [], currencies = [],
             </div>
 
             <div className="grid grid-cols-12 mt-2">
-              <Label htmlFor="receipt_number" className="md:col-span-2 col-span-12">
-                Receipt Number
+              <Label htmlFor="title" className="md:col-span-2 col-span-12">
+                Title *
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <Input
-                  id="receipt_number"
+                  id="title"
                   type="text"
-                  value={data.receipt_number}
-                  onChange={(e) => setData("receipt_number", e.target.value)}
+                  value={data.title}
+                  onChange={(e) => setData("title", e.target.value)}
                   className="md:w-1/2 w-full"
+                  required
                 />
-                <InputError message={errors.receipt_number} className="text-sm" />
+                <InputError message={errors.title} className="text-sm" />
               </div>
             </div>
 
@@ -451,7 +355,7 @@ export default function Create({ customers = [], products = [], currencies = [],
 
             <div className="grid grid-cols-12 mt-2">
               <Label htmlFor="receipt_date" className="md:col-span-2 col-span-12">
-                Receipt Date *
+                Invoice Date *
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <Popover>
@@ -514,7 +418,7 @@ export default function Create({ customers = [], products = [], currencies = [],
             </div>
 
             <div className="grid grid-cols-12 mt-2">
-              <Label htmlFor="account_id" className="md:col-span-2 col-span-12">
+              <Label htmlFor="customer_id" className="md:col-span-2 col-span-12">
                 Payment Account *
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
@@ -526,7 +430,8 @@ export default function Create({ customers = [], products = [], currencies = [],
                     }))}
                     value={data.account_id}
                     onChange={(value) => setData("account_id", value)}
-                    placeholder="Select payment account"
+                    placeholder="Select account"
+                    required
                   />
                 </div>
                 <InputError message={errors.account_id} className="text-sm" />
@@ -537,7 +442,7 @@ export default function Create({ customers = [], products = [], currencies = [],
 
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Receipt Items</h3>
+                <h3 className="text-lg font-medium">Invoice Items</h3>
                 <Button variant="secondary" type="button" onClick={addReceiptItem}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Item
@@ -560,7 +465,7 @@ export default function Create({ customers = [], products = [], currencies = [],
                         placeholder="Select product"
                       />
                     </div>
-
+                    
                     <div>
                       <Label>Quantity *</Label>
                       <Input
@@ -570,7 +475,7 @@ export default function Create({ customers = [], products = [], currencies = [],
                         onChange={(e) => updateReceiptItem(index, "quantity", parseInt(e.target.value))}
                       />
                     </div>
-
+                    
                     <div>
                       <Label>Unit Cost *</Label>
                       <Input
@@ -592,18 +497,18 @@ export default function Create({ customers = [], products = [], currencies = [],
                         rows={1}
                       />
                     </div>
-
+                    
                     <div className="md:col-span-3">
                       <TaxSelector index={index} />
                     </div>
-
+                    
                     <div className="md:col-span-2">
                       <Label>Subtotal</Label>
                       <div className="p-2 bg-white rounded mt-2 text-right">
                         {(item.quantity * item.unit_cost).toFixed(2)}
                       </div>
                     </div>
-
+                    
                     <div className="md:col-span-1 flex items-end justify-end">
                       {receiptItems.length > 1 && (
                         <Button
@@ -632,8 +537,8 @@ export default function Create({ customers = [], products = [], currencies = [],
                 <div className="md:w-1/2 w-full">
                   <SearchableCombobox
                     options={[
-                      { id: "percentage", name: "Percentage (%)" },
-                      { id: "fixed", name: "Fixed Amount" }
+                      { id: "0", name: "Percentage (%)" },
+                      { id: "1", name: "Fixed Amount" }
                     ]}
                     value={data.discount_type}
                     onChange={(value) => setData("discount_type", value)}
@@ -694,12 +599,27 @@ export default function Create({ customers = [], products = [], currencies = [],
               </div>
             </div>
 
+            <div className="grid grid-cols-12 mt-2">
+              <Label htmlFor="attachment" className="md:col-span-2 col-span-12">
+                Attachment
+              </Label>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                <Input
+                  id="attachment"
+                  type="file"
+                  onChange={(e) => setData("attachment", e.target.files[0])}
+                  className="md:w-1/2 w-full"
+                />
+                <InputError message={errors.attachment} className="text-sm" />
+              </div>
+            </div>
+
             <div className="mt-6 space-y-2">
               <div className="space-y-2">
                 <div className="text-sm">Subtotal: {calculateSubtotal().toFixed(2)}</div>
                 <div className="text-sm">Taxes: {calculateTaxes().toFixed(2)}</div>
                 <div className="text-sm">Discount: {calculateDiscount().toFixed(2)}</div>
-                <div className="text-lg font-bold">{renderTotal()}</div>
+                {renderTotal()}
               </div>
 
               <div className="space-x-2">
@@ -721,7 +641,7 @@ export default function Create({ customers = [], products = [], currencies = [],
                   Reset
                 </Button>
                 <Button type="submit" disabled={processing}>
-                  Create Receipt
+                  Create Cash Invoice
                 </Button>
               </div>
             </div>

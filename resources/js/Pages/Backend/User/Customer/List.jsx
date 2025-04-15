@@ -1,23 +1,40 @@
-import { Button } from "@/Components/ui/button";
+import React, { useState, useEffect } from "react";
+import { Head, Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { Link, usePage, router } from "@inertiajs/react";
-import PageHeader from "@/Components/PageHeader";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit } from "lucide-react";
-import Modal from "@/Components/Modal";
-import { useState, useMemo } from "react";
 import { SidebarInset } from "@/Components/ui/sidebar";
+import { Button } from "@/Components/ui/button";
 import { Checkbox } from "@/Components/ui/checkbox";
-import { DataTable } from "@/Components/ui/data-table/data-table";
-import TableActions from "@/Components/shared/TableActions";
-
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/Components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/Components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
+import { Input } from "@/Components/ui/input";
+import { Edit, EyeIcon, FileDown, FileUp, MoreVertical, Plus, Trash } from "lucide-react";
+import { Toaster } from "@/Components/ui/toaster";
+import { useToast } from "@/hooks/use-toast";
+import TableActions from "@/Components/shared/TableActions";
+import PageHeader from "@/Components/PageHeader";
+import Modal from "@/Components/Modal";
 
-const DeleteCustomersModal = ({ show, onClose, onConfirm, processing }) => (
+// Delete Confirmation Modal Component
+const DeleteCustomerModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm} className="p-6">
       <h2 className="text-lg font-medium">
@@ -37,13 +54,42 @@ const DeleteCustomersModal = ({ show, onClose, onConfirm, processing }) => (
           variant="destructive"
           disabled={processing}
         >
-          Delete Customer
+          Delete
         </Button>
       </div>
     </form>
   </Modal>
 );
 
+// Bulk Delete Confirmation Modal Component
+const DeleteAllCustomersModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm} className="p-6">
+      <h2 className="text-lg font-medium">
+        Are you sure you want to delete {count} selected customer{count !== 1 ? 's' : ''}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="destructive"
+          disabled={processing}
+        >
+          Delete Selected
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+// Import Customers Modal Component
 const ImportCustomersModal = ({ show, onClose, onSubmit, processing }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onSubmit} className="p-6">
@@ -56,7 +102,7 @@ const ImportCustomersModal = ({ show, onClose, onSubmit, processing }) => (
             <label className="block font-medium text-sm text-gray-700">
               Customers File
             </label>
-            <Link href="/uploads/media/default/sample_customers.xlsx">
+            <Link href="/uploads/media/default/sample_suppliers.xlsx">
               <Button variant="secondary" size="sm">
                 Use This Sample File
               </Button>
@@ -100,34 +146,7 @@ const ImportCustomersModal = ({ show, onClose, onSubmit, processing }) => (
           type="submit"
           disabled={processing}
         >
-          Import Items
-        </Button>
-      </div>
-    </form>
-  </Modal>
-);
-
-const DeleteAllCustomersModal = ({ show, onClose, onConfirm, processing }) => (
-  <Modal show={show} onClose={onClose}>
-    <form onSubmit={onConfirm} className="p-6">
-      <h2 className="text-lg font-medium">
-        Are you sure you want to delete all selected customers?
-      </h2>
-      <div className="mt-6 flex justify-end">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={onClose}
-          className="mr-3"
-        >
-          Close
-        </Button>
-        <Button
-          type="submit"
-          variant="destructive"
-          disabled={processing}
-        >
-          Delete All
+          Import
         </Button>
       </div>
     </form>
@@ -135,21 +154,107 @@ const DeleteAllCustomersModal = ({ show, onClose, onConfirm, processing }) => (
 );
 
 export default function List({ customers = [], meta = {}, filters = {} }) {
-  const { auth } = usePage().props;
+  const { flash = {} } = usePage().props;
+  const { toast } = useToast();
   const [selectedCustomers, setSelectedCustomers] = useState([]);
+  const [isAllSelected, setIsAllSelected] = useState(false);
+  const [search, setSearch] = useState(filters.search || "");
+  const [perPage, setPerPage] = useState(meta.per_page || 10);
+  const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
+  const [bulkAction, setBulkAction] = useState("");
+  
+  // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState(null);
-  const [tableRef, setTableRef] = useState(null);
   const [processing, setProcessing] = useState(false);
 
-  // Format currency with proper ISO 4217 code
-  const formatCurrency = (amount, currencyCode = 'USD') => {
-    return new Intl.NumberFormat('en-US', { 
-      style: 'currency', 
-      currency: currencyCode 
-    }).format(amount);
+  useEffect(() => {
+    if (flash && flash.success) {
+      toast({
+        title: "Success",
+        description: flash.success,
+      });
+    }
+
+    if (flash && flash.error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: flash.error,
+      });
+    }
+  }, [flash, toast]);
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedCustomers([]);
+    } else {
+      setSelectedCustomers(customers.map((customer) => customer.id));
+    }
+    setIsAllSelected(!isAllSelected);
+  };
+
+  const toggleSelectCustomer = (id) => {
+    if (selectedCustomers.includes(id)) {
+      setSelectedCustomers(selectedCustomers.filter((customerId) => customerId !== id));
+      setIsAllSelected(false);
+    } else {
+      setSelectedCustomers([...selectedCustomers, id]);
+      if (selectedCustomers.length + 1 === customers.length) {
+        setIsAllSelected(true);
+      }
+    }
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    router.get(
+      route("customers.index"),
+      { search, page: 1, per_page: perPage },
+      { preserveState: true }
+    );
+  };
+
+  const handlePerPageChange = (value) => {
+    setPerPage(value);
+    router.get(
+      route("customers.index"),
+      { search, page: 1, per_page: value },
+      { preserveState: true }
+    );
+  };
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    router.get(
+      route("customers.index"),
+      { search, page, per_page: perPage },
+      { preserveState: true }
+    );
+  };
+
+  const handleBulkAction = () => {
+    if (bulkAction === "") return;
+
+    if (selectedCustomers.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select at least one customer",
+      });
+      return;
+    }
+
+    if (bulkAction === "delete") {
+      setShowDeleteAllModal(true);
+    }
+  };
+
+  const handleDeleteConfirm = (id) => {
+    setCustomerToDelete(id);
+    setShowDeleteModal(true);
   };
 
   const handleDelete = (e) => {
@@ -170,18 +275,15 @@ export default function List({ customers = [], meta = {}, filters = {} }) {
 
   const handleDeleteAll = (e) => {
     e.preventDefault();
-    if (!tableRef) return;
-    
-    const selectedIds = tableRef.getSelectedRowModel().rows.map(row => row.original.id);
-    if (selectedIds.length === 0) return;
-
     setProcessing(true);
-    router.post(route('customers.destroy-multiple'), {
-      customers: selectedIds
+    
+    router.post(route('customers.bulk_action'), {
+      delete_customers: selectedCustomers.join(',')
     }, {
       onSuccess: () => {
         setShowDeleteAllModal(false);
-        tableRef.toggleAllRowsSelected(false);
+        setSelectedCustomers([]);
+        setIsAllSelected(false);
         setProcessing(false);
       },
       onError: () => {
@@ -195,7 +297,7 @@ export default function List({ customers = [], meta = {}, filters = {} }) {
     const formData = new FormData(e.target);
     setProcessing(true);
     
-    router.post(route('customers.import'), formData, {
+    router.post(route('customers.import_customers'), formData, {
       onSuccess: () => {
         setShowImportModal(false);
         setProcessing(false);
@@ -206,250 +308,255 @@ export default function List({ customers = [], meta = {}, filters = {} }) {
     });
   };
 
-  const handlePagination = (pagination) => {
-    // Ensure we have valid numeric values for page and page size
-    const pageIndex = isNaN(pagination.pageIndex) ? 0 : pagination.pageIndex;
-    const pageSize = isNaN(pagination.pageSize) ? 10 : pagination.pageSize;
-    
-    // Create query parameters object (only include non-empty values)
-    const params = {
-      page: pageIndex + 1, // Convert 0-indexed to 1-indexed
-      per_page: pageSize,
-    };
-    
-    // Only add search if it's non-empty
-    if (pagination.globalFilter || filters.search) {
-      params.search = pagination.globalFilter || filters.search || '';
-    }
-    
-    // Only add column filters if they exist
-    const columnFiltersArray = pagination.columnFilters || filters.columnFilters || [];
-    if (columnFiltersArray.length > 0) {
-      params.columnFilters = JSON.stringify(columnFiltersArray);
-    }
-    
-    // Only add sorting if it exists
-    const sortingArray = pagination.sorting || filters.sorting || [];
-    if (sortingArray.length > 0) {
-      params.sorting = JSON.stringify(sortingArray);
+  const renderPageNumbers = () => {
+    const totalPages = meta.last_page;
+    const pages = [];
+    const maxPagesToShow = 5;
+
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = startPage + maxPagesToShow - 1;
+
+    if (endPage > totalPages) {
+      endPage = totalPages;
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
     }
 
-    // Debug the parameters being sent to the server
-    console.log('Sending to server:', params);
-    
-    // Update URL and fetch data
-    router.get(route('customers.index'), params, {
-      preserveState: true,
-      preserveScroll: true,
-      only: ['customers', 'meta', 'filters'],
-      replace: false, // Use false to update browser history
-    });
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(
+        <Button
+          key={i}
+          variant={i === currentPage ? "default" : "outline"}
+          size="sm"
+          onClick={() => handlePageChange(i)}
+          className="mx-1"
+        >
+          {i}
+        </Button>
+      );
+    }
+
+    return pages;
   };
 
-  const handleDataTableChange = (updatedState) => {
-    // Ensure we have valid numeric values for page and page size
-    const pageIndex = isNaN(updatedState.pagination.pageIndex) ? 0 : updatedState.pagination.pageIndex;
-    const pageSize = isNaN(updatedState.pagination.pageSize) ? 10 : updatedState.pagination.pageSize;
-    
-    // Create query parameters object (only include non-empty values)
-    const params = {
-      page: pageIndex + 1, // Convert 0-indexed to 1-indexed
-      per_page: pageSize,
-    };
-    
-    // Only add search if it's non-empty
-    if (updatedState.globalFilter) {
-      params.search = updatedState.globalFilter;
-    }
-    
-    // Only add column filters if they exist
-    const columnFiltersArray = updatedState.columnFilters || [];
-    if (columnFiltersArray.length > 0) {
-      params.columnFilters = JSON.stringify(columnFiltersArray);
-    }
-    
-    // Only add sorting if it exists
-    const sortingArray = updatedState.sorting || [];
-    if (sortingArray.length > 0) {
-      params.sorting = JSON.stringify(sortingArray);
-    }
-
-    // Debug the parameters being sent to the server
-    console.log('Table state change:', params);
-    
-    // Update URL and fetch data
-    router.get(route('customers.index'), params, {
-      preserveState: true,
-      preserveScroll: true,
-      only: ['customers', 'meta', 'filters'],
-      replace: false, // Use false to update browser history
-    });
+  const exportCustomers = () => {
+    router.get(route("customers.export_customers"));
   };
-
-  const columns = useMemo(
-    () => [
-      {
-        id: "select",
-        header: ({ table }) => (
-          <Checkbox
-            checked={table.getIsAllPageRowsSelected()}
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-            aria-label="Select all"
-          />
-        ),
-        cell: ({ row }) => (
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label="Select row"
-          />
-        ),
-        enableSorting: false,
-        enableHiding: false,
-      },
-      {
-        accessorKey: "name",
-        header: "Name",
-      },
-      {
-        accessorKey: "company_name",
-        header: "Company Name",
-      },
-      {
-        accessorKey: "email",
-        header: "Email",
-      },
-      {
-        accessorKey: "phone",
-        header: "Phone",
-      },
-      {
-        id: "actions",
-        header: "Actions",
-        cell: ({ row }) => (
-          <TableActions
-            actions={[
-              {
-                label: "Edit",
-                icon: Edit,
-                onClick: () => router.visit(route('customers.edit', row.original.id))
-              },
-              {
-                label: "View",
-                icon: Eye,
-                onClick: () => router.visit(route('customers.show', row.original.id))
-              },
-              {
-                label: "Delete",
-                icon: Trash2,
-                onClick: () => {
-                  setCustomerToDelete(row.original.id);
-                  setShowDeleteModal(true);
-                },
-                className: "text-red-600"
-              }
-            ]}
-          />
-        ),
-      },
-    ],
-    []
-  );
-
-  const filterableColumns = [
-    {
-      id: "status",
-      title: "Status",
-      options: [
-        { label: "Active", value: "1" },
-        { label: "Disabled", value: "0" },
-      ],
-    },
-  ];
-
-  const searchableColumns = [
-    {
-      id: "name",
-      title: "Name",
-    },
-  ];
 
   return (
     <AuthenticatedLayout>
+      <Head title="Customers" />
+      <Toaster />
       <SidebarInset>
         <div className="main-content">
-          <PageHeader page="Customers" subpage="list" url="customers.index" />
-
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-            <div className="flex items-center space-x-2">
-              <Link href={route("customers.create")}>
-                <Button>Add New Customer</Button>
-              </Link>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="secondary">
-                    <MoreVertical className="h-4 w-4" />
+          <PageHeader
+            page="Customers"
+            subpage="List"
+            url="customers.index"
+          />
+          <div className="p-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                <Link href={route("customers.create")}>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Customer
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setShowImportModal(true)}>
-                    <FileUp className="mr-2 h-4 w-4" /> Import
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href={route('customers.export')}>
+                </Link>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="secondary">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setShowImportModal(true)}>
+                      <FileUp className="mr-2 h-4 w-4" /> Import
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportCustomers}>
                       <FileDown className="mr-2 h-4 w-4" /> Export
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              <div className="flex flex-col md:flex-row gap-4 md:items-center">
+                <form onSubmit={handleSearch} className="flex gap-2">
+                  <Input
+                    placeholder="Search customers..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full md:w-80"
+                  />
+                  <Button type="submit">Search</Button>
+                </form>
+              </div>
             </div>
 
-              <DataTable
-                columns={columns}
-                data={customers}
-                filterableColumns={filterableColumns}
-                searchableColumns={searchableColumns}
-                totalRows={meta.total || 0}
-                pageCount={meta.last_page || 1}
-                onPaginationChange={handlePagination}
-                onTableStateChange={handleDataTableChange}
-                serverSide={true}
-                initialState={{
-                  pagination: {
-                    pageIndex: (meta.current_page || 1) - 1,
-                    pageSize: meta.per_page || 10,
-                  },
-                  globalFilter: filters.search || '',
-                  columnFilters: filters.columnFilters || [],
-                  sorting: filters.sorting || [],
-                }}
-                tableRef={setTableRef}
-                meta={meta}
-              />
+            <div className="mb-4 flex flex-col md:flex-row gap-4 justify-between">
+              <div className="flex items-center gap-2">
+                <Select value={bulkAction} onValueChange={setBulkAction}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Bulk actions" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="delete">Delete Selected</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleBulkAction} variant="outline">
+                  Apply
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Show</span>
+                <Select value={perPage.toString()} onValueChange={handlePerPageChange}>
+                  <SelectTrigger className="w-[80px]">
+                    <SelectValue placeholder="10" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-gray-500">entries</span>
+              </div>
+            </div>
+
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px]">
+                      <Checkbox
+                        checked={isAllSelected}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                    </TableHead>
+                    <TableHead className="w-[80px]">ID</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Company</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {customers.length > 0 ? (
+                    customers.map((customer) => (
+                      <TableRow key={customer.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedCustomers.includes(customer.id)}
+                            onCheckedChange={() => toggleSelectCustomer(customer.id)}
+                          />
+                        </TableCell>
+                        <TableCell>{customer.id}</TableCell>
+                        <TableCell>{customer.name}</TableCell>
+                        <TableCell>{customer.company_name || "-"}</TableCell>
+                        <TableCell>{customer.email || "-"}</TableCell>
+                        <TableCell>{customer.phone || "-"}</TableCell>
+                        <TableCell className="text-right">
+                          <TableActions
+                            actions={[
+                              {
+                                label: "View",
+                                icon: <EyeIcon className="h-4 w-4" />,
+                                href: route("customers.show", customer.id),
+                              },
+                              {
+                                label: "Edit",
+                                icon: <Edit className="h-4 w-4" />,
+                                href: route("customers.edit", customer.id),
+                              },
+                              {
+                                label: "Delete",
+                                icon: <Trash className="h-4 w-4" />,
+                                onClick: () => handleDeleteConfirm(customer.id),
+                                destructive: true,
+                              },
+                            ]}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={8} className="h-24 text-center">
+                        No customers found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {customers.length > 0 && meta.total > 0 && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-gray-500">
+                  Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, meta.total)} of {meta.total} entries
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                  >
+                    First
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  {renderPageNumbers()}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === meta.last_page}
+                  >
+                    Next
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(meta.last_page)}
+                    disabled={currentPage === meta.last_page}
+                  >
+                    Last
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
-
-          <DeleteCustomersModal
-            show={showDeleteModal}
-            onClose={() => setShowDeleteModal(false)}
-            onConfirm={handleDelete}
-            processing={processing}
-          />
-
-          <DeleteAllCustomersModal
-            show={showDeleteAllModal}
-            onClose={() => setShowDeleteAllModal(false)}
-            onConfirm={handleDeleteAll}
-            processing={processing}
-          />
-
-          <ImportCustomersModal
-            show={showImportModal}
-            onClose={() => setShowImportModal(false)}
-            onSubmit={handleImport}
-            processing={processing}
-          />
         </div>
       </SidebarInset>
+
+      <DeleteCustomerModal
+        show={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDelete}
+        processing={processing}
+      />
+
+      <DeleteAllCustomersModal
+        show={showDeleteAllModal}
+        onClose={() => setShowDeleteAllModal(false)}
+        onConfirm={handleDeleteAll}
+        processing={processing}
+        count={selectedCustomers.length}
+      />
+
+      <ImportCustomersModal
+        show={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSubmit={handleImport}
+        processing={processing}
+      />
     </AuthenticatedLayout>
   );
 }

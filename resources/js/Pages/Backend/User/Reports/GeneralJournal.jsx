@@ -36,13 +36,17 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
     const [search, setSearch] = useState("");
     const [perPage, setPerPage] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
-    
 
 
-    const { data, setData, post, processing, errors, reset } = useForm({
+
+    const { data, setData, post, processing } = useForm({
         date1: date1,
         date2: date2,
     });
+    
+    const handleExport = () => {
+        window.location.href = route("reports.gen_journal_export");
+      };
 
     const handleSearch = (e) => {
         e.preventDefault();
@@ -126,7 +130,7 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
     const handlePrint = () => {
         // Create a new window for printing
         const printWindow = window.open('', '_blank', 'width=800,height=600');
-        
+
         // Generate CSS for the print window
         const style = `
             <style>
@@ -139,7 +143,7 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
                 .total-row { font-weight: bold; background-color: #f9f9f9; }
             </style>
         `;
-        
+
         // Start building the HTML content for the print window
         let printContent = `
             <!DOCTYPE html>
@@ -170,7 +174,7 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
                     </thead>
                     <tbody>
         `;
-        
+
         // Add table rows from transactions data
         if (transactions.length > 0) {
             transactions.forEach(transaction => {
@@ -198,7 +202,7 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
                 </tr>
             `;
         }
-        
+
         // Complete the HTML content
         printContent += `
                     </tbody>
@@ -206,17 +210,17 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
             </body>
             </html>
         `;
-        
+
         // Write the content to the print window and trigger print
         printWindow.document.open();
         printWindow.document.write(printContent);
         printWindow.document.close();
-        
+
         // Wait for content to load before printing
         setTimeout(() => {
             printWindow.print();
             // Close the window after printing (optional, can be commented out if you want to keep it open)
-            printWindow.onafterprint = function() {
+            printWindow.onafterprint = function () {
                 printWindow.close();
             };
         }, 300);
@@ -306,9 +310,7 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
                                 <Button variant="outline" onClick={handlePrint}>
                                     Print
                                 </Button>
-                                <a download href={route("reports.gen_journal_export")}>
-                                    <Button variant="outline">Export</Button>
-                                </a>
+                                <Button variant="outline" onClick={handleExport}>Export</Button>
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-sm text-gray-500">Show</span>
