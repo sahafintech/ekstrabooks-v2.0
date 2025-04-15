@@ -34,11 +34,11 @@ import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 import { format } from "date-fns";
 
-const DeleteCashPurchaseModal = ({ show, onClose, onConfirm, processing }) => (
+const DeleteBillModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm} className="p-6">
       <h2 className="text-lg font-medium">
-        Are you sure you want to delete this cash purchase?
+        Are you sure you want to delete this bill?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -54,32 +54,32 @@ const DeleteCashPurchaseModal = ({ show, onClose, onConfirm, processing }) => (
           variant="destructive"
           disabled={processing}
         >
-          Delete Cash Purchase
+          Delete Bill
         </Button>
       </div>
     </form>
   </Modal>
 );
 
-const ImportCashPurchasesModal = ({ show, onClose, onSubmit, processing }) => (
+const ImportBillsModal = ({ show, onClose, onSubmit, processing }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onSubmit} className="p-6">
       <div className="ti-modal-header">
-        <h3 className="text-lg font-bold">Import Cash Purchases</h3>
+        <h3 className="text-lg font-bold">Import Bills</h3>
       </div>
       <div className="ti-modal-body grid grid-cols-12">
         <div className="col-span-12">
           <div className="flex items-center justify-between">
             <label className="block font-medium text-sm text-gray-700">
-              Cash Purchases File
+              Bills File
             </label>
-            <Link href="/uploads/media/default/sample_cash_purchases.xlsx">
+            <Link href="/uploads/media/default/sample_bills.xlsx">
               <Button variant="secondary" size="sm">
                 Use This Sample File
               </Button>
             </Link>
           </div>
-          <input type="file" className="w-full dropify" name="cash_purchases_file" required />
+          <input type="file" className="w-full dropify" name="bills_file" required />
         </div>
         <div className="col-span-12 mt-4">
           <ul className="space-y-3 text-sm">
@@ -117,18 +117,18 @@ const ImportCashPurchasesModal = ({ show, onClose, onSubmit, processing }) => (
           type="submit"
           disabled={processing}
         >
-          Import Cash Purchases
+          Import Bills
         </Button>
       </div>
     </form>
   </Modal>
 );
 
-const DeleteAllCashPurchasesModal = ({ show, onClose, onConfirm, processing, count }) => (
+const DeleteAllBillsModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm} className="p-6">
       <h2 className="text-lg font-medium">
-        Are you sure you want to delete {count} selected cash purchase{count !== 1 ? 's' : ''}?
+        Are you sure you want to delete {count} selected bill{count !== 1 ? 's' : ''}?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -151,7 +151,7 @@ const DeleteAllCashPurchasesModal = ({ show, onClose, onConfirm, processing, cou
   </Modal>
 );
 
-const PurchaseApprovalStatusBadge = ({ status }) => {
+const BillApprovalStatusBadge = ({ status }) => {
   const statusMap = {
     0: { label: "Pending", className: "text-gray-400" },
     1: { label: "Approved", className: "text-green-400" },
@@ -166,11 +166,26 @@ const PurchaseApprovalStatusBadge = ({ status }) => {
   );
 };
 
+const BillStatusBadge = ({ status }) => {
+  const statusMap = {
+    0: { label: "Active", className: "text-blue-600" },
+    1: { label: "Partial Paid", className: "text-yellow-600" },
+    2: { label: "Paid", className: "text-green-600" },
+  };
 
-export default function List({ purchases = [], meta = {}, filters = {} }) {
+  const { label, className } = statusMap[status] || statusMap[0];
+
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${className}`}>
+      {label}
+    </span>
+  );
+};
+
+export default function List({ bills = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
-  const [selectedPurchases, setSelectedPurchases] = useState([]);
+  const [selectedBills, setSelectedBills] = useState([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
   const [perPage, setPerPage] = useState(filters.per_page || 10);
@@ -181,7 +196,7 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
-  const [purchaseToDelete, setPurchaseToDelete] = useState(null);
+  const [billToDelete, setBillToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
@@ -203,21 +218,21 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
 
   const toggleSelectAll = (checked) => {
     setIsAllSelected(checked);
-    setSelectedPurchases(checked ? purchases.map(purchase => purchase.id) : []);
+    setSelectedBills(checked ? bills.map(bill => bill.id) : []);
   };
 
-  const toggleSelectPurchase = (purchaseId) => {
-    setSelectedPurchases(prev => {
-      if (prev.includes(purchaseId)) {
-        return prev.filter(id => id !== purchaseId);
+  const toggleSelectBill = (billId) => {
+    setSelectedBills(prev => {
+      if (prev.includes(billId)) {
+        return prev.filter(id => id !== billId);
       } else {
-        return [...prev, purchaseId];
+        return [...prev, billId];
       }
     });
   };
 
-  const handleDeleteConfirm = (purchaseId) => {
-    setPurchaseToDelete(purchaseId);
+  const handleDeleteConfirm = (billId) => {
+    setBillToDelete(billId);
     setShowDeleteModal(true);
   };
 
@@ -225,15 +240,15 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
     e.preventDefault();
     setProcessing(true);
 
-    router.delete(route("cash_purchases.destroy", purchaseToDelete), {
+    router.delete(route("bill_invoices.destroy", billToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
-        setPurchaseToDelete(null);
+        setBillToDelete(null);
         setProcessing(false);
-        setSelectedPurchases(prev => prev.filter(id => id !== purchaseToDelete));
+        setSelectedBills(prev => prev.filter(id => id !== billToDelete));
         toast({
-          title: "Cash Purchase Deleted",
-          description: "Cash purchase has been deleted successfully.",
+          title: "Bill Deleted",
+          description: "bill has been deleted successfully.",
         });
       },
       onError: () => {
@@ -241,7 +256,7 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
         toast({
           variant: "destructive",
           title: "Error",
-          description: "There was an error deleting the cash purchase.",
+          description: "There was an error deleting the bill.",
         });
       }
     });
@@ -251,16 +266,16 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
     e.preventDefault();
     setProcessing(true);
 
-    router.delete(route("cash_purchases.delete_all"), {
-      data: { ids: selectedPurchases },
+    router.delete(route("bill_invoices.delete_all"), {
+      data: { ids: selectedBills },
       onSuccess: () => {
         setShowDeleteAllModal(false);
         setProcessing(false);
-        setSelectedPurchases([]);
+        setSelectedBills([]);
         setIsAllSelected(false);
         toast({
-          title: "Cash Purchases Deleted",
-          description: "Selected cash purchases have been deleted successfully.",
+          title: "Bills Deleted",
+          description: "Selected cash bills have been deleted successfully.",
         });
       },
       onError: () => {
@@ -268,7 +283,7 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
         toast({
           variant: "destructive",
           title: "Error",
-          description: "There was an error deleting the selected cash purchases.",
+          description: "There was an error deleting the selected cash bills.",
         });
       }
     });
@@ -280,13 +295,13 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
     
     const formData = new FormData(e.target);
     
-    router.post(route("cash_purchases.import"), formData, {
+    router.post(route("bill_invoices.import"), formData, {
       onSuccess: () => {
         setShowImportModal(false);
         setProcessing(false);
         toast({
           title: "Import Successful",
-          description: "Cash purchases have been imported successfully.",
+          description: "Bill have been imported successfully.",
         });
       },
       onError: (errors) => {
@@ -303,7 +318,7 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
   const handleSearch = (e) => {
     e.preventDefault();
     router.get(
-      route("cash_purchases.index"),
+      route("bill_invoices.index"),
       { search, page: 1, per_page: perPage },
       { preserveState: true }
     );
@@ -312,7 +327,7 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
   const handlePerPageChange = (value) => {
     setPerPage(parseInt(value));
     router.get(
-      route("cash_purchases.index"),
+      route("bill_invoices.index"),
       { search, page: 1, per_page: value },
       { preserveState: true }
     );
@@ -321,14 +336,14 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
   const handlePageChange = (page) => {
     setCurrentPage(page);
     router.get(
-      route("cash_purchases.index"),
+      route("bill_invoices.index"),
       { search, page, per_page: perPage },
       { preserveState: true }
     );
   };
 
   const handleBulkAction = () => {
-    if (bulkAction === "delete" && selectedPurchases.length > 0) {
+    if (bulkAction === "delete" && selectedBills.length > 0) {
       setShowDeleteAllModal(true);
     }
   };
@@ -365,22 +380,22 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Cash Purchases" />
+      <Head title="Bill Invoices" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">
           <PageHeader
-            page="Cash Purchases"
+            page="Bill Invoices"
             subpage="List"
-            url="cash_purchases.index"
+            url="bill_invoices.index"
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div className="flex flex-col md:flex-row gap-4">
-                <Link href={route("cash_purchases.create")}>
+                <Link href={route("bill_invoices.create")}>
                   <Button>
                     <Plus className="h-4 w-4 mr-2" />
-                    Add Cash Purchase
+                    Add Bill
                   </Button>
                 </Link>
                 <DropdownMenu>
@@ -393,7 +408,7 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
                     <DropdownMenuItem onClick={() => setShowImportModal(true)}>
                       <FileUp className="mr-2 h-4 w-4" /> Import
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => window.location.href = route("cash_purchases.export")}>
+                    <DropdownMenuItem onClick={() => window.location.href = route("bill_invoices.export")}>
                       <FileDown className="mr-2 h-4 w-4" /> Export
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -402,7 +417,7 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <form onSubmit={handleSearch} className="flex gap-2">
                   <Input
-                    placeholder="Search cash purchases..."
+                    placeholder="Search cash bills..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="w-full md:w-80"
@@ -453,32 +468,46 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
                         onCheckedChange={toggleSelectAll}
                       />
                     </TableHead>
-                    <TableHead>Purchase Number</TableHead>
+                    <TableHead>Bill Number</TableHead>
                     <TableHead>Vendor</TableHead>
                     <TableHead>Date</TableHead>
+                    <TableHead>Due Date</TableHead>
                     <TableHead className="text-right">Grand Total</TableHead>
+                    <TableHead className="text-right">Paid</TableHead>
+                    <TableHead className="text-right">Due</TableHead>
                     <TableHead>Approval Status</TableHead>
+                    <TableHead>Bill Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {purchases.length > 0 ? (
-                    purchases.map((purchase) => (
-                      <TableRow key={purchase.id}>
+                  {bills.length > 0 ? (
+                    bills.map((bill) => (
+                      <TableRow key={bill.id}>
                         <TableCell>
                           <Checkbox
-                            checked={selectedPurchases.includes(purchase.id)}
-                            onCheckedChange={() => toggleSelectPurchase(purchase.id)}
+                            checked={selectedBills.includes(bill.id)}
+                            onCheckedChange={() => toggleSelectBill(bill.id)}
                           />
                         </TableCell>
-                        <TableCell>{purchase.bill_no}</TableCell>
-                        <TableCell>{purchase.vendor ? purchase.vendor.name : "-"}</TableCell>
-                        <TableCell>{purchase.purchase_date}</TableCell>
+                        <TableCell>{bill.bill_no}</TableCell>
+                        <TableCell>{bill.vendor ? bill.vendor.name : "-"}</TableCell>
+                        <TableCell>{bill.purchase_date}</TableCell>
+                        <TableCell>{bill.due_date}</TableCell>
                         <TableCell className="text-right">
-                          {purchase.grand_total}
+                          {bill.grand_total}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {bill.paid}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {bill.grand_total - bill.paid}
                         </TableCell>
                         <TableCell>
-                          <PurchaseApprovalStatusBadge status={purchase.approval_status} />
+                          <BillApprovalStatusBadge status={bill.approval_status} />
+                        </TableCell>
+                        <TableCell>
+                          <BillStatusBadge status={bill.bill_status} />
                         </TableCell>
                         <TableCell className="text-right">
                           <TableActions
@@ -486,17 +515,17 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
                               {
                                 label: "View",
                                 icon: <Eye className="h-4 w-4" />,
-                                href: route("cash_purchases.show", purchase.id),
+                                href: route("bill_invoices.show", bill.id),
                               },
                               {
                                 label: "Edit",
                                 icon: <Edit className="h-4 w-4" />,
-                                href: route("cash_purchases.edit", purchase.id),
+                                href: route("bill_invoices.edit", bill.id),
                               },
                               {
                                 label: "Delete",
                                 icon: <Trash2 className="h-4 w-4" />,
-                                onClick: () => handleDeleteConfirm(purchase.id),
+                                onClick: () => handleDeleteConfirm(bill.id),
                                 destructive: true,
                               },
                             ]}
@@ -507,7 +536,7 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={8} className="h-24 text-center">
-                        No cash purchases found.
+                        No cash bills found.
                       </TableCell>
                     </TableRow>
                   )}
@@ -515,7 +544,7 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
               </Table>
             </div>
 
-            {purchases.length > 0 && meta.total > 0 && (
+            {bills.length > 0 && meta.total > 0 && (
               <div className="flex items-center justify-between mt-4">
                 <div className="text-sm text-gray-500">
                   Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, meta.total)} of {meta.total} entries
@@ -561,22 +590,22 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
         </div>
       </SidebarInset>
 
-      <DeleteCashPurchaseModal
+      <DeleteBillModal
         show={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleDelete}
         processing={processing}
       />
 
-      <DeleteAllCashPurchasesModal
+      <DeleteAllBillsModal
         show={showDeleteAllModal}
         onClose={() => setShowDeleteAllModal(false)}
         onConfirm={handleDeleteAll}
         processing={processing}
-        count={selectedPurchases.length}
+        count={selectedBills.length}
       />
 
-      <ImportCashPurchasesModal
+      <ImportBillsModal
         show={showImportModal}
         onClose={() => setShowImportModal(false)}
         onSubmit={handleImport}

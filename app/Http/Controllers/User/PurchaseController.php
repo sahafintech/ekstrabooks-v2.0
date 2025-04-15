@@ -10,7 +10,9 @@ use App\Models\Attachment;
 use App\Models\AuditLog;
 use App\Models\BillPayment;
 use App\Models\BusinessSetting;
+use App\Models\Currency;
 use App\Models\PendingTransaction;
+use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
 use App\Models\PurchaseItemTax;
@@ -21,6 +23,7 @@ use App\Models\Vendor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Validator;
 
@@ -39,16 +42,41 @@ class PurchaseController extends Controller
 	 *
 	 * @return \Illuminate\Http\Response
 	 */
-	public function index()
+	public function index(Request $request)
 	{
-		$purchases = Purchase::select('purchases.*')
-			->with('vendor')
+		$search = $request->get('search', '');
+		$perPage = $request->get('per_page', 10);
+
+		$query = Purchase::with('vendor')
 			->where('cash', 0)
 			->where('order', 0)
-			->orderBy("purchases.id", "desc")
-			->get();
+			->orderBy('id', 'desc');
 
-		return view('backend.user.purchase.list', compact('purchases'));
+		if ($search) {
+			$query->where(function ($q) use ($search) {
+				$q->where('bill_no', 'like', "%$search%")
+					->orWhere('title', 'like', "%$search%")
+					->orWhereHas('vendor', function ($q) use ($search) {
+						$q->where('name', 'like', "%$search%");
+					});
+			});
+		}
+
+		$bills = $query->paginate($perPage)->withQueryString();
+
+		return Inertia::render('Backend/User/Bill/List', [
+			'bills' => $bills->items(),
+			'meta' => [
+				'current_page' => $bills->currentPage(),
+				'per_page' => $bills->perPage(),
+				'last_page' => $bills->lastPage(),
+				'total' => $bills->total(),
+			],
+			'filters' => [
+				'search' => $search,
+				'per_page' => $perPage,
+			],
+		]);
 	}
 
 	/**
@@ -58,7 +86,39 @@ class PurchaseController extends Controller
 	 */
 	public function create(Request $request)
 	{
-		return view('backend.user.purchase.create');
+		$vendors = Vendor::where('business_id', $request->activeBusiness->id)
+			->orderBy('id', 'desc')
+			->get();
+
+		$products = Product::where('business_id', $request->activeBusiness->id)
+			->orderBy('id', 'desc')
+			->get();
+
+		$currencies = Currency::orderBy('id', 'desc')
+			->get();
+
+		$taxes = Tax::orderBy('id', 'desc')
+			->get();
+
+		$accounts = Account::orderBy('id', 'desc')
+			->get();
+
+		$purchase_title = get_business_option('purchase_title', 'Bill Invoice');
+
+		$inventory = Account::where('account_name', 'Inventory')->first();
+
+		$decimalPlace = get_business_option('decimal_place', 2);
+
+		return Inertia::render('Backend/User/Bill/Create', [
+			'vendors' => $vendors,
+			'products' => $products,
+			'currencies' => $currencies,
+			'taxes' => $taxes,
+			'accounts' => $accounts,
+			'purchase_title' => $purchase_title,
+			'decimalPlace' => $decimalPlace,
+			'inventory' => $inventory,
+		]);
 	}
 
 	/**
@@ -481,11 +541,7 @@ class PurchaseController extends Controller
 		$audit->event = 'Bill Invoice Created' . ' ' . $purchase->bill_no;
 		$audit->save();
 
-		if ($purchase->id > 0) {
-			return redirect()->route('bill_invoices.show', $purchase->id)->with('success', _lang('Saved Successfully'));
-		} else {
-			return back()->with('error', _lang('Something going wrong, Please try again'));
-		}
+		return redirect()->route('bill_invoices.show', $purchase->id)->with('success', _lang('Saved Successfully'));
 	}
 
 	/**
@@ -494,12 +550,15 @@ class PurchaseController extends Controller
 	 * @param  int  $id
 	 * @return \Illuminate\Http\Response
 	 */
-	public function show(Request $request, $id)
+	public function show($id)
 	{
-		$alert_col = 'col-lg-8 offset-lg-2';
-		$purchase = Purchase::with(['business', 'items'])->find($id);
-		$attachments = Attachment::where('ref_id', $id)->where('ref_type', 'bill invoice')->get();
-		return view('backend.user.purchase.view', compact('purchase', 'id', 'alert_col', 'attachments'));
+		$bill = Purchase::with(['business', 'items', 'taxes', 'vendor'])->find($id);
+		$attachments = Attachment::where('ref_type', 'cash purchase')->where('ref_id', $id)->get();
+
+		return Inertia::render('Backend/User/Bill/View', [
+			'bill' => $bill,
+			'attachments' => $attachments,
+		]);
 	}
 
 	/**
@@ -508,20 +567,34 @@ class PurchaseController extends Controller
 	 * @param  int  $id
 	 * @return \Illuminate\Http\Response
 	 */
-	public function edit(Request $request, $id)
+	public function edit($id)
 	{
-		$purchase = Purchase::with('items')
-			->where('id', $id)
-			->where('status', '!=', 2)
-			->first();
+		$bill = Purchase::with(['business', 'items', 'taxes', 'vendor'])->find($id);
 
-		if ($purchase == null) {
-			return back()->with('error', _lang('This invoice is already paid'));
+		if (!has_permission('bill_invoices.approve') && !request()->isOwner && $bill->approval_status == 1) {
+			return back()->with('error', _lang('Permission denied'));
 		}
 
 		$attachments = Attachment::where('ref_id', $id)->where('ref_type', 'bill invoice')->get();
+		$accounts = Account::all();
+		$currencies = Currency::all();
+		$decimalPlace = get_business_option('decimal_place', 2);
+		$vendors = Vendor::all();
+		$products = Product::all();
+		$taxes = Tax::all();
+		$inventory = Account::where('account_name', 'Inventory')->first();
 
-		return view('backend.user.purchase.edit', compact('purchase', 'id', 'attachments'));
+		return Inertia::render('Backend/User/Bill/Edit', [
+			'bill' => $bill,
+			'attachments' => $attachments,
+			'decimalPlace' => $decimalPlace,
+			'accounts' => $accounts,
+			'currencies' => $currencies,
+			'vendors' => $vendors,
+			'products' => $products,
+			'taxes' => $taxes,
+			'inventory' => $inventory,
+		]);
 	}
 
 	/**
@@ -1071,15 +1144,8 @@ class PurchaseController extends Controller
 		$audit->event = 'Bill Invoice Updated' . ' ' . $purchase->bill_no;
 		$audit->save();
 
-		if (!$request->ajax()) {
-			if ($purchase->status == 0) {
-				return redirect()->route('bill_invoices.show', $purchase->id)->with('success', _lang('Updated Successfully'));
-			} else {
-				return redirect()->route('bill_invoices.index')->with('success', _lang('Updated Successfully'));
-			}
-		} else {
-			return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $purchase, 'table' => '#invoices_table']);
-		}
+
+		return redirect()->route('bill_invoices.show', $purchase->id)->with('success', _lang('Updated Successfully'));
 	}
 
 	/** Duplicate Invoice */

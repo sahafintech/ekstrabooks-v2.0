@@ -65,25 +65,23 @@ class CashPurchaseController extends Controller
 	 *
 	 * @return \Illuminate\Http\Response
 	 */
-	public function create(Request $request)
+	public function create()
 	{
-        $vendors = Vendor::where('business_id', $request->activeBusiness->id)
-            ->orderBy('name', 'asc')
+        $vendors = Vendor::orderBy('id', 'desc')
             ->get();
             
-        $products = Product::where('business_id', $request->activeBusiness->id)
-            ->orderBy('name', 'asc')
+        $products = Product::orderBy('id', 'desc')
             ->get();
             
-        $currencies = Currency::where('business_id', $request->activeBusiness->id)
-            ->orderBy('name', 'asc')
+        $currencies = Currency::orderBy('id', 'desc')
             ->get();
             
-        $taxes = Tax::where('business_id', $request->activeBusiness->id)
-            ->orderBy('name', 'asc')
+        $taxes = Tax::orderBy('id', 'desc')
             ->get();
             
         $accounts = Account::all();
+
+		$inventory = Account::where('account_name', 'Inventory')->first();
 
 		$purchase_title = get_business_option('purchase_title', 'Cash Purchase');
 
@@ -93,6 +91,7 @@ class CashPurchaseController extends Controller
             'vendors' => $vendors,
             'products' => $products,
             'currencies' => $currencies,
+            'inventory' => $inventory,
             'taxes' => $taxes,
             'accounts' => $accounts,
             'purchase_title' => $purchase_title,
@@ -568,7 +567,7 @@ class CashPurchaseController extends Controller
 
 	public function show($id)
 	{
-		$bill = Purchase::with(['business', 'items', 'taxes'])->find($id);
+		$bill = Purchase::with(['business', 'items', 'taxes', 'vendor'])->find($id);
 		$attachments = Attachment::where('ref_type', 'cash purchase')->where('ref_id', $id)->get();
 
 		return Inertia::render('Backend/User/CashPurchase/View', [
@@ -585,9 +584,7 @@ class CashPurchaseController extends Controller
 	 */
 	public function edit(Request $request, $id)
 	{
-		$bill = Purchase::with('items')
-			->where('id', $id)
-			->first();
+		$bill = Purchase::with(['business', 'items', 'taxes', 'vendor'])->find($id);
 
 		if (!has_permission('cash_purchases.approve') && !request()->isOwner && $bill->approval_status == 1) {
 			return back()->with('error', _lang('Permission denied'));
@@ -606,6 +603,7 @@ class CashPurchaseController extends Controller
 		$vendors = Vendor::all();
 		$products = Product::all();
 		$taxes = Tax::all();
+		$inventory = Account::where('account_name', 'Inventory')->first();
 
 		return Inertia::render('Backend/User/CashPurchase/Edit', [
 			'bill' => $bill,
@@ -617,6 +615,7 @@ class CashPurchaseController extends Controller
 			'vendors' => $vendors,
 			'products' => $products,
 			'taxes' => $taxes,
+			'inventory' => $inventory,
 		]);
 	}
 

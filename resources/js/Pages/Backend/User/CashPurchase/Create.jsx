@@ -20,7 +20,7 @@ import { format } from "date-fns";
 import { cn, convertCurrency, formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
 
-export default function Create({ vendors = [], products = [], currencies = [], taxes = [], accounts = [], purchase_title, decimalPlace }) {
+export default function Create({ vendors = [], products = [], currencies = [], taxes = [], accounts = [], purchase_title, decimalPlace, inventory }) {
   const [purchaseItems, setPurchaseItems] = useState([{
     product_id: "",
     product_name: "",
@@ -43,7 +43,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     currency: "",
     exchange_rate: 1,
     converted_total: 0,
-    discount_type: "percentage",
+    discount_type: "0",
     discount_value: 0,
     template: "",
     note: "",
@@ -166,6 +166,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
         console.log("Selected product:", product);
         updatedItems[index].product_name = product.name;
         updatedItems[index].unit_cost = product.selling_price;
+        updatedItems[index].account_id = inventory.id;
 
         // Also update the description if it's empty
         if (!updatedItems[index].description) {
@@ -183,6 +184,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     setData("quantity", updatedItems.map(item => item.quantity));
     setData("unit_cost", updatedItems.map(item => item.unit_cost));
     setData("taxes", updatedItems.map(item => item.taxes));
+    setData("account_id", updatedItems.map(item => item.account_id));
   };
 
   const calculateSubtotal = () => {
@@ -201,7 +203,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
 
   const calculateDiscount = () => {
     const subtotal = calculateSubtotal();
-    if (data.discount_type === "percentage") {
+    if (data.discount_type === "0") {
       return (subtotal * data.discount_value) / 100;
     }
     return data.discount_value;
@@ -811,8 +813,8 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                 <div className="md:w-1/2 w-full">
                   <SearchableCombobox
                     options={[
-                      { id: "percentage", name: "Percentage (%)" },
-                      { id: "fixed", name: "Fixed Amount" }
+                      { id: "0", name: "Percentage (%)" },
+                      { id: "1", name: "Fixed Amount" }
                     ]}
                     value={data.discount_type}
                     onChange={(value) => setData("discount_type", value)}

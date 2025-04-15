@@ -154,9 +154,9 @@ const InvoiceStatusBadge = ({ status }) => {
   const statusMap = {
     0: { label: "Draft", className: "text-gray-600" },
     1: { label: "Active", className: "text-blue-600" },
-    2: { label: "Paid", className: "text-success" },
-    3: { label: "Partially Paid", className: "text-warning" },
-    4: { label: "Canceled", className: "text-danger" }
+    2: { label: "Paid", className: "text-green-600" },
+    3: { label: "Partially Paid", className: "text-yellow-600" },
+    4: { label: "Canceled", className: "text-red-600" }
   };
 
   return (
