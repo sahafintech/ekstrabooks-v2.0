@@ -331,8 +331,8 @@ export default function View({ customer, invoice, recent_transactions, invoices,
                       {recent_transactions.map((transaction) => (
                         <div key={transaction.id} className="flex items-center justify-between p-3 rounded-md border">
                           <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-full ${transaction.type === 'income' ? 'bg-green-100' : 'bg-red-100'}`}>
-                              {transaction.type === 'income' ? (
+                            <div className={`p-2 rounded-full ${transaction.dr_cr === 'dr' ? 'bg-green-100' : 'bg-red-100'}`}>
+                              {transaction.dr_cr === 'dr' ? (
                                 <DollarSign className="h-4 w-4 text-green-600" />
                               ) : (
                                 <DollarSign className="h-4 w-4 text-red-600" />
@@ -340,11 +340,11 @@ export default function View({ customer, invoice, recent_transactions, invoices,
                             </div>
                             <div>
                               <div className="font-medium">{transaction.description}</div>
-                              <div className="text-sm text-gray-500">{formatDate(transaction.trans_date)}</div>
+                              <div className="text-sm text-gray-500">{transaction.trans_date}</div>
                             </div>
                           </div>
-                          <div className={`font-medium ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                            {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                          <div className={`font-medium ${transaction.dr_cr === 'dr' ? 'text-green-600' : 'text-red-600'}`}>
+                            {transaction.dr_cr === 'dr' ? '+' : '-'}{transaction.transaction_amount}
                           </div>
                         </div>
                       ))}

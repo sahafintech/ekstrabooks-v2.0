@@ -23,6 +23,10 @@ class BillPayment extends Model
         return $this->belongsToMany(Purchase::class, 'purchase_payments', 'payment_id', 'purchase_id')->withPivot('amount');
     }
 
+    public function business() {
+        return $this->belongsTo(Business::class, 'business_id');
+    }
+
     protected function date(): Attribute {
         $date_format = get_date_format();
 

@@ -2,27 +2,76 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Account;
 use App\Models\AuditLog;
 use App\Models\BillPayment;
 use App\Models\Purchase;
 use App\Models\PurchasePayment;
 use App\Models\Transaction;
+use App\Models\TransactionMethod;
+use App\Models\Vendor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Inertia\Inertia;
 
 class BillPaymentsController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $bill_payments = BillPayment::with('purchases')->get();
-        return view('backend.user.purchase.pay_bills.payments', compact('bill_payments'));
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
+
+        $query = BillPayment::with('vendor', 'purchases')->orderBy("id", "desc");
+
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('vendor.name', 'like', "%{$search}%")
+                    ->orWhere('amount', 'like', "%{$search}%");
+            });
+        }
+
+        $payments = $query->paginate($per_page)->withQueryString();
+
+        // Return Inertia view
+        return Inertia::render('Backend/User/BillPayment/List', [
+            'payments' => $payments->items(),
+            'meta' => [
+                'current_page' => $payments->currentPage(),
+                'from' => $payments->firstItem(),
+                'last_page' => $payments->lastPage(),
+                'links' => $payments->linkCollection(),
+                'path' => $payments->path(),
+                'per_page' => $payments->perPage(),
+                'to' => $payments->lastItem(),
+                'total' => $payments->total(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $request->get('sorting', []),
+            ],
+        ]);
     }
 
     public function create()
     {
-        return view('backend.user.purchase.pay_bills.add-payment');
+        $vendors = Vendor::all();
+        $accounts = Account::where(function ($query) {
+            $query->where('account_type', 'Bank')
+                ->orWhere('account_type', 'Cash');
+        })->get();
+        $decimalPlace = get_business_option('decimal_place', 2);
+        $methods = TransactionMethod::all();
+
+        return Inertia::render('Backend/User/BillPayment/Create', [
+            'vendors' => $vendors,
+            'decimalPlace' => $decimalPlace,
+            'accounts' => $accounts,
+            'methods' => $methods,
+        ]);
     }
 
     public function store(Request $request)
@@ -36,9 +85,7 @@ class BillPaymentsController extends Controller
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            }
+            return redirect()->back()->withErrors($validator);
         }
 
         if ($request->invoices == null) {
@@ -47,13 +94,13 @@ class BillPaymentsController extends Controller
 
         for ($i = 0; $i < count($request->invoices); $i++) {
 
-            $purchase = Purchase::find($request->invoices[$i]);
+            $purchase = Purchase::find($request->invoices[$i]['invoice_id']);
 
-            if ($request->amount[$request->invoices[$i]] > ($purchase->grand_total - $purchase->paid)) {
+            if ($request->invoices[$i]['amount'] > ($purchase->grand_total - $purchase->paid)) {
                 return redirect()->back()->with('error', _lang('Amount must be equal or less than due amount'));
             }
 
-            if ($request->amount[$request->invoices[$i]] <= 0) {
+            if ($request->invoices[$i]['amount'] <= 0) {
                 return redirect()->back()->with('error', _lang('Amount must be greater than 0'));
             }
         }
@@ -61,7 +108,7 @@ class BillPaymentsController extends Controller
         $amount = 0;
 
         foreach ($request->invoices as $invoice) {
-            $amount += $request->amount[$invoice];
+            $amount += $invoice['amount'];
         }
 
         $payment = new BillPayment();
@@ -89,12 +136,12 @@ class BillPaymentsController extends Controller
         for ($i = 0; $i < count($request->invoices); $i++) {
             DB::beginTransaction();
 
-            $purchase = Purchase::find($request->invoices[$i]);
+            $purchase = Purchase::find($request->invoices[$i]['invoice_id']);
 
             $purchase_payment = new PurchasePayment();
-            $purchase_payment->purchase_id = $request->invoices[$i];
+            $purchase_payment->purchase_id = $request->invoices[$i]['invoice_id'];
             $purchase_payment->payment_id = $payment->id;
-            $purchase_payment->amount = convert_currency($purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $purchase->currency, $request->amount[$request->invoices[$i]]));
+            $purchase_payment->amount = convert_currency($purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $purchase->currency, $request->invoices[$i]['amount']));
             $purchase_payment->save();
 
             $transaction              = new Transaction();
@@ -102,14 +149,14 @@ class BillPaymentsController extends Controller
             $transaction->account_id  = $request->account_id;
             $transaction->transaction_method      = $request->method;
             $transaction->dr_cr       = 'cr';
-            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $purchase->currency, $request->amount[$request->invoices[$i]]);
+            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $purchase->currency, $request->invoices[$i]['amount']);
             $transaction->transaction_currency    = $purchase->currency;
             $transaction->currency_rate           = $purchase->exchange_rate;
-            $transaction->base_currency_amount = convert_currency($purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $purchase->currency, $request->amount[$request->invoices[$i]]));
+            $transaction->base_currency_amount = convert_currency($purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $purchase->currency, $request->invoices[$i]['amount']));
             $transaction->reference   = $request->reference;
             $transaction->description = _lang('Bill Invoice Payment') . ' #' . $purchase->bill_no;
             $transaction->attachment  = $attachment;
-            $transaction->ref_id      = $request->invoices[$i] . ',' . $payment->id;
+            $transaction->ref_id      = $request->invoices[$i]['invoice_id'] . ',' . $payment->id;
             $transaction->ref_type    = 'bill payment';
             $transaction->vendor_id = $request->vendor_id;
             $transaction->save();
@@ -118,19 +165,19 @@ class BillPaymentsController extends Controller
             $transaction->trans_date  = Carbon::parse($request->trans_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
             $transaction->account_id  = get_account('Accounts Payable')->id;
             $transaction->dr_cr       = 'dr';
-            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $purchase->currency, $request->amount[$request->invoices[$i]]);
+            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $purchase->currency, $request->invoices[$i]['amount']);
             $transaction->transaction_currency    = $purchase->currency;
             $transaction->currency_rate           = $purchase->exchange_rate;
-            $transaction->base_currency_amount = convert_currency($purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $purchase->currency, $request->amount[$request->invoices[$i]]));
+            $transaction->base_currency_amount = convert_currency($purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $purchase->currency, $request->invoices[$i]['amount']));
             $transaction->reference   = $request->reference;
             $transaction->description = _lang('Bill Invoice Payment') . ' #' . $purchase->bill_no;
             $transaction->attachment  = $attachment;
-            $transaction->ref_id      = $request->invoices[$i] . ',' . $payment->id;
+            $transaction->ref_id      = $request->invoices[$i]['invoice_id'] . ',' . $payment->id;
             $transaction->ref_type    = 'bill payment';
             $transaction->vendor_id = $request->vendor_id;
             $transaction->save();
 
-            $purchase->paid   = $purchase->paid + convert_currency($purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $purchase->currency, $request->amount[$request->invoices[$i]]));
+            $purchase->paid   = $purchase->paid + convert_currency($purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $purchase->currency, $request->invoices[$i]['amount']));
             $purchase->status = 1; //Partially Paid
             if ($purchase->paid >= $purchase->grand_total) {
                 $purchase->status = 2; //Paid
@@ -150,11 +197,24 @@ class BillPaymentsController extends Controller
         return redirect()->route('bill_payments.index')->with('success', _lang('Payment Made Successfully'));
     }
 
-    public function edit(Request $request, $id)
+    public function edit($id)
     {
         $payment = BillPayment::where('id', $id)->with('purchases')->first();
+        $vendors = Vendor::all();
+        $accounts = Account::where(function ($query) {
+            $query->where('account_type', 'Bank')
+                ->orWhere('account_type', 'Cash');
+        })->get();
+        $decimalPlace = get_business_option('decimal_place', 2);
+        $methods = TransactionMethod::all();
 
-        return view('backend.user.purchase.pay_bills.edit', compact('payment', 'id'));
+        return Inertia::render('Backend/User/BillPayment/Edit', [
+            'vendors' => $vendors,
+            'decimalPlace' => $decimalPlace,
+            'accounts' => $accounts,
+            'methods' => $methods,
+            'payment' => $payment,
+        ]);
     }
 
     public function update(Request $request, $id)
@@ -168,9 +228,6 @@ class BillPaymentsController extends Controller
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            }
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
@@ -178,132 +235,126 @@ class BillPaymentsController extends Controller
             return redirect()->back()->with('error', _lang('Please Select At Least One Invoice'));
         }
 
-        try {
-            DB::beginTransaction();
-            
-            $payment = BillPayment::findOrFail($id);
+        DB::beginTransaction();
 
-            // Validate amounts before processing
-            for ($i = 0; $i < count($request->invoices); $i++) {
-                $purchase = Purchase::findOrFail($request->invoices[$i]);
-                $old_purchase_payment = PurchasePayment::where('purchase_id', $request->invoices[$i])
-                    ->where('payment_id', $payment->id)
-                    ->firstOrFail();
+        $payment = BillPayment::findOrFail($id);
 
-                if ($request->amount[$request->invoices[$i]] > ($purchase->grand_total - ($purchase->paid - $old_purchase_payment->amount))) {
-                    throw new \Exception(_lang('Amount must be equal or less than due amount'));
-                }
+        // Validate amounts before processing
+        for ($i = 0; $i < count($request->invoices); $i++) {
+            $purchase = Purchase::findOrFail($request->invoices[$i]['invoice_id']);
+            $old_purchase_payment = PurchasePayment::where('purchase_id', $request->invoices[$i]['invoice_id'])
+                ->where('payment_id', $payment->id)
+                ->firstOrFail();
 
-                if ($request->amount[$request->invoices[$i]] <= 0) {
-                    throw new \Exception(_lang('Amount must be greater than 0'));
-                }
+            if ($request->invoices[$i]['amount'] > ($purchase->grand_total - ($purchase->paid - $old_purchase_payment->amount))) {
+                throw new \Exception(_lang('Amount must be equal or less than due amount'));
             }
 
-            $amount = array_sum(array_map('floatval', $request->amount));
-
-            // Update payment details
-            $payment->date = Carbon::parse($request->trans_date)->format('Y-m-d');
-            $payment->account_id = $request->account_id;
-            $payment->payment_method = $request->method;
-            $payment->amount = $amount;
-            $payment->vendor_id = $request->vendor_id;
-            $payment->reference = $request->reference;
-            $payment->save();
-
-            $attachment = '';
-            if ($request->hasfile('attachment')) {
-                $file = $request->file('attachment');
-                $attachment = rand() . time() . $file->getClientOriginalName();
-                $file->move(public_path() . "/uploads/media/", $attachment);
+            if ($request->invoices[$i]['amount'] <= 0) {
+                throw new \Exception(_lang('Amount must be greater than 0'));
             }
-
-            $currentTime = Carbon::now();
-
-            // Process each invoice
-            foreach ($request->invoices as $i => $invoice_id) {
-                $purchase = Purchase::findOrFail($invoice_id);
-                $old_purchase_payment = PurchasePayment::where('purchase_id', $invoice_id)
-                    ->where('payment_id', $payment->id)
-                    ->firstOrFail();
-
-                // Reset purchase paid amount
-                $purchase->paid = $purchase->paid - $old_purchase_payment->amount;
-                $purchase->status = $this->calculatePurchaseStatus($purchase->paid, $purchase->grand_total);
-                $purchase->save();
-
-                // Delete old payment and transactions
-                $old_purchase_payment->delete();
-                Transaction::where('ref_id', $invoice_id . ',' . $payment->id)
-                    ->where('ref_type', 'bill payment')
-                    ->delete();
-
-                // Create new purchase payment
-                $purchase_payment = new PurchasePayment();
-                $purchase_payment->purchase_id = $invoice_id;
-                $purchase_payment->payment_id = $payment->id;
-                $purchase_payment->amount = convert_currency(
-                    $purchase->currency,
-                    $request->activeBusiness->currency,
-                    convert_currency(
-                        $request->activeBusiness->currency,
-                        $purchase->currency,
-                        $request->amount[$invoice_id]
-                    )
-                );
-                $purchase_payment->save();
-
-                // Create credit transaction
-                $this->createTransaction(
-                    $request,
-                    $purchase,
-                    $payment,
-                    $currentTime,
-                    'cr',
-                    $request->account_id,
-                    $attachment,
-                    $invoice_id
-                );
-
-                // Create debit transaction
-                $this->createTransaction(
-                    $request,
-                    $purchase,
-                    $payment,
-                    $currentTime,
-                    'dr',
-                    get_account('Accounts Payable')->id,
-                    $attachment,
-                    $invoice_id
-                );
-
-                // Update purchase paid amount
-                $purchase->paid = $purchase->paid + convert_currency(
-                    $purchase->currency,
-                    $request->activeBusiness->currency,
-                    convert_currency(
-                        $request->activeBusiness->currency,
-                        $purchase->currency,
-                        $request->amount[$invoice_id]
-                    )
-                );
-                $purchase->status = $this->calculatePurchaseStatus($purchase->paid, $purchase->grand_total);
-                $purchase->save();
-            }
-
-            // Create audit log
-            $audit = new AuditLog();
-            $audit->date_changed = date('Y-m-d H:i:s');
-            $audit->changed_by = auth()->user()->id;
-            $audit->event = 'Bill Payment Updated for ' . $purchase->bill_no;
-            $audit->save();
-
-            DB::commit();
-            return redirect()->route('bill_payments.index')->with('success', _lang('Payment Updated Successfully'));
-
-        } catch (\Exception $e) {
-            DB::rollback();
-            return redirect()->back()->with('error', $e->getMessage());
         }
+
+        $amount = array_sum(array_map('floatval', array_column($request->invoices, 'amount')));
+
+        // Update payment details
+        $payment->date = Carbon::parse($request->trans_date)->format('Y-m-d');
+        $payment->account_id = $request->account_id;
+        $payment->payment_method = $request->method;
+        $payment->amount = $amount;
+        $payment->vendor_id = $request->vendor_id;
+        $payment->reference = $request->reference;
+        $payment->save();
+
+        $attachment = '';
+        if ($request->hasfile('attachment')) {
+            $file = $request->file('attachment');
+            $attachment = rand() . time() . $file->getClientOriginalName();
+            $file->move(public_path() . "/uploads/media/", $attachment);
+        }
+
+        $currentTime = Carbon::now();
+
+        // Process each invoice
+        foreach ($request->invoices as $i => $invoice) {
+            $purchase = Purchase::findOrFail($invoice['invoice_id']);
+            $old_purchase_payment = PurchasePayment::where('purchase_id', $invoice['invoice_id'])
+                ->where('payment_id', $payment->id)
+                ->firstOrFail();
+
+            // Reset purchase paid amount
+            $purchase->paid = $purchase->paid - $old_purchase_payment->amount;
+            $purchase->status = $this->calculatePurchaseStatus($purchase->paid, $purchase->grand_total);
+            $purchase->save();
+
+            // Delete old payment and transactions
+            $old_purchase_payment->delete();
+            Transaction::where('ref_id', $invoice['invoice_id'] . ',' . $payment->id)
+                ->where('ref_type', 'bill payment')
+                ->delete();
+
+            // Create new purchase payment
+            $purchase_payment = new PurchasePayment();
+            $purchase_payment->purchase_id = $invoice['invoice_id'];
+            $purchase_payment->payment_id = $payment->id;
+            $purchase_payment->amount = convert_currency(
+                $purchase->currency,
+                $request->activeBusiness->currency,
+                convert_currency(
+                    $request->activeBusiness->currency,
+                    $purchase->currency,
+                    $invoice['amount']
+                )
+            );
+            $purchase_payment->save();
+
+            // Create credit transaction
+            $this->createTransaction(
+                $request,
+                $purchase,
+                $payment,
+                $currentTime,
+                'cr',
+                $request->account_id,
+                $attachment,
+                $invoice
+            );
+
+            // Create debit transaction
+            $this->createTransaction(
+                $request,
+                $purchase,
+                $payment,
+                $currentTime,
+                'dr',
+                get_account('Accounts Payable')->id,
+                $attachment,
+                $invoice
+            );
+
+            // Update purchase paid amount
+            $purchase->paid = $purchase->paid + convert_currency(
+                $purchase->currency,
+                $request->activeBusiness->currency,
+                convert_currency(
+                    $request->activeBusiness->currency,
+                    $purchase->currency,
+                    $invoice['amount']
+                )
+            );
+            $purchase->status = $this->calculatePurchaseStatus($purchase->paid, $purchase->grand_total);
+            $purchase->save();
+        }
+
+        // Create audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Bill Payment Updated for ' . $purchase->bill_no;
+        $audit->save();
+
+        DB::commit();
+        return redirect()->route('bill_payments.index')->with('success', _lang('Payment Updated Successfully'));
     }
 
     private function calculatePurchaseStatus($paid, $grand_total)
@@ -317,7 +368,7 @@ class BillPaymentsController extends Controller
         }
     }
 
-    private function createTransaction($request, $purchase, $payment, $currentTime, $dr_cr, $account_id, $attachment, $invoice_id)
+    private function createTransaction($request, $purchase, $payment, $currentTime, $dr_cr, $account_id, $attachment, $invoice)
     {
         $transaction = new Transaction();
         $transaction->trans_date = Carbon::parse($request->trans_date)
@@ -329,7 +380,7 @@ class BillPaymentsController extends Controller
         $transaction->transaction_amount = convert_currency(
             $request->activeBusiness->currency,
             $purchase->currency,
-            $request->amount[$invoice_id]
+            $invoice['amount']
         );
         $transaction->transaction_currency = $purchase->currency;
         $transaction->currency_rate = $purchase->exchange_rate;
@@ -339,19 +390,19 @@ class BillPaymentsController extends Controller
             convert_currency(
                 $request->activeBusiness->currency,
                 $purchase->currency,
-                $request->amount[$invoice_id]
+                $invoice['amount']
             )
         );
         $transaction->reference = $request->reference;
         $transaction->description = _lang('Bill Invoice Payment') . ' #' . $purchase->bill_no;
         $transaction->attachment = $attachment;
-        $transaction->ref_id = $invoice_id . ',' . $payment->id;
+        $transaction->ref_id = $invoice['invoice_id'] . ',' . $payment->id;
         $transaction->ref_type = 'bill payment';
         $transaction->vendor_id = $request->vendor_id;
         $transaction->save();
     }
 
-    public function destroy(Request $request, $id)
+    public function destroy($id)
     {
         $payment = BillPayment::find($id);
         $purchase_payments = PurchasePayment::where('payment_id', $id)->get();
@@ -390,10 +441,14 @@ class BillPaymentsController extends Controller
         return redirect()->route('bill_payments.index')->with('success', _lang('Payment Deleted Successfully'));
     }
 
-    public function show(Request $request, $id)
+    public function show($id)
     {
-        $payment = BillPayment::where('id', $id)->with('purchases', 'vendor')->first();
+        $payment = BillPayment::where('id', $id)->with('purchases', 'vendor', 'business')->first();
+        $decimalPlace = get_business_option('decimal_place', 2);
 
-        return view('backend.user.purchase.pay_bills.view', compact('payment', 'id'));
+        return Inertia::render('Backend/User/BillPayment/View', [
+            'payment' => $payment,
+            'decimalPlace' => $decimalPlace
+        ]);
     }
 }

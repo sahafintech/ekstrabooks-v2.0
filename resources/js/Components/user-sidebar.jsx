@@ -136,7 +136,7 @@ export function UserSidebar({ businesses, active_business, ...props }) {
             url: "#",
             icon: Users,
             isActive: isRoute("vendors.index") || isRoute("purchase_orders.index") || isRoute("cash_purchases.index") ||
-                isRoute("bill_invoices.index") || isRoute("billI_invoices.pay_bill") || isRoute("purchase_returns.index"),
+                isRoute("bill_invoices.index") || isRoute("bill_payments.index") || isRoute("purchase_returns.index"),
             items: [
                 {
                     title: "All Suppliers",
@@ -160,8 +160,8 @@ export function UserSidebar({ businesses, active_business, ...props }) {
                 },
                 {
                     title: "Pay Bills",
-                    url: route("billI_invoices.pay_bill"),
-                    isActive: isRoute("billI_invoices.pay_bill"),
+                    url: route("bill_payments.index"),
+                    isActive: isRoute("bill_payments.index"),
                 },
                 {
                     title: "Purchase Return",

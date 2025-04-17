@@ -1557,15 +1557,15 @@ class PurchaseController extends Controller
 		$audit = new AuditLog();
 		$audit->date_changed = date('Y-m-d H:i:s');
 		$audit->changed_by = auth()->user()->id;
-		$audit->event = 'Approved Cash Purchase ' . $bill->bill_no;
+		$audit->event = 'Approved Bill Invoice ' . $bill->bill_no;
 		$audit->save();
 
 		return redirect()->route('bill_invoices.index')->with('success', _lang('Approved Successfully'));
 	}
 
-	public function reject(Request $request, $id)
+	public function reject($id)
 	{
-		$bill = Purchase::find(request()->id);
+		$bill = Purchase::find($id);
 		if ($bill->approval_status == 1) {
 			$bill->approval_status = 0;
 			$bill->approved_by = null;
@@ -1575,8 +1575,8 @@ class PurchaseController extends Controller
 			// delete all transactions
 			$transactions = Transaction::where('ref_id', $bill->id)
 				->where(function ($query) {
-					$query->where('ref_type', 'cash purchase')
-						->orWhere('ref_type', 'cash purchase tax');
+					$query->where('ref_type', 'bill invoice')
+						->orWhere('ref_type', 'bill invoice tax');
 				})
 				->get();
 
@@ -1588,23 +1588,16 @@ class PurchaseController extends Controller
 				$transaction->delete();
 			}
 
-			// bill invoice payment
-			$transaction = Transaction::where('ref_id', $bill->id)->where('ref_type', 'cash purchase payment')->get();
-			foreach ($transaction as $data) {
-				$data->delete();
-			}
-
-
 			// audit log
 			$audit = new AuditLog();
 			$audit->date_changed = date('Y-m-d H:i:s');
 			$audit->changed_by = auth()->user()->id;
-			$audit->event = 'Rejected Cash Purchase ' . $bill->bill_no;
+			$audit->event = 'Rejected Bill Invoice ' . $bill->bill_no;
 			$audit->save();
 
-			return redirect()->route('cash_purchases.index')->with('success', _lang('Rejected Successfully'));
+			return redirect()->route('bill_invoices.index')->with('success', _lang('Rejected Successfully'));
 		} else {
-			return redirect()->route('cash_purchases.index')->with('error', _lang('Already Rejected'));
+			return redirect()->route('bill_invoices.index')->with('error', _lang('Already Rejected'));
 		}
 	}
 }

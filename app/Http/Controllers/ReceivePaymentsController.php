@@ -4,26 +4,75 @@ namespace App\Http\Controllers;
 
 use App\Models\Account;
 use App\Models\AuditLog;
+use App\Models\Business;
+use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\InvoicePayment;
 use App\Models\ReceivePayment;
 use App\Models\Transaction;
+use App\Models\TransactionMethod;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Inertia\Inertia;
 
 class ReceivePaymentsController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $receive_payments = ReceivePayment::where('deffered_payment', 0)->get();
-        return view('backend.user.invoice.receive_payment.payments', compact('receive_payments'));
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
+
+        $query = ReceivePayment::where('deffered_payment', 0)->with('customer', 'invoices')->orderBy("id", "desc");
+
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('customer.name', 'like', "%{$search}%")
+                    ->orWhere('amount', 'like', "%{$search}%");
+            });
+        }
+
+        $payments = $query->paginate($per_page)->withQueryString();
+
+        // Return Inertia view
+        return Inertia::render('Backend/User/ReceivePayment/List', [
+            'payments' => $payments->items(),
+            'meta' => [
+                'current_page' => $payments->currentPage(),
+                'from' => $payments->firstItem(),
+                'last_page' => $payments->lastPage(),
+                'links' => $payments->linkCollection(),
+                'path' => $payments->path(),
+                'per_page' => $payments->perPage(),
+                'to' => $payments->lastItem(),
+                'total' => $payments->total(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $request->get('sorting', []),
+            ],
+        ]);
     }
 
     public function create()
     {
-        return view('backend.user.invoice.receive_payment.add-payment');
+        $customers = Customer::all();
+        $accounts = Account::where(function ($query) {
+            $query->where('account_type', 'Bank')
+                ->orWhere('account_type', 'Cash');
+        })->get();
+        $decimalPlace = get_business_option('decimal_place', 2);
+        $methods = TransactionMethod::all();
+
+        return Inertia::render('Backend/User/ReceivePayment/Create', [
+            'customers' => $customers,
+            'decimalPlace' => $decimalPlace,
+            'accounts' => $accounts,
+            'methods' => $methods,
+        ]);
     }
 
     public function store(Request $request)
@@ -37,9 +86,7 @@ class ReceivePaymentsController extends Controller
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            }
+           return redirect()->back()->withErrors($validator)->withInput();
         }
 
         $default_accounts = ['Accounts Receivable', 'Sales Tax Payable', 'Sales Discount Allowed', 'Inventory'];
@@ -88,13 +135,13 @@ class ReceivePaymentsController extends Controller
         }
 
         for ($i = 0; $i < count($request->invoices); $i++) {
-            $invoice = Invoice::find($request->invoices[$i]);
+            $invoice = Invoice::find($request->invoices[$i]['invoice_id']);
 
-            if ($request->amount[$request->invoices[$i]] > ($invoice->grand_total - $invoice->paid)) {
+            if ($request->invoices[$i]['amount'] > ($invoice->grand_total - $invoice->paid)) {
                 return redirect()->back()->with('error', _lang('Amount must be equal or less than due amount'));
             }
 
-            if ($request->amount[$request->invoices[$i]] == 0) {
+            if ($request->invoices[$i]['amount'] == 0) {
                 return redirect()->back()->with('error', _lang('Amount must be greater than 0'));
             }
         }
@@ -102,7 +149,7 @@ class ReceivePaymentsController extends Controller
         $amount = 0;
 
         foreach ($request->invoices as $invoice) {
-            $amount += $request->amount[$invoice];
+            $amount += $invoice['amount'];
         }
 
         $payment = new ReceivePayment();
@@ -127,16 +174,16 @@ class ReceivePaymentsController extends Controller
         for ($i = 0; $i < count($request->invoices); $i++) {
             DB::beginTransaction();
 
-            $invoice = Invoice::find($request->invoices[$i]);
+            $invoice = Invoice::find($request->invoices[$i]['invoice_id']);
 
-            if ($request->amount[$request->invoices[$i]] > ($invoice->grand_total - $invoice->paid)) {
+            if ($request->invoices[$i]['amount'] > ($invoice->grand_total - $invoice->paid)) {
                 return redirect()->back()->with('error', _lang('Amount must be equal or less than due amount'));
             }
 
             $invoice_payment = new InvoicePayment();
-            $invoice_payment->invoice_id = $request->invoices[$i];
+            $invoice_payment->invoice_id = $request->invoices[$i]['invoice_id'];
             $invoice_payment->payment_id = $payment->id;
-            $invoice_payment->amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->amount[$request->invoices[$i]]));
+            $invoice_payment->amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->invoices[$i]['amount']));
             $invoice_payment->save();
 
             $transaction              = new Transaction();
@@ -144,14 +191,14 @@ class ReceivePaymentsController extends Controller
             $transaction->account_id  = $request->account_id;
             $transaction->transaction_method      = $request->method;
             $transaction->dr_cr       = 'dr';
-            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $invoice->currency, $request->amount[$request->invoices[$i]]);
+            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $invoice->currency, $request->invoices[$i]['amount']);
             $transaction->transaction_currency    = $invoice->currency;
             $transaction->currency_rate           = $invoice->exchange_rate;
-            $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->amount[$request->invoices[$i]]));
+            $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->invoices[$i]['amount']));
             $transaction->reference   = $request->reference;
             $transaction->description = _lang('Credit Invoice Payment') . ' #' . $invoice->invoice_number;
             $transaction->attachment  = $attachment;
-            $transaction->ref_id      = $request->invoices[$i] . ',' . $payment->id;
+            $transaction->ref_id      = $request->invoices[$i]['invoice_id'] . ',' . $payment->id;
             $transaction->ref_type    = 'invoice payment';
             $transaction->customer_id = $request->customer_id;
             $transaction->save();
@@ -160,20 +207,20 @@ class ReceivePaymentsController extends Controller
             $transaction->trans_date  = Carbon::parse($request->trans_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
             $transaction->account_id  = get_account('Accounts Receivable')->id;
             $transaction->dr_cr       = 'cr';
-            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $invoice->currency, $request->amount[$request->invoices[$i]]);
+            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $invoice->currency, $request->invoices[$i]['amount']);
             $transaction->transaction_currency    = $invoice->currency;
             $transaction->currency_rate           = $invoice->exchange_rate;
-            $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->amount[$request->invoices[$i]]));
+            $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->invoices[$i]['amount']));
             $transaction->reference   = $request->reference;
             $transaction->description = _lang('Credit Invoice Payment') . ' #' . $invoice->invoice_number;
             $transaction->attachment  = $attachment;
-            $transaction->ref_id      = $request->invoices[$i] . ',' . $payment->id;
+            $transaction->ref_id      = $request->invoices[$i]['invoice_id'] . ',' . $payment->id;
             $transaction->ref_type    = 'invoice payment';
             $transaction->customer_id = $request->customer_id;
 
             $transaction->save();
 
-            $invoice->paid   = $invoice->paid + convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->amount[$request->invoices[$i]]));
+            $invoice->paid   = $invoice->paid + convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->invoices[$i]['amount']));
             $invoice->status = 3; //Partially Paid
             if ($invoice->paid >= $invoice->grand_total) {
                 $invoice->status = 2; //Paid
@@ -204,9 +251,7 @@ class ReceivePaymentsController extends Controller
         ]);
 
         if ($validator->fails()) {
-            if ($request->ajax()) {
-                return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-            }
+            return redirect()->back()->withErrors($validator)->withInput();
         }
 
         if ($request->invoices == null) {
@@ -217,15 +262,15 @@ class ReceivePaymentsController extends Controller
 
         for ($i = 0; $i < count($request->invoices); $i++) {
 
-            $invoice = Invoice::find($request->invoices[$i]);
+            $invoice = Invoice::find($request->invoices[$i]['invoice_id']);
 
-            $invoice_payment = InvoicePayment::where('invoice_id', $request->invoices[$i])->where('payment_id', $payment->id)->first();
+            $invoice_payment = InvoicePayment::where('invoice_id', $request->invoices[$i]['invoice_id'])->where('payment_id', $payment->id)->first();
 
-            if ($request->amount[$request->invoices[$i]] > ($invoice->grand_total - ($invoice->paid - $invoice_payment->amount))) {
+            if ($request->invoices[$i]['amount'] > ($invoice->grand_total - ($invoice->paid - $invoice_payment->amount))) {
                 return redirect()->back()->with('error', _lang('Amount must be equal or less than due amount'));
             }
 
-            if ($request->amount[$request->invoices[$i]] == 0) {
+            if ($request->invoices[$i]['amount'] == 0) {
                 return redirect()->back()->with('error', _lang('Amount must be greater than 0'));
             }
         }
@@ -274,7 +319,7 @@ class ReceivePaymentsController extends Controller
         $amount = 0;
 
         foreach ($request->invoices as $invoice) {
-            $amount += $request->amount[$invoice];
+            $amount += $invoice['amount'];
         }
 
         $payment->date = Carbon::parse($request->trans_date)->format('Y-m-d');
@@ -298,9 +343,9 @@ class ReceivePaymentsController extends Controller
         for ($i = 0; $i < count($request->invoices); $i++) {
             DB::beginTransaction();
 
-            $invoice = Invoice::find($request->invoices[$i]);
+            $invoice = Invoice::find($request->invoices[$i]['invoice_id']);
 
-            $invoice_payment = InvoicePayment::where('invoice_id', $request->invoices[$i])->where('payment_id', $payment->id)->first();
+            $invoice_payment = InvoicePayment::where('invoice_id', $request->invoices[$i]['invoice_id'])->where('payment_id', $payment->id)->first();
 
             $invoice->paid   = $invoice->paid - convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $invoice_payment->amount));
             if ($invoice->paid >= $invoice->grand_total) {
@@ -321,9 +366,9 @@ class ReceivePaymentsController extends Controller
             }
 
             $invoice_payment = new InvoicePayment();
-            $invoice_payment->invoice_id = $request->invoices[$i];
+            $invoice_payment->invoice_id = $request->invoices[$i]['invoice_id'];
             $invoice_payment->payment_id = $payment->id;
-            $invoice_payment->amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->amount[$request->invoices[$i]]));
+            $invoice_payment->amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->invoices[$i]['amount']));
             $invoice_payment->save();
 
             $transaction              = new Transaction();
@@ -331,14 +376,14 @@ class ReceivePaymentsController extends Controller
             $transaction->account_id  = $request->account_id;
             $transaction->transaction_method      = $request->method;
             $transaction->dr_cr       = 'dr';
-            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $invoice->currency, $request->amount[$request->invoices[$i]]);
+            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $invoice->currency, $request->invoices[$i]['amount']);
             $transaction->transaction_currency    = $invoice->currency;
             $transaction->currency_rate           = $invoice->exchange_rate;
-            $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->amount[$request->invoices[$i]]));
+            $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->invoices[$i]['amount']));
             $transaction->reference   = $request->reference;
             $transaction->description = _lang('Credit Invoice Payment') . ' #' . $invoice->invoice_number;
             $transaction->attachment  = $attachment;
-            $transaction->ref_id      = $request->invoices[$i] . ',' . $payment->id;
+            $transaction->ref_id      = $request->invoices[$i]['invoice_id'] . ',' . $payment->id;
             $transaction->ref_type    = 'invoice payment';
             $transaction->customer_id = $request->customer_id;
             $transaction->save();
@@ -347,19 +392,19 @@ class ReceivePaymentsController extends Controller
             $transaction->trans_date  = Carbon::parse($request->trans_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
             $transaction->account_id  = get_account('Accounts Receivable')->id;
             $transaction->dr_cr       = 'cr';
-            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $invoice->currency, $request->amount[$request->invoices[$i]]);
+            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $invoice->currency, $request->invoices[$i]['amount']);
             $transaction->transaction_currency    = $invoice->currency;
             $transaction->currency_rate           = $invoice->exchange_rate;
-            $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->amount[$request->invoices[$i]]));
+            $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->invoices[$i]['amount']));
             $transaction->reference   = $request->reference;
             $transaction->description = _lang('Credit Invoice Payment') . ' #' . $invoice->invoice_number;
             $transaction->attachment  = $attachment;
-            $transaction->ref_id      = $request->invoices[$i] . ',' . $payment->id;
+            $transaction->ref_id      = $request->invoices[$i]['invoice_id'] . ',' . $payment->id;
             $transaction->ref_type    = 'invoice payment';
             $transaction->customer_id = $request->customer_id;
             $transaction->save();
 
-            $invoice->paid   = $invoice->paid + convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->amount[$request->invoices[$i]]));
+            $invoice->paid   = $invoice->paid + convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->invoices[$i]['amount']));
             $invoice->status = 3; //Partially Paid
             if ($invoice->paid >= $invoice->grand_total) {
                 $invoice->status = 2; //Paid
@@ -379,11 +424,24 @@ class ReceivePaymentsController extends Controller
         return redirect()->route('receive_payments.index')->with('success', _lang('Payment Updated Successfully'));
     }
 
-    public function edit(Request $request, $id)
+    public function edit($id)
     {
         $payment = ReceivePayment::where('id', $id)->with('invoices')->first();
+        $customers = Customer::all();
+        $accounts = Account::where(function ($query) {
+            $query->where('account_type', 'Bank')
+                ->orWhere('account_type', 'Cash');
+        })->get();
+        $decimalPlace = get_business_option('decimal_place', 2);
+        $methods = TransactionMethod::all();
 
-        return view('backend.user.invoice.receive_payment.edit', compact('payment', 'id'));
+        return Inertia::render('Backend/User/ReceivePayment/Edit', [
+            'customers' => $customers,
+            'decimalPlace' => $decimalPlace,
+            'accounts' => $accounts,
+            'methods' => $methods,
+            'payment' => $payment,
+        ]);
     }
 
     public function destroy(Request $request, $id)
@@ -430,10 +488,14 @@ class ReceivePaymentsController extends Controller
         return redirect()->route('receive_payments.index')->with('success', _lang('Payment Deleted Successfully'));
     }
 
-    public function show(Request $request, $id)
+    public function show($id)
     {
-        $payment = ReceivePayment::where('id', $id)->with('invoices', 'customer')->first();
+        $payment = ReceivePayment::where('id', $id)->with('invoices', 'customer', 'business')->first();
+        $decimalPlace = get_business_option('decimal_place', 2);
 
-        return view('backend.user.invoice.receive_payment.view', compact('payment', 'id'));
+        return Inertia::render('Backend/User/ReceivePayment/View', [
+            'payment' => $payment,
+            'decimalPlace' => $decimalPlace
+        ]);
     }
 }

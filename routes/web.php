@@ -393,9 +393,8 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		//Bills
 		Route::match(['get', 'post'], 'bill_invoices/pay_bill', [PurchaseController::class, 'pay_bill'])->name('billI_invoices.pay_bill');
 		Route::get('purchases/{id}/duplicate', [PurchaseController::class, 'duplicate'])->name('bill_invoices.duplicate');
-		Route::post('bill_invoices/get_table_data', [PurchaseController::class, 'get_table_data']);
 		Route::resource('bill_invoices', PurchaseController::class);
-		Route::get('vendor/get_bills/{id}', [PurchaseController::class, 'get_bills']);
+		Route::get('vendor/get_bills/{id}', [PurchaseController::class, 'get_bills'])->name('vendor.get_bills');
 		Route::post('import_bills', [PurchaseController::class, 'import_bills'])->name('bill_invoices.import');
 		Route::post('bill_invoices/filter', [PurchaseController::class, 'bill_invoices_filter'])->name('bill_invoices.filter');
 		Route::resource('bill_payments', BillPaymentsController::class);
@@ -564,7 +563,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 	Route::group(['prefix' => 'user'], function () {
 		Route::get('find_taxes', [InvoiceController::class, 'find_taxes'])->name('invoices.find_taxes');
 		Route::get('find_currency/{name}', [InvoiceController::class, 'find_currency'])->name("invoices.find_currency");
-		Route::get('customer/get_invoices/{id}', [InvoiceController::class, 'get_invoices']);
+		Route::get('customer/get_invoices/{id}', [InvoiceController::class, 'get_invoices'])->name('customer.get_invoices');
 		Route::get('prescription_products/{id}', [PrescriptionController::class, 'find_prescription_products'])->name('prescriptions.find_prescription_products');
 		Route::get('products/findProduct/{id}', [ProductController::class, 'findProduct'])->name("products.find_product");
 		Route::get('products/getProducts/{type}', [ProductController::class, 'getProducts']);
