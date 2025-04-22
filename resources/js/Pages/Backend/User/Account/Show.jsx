@@ -17,10 +17,9 @@ import {
   CardHeader, 
   CardTitle, 
   CardContent, 
-  CardDescription 
 } from "@/Components/ui/card";
 import { Badge } from "@/Components/ui/badge";
-import { CalendarIcon, FileText, Pencil } from "lucide-react";
+import { FileText, Pencil } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 export default function Show({ account, combined_transactions }) {

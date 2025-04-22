@@ -80,7 +80,7 @@ class AccountController extends Controller
         // Get currencies for the dropdown
         $currencies = Currency::all();
         $accountTypes = AccountType::all();
-        
+
         return Inertia::render('Backend/User/Account/Create', [
             'currencies' => $currencies,
             'accountTypes' => $accountTypes,
@@ -345,7 +345,7 @@ class AccountController extends Controller
 
         // Get currencies for the dropdown
         $currencies = Currency::all();
-        
+
         return Inertia::render('Backend/User/Account/Edit', [
             'account' => $account,
             'openingBalance' => $openingBalance,
@@ -535,35 +535,35 @@ class AccountController extends Controller
         $accountIds = $request->accounts;
         $deletedCount = 0;
         $failedCount = 0;
-        
+
         foreach ($accountIds as $id) {
             $account = Account::find($id);
-            
+
             if (!$account) {
                 $failedCount++;
                 continue;
             }
-            
+
             if ($account->transactions->count() > 0) {
                 $failedCount++;
                 continue;
             }
-            
+
             // audit log
             $audit = new AuditLog();
             $audit->date_changed = date('Y-m-d H:i:s');
             $audit->changed_by = auth()->id();
             $audit->event = 'Deleted Account ' . $account->account_name;
             $audit->save();
-            
+
             $account->delete();
             $deletedCount++;
         }
-        
+
         if ($failedCount > 0) {
             return back()->with('warning', $deletedCount . ' accounts deleted successfully. ' . $failedCount . ' accounts could not be deleted because they have transactions.');
         }
-        
+
         return back()->with('success', $deletedCount . ' accounts deleted successfully');
     }
 
@@ -611,82 +611,52 @@ class AccountController extends Controller
     {
         if ($request->isMethod('get')) {
 
-            $date1 = $request->has('date1') ? Carbon::parse($request->date1)->format('Y-m-d') : Carbon::now()->subDays(30)->format('Y-m-d');
-            $date2 = $request->has('date2') ? Carbon::parse($request->date2)->format('Y-m-d') : Carbon::now()->format('Y-m-d');
+            $date1 = Carbon::now()->startOfMonth()->format('Y-m-d');
+            $date2 = Carbon::now()->format('Y-m-d');
 
             session(['start_date' => $date1]);
             session(['end_date' => $date2]);
 
             $account = Account::where('id', $id)->first();
 
-            $normal_transactions = $account->transactions()
-                ->whereNotIn('ref_type', ['invoice payment', 'bill payment', 'd invoice payment', 'payslip', 'd invoice income', 'd invoice tax'])
+            $transactions = $account->transactions()
                 ->whereDate('trans_date', '>=', $date1)
                 ->whereDate('trans_date', '<=', $date2)
                 ->get();
 
-            $get_payment_income_transactions = $account->transactions()
-                ->whereIn('ref_type', ['invoice payment', 'bill payment', 'd invoice payment', 'd invoice income', 'd invoice tax'])
-                ->whereDate('trans_date', '>=', $date1)
-                ->whereDate('trans_date', '<=', $date2)
-                ->get(); // Fetch the transactions as a collection
-
-            $payment_income_transactions = $get_payment_income_transactions->groupBy(function ($transaction) {
-                // Check if the ref_id contains a comma
-                if (strpos($transaction->ref_id, ',') !== false) {
-                    // Extract the second part of ref_id
-                    return explode(',', $transaction->ref_id)[1];
-                }
-                // Otherwise, return the ref_id as is
-                return $transaction->ref_id;
-            });
-
-            $payslip_transactions = $account->transactions()
-                ->where('ref_type', 'payslip')
-                ->whereDate('trans_date', '>=', $date1)
-                ->whereDate('trans_date', '<=', $date2)
-                ->get()
-                ->groupBy('trans_date');
-
-            $combined_transactions = $this->combine($payment_income_transactions, $payslip_transactions, $normal_transactions);
-            
-            // Sort transactions by date
-            $combined_transactions = $combined_transactions->sortByDesc('trans_date');
-            
-            // Calculate running balance
             $opening_balance = $account->opening_balance;
+            $currenct_balance = get_account_balance($id) ?? 0;
             $running_balance = [];
-            $current_balance = $opening_balance;
-            
-            foreach ($combined_transactions as $key => $transaction) {
+            $balance = 0;
+
+            foreach ($transactions as $key => $transaction) {
                 if ($transaction->dr_cr == 'dr') {
-                    $current_balance += $transaction->base_currency_amount;
+                    $balance += $transaction->base_currency_amount;
                 } else {
-                    $current_balance -= $transaction->base_currency_amount;
+                    $balance -= $transaction->base_currency_amount;
                 }
-                $running_balance[$key] = $current_balance;
+                $running_balance[$key] = $balance;
             }
-            
+
             $balances = [
                 'opening' => $opening_balance,
                 'closing' => end($running_balance) ?: $opening_balance,
                 'running' => $running_balance
             ];
 
-            $date1Obj = Carbon::parse($date1);
-            $date2Obj = Carbon::parse($date2);
-            
-            $dateRange = [
-                'from' => $date1Obj->format('Y-m-d'),
-                'to' => $date2Obj->format('Y-m-d')
-            ];
+            $currency = $account->currency ?? $request->activeBusiness->currency;
+            $business_name = $request->activeBusiness->name;
 
             // Return Inertia view with JSON data
             return Inertia::render('Backend/User/Account/AccountStatement', [
                 'account' => $account,
-                'transactions' => $combined_transactions->values(),
+                'transactions' => $transactions,
                 'balances' => $balances,
-                'dateRange' => $dateRange
+                'currency' => $currency,
+                'business_name' => $business_name,
+                'date1' => $date1,
+                'date2' => $date2,
+                'currenct_balance' => $currenct_balance
             ]);
         } else {
             $request->validate([
@@ -694,13 +664,53 @@ class AccountController extends Controller
                 'date2' => 'required',
             ]);
 
-            $date1 = Carbon::parse($request->date1)->format('Y-m-d');
-            $date2 = Carbon::parse($request->date2)->format('Y-m-d');
+            $date1 = Carbon::parse($request->date1);
+            $date2 = Carbon::parse($request->date2);
 
             session(['start_date' => $date1]);
             session(['end_date' => $date2]);
-            
-            return redirect()->route('accounts.account_statement', ['id' => $id, 'date1' => $date1, 'date2' => $date2]);
+
+            $account = Account::where('id', $id)->first();
+
+            $transactions = $account->transactions()
+                ->whereDate('trans_date', '>=', $date1)
+                ->whereDate('trans_date', '<=', $date2)
+                ->get();
+
+            $opening_balance = $account->opening_balance;
+            $running_balance = [];
+            $currenct_balance = get_account_balance($id) ?? 0;
+            $balance = 0;
+
+            foreach ($transactions as $key => $transaction) {
+                if ($transaction->dr_cr == 'dr') {
+                    $balance += $transaction->base_currency_amount;
+                } else {
+                    $balance -= $transaction->base_currency_amount;
+                }
+                $running_balance[$key] = $balance;
+            }
+
+            $balances = [
+                'opening' => $opening_balance,
+                'closing' => end($running_balance) ?: $opening_balance,
+                'running' => $running_balance
+            ];
+
+            $currency = $account->currency ?? $request->activeBusiness->currency;
+            $business_name = $request->activeBusiness->name;
+
+            // Return Inertia view with JSON data
+            return Inertia::render('Backend/User/Account/AccountStatement', [
+                'account' => $account,
+                'transactions' => $transactions,
+                'balances' => $balances,
+                'currency' => $currency,
+                'business_name' => $business_name,
+                'date1' => $date1,
+                'date2' => $date2,
+                'currenct_balance' => $currenct_balance
+            ]);
         }
     }
 

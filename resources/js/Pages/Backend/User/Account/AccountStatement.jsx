@@ -1,308 +1,426 @@
-import React, { useState, useEffect } from "react";
-import { Link, router, usePage } from "@inertiajs/react";
+import React, { useState } from "react";
+import { Head, router, useForm } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
-import PageHeader from "@/Components/PageHeader";
 import { Button } from "@/Components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/Components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
-import { Label } from "@/Components/ui/label";
+import { toast } from "sonner";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/Components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/Components/ui/table";
-import { Badge } from "@/Components/ui/badge";
-import { CalendarIcon, ArrowLeft, ArrowRight, Loader2, Download, Printer, RefreshCw } from "lucide-react";
-import { format, parse, addDays, subDays } from "date-fns";
+import { Toaster } from "@/Components/ui/toaster";
+import PageHeader from "@/Components/PageHeader";
 import { Calendar } from "@/Components/ui/calendar";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/Components/ui/popover";
-import { cn } from "@/lib/utils";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { cn, formatCurrency } from "@/lib/utils";
+import { Badge } from "@/Components/ui/badge";
 
-// MyDatepicker component using the same style as in Create.jsx
-const MyDatepicker = ({ id, label, value, onChange, className }) => {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            id={id}
-            variant={"outline"}
-            className={cn(
-              "w-full justify-start text-left font-normal",
-              !value && "text-muted-foreground",
-              className
-            )}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {value ? (
-              format(new Date(value), "PPP")
-            ) : (
-              <span>Pick a date</span>
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={value ? new Date(value) : undefined}
-            onSelect={(date) =>
-              onChange(date ? format(date, "yyyy-MM-dd") : "")
-            }
-            initialFocus
-          />
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
-};
+export default function AccountStatement({ transactions, account, date1, date2, meta = {}, currency, business_name, balances, currenct_balance }) {
+  const [search, setSearch] = useState("");
+  const [perPage, setPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
-export default function AccountStatement({ account, transactions, balances, dateRange }) {
-  const { auth } = usePage().props;
-  const [fromDate, setFromDate] = useState(dateRange?.from || format(subDays(new Date(), 30), 'yyyy-MM-dd'));
-  const [toDate, setToDate] = useState(dateRange?.to || format(new Date(), 'yyyy-MM-dd'));
-  const [isLoading, setIsLoading] = useState(false);
+  const { data, setData, post, processing } = useForm({
+    date1: date1,
+    date2: date2,
+  });
 
-  // Format currency with proper ISO 4217 code
-  const formatCurrency = (amount, currencyCode = 'USD') => {
-    return new Intl.NumberFormat('en-US', { 
-      style: 'currency', 
-      currency: currencyCode.split(' ')[0] // Extract ISO code if it has a description
-    }).format(amount);
+  const handleExport = () => {
+    window.location.href = route("accounts.account_statement_export", account.id);
   };
 
-  const handleDateChange = () => {
-    setIsLoading(true);
-    router.get(route('accounts.account_statement', account.id), 
-      { date1: fromDate, date2: toDate },
-      { 
-        preserveState: true,
-        onSuccess: () => {
-          setIsLoading(false);
-        },
-        onError: () => {
-          setIsLoading(false);
-        }
-      }
+  const handleSearch = (e) => {
+    e.preventDefault();
+    router.get(
+      route("accounts.account_statement", account.id),
+      {
+        search: search,
+        per_page: perPage,
+        page: 1
+      },
+      { preserveState: true }
+    );
+    setCurrentPage(1);
+  };
+
+  const handleGenerate = (e) => {
+    e.preventDefault();
+    post(route("accounts.account_statement", account.id), {
+      date1: data.date1,
+      date2: data.date2,
+      search: search,
+      per_page: perPage,
+      page: 1,
+      preserveScroll: true,
+      preserveState: true,
+      onSuccess: () => {
+        toast.success("Report Generated successfully");
+        setCurrentPage(1);
+      },
+    });
+  };
+
+  const handlePerPageChange = (value) => {
+    setPerPage(value);
+    router.get(
+      route("accounts.account_statement", account.id),
+      { search, page: 1, per_page: value },
+      { preserveState: true }
     );
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    router.get(
+      route("accounts.account_statement", account.id),
+      { search, page, per_page: perPage },
+      { preserveState: true }
+    );
   };
 
-  const handleExport = () => {
-    window.location.href = route('accounts.export_account_statement', account.id);
-  };
+  const renderPageNumbers = () => {
+    const totalPages = meta.last_page;
+    const pages = [];
+    const maxPagesToShow = 5;
 
-  // Quick date selection shortcuts
-  const setDateRange = (range) => {
-    const today = new Date();
-    let newFromDate;
-    
-    switch(range) {
-      case 'today':
-        newFromDate = format(today, 'yyyy-MM-dd');
-        setFromDate(newFromDate);
-        setToDate(format(today, 'yyyy-MM-dd'));
-        break;
-      case 'yesterday':
-        const yesterday = subDays(today, 1);
-        newFromDate = format(yesterday, 'yyyy-MM-dd');
-        setFromDate(newFromDate);
-        setToDate(newFromDate);
-        break;
-      case 'last7days':
-        newFromDate = format(subDays(today, 6), 'yyyy-MM-dd');
-        setFromDate(newFromDate);
-        setToDate(format(today, 'yyyy-MM-dd'));
-        break;
-      case 'last30days':
-        newFromDate = format(subDays(today, 29), 'yyyy-MM-dd');
-        setFromDate(newFromDate);
-        setToDate(format(today, 'yyyy-MM-dd'));
-        break;
-      case 'thisMonth':
-        const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        newFromDate = format(firstDayThisMonth, 'yyyy-MM-dd');
-        setFromDate(newFromDate);
-        setToDate(format(today, 'yyyy-MM-dd'));
-        break;
-      case 'lastMonth':
-        const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-        newFromDate = format(firstDayLastMonth, 'yyyy-MM-dd');
-        setFromDate(newFromDate);
-        setToDate(format(lastDayLastMonth, 'yyyy-MM-dd'));
-        break;
-      default:
-        break;
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = startPage + maxPagesToShow - 1;
+
+    if (endPage > totalPages) {
+      endPage = totalPages;
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
     }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(
+        <Button
+          key={i}
+          variant={i === currentPage ? "default" : "outline"}
+          size="sm"
+          onClick={() => handlePageChange(i)}
+          className="mx-1"
+        >
+          {i}
+        </Button>
+      );
+    }
+
+    return pages;
+  };
+
+  const handlePrint = () => {
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+
+    // Generate CSS for the print window
+    const style = `
+            <style>
+                body { font-family: Arial, sans-serif; }
+                table { width: 100%; border-collapse: collapse; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; }
+                h2, h1 { text-align: center; margin-bottom: 20px; }
+                text-right { text-align: right; }
+                .total-row { font-weight: bold; background-color: #f9f9f9; }
+            </style>
+        `;
+
+    // Start building the HTML content for the print window
+    let printContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>General Journal</title>
+                ${style}
+            </head>
+            <body>
+                <h1>${business_name}</h1>
+                <h2>General Journal (${data.date1} - ${data.date2})</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Account</th>
+                            <th>Description</th>
+                            <th>Type</th>
+                            <th>Name</th>
+                            <th>Transaction Currency</th>
+                            <th>Transaction Amount[Debit]</th>
+                            <th>Transaction Amount[Credit]</th>
+                            <th>Currency Rate</th>
+                            <th>Base Currency</th>
+                            <th>Base Amount[Debit]</th>
+                            <th>Base Amount[Credit]</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+    // Add table rows from transactions data
+    if (transactions.length > 0) {
+      transactions.forEach(transaction => {
+        printContent += `
+                    <tr>
+                        <td>${transaction.trans_date || 'N/A'}</td>
+                        <td>${account.account_name || 'N/A'}</td>
+                        <td>${transaction.description || 'N/A'}</td>
+                        <td>${transaction.ref_type === 'receipt' ? 'cash invoice' : transaction.ref_type || 'N/A'}</td>
+                        <td>${transaction.payee_name || 'N/A'}</td>
+                        <td>${transaction.transaction_currency || 'N/A'}</td>
+                        <td>${transaction.dr_cr === 'dr' ? transaction.transaction_amount : 0}</td>
+                        <td>${transaction.dr_cr === 'cr' ? transaction.transaction_amount : 0}</td>
+                        <td>${transaction.currency_rate || 'N/A'}</td>
+                        <td>${currency}</td>
+                        <td>${transaction.dr_cr === 'dr' ? transaction.base_currency_amount : 0}</td>
+                        <td>${transaction.dr_cr === 'cr' ? transaction.base_currency_amount : 0}</td>
+                    </tr>
+                `;
+      });
+    } else {
+      printContent += `
+                <tr>
+                    <td colspan="12" style="text-align: center;">No transactions found.</td>
+                </tr>
+            `;
+    }
+
+    // Complete the HTML content
+    printContent += `
+                    </tbody>
+                </table>
+            </body>
+            </html>
+        `;
+
+    // Write the content to the print window and trigger print
+    printWindow.document.open();
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+
+    // Wait for content to load before printing
+    setTimeout(() => {
+      printWindow.print();
+      // Close the window after printing (optional, can be commented out if you want to keep it open)
+      printWindow.onafterprint = function () {
+        printWindow.close();
+      };
+    }, 300);
   };
 
   return (
     <AuthenticatedLayout>
+      <Head title="Account Statement" />
+      <Toaster />
       <SidebarInset>
         <div className="main-content">
-          <PageHeader 
-            page='Chart of accounts'
-            subpage={account?.account_code}
-            url='accounts.index'
+          <PageHeader
+            page="Accounts"
+            subpage={account?.account_name}
+            url="accounts.index"
           />
+          <div className="p-4">
+            <div className="print:shadow-none print:border-none">
+              <div className="flex flex-col gap-1">
+                <div className="text-sm font-medium text-muted-foreground">Account Code: <span className="ml-2 text-primary">{account?.account_code}</span></div>
+                <div className="text-sm font-medium text-muted-foreground">Currency: <span className="ml-2 text-primary">{account?.currency}</span></div>
+                <div className="text-sm font-medium text-muted-foreground">Account Type: <span className="ml-2 text-primary">{account?.account_type}</span></div>
+                <div className="text-sm font-medium text-muted-foreground">Balance: <span className="ml-2 text-primary">{formatCurrency({amount: currenct_balance, currency})}</span></div>
+              </div>
+            </div>
+            <div className="flex flex-col justify-between items-start my-6 gap-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                <form onSubmit={handleGenerate} className="flex gap-2">
+                  <div className="flex items-center gap-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full md:w-auto justify-start text-left font-normal",
+                            !data.date1 && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {data.date1 ? format(new Date(data.date1), "PPP") : <span>From date</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={data.date1 ? new Date(data.date1) : undefined}
+                          onSelect={(date) => setData('date1', date ? format(date, "yyyy-MM-dd") : '')}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
 
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-0 print:p-0">
-            {/* Account summary card */}
-            <Card className="print:shadow-none print:border-none">
-              <CardHeader className="print:pb-0">
-                <CardTitle className="flex justify-between items-center">
-                  <div>Account Details</div>
-                  <Badge className="ml-2">{account?.account_type}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Account Code</div>
-                    <div className="font-medium">{account?.account_code}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Currency</div>
-                    <div className="font-medium">{account?.currency || "Default Currency"}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Opening Balance</div>
-                    <div className="font-medium">
-                      {account?.opening_balance ? 
-                        formatCurrency(account.opening_balance, account.currency || 'USD') : 
-                        formatCurrency(0, 'USD')}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full md:w-auto justify-start text-left font-normal",
+                            !data.date2 && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {data.date2 ? format(new Date(data.date2), "PPP") : <span>To date</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={data.date2 ? new Date(data.date2) : undefined}
+                          onSelect={(date) => setData('date2', date ? format(date, "yyyy-MM-dd") : '')}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
 
-            {/* Date Range Filter Card */}
-            <Card className="print:hidden">
-              <CardHeader>
-                <CardTitle>Date Range</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
-                  <div className="flex-1">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <MyDatepicker id="fromDate" label="From Date" value={fromDate} onChange={(value) => setFromDate(value)} />
-                      <MyDatepicker id="toDate" label="To Date" value={toDate} onChange={(value) => setToDate(value)} />
-                    </div>
+                    <Button type="submit" disabled={processing}>{processing ? 'Generating...' : 'Generate'}</Button>
                   </div>
-                  <div className="flex-1">
-                    <Label>Quick Select</Label>
-                    <div className="grid grid-cols-3 gap-2 mt-2">
-                      <Button variant="outline" size="sm" onClick={() => setDateRange('today')}>Today</Button>
-                      <Button variant="outline" size="sm" onClick={() => setDateRange('yesterday')}>Yesterday</Button>
-                      <Button variant="outline" size="sm" onClick={() => setDateRange('last7days')}>Last 7 Days</Button>
-                      <Button variant="outline" size="sm" onClick={() => setDateRange('last30days')}>Last 30 Days</Button>
-                      <Button variant="outline" size="sm" onClick={() => setDateRange('thisMonth')}>This Month</Button>
-                      <Button variant="outline" size="sm" onClick={() => setDateRange('lastMonth')}>Last Month</Button>
-                    </div>
-                  </div>
-                  <div className="flex items-end">
-                    <Button 
-                      onClick={handleDateChange} 
-                      disabled={isLoading}
-                      className="w-full"
-                    >
-                      {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-                      Apply
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex justify-end space-x-2 mt-4">
-                  <Button variant="outline" onClick={handlePrint} size="sm">
-                    <Printer className="h-4 w-4 mr-2" />
-                    Print
-                  </Button>
-                  <Button variant="outline" onClick={handleExport} size="sm">
-                    <Download className="h-4 w-4 mr-2" />
-                    Export
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                </form>
+              </div>
+              <div className="flex flex-col md:flex-row gap-4 md:items-center">
+                <form onSubmit={handleSearch} className="flex gap-2">
+                  <Input
+                    placeholder="Search..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full md:w-80"
+                  />
+                  <Button type="submit">Search</Button>
+                </form>
+              </div>
+            </div>
 
-            {/* Transactions Table */}
-            <Card className="print:shadow-none print:border-none">
-              <CardHeader className="print:py-2">
-                <CardTitle>Transaction History</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Reference</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead className="text-right">Debit</TableHead>
-                      <TableHead className="text-right">Credit</TableHead>
-                      <TableHead className="text-right">Balance</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {transactions && transactions.length > 0 ? (
-                      <>
-                        <TableRow className="font-medium bg-muted">
-                          <TableCell colSpan={5}>Opening Balance</TableCell>
-                          <TableCell className="text-right">
-                            {formatCurrency(balances?.opening || 0, account?.currency || 'USD')}
-                          </TableCell>
-                        </TableRow>
-                        {transactions.map((transaction, index) => (
-                          <TableRow key={transaction.id}>
-                            <TableCell>{format(new Date(transaction.trans_date), 'dd MMM yyyy')}</TableCell>
-                            <TableCell>
-                              {transaction.ref_id && 
-                                (transaction.ref_type ? 
-                                  <Badge variant="outline" className="font-normal">
-                                    {transaction.ref_type.toUpperCase()} #{transaction.ref_id}
-                                  </Badge> : 
-                                  transaction.ref_id)
-                              }
-                            </TableCell>
-                            <TableCell>{transaction.description}</TableCell>
-                            <TableCell className="text-right">
-                              {transaction.dr_cr === 'dr' ? 
-                                formatCurrency(transaction.amount, account?.currency || 'USD') : 
-                                formatCurrency(0, account?.currency || 'USD')}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {transaction.dr_cr === 'cr' ? 
-                                formatCurrency(transaction.amount, account?.currency || 'USD') : 
-                                formatCurrency(0, account?.currency || 'USD')}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {formatCurrency(balances?.running[index] || 0, account?.currency || 'USD')}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                        <TableRow className="font-medium bg-muted">
-                          <TableCell colSpan={5}>Closing Balance</TableCell>
-                          <TableCell className="text-right">
-                            {formatCurrency(balances?.closing || 0, account?.currency || 'USD')}
-                          </TableCell>
-                        </TableRow>
-                      </>
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center py-10">
-                          No transactions found for the selected period
+            <div className="mb-4 flex flex-col md:flex-row gap-4 justify-between">
+              <div className="flex items-center gap-2 print-buttons">
+                <Button variant="outline" onClick={handlePrint}>
+                  Print
+                </Button>
+                <Button variant="outline" onClick={handleExport}>Export</Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Show</span>
+                <Select value={perPage.toString()} onValueChange={handlePerPageChange}>
+                  <SelectTrigger className="w-[80px]">
+                    <SelectValue placeholder="10" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-gray-500">entries</span>
+              </div>
+            </div>
+
+            <div className="rounded-md border printable-table">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Reference</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Debit</TableHead>
+                    <TableHead className="text-right">Credit</TableHead>
+                    <TableHead className="text-right">Balance</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {transactions.length > 0 ? (
+                    transactions.map((transaction, index) => (
+                      <TableRow key={transaction.id}>
+                        <TableCell>{transaction.trans_date || 'N/A'}</TableCell>
+                        <TableCell>
+                          {transaction.ref_id &&
+                            (transaction.ref_type ?
+                              <Badge variant="outline" className="font-normal">
+                                {transaction.ref_type.toUpperCase()} #{transaction.ref_id}
+                              </Badge> :
+                              transaction.ref_id)
+                          }
                         </TableCell>
+                        <TableCell>{transaction.description || 'N/A'}</TableCell>
+                        <TableCell className="text-right">{transaction.dr_cr === 'dr' ? formatCurrency({amount: transaction.transaction_amount, currency}) : formatCurrency({amount: 0, currency})}</TableCell>
+                        <TableCell className="text-right">{transaction.dr_cr === 'cr' ? formatCurrency({amount: transaction.transaction_amount, currency}) : formatCurrency({amount: 0, currency})}</TableCell>
+                        <TableCell className="text-right">{formatCurrency({amount: balances?.running[index], currency})}</TableCell>
                       </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={13} className="h-24 text-center">
+                        No transactions found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {transactions.length > 0 && meta.total > 0 && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-gray-500">
+                  Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, meta.total)} of {meta.total} entries
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                  >
+                    First
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  {renderPageNumbers()}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === meta.last_page}
+                  >
+                    Next
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(meta.last_page)}
+                    disabled={currentPage === meta.last_page}
+                  >
+                    Last
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </SidebarInset>

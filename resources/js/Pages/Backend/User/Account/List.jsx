@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { Edit, Eye, Plus, Settings, Trash, Users } from "lucide-react";
+import { Book, Edit, Eye, Plus, Settings, Trash, Users } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -118,7 +118,6 @@ export default function List({ accounts = [], meta = {}, filters = {} }) {
   }, [flash, toast]);
 
   const { auth } = usePage().props;
-  const userId = auth.user.id;
 
   const toggleSelectAll = () => {
     if (isAllSelected) {
@@ -371,6 +370,11 @@ export default function List({ accounts = [], meta = {}, filters = {} }) {
                                 icon: <Trash className="h-4 w-4" />,
                                 onClick: () => handleDeleteConfirm(account.id),
                                 destructive: true,
+                              },
+                              {
+                                label: "Statement",
+                                icon: <Book className="h-4 w-4" />,
+                                href: route("accounts.account_statement", account.id),
                               },
                             ]}
                           />
