@@ -23,6 +23,7 @@
     <style>
         * {
             scrollbar-width: thin;
+            font-size: 13px;
         }
     </style>
 </head>

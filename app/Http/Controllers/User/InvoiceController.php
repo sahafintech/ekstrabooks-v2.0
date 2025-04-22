@@ -425,7 +425,6 @@ class InvoiceController extends Controller
         $invoice = Invoice::with([
             'business',
             'items',
-            'taxes',
             'customer',
             'taxes'
         ])->find($id);
@@ -543,9 +542,9 @@ class InvoiceController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit(Request $request, $id)
+    public function edit($id)
     {
-        $invoice = Invoice::with(['items.taxes', 'taxes', 'customer'])
+        $invoice = Invoice::with(['items', 'taxes', 'customer'])
             ->where('id', $id)
             ->where('status', '!=', 2)
             ->where('is_recurring', 0)

@@ -663,7 +663,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
 
                     <div className="md:col-span-2">
                       <Label>Subtotal</Label>
-                      <div className="p-2 bg-white rounded mt-2 text-right">
+                      <div className="p-2 bg-white rounded text-right">
                         {(item.quantity * item.unit_cost).toFixed(2)}
                       </div>
                     </div>

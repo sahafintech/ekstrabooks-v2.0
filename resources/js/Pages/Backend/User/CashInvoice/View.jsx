@@ -210,7 +210,7 @@ export default function View({ receipt, attachments, decimalPlace }) {
                                     {receipt.taxes.map((tax, index) => (
                                         <div key={index} className="flex justify-between py-2">
                                             <span>
-                                                {tax.name} ({tax.rate}%):
+                                                {tax.name}:
                                             </span>
                                             <span>{formatCurrency(tax.amount, receipt.currency, decimalPlace)}</span>
                                         </div>

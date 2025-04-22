@@ -224,7 +224,7 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
   const handleSearch = (e) => {
     e.preventDefault();
     router.get(
-      route("invoices.index"),
+      route("deffered_invoices.index"),
       { search, page: 1, per_page: perPage },
       { preserveState: true }
     );
@@ -233,7 +233,7 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
   const handlePerPageChange = (value) => {
     setPerPage(value);
     router.get(
-      route("invoices.index"),
+      route("deffered_invoices.index"),
       { search, page: 1, per_page: value },
       { preserveState: true }
     );
@@ -242,7 +242,7 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
   const handlePageChange = (page) => {
     setCurrentPage(page);
     router.get(
-      route("invoices.index"),
+      route("deffered_invoices.index"),
       { search, page, per_page: perPage },
       { preserveState: true }
     );
@@ -274,7 +274,7 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
     e.preventDefault();
     setProcessing(true);
     
-    router.delete(route('invoices.destroy', invoiceToDelete), {
+    router.delete(route('deffered_invoices.destroy', invoiceToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
         setInvoiceToDelete(null);
@@ -290,7 +290,7 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
     e.preventDefault();
     setProcessing(true);
     
-    router.post(route('invoices.destroy-multiple'), {
+    router.post(route('deffered_invoices.destroy-multiple'), {
       invoices: selectedInvoices
     }, {
       onSuccess: () => {
@@ -310,7 +310,7 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
     const formData = new FormData(e.target);
     setProcessing(true);
 
-    router.post(route('invoices.import'), formData, {
+    router.post(route('deffered_invoices.import'), formData, {
       onSuccess: () => {
         setShowImportModal(false);
         setProcessing(false);
@@ -352,27 +352,27 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
   };
 
   const exportInvoices = () => {
-    router.get(route("invoices.export"));
+    router.get(route("deffered_invoices.export"));
   };
 
   return (
     <AuthenticatedLayout>
-      <Head title="Invoices" />
+      <Head title="Deffered Invoices" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">
           <PageHeader
-            page="Invoices"
+            page="Deffered Invoices"
             subpage="List"
-            url="invoices.index"
+            url="deffered_invoices.index"
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div className="flex flex-col md:flex-row gap-4">
-                <Link href={route("invoices.create")}>
+                <Link href={route("deffered_invoices.create")}>
                   <Button>
                     <Plus className="w-4 h-4 mr-2" />
-                    Add Invoice
+                    Add Deffered Invoice
                   </Button>
                 </Link>
                 <DropdownMenu>
@@ -445,9 +445,11 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
                         onCheckedChange={toggleSelectAll}
                       />
                     </TableHead>
-                    <TableHead>Invoice Number</TableHead>
+                    <TableHead>Policy Number</TableHead>
+                    <TableHead>Policy Start</TableHead>
+                    <TableHead>Policy End</TableHead>
                     <TableHead>Customer</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead>Invoiece Date</TableHead>
                     <TableHead>Due Date</TableHead>
                     <TableHead className="text-right">Grand Total</TableHead>
                     <TableHead className="text-right">Paid</TableHead>
@@ -466,7 +468,9 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
                             onCheckedChange={() => toggleSelectInvoice(invoice.id)}
                           />
                         </TableCell>
-                        <TableCell>{invoice.invoice_number}</TableCell>
+                        <TableCell>{invoice.order_number}</TableCell>
+                        <TableCell>{invoice.deffered_start}</TableCell>
+                        <TableCell>{invoice.deffered_end}</TableCell>
                         <TableCell>{invoice.customer ? invoice.customer.name : "-"}</TableCell>
                         <TableCell>{invoice.invoice_date}</TableCell>
                         <TableCell>{invoice.due_date}</TableCell>
@@ -482,12 +486,12 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
                               {
                                 label: "View",
                                 icon: <Eye className="h-4 w-4" />,
-                                href: route("invoices.show", invoice.id),
+                                href: route("deffered_invoices.show", invoice.id),
                               },
                               {
                                 label: "Edit",
                                 icon: <Edit className="h-4 w-4" />,
-                                href: route("invoices.edit", invoice.id),
+                                href: route("deffered_invoices.edit", invoice.id),
                               },
                               {
                                 label: "Delete",

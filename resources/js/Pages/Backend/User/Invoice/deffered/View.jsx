@@ -39,7 +39,7 @@ export default function View({ invoice, attachments, decimalPlace }) {
 
     const handleEmailInvoice = () => {
         setIsLoading(prev => ({ ...prev, email: true }));
-        router.visit(route('invoices.send_email', invoice.id), {
+        router.visit(route('deffered_invoices.send_email', invoice.id), {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Email form opened successfully');
@@ -54,28 +54,28 @@ export default function View({ invoice, attachments, decimalPlace }) {
 
     const handleDownloadPDF = () => {
         setIsLoading(prev => ({ ...prev, pdf: true }));
-        window.open(route('invoices.pdf', invoice.id), '_blank');
+        window.open(route('deffered_invoices.pdf', invoice.id), '_blank');
         setTimeout(() => {
             setIsLoading(prev => ({ ...prev, pdf: false }));
         }, 1000);
     };
 
     const handleShareLink = () => {
-        router.visit(route('invoices.link', invoice.id), {
+        router.visit(route('deffered_invoices.link', invoice.id), {
             preserveScroll: true
         });
     };
 
     return (
         <AuthenticatedLayout>
-            <Head title={`Invoice #${invoice.id}`} />
+            <Head title={`Deffered Invoice #${invoice.id}`} />
 
             <SidebarInset>
                 <div className="space-y-4">
                     <PageHeader
-                        page="Invoices"
+                        page="Deffered Invoices"
                         subpage={`Invoice #${invoice.invoice_number}`}
-                        url="invoices.index"
+                        url="deffered_invoices.index"
                     />
 
                     <div className="flex items-center justify-end space-x-2 mb-4">
@@ -121,7 +121,7 @@ export default function View({ invoice, attachments, decimalPlace }) {
                                     <span>Share Link</span>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem asChild>
-                                    <Link href={route("invoices.edit", invoice.id)} className="flex items-center">
+                                    <Link href={route("deffered_invoices.edit", invoice.id)} className="flex items-center">
                                         <Edit className="mr-2 h-4 w-4" />
                                         <span>Edit Invoice</span>
                                     </Link>
@@ -148,11 +148,11 @@ export default function View({ invoice, attachments, decimalPlace }) {
                                     <h1 className="text-2xl font-bold">{invoice.title}</h1>
                                     <div className="mt-2 text-sm">
                                         <p><span className="font-medium">Invoice #:</span> {invoice.invoice_number}</p>
+                                        {invoice.order_number && (
+                                            <p><span className="font-medium">Policy Number:</span> {invoice.order_number}</p>
+                                        )}
                                         <p><span className="font-medium">Invoice Date:</span> {invoice.invoice_date}</p>
                                         <p><span className="font-medium">Due Date:</span> {invoice.due_date}</p>
-                                        {invoice.order_number && (
-                                            <p><span className="font-medium">Order Number:</span> {invoice.order_number}</p>
-                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -177,8 +177,21 @@ export default function View({ invoice, attachments, decimalPlace }) {
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Item</TableHead>
-                                            <TableHead>Description</TableHead>
-                                            <TableHead className="text-right">Quantity</TableHead>
+                                            <TableHead>Benefit</TableHead>
+                                            {invoice.invoice_category !== "other" && (
+                                                <TableHead>Limits</TableHead>
+                                            )}
+                                            {invoice.invoice_category == "other" && (
+                                                <TableHead className="text-right">Sum Insured</TableHead>
+                                            )}
+                                            {invoice.invoice_category === 'medical' && (
+                                                <TableHead>Family Size</TableHead>
+                                            )}
+                                            {invoice.invoice_category === 'medical' ? (
+                                                <TableHead className="text-right">Members</TableHead>
+                                            ) : (
+                                                <TableHead className="text-right">Quantity</TableHead>
+                                            )}
                                             <TableHead className="text-right">Unit Cost</TableHead>
                                             <TableHead className="text-right">Total</TableHead>
                                         </TableRow>
@@ -187,7 +200,16 @@ export default function View({ invoice, attachments, decimalPlace }) {
                                         {invoice.items.map((item, index) => (
                                             <TableRow key={index}>
                                                 <TableCell className="font-medium">{item.product_name}</TableCell>
-                                                <TableCell>{item.description}</TableCell>
+                                                <TableCell>{item.benefits}</TableCell>
+                                                {invoice.invoice_category !== 'other' && (
+                                                    <TableCell>{formatCurrency(item.limits, invoice.currency, decimalPlace)}</TableCell>
+                                                )}
+                                                {invoice.invoice_category == "other" && (
+                                                    <TableCell className="text-right">{formatCurrency(item.sum_insured, invoice.currency, decimalPlace)}</TableCell>
+                                                )}
+                                                {invoice.invoice_category === 'medical' && (
+                                                    <TableCell>{item.family_size}</TableCell>
+                                                )}
                                                 <TableCell className="text-right">{item.quantity}</TableCell>
                                                 <TableCell className="text-right">{formatCurrency(item.unit_cost, invoice.currency, decimalPlace)}</TableCell>
                                                 <TableCell className="text-right">
@@ -242,7 +264,7 @@ export default function View({ invoice, attachments, decimalPlace }) {
                                             </span>
                                         </div>
                                     )}
-                                    
+
                                     {/* Base currency equivalent total */}
                                     {invoice.currency !== invoice.business.currency && (
                                         <div className="flex justify-between py-2 text-sm text-gray-600">

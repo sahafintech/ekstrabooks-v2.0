@@ -28,7 +28,9 @@ class BillPaymentsController extends Controller
         // Apply search if provided
         if (!empty($search)) {
             $query->where(function ($q) use ($search) {
-                $q->where('vendor.name', 'like', "%{$search}%")
+                $q->whereHas('vendor', function ($q2) use ($search) {
+                    $q2->where('name', 'like', "%{$search}%");
+                })
                     ->orWhere('amount', 'like', "%{$search}%");
             });
         }

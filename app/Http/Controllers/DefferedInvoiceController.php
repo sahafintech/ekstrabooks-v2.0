@@ -12,17 +12,19 @@ use App\Models\DefferedAddition;
 use App\Models\DefferedDeduction;
 use App\Models\DefferedEarning;
 use App\Models\DefferedPayment;
+use App\Models\InsuranceBenefit;
+use App\Models\InsuranceFamilySize;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\InvoiceItemTax;
 use App\Models\Product;
-use App\Models\ReceivePayment;
 use App\Models\Tax;
 use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Inertia\Inertia;
 
 class DefferedInvoiceController extends Controller
 {
@@ -43,16 +45,71 @@ class DefferedInvoiceController extends Controller
         });
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $receive_payments = ReceivePayment::where('deffered_payment', 1)->with('invoices')->get();
-        $invoices = Invoice::where('is_deffered', 1)->get();
-        return view('backend.user.invoice.deffered.list', compact('invoices', 'receive_payments'));
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
+
+        $query = Invoice::where('is_deffered', 1)->with('customer')->orderBy("id", "desc");
+
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('customer', function ($q2) use ($search) {
+                    $q2->where('name', 'like', "%{$search}%");
+                })
+                    ->orWhere('grand_total', 'like', "%{$search}%")
+                    ->orWhere('order_number', 'like', "%{$search}%");
+            });
+        }
+
+        // Get vendors with pagination
+        $invoices = $query->paginate($per_page)->withQueryString();
+
+        // Return Inertia view
+        return Inertia::render('Backend/User/Invoice/Deffered/List', [
+            'invoices' => $invoices->items(),
+            'meta' => [
+                'current_page' => $invoices->currentPage(),
+                'from' => $invoices->firstItem(),
+                'last_page' => $invoices->lastPage(),
+                'links' => $invoices->linkCollection(),
+                'path' => $invoices->path(),
+                'per_page' => $invoices->perPage(),
+                'to' => $invoices->lastItem(),
+                'total' => $invoices->total(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $request->get('sorting', []),
+            ],
+        ]);
     }
 
     public function create()
     {
-        return view('backend.user.invoice.deffered.create');
+        $invoice_title = get_business_option('invoice_title', 'Invoice');
+        $customers = Customer::all();
+        $currencies = Currency::all();
+        $products = Product::all();
+        $taxes = Tax::all();
+        $familySizes = InsuranceFamilySize::all();
+        $benefits = InsuranceBenefit::all();
+        $decimalPlace = get_business_option('decimal_place', 2);
+        $dateFormat = get_business_option('date_format', 'Y-m-d');
+
+        return Inertia::render('Backend/User/Invoice/Deffered/Create', [
+            'invoice_title' => $invoice_title,
+            'customers' => $customers,
+            'currencies' => $currencies,
+            'products' => $products,
+            'taxes' => $taxes,
+            'decimalPlace' => $decimalPlace,
+            'familySizes' => $familySizes,
+            'benefits' => $benefits,
+            'dateFormat' => $dateFormat
+        ]);
     }
 
     public function store(Request $request)
@@ -68,14 +125,16 @@ class DefferedInvoiceController extends Controller
             'invoice_category' => 'required',
             'invoice_date'   => 'required|date',
             'due_date'       => 'required|after_or_equal:invoice_date',
+            'earnings'  => 'required',
         ], [
             'product_id.required' => _lang('You must add at least one item'),
         ]);
 
         if ($validator->fails()) {
-            return redirect()->route('deffered_invoices.create')
-                ->withErrors($validator)
-                ->withInput();
+            return response()->json([
+                'status' => 'error',
+                'message' => $validator->errors()->first()
+            ]);
         }
 
         DB::beginTransaction();
@@ -183,14 +242,14 @@ class DefferedInvoiceController extends Controller
             }
         }
 
-        if ($request->earnings['start_date'][0] != null) {
-            foreach ($request->earnings['start_date'] as $key => $start_date) {
+        if ($request->earnings) {
+            foreach ($request->earnings as $earning) {
                 $defferedEarnings = new DefferedEarning();
                 $defferedEarnings->invoice_id = $invoice->id;
-                $defferedEarnings->start_date = Carbon::parse($start_date)->format('Y-m-d');
-                $defferedEarnings->end_date = Carbon::parse($request->earnings['end_date'][$key])->format('Y-m-d');
-                $defferedEarnings->days = $request->earnings['days'][$key];
-                $defferedEarnings->amount = $request->earnings['amount'][$key];
+                $defferedEarnings->start_date = Carbon::parse($earning['start_date'])->format('Y-m-d');
+                $defferedEarnings->end_date = Carbon::parse($earning['end_date'])->format('Y-m-d');
+                $defferedEarnings->days = $earning['number_of_days'];
+                $defferedEarnings->amount = $earning['amount'];
                 $defferedEarnings->save();
             }
         }
@@ -255,13 +314,13 @@ class DefferedInvoiceController extends Controller
                 $transaction->save();
             }
 
-            if (isset($request->tax_amount)) {
-                foreach ($request->tax_amount as $index => $amount) {
-                    $tax = Tax::find($index);
+            if (isset($request->taxes)) {
+                foreach ($request->taxes as $taxId) {
+                    $tax = Tax::find($taxId);
 
                     $invoiceItem->taxes()->save(new InvoiceItemTax([
                         'invoice_id' => $invoice->id,
-                        'tax_id'     => $index,
+                        'tax_id'     => $taxId,
                         'name'       => $tax->name . ' ' . $tax->rate . ' %',
                         'amount'     => ($invoiceItem->sub_total / 100) * $tax->rate,
                     ]));
@@ -353,11 +412,7 @@ class DefferedInvoiceController extends Controller
         $audit->event = 'Deffered Invoice Created: ' . $invoice->title;
         $audit->save();
 
-        if ($invoice->id > 0) {
-            return redirect()->route('invoices.show', $invoice->id)->with('success', _lang('Saved Successfully'));
-        } else {
-            return back()->with('error', _lang('Something going wrong, Please try again'));
-        }
+        return redirect()->route('deffered_invoices.show', $invoice->id)->with('success', _lang('Saved Successfully'));
     }
 
     private function calculateTotal(Request $request)
@@ -379,7 +434,7 @@ class DefferedInvoiceController extends Controller
             //Calculate Taxes
             if (isset($request->tax_amount)) {
                 foreach ($request->tax_amount as $index => $amount) {
-                    if($amount == 0) {
+                    if ($amount == 0) {
                         continue;
                     }
                     $tax         = Tax::find($index);
@@ -469,15 +524,36 @@ class DefferedInvoiceController extends Controller
 
     public function edit($id)
     {
-        $invoice = Invoice::where('id', $id)->with('deffered_payments', 'deffered_earnings', 'deffered_additions', 'deffered_deductions')
-            ->withSum('deffered_earnings', 'amount')
-            ->withSum('deffered_additions', 'amount')
-            ->withSum('deffered_deductions', 'amount')
-            ->where('is_deffered', 1)
-            ->first();
+        $invoice = Invoice::where('id', $id)->with('deffered_earnings', 'items', 'taxes')->first();
 
         $attachments = Attachment::where('ref_id', $id)->where('ref_type', 'invoice')->get();
-        return view('backend.user.invoice.deffered.edit', compact('invoice', 'id', 'attachments'));
+        $customers = Customer::all();
+        $currencies = Currency::all();
+        $products = Product::all();
+        $taxes = Tax::all();
+        $familySizes = InsuranceFamilySize::all();
+        $benefits = InsuranceBenefit::all();
+        $decimalPlace = get_business_option('decimal_place', 2);
+        $dateFormat = get_business_option('date_format', 'Y-m-d');
+        $taxIds = $invoice->taxes
+            ->pluck('tax_id')
+            ->map(fn($id) => (string) $id)
+            ->toArray();
+
+
+        return Inertia::render('Backend/User/Invoice/Deffered/Edit', [
+            'invoice' => $invoice,
+            'attachments' => $attachments,
+            'customers' => $customers,
+            'currencies' => $currencies,
+            'products' => $products,
+            'taxes' => $taxes,
+            'taxIds' => $taxIds,
+            'decimalPlace' => $decimalPlace,
+            'familySizes' => $familySizes,
+            'benefits' => $benefits,
+            'dateFormat' => $dateFormat
+        ]);
     }
 
     public function get_invoices(Request $request)
@@ -581,74 +657,74 @@ class DefferedInvoiceController extends Controller
             }
         }
 
-        if ($request->earnings['start_date'][0] != null) {
-            foreach ($request->earnings['start_date'] as $key => $start_date) {
-                $defferedEarning = DefferedEarning::where('invoice_id', $id)->where('start_date', Carbon::parse($start_date)->format('Y-m-d'))->where('end_date', Carbon::parse($request->earnings['end_date'][$key])->format('Y-m-d'))->where('status', 0)->first();
+        if ($request->earnings) {
+            foreach ($request->earnings as $earning) {
+                $defferedEarning = DefferedEarning::where('invoice_id', $invoice->id)->where('start_date', Carbon::parse($earning['start_date'])->format('Y-m-d'))->where('end_date', Carbon::parse($earning['end_date'])->format('Y-m-d'))->where('status', 0)->first();
 
                 if ($defferedEarning) {
-                    $defferedEarning->amount = $request->earnings['amount'][$key];
+                    $defferedEarning->amount = $earning['amount'];
                     $defferedEarning->save();
                 }
             }
         }
 
-        if (isset($request->payments) &&  isset($request->payments['date'])) {
-            if ($request->payments['date'][0] != null) {
-                // delete all previous payments which have status 0
-                $defferedPayment = DefferedPayment::where('status', 0)->get();
-                foreach ($defferedPayment as $payment) {
-                    $payment->delete();
-                }
-                foreach ($request->payments['date'] as $key => $date) {
-                    $defferedPayment = new DefferedPayment();
-                    $defferedPayment->invoice_id = $invoice->id;
-                    $defferedPayment->date = Carbon::parse($date)->format('Y-m-d');
-                    $defferedPayment->due_date = Carbon::parse($request->payments['due_date'][$key])->format('Y-m-d');
-                    $defferedPayment->amount = $request->payments['amount'][$key];
-                    $defferedPayment->save();
-                }
-            }
-        }
+        // if (isset($request->payments) &&  isset($request->payments['date'])) {
+        //     if ($request->payments['date'][0] != null) {
+        //         // delete all previous payments which have status 0
+        //         $defferedPayment = DefferedPayment::where('status', 0)->get();
+        //         foreach ($defferedPayment as $payment) {
+        //             $payment->delete();
+        //         }
+        //         foreach ($request->payments['date'] as $key => $date) {
+        //             $defferedPayment = new DefferedPayment();
+        //             $defferedPayment->invoice_id = $invoice->id;
+        //             $defferedPayment->date = Carbon::parse($date)->format('Y-m-d');
+        //             $defferedPayment->due_date = Carbon::parse($request->payments['due_date'][$key])->format('Y-m-d');
+        //             $defferedPayment->amount = $request->payments['amount'][$key];
+        //             $defferedPayment->save();
+        //         }
+        //     }
+        // }
 
-        if ($request->deductions['amount'][0] != null) {
-            $deductions = DefferedDeduction::where('invoice_id', $invoice->id)->get();
+        // if ($request->deductions['amount'][0] != null) {
+        //     $deductions = DefferedDeduction::where('invoice_id', $invoice->id)->get();
 
-            foreach ($deductions as $deduction) {
-                $deduction->delete();
-            }
+        //     foreach ($deductions as $deduction) {
+        //         $deduction->delete();
+        //     }
 
-            $invoice->grand_total = $invoice->grand_total - array_sum($request->deductions['amount']);
-            $invoice->converted_total = convert_currency($request->currency, $request->activeBusiness->currency, $invoice->grand_total);
-            $invoice->save();
+        //     $invoice->grand_total = $invoice->grand_total - array_sum($request->deductions['amount']);
+        //     $invoice->converted_total = convert_currency($request->currency, $request->activeBusiness->currency, $invoice->grand_total);
+        //     $invoice->save();
 
-            foreach ($request->deductions['amount'] as $key => $amount) {
-                $defferedDeduction = new DefferedDeduction();
-                $defferedDeduction->invoice_id = $invoice->id;
-                $defferedDeduction->amount = $amount;
-                $defferedDeduction->description = $request->deductions['description'][$key];
-                $defferedDeduction->save();
-            }
-        }
+        //     foreach ($request->deductions['amount'] as $key => $amount) {
+        //         $defferedDeduction = new DefferedDeduction();
+        //         $defferedDeduction->invoice_id = $invoice->id;
+        //         $defferedDeduction->amount = $amount;
+        //         $defferedDeduction->description = $request->deductions['description'][$key];
+        //         $defferedDeduction->save();
+        //     }
+        // }
 
-        if ($request->additions['amount'][0] != null) {
-            $additions = DefferedAddition::where('invoice_id', $invoice->id)->get();
+        // if ($request->additions['amount'][0] != null) {
+        //     $additions = DefferedAddition::where('invoice_id', $invoice->id)->get();
 
-            foreach ($additions as $addition) {
-                $addition->delete();
-            }
+        //     foreach ($additions as $addition) {
+        //         $addition->delete();
+        //     }
 
-            $invoice->grand_total = $invoice->grand_total + array_sum($request->additions['amount']);
-            $invoice->converted_total = convert_currency($request->currency, $request->activeBusiness->currency, $invoice->grand_total);
-            $invoice->save();
+        //     $invoice->grand_total = $invoice->grand_total + array_sum($request->additions['amount']);
+        //     $invoice->converted_total = convert_currency($request->currency, $request->activeBusiness->currency, $invoice->grand_total);
+        //     $invoice->save();
 
-            foreach ($request->additions['amount'] as $key => $amount) {
-                $defferedAddition = new DefferedAddition();
-                $defferedAddition->invoice_id = $invoice->id;
-                $defferedAddition->amount = $amount;
-                $defferedAddition->description = $request->additions['description'][$key];
-                $defferedAddition->save();
-            }
-        }
+        //     foreach ($request->additions['amount'] as $key => $amount) {
+        //         $defferedAddition = new DefferedAddition();
+        //         $defferedAddition->invoice_id = $invoice->id;
+        //         $defferedAddition->amount = $amount;
+        //         $defferedAddition->description = $request->additions['description'][$key];
+        //         $defferedAddition->save();
+        //     }
+        // }
 
         //Update Invoice item
         foreach ($invoice->items as $invoice_item) {
@@ -751,16 +827,13 @@ class DefferedInvoiceController extends Controller
 
 
 
-            if (isset($request->tax_amount)) {
-                foreach ($request->tax_amount as $index => $amount) {
-                    if ($amount == 0) {
-                        continue;
-                    }
-                    $tax = Tax::find($index);
+            if (isset($request->taxes)) {
+                foreach ($request->taxes as $taxId) {
+                    $tax = Tax::find($taxId);
 
                     $invoiceItem->taxes()->save(new InvoiceItemTax([
                         'invoice_id' => $invoice->id,
-                        'tax_id'     => $index,
+                        'tax_id'     => $taxId,
                         'name'       => $tax->name . ' ' . $tax->rate . ' %',
                         'amount'     => ($invoiceItem->sub_total / 100) * $tax->rate,
                     ]));
@@ -776,7 +849,7 @@ class DefferedInvoiceController extends Controller
                     $transaction->description = _lang('Deffered Invoice Tax') . ' #' . $invoice->invoice_number;
                     $transaction->ref_id      = $invoice->id;
                     $transaction->ref_type    = 'd invoice tax';
-                    $transaction->tax_id      = $tax->id;
+                    $transaction->tax_id      = $taxId;
                     $transaction->save();
                 }
             }
@@ -858,11 +931,36 @@ class DefferedInvoiceController extends Controller
         $audit->event = 'Deffered Invoice Updated: ' . $invoice->title;
         $audit->save();
 
-        if ($invoice->id > 0) {
-            return redirect()->route('invoices.show', $invoice->id)->with('success', _lang('Invoice Updated Successfully'));
-        } else {
-            return back()->with('error', _lang('Something going wrong, Please try again'));
-        }
+        return redirect()->route('deffered_invoices.show', $invoice->id)->with('success', _lang('Invoice Updated Successfully'));
+    }
+
+    /**
+     * Preview Private Invoice
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function show(Request $request, $id)
+    {
+        $invoice = Invoice::with([
+            'business',
+            'items',
+            'deffered_earnings',
+            'customer',
+            'taxes'
+        ])->find($id);
+
+        $attachments = Attachment::where('ref_id', $id)
+            ->where('ref_type', 'invoice')
+            ->get();
+
+        $decimalPlaces = get_business_option('decimal_places', 2);
+
+        return Inertia::render('Backend/User/Invoice/Deffered/View', [
+            'invoice' => $invoice,
+            'attachments' => $attachments,
+            'decimalPlaces' => $decimalPlaces
+        ]);
     }
 
     public function deffered_invoices_filter(Request $request)

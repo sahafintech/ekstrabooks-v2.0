@@ -211,7 +211,7 @@ export default function View({ bill, attachments, decimalPlace }) {
                                     {bill.taxes.map((tax, index) => (
                                         <div key={index} className="flex justify-between py-2">
                                             <span>
-                                                {tax.name} ({tax.rate}%):
+                                                {tax.name}:
                                             </span>
                                             <span>{formatCurrency(tax.amount, bill.business.currency, decimalPlace)}</span>
                                         </div>
