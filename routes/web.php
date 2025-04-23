@@ -519,9 +519,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('payslips/get_table_data', [PayrollController::class, 'get_table_data']);
 		Route::resource('payslips', PayrollController::class);
 		Route::get('payslips_export', [PayrollController::class, 'export_payslips'])->name('payslips.export');
-		Route::post('payslips/approve', [PayrollController::class, 'approve'])->name('payslips.approve');
-		Route::post('payslips/reject', [PayrollController::class, 'reject'])->name('payslips.reject');
-		Route::post('all_payslips', [PayrollController::class, 'payslips_all'])->name('payslips.all');
+		Route::post('payslips/bulk_approve', [PayrollController::class, 'bulk_approve'])->name('payslips.bulk_approve');
+		Route::post('payslips/bulk_reject', [PayrollController::class, 'bulk_reject'])->name('payslips.bulk_reject');
+		Route::post('payslips/bulk_delete', [PayrollController::class, 'bulk_delete'])->name('payslips.bulk_delete');
+		Route::post('payslips/bulk_accrue', [PayrollController::class, 'bulk_accrue'])->name('payslips.bulk_accrue');
+		Route::post('payslips/bulk_payment', [PayrollController::class, 'bulk_payment'])->name('payslips.bulk_payment');
 
 		//Taxes
 		Route::resource('taxes', TaxController::class);

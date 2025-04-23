@@ -233,8 +233,7 @@ export function UserSidebar({ businesses, active_business, ...props }) {
             url: "#",
             icon: GroupIcon,
             isActive: isRoute("staffs.index") || isRoute("attendance.index") || isRoute("departments.index") ||
-                isRoute("designations.index") || isRoute("payslips.index") || isRoute("payslips.accrue") ||
-                isRoute("payslips.make_payment") || isRoute("holidays.index") || isRoute("leaves.index") ||
+                isRoute("designations.index") || isRoute("payslips.index") || isRoute("holidays.index") || isRoute("leaves.index") ||
                 isRoute("awards.index"),
             items: [
                 {
@@ -261,16 +260,6 @@ export function UserSidebar({ businesses, active_business, ...props }) {
                     title: "Manage Payroll",
                     url: route("payslips.index"),
                     isActive: isRoute("payslips.index"),
-                },
-                {
-                    title: "Accrue Payroll",
-                    url: route("payslips.accrue"),
-                    isActive: isRoute("payslips.accrue"),
-                },
-                {
-                    title: "Make Payment",
-                    url: route("payslips.make_payment"),
-                    isActive: isRoute("payslips.make_payment"),
                 },
                 {
                     title: "Holidays",

@@ -15,7 +15,7 @@ return new class extends Migration {
             $table->date('date')->nullable();
             $table->string('description', 191)->nullable();
             $table->decimal('amount', 28, 8);
-            $table->string('type', 20)->deffault('add')->comment('add | deduct');
+            $table->string('type', 20)->default('add')->comment('add | deduct');
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
             $table->timestamps();

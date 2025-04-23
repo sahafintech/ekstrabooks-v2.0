@@ -67,11 +67,6 @@ class StaffController extends Controller
 
         $employees = $query->paginate($per_page);
 
-        $employees->transform(function ($employee) use ($request) {
-            $employee->basic_salary = formatAmount($employee->basic_salary, currency_symbol($request->activeBusiness->currency));
-            return $employee;
-        });
-
         return Inertia::render('Backend/User/Staff/List', [
             'employees' => $employees->items(),
             'meta' => [

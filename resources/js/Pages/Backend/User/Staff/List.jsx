@@ -33,6 +33,7 @@ import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
+import { formatCurrency } from "@/lib/utils";
 
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
@@ -469,7 +470,7 @@ export default function List({ employees = [], meta = {}, filters = {} }) {
                         <TableCell>{employee.department?.name || "-"}</TableCell>
                         <TableCell>{employee.designation?.name || "-"}</TableCell>
                         <TableCell>{formatDate(employee.joining_date)}</TableCell>
-                        <TableCell>{employee.basic_salary}</TableCell>
+                        <TableCell>{formatCurrency({ amount: employee.basic_salary })}</TableCell>
                         <TableCell className="text-right">
                           <TableActions
                             actions={[

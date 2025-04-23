@@ -17,6 +17,7 @@ use App\Models\SalaryBenefit;
 use App\Models\Tax;
 use App\Models\TaxCalculationMethod;
 use App\Models\Transaction;
+use App\Models\TransactionMethod;
 use App\Utilities\Overrider;
 use Carbon\Carbon;
 use DataTables;
@@ -24,6 +25,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\Calculation\DateTimeExcel\Current;
 use Validator;
@@ -59,25 +61,67 @@ class PayrollController extends Controller
      */
     public function index(Request $request)
     {
-        session(['month' => $request->month ? $request->month : date('m')]);
-        session(['year' => $request->year ? $request->year : date('Y')]);
+        session(['month' => $request->month ?? date('m')]);
+        session(['year' => $request->year ?? date('Y')]);
 
         $month = session('month');
         $year  = session('year');
 
-        $payrolls = Payroll::with('staff')->select('payslips.*')
-            ->where('month', session('month'))
-            ->where('year', session('year'))
-            ->get();
-        
-        $total_netsalary = $payrolls->sum('net_salary');
-        $total_basicsalary = $payrolls->sum('current_salary');
-        $total_allowance = $payrolls->sum('total_allowance');
-        $total_deduction = $payrolls->sum('total_deduction');
-        $total_tax = $payrolls->sum('tax_amount');
-        $total_advance = $payrolls->sum('advance');
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
 
-        return view('backend.user.payroll.list', compact('payrolls', 'month', 'year', 'total_netsalary', 'total_basicsalary', 'total_allowance', 'total_deduction', 'total_tax', 'total_advance'));
+        $query = Payroll::with('staff')
+            ->where('month', session('month'))
+            ->where('year', session('year'));
+
+        if ($search) {
+            $query->whereHas('staff', function ($q) use ($search) {
+                $q->where('name', 'like', "%$search%")
+                    ->orWhere('basic_salary', 'like', "%$search%");
+            });
+        }
+
+        $payrolls = $query->paginate($per_page);
+
+        $total_netsalary = $query->get()->sum('net_salary');
+        $total_basicsalary = $query->get()->sum('current_salary');
+        $total_allowance = $query->get()->sum('total_allowance');
+        $total_deduction = $query->get()->sum('total_deduction');
+        $total_tax = $query->get()->sum('tax_amount');
+        $total_advance = $query->get()->sum('advance');
+        $accounts = Account::all();
+        $methods = TransactionMethod::all();
+
+        $years = [];
+        for ($y = 2020; $y <= date('Y'); $y++) {
+            $years[] = $y;
+        }
+
+        return Inertia::render('Backend/User/Payroll/List', [
+            'payrolls' => $payrolls->items(),
+            'total_netsalary' => $total_netsalary,
+            'total_basicsalary' => $total_basicsalary,
+            'total_allowance' => $total_allowance,
+            'total_deduction' => $total_deduction,
+            'total_tax' => $total_tax,
+            'total_advance' => $total_advance,
+            'meta' => [
+                'current_page' => $payrolls->currentPage(),
+                'per_page' => $payrolls->perPage(),
+                'from' => $payrolls->firstItem(),
+                'to' => $payrolls->lastItem(),
+                'total' => $payrolls->total(),
+                'last_page' => $payrolls->lastPage(),
+            ],
+            'filters' => [
+                'search' => $search,
+            ],
+            'years' => $years,
+            'month' => $month,
+            'year' => $year,
+            'accounts' => $accounts,
+            'methods' => $methods,
+        ]);
     }
 
     /**
@@ -87,8 +131,13 @@ class PayrollController extends Controller
      */
     public function create(Request $request)
     {
-        $alert_col = 'col-lg-4 offset-lg-4';
-        return view('backend.user.payroll.create', compact('alert_col'));
+        $years = [];
+        for ($y = 2020; $y <= date('Y'); $y++) {
+            $years[] = $y;
+        }
+        return Inertia::render('Backend/User/Payroll/Create', [
+            'years' => $years,
+        ]);
     }
 
     /**
@@ -102,9 +151,6 @@ class PayrollController extends Controller
         $validator = Validator::make($request->all(), [
             'month' => 'required',
             'year'  => 'required',
-            'tax_type' => 'required|in:legacy,method',
-            'tax_calculation_method_id' => 'required_if:tax_type,method',
-            'taxes' => 'required_if:tax_type,legacy|array',
         ]);
 
         if ($validator->fails()) {
@@ -149,7 +195,7 @@ class PayrollController extends Controller
             ->whereDoesntHave('payslips', function ($query) use ($month, $year) {
                 $query->where('month', $month)->where('year', $year);
             })
-            ->where(function (Builder $query) use ($month, $year) {
+            ->where(function (Builder $query) {
                 $query->where("end_date", NULL)->orWhere("end_date", ">", now());
             })
             ->get();
@@ -159,8 +205,6 @@ class PayrollController extends Controller
         }
 
         foreach ($employees as $employee) {
-            $taxes_amount    = 0;
-
             //Get Absence Fine
             $absence_fine = 0;
             $full_day     = AbsentFine::where('business_id', request()->activeBusiness->id)->first()->full_day_fine ?? 0;
@@ -181,43 +225,14 @@ class PayrollController extends Controller
             $total_benefits  = $employee->basic_salary + $benefits?->sum('amount');
             $total_deduction = $deductions?->sum('amount') + $employee->employee_benefits->where('month', $month)->where('year', $year)->first()?->advance + $absence_fine;
 
-            // Tax calculation
-            $tax_calculation_method_id = null;
-            
-            if ($request->tax_type === 'method' && $request->tax_calculation_method_id) {
-                // Using the new tax calculation method
-                $tax_calculation_method = TaxCalculationMethod::find($request->tax_calculation_method_id);
-                
-                if ($tax_calculation_method) {
-                    $tax_calculation_method_id = $tax_calculation_method->id;
-                    
-                    // Calculate income for tax purposes (could be different than total benefits based on tax law)
-                    $taxable_income = $employee->basic_salary;
-                    $taxes_amount = $tax_calculation_method->calculateTax($taxable_income);
-                }
-            } else if ($request->tax_type === 'legacy' && $request->taxes) {
-                // Legacy tax calculation (fixed percentage from Tax model)
-                foreach ($request->taxes as $tax) {
-                    $tax_rate = Tax::find($tax)->rate;
-                    $taxes_amount += ($employee->basic_salary * $tax_rate) / 100;
-                }
-            }
-
             $payroll                    = new Payroll();
             $payroll->employee_id       = $employee->id;
             $payroll->month             = $month;
             $payroll->year              = $year;
             $payroll->current_salary    = $employee->basic_salary;
-            $payroll->net_salary        = ($total_benefits - $total_deduction - $taxes_amount);
-            $payroll->tax_amount        = $taxes_amount;
-            
-            if ($request->tax_type === 'method' && $request->tax_calculation_method_id) {
-                $payroll->tax_calculation_method_id = $tax_calculation_method_id;
-                $payroll->taxes = null; // Not using the old tax system
-            } else {
-                $payroll->taxes = json_encode($request->taxes);
-            }
-            
+            $payroll->net_salary        = ($total_benefits - $total_deduction);
+            $payroll->tax_amount        = 0;
+
             $payroll->total_allowance   = $benefits?->sum('amount');
             $payroll->total_deduction   = $total_deduction;
             $payroll->absence_fine      = $absence_fine;
@@ -235,11 +250,7 @@ class PayrollController extends Controller
         $audit->event = 'Generated Payslip for ' . count($employees) . ' employees';
         $audit->save();
 
-        if ($payroll->id > 0) {
-            return redirect()->route('payslips.index')->with('success', _lang('Payslip Generated Successfully'));
-        } else {
-            return redirect()->route('payslips.index')->with('error', _lang('Error Occured, Please try again !'));
-        }
+        return redirect()->route('payslips.index')->with('success', _lang('Payslip Generated Successfully'));
     }
 
     /**
@@ -248,12 +259,13 @@ class PayrollController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show(Request $request, $id)
+    public function show($id)
     {
-        $payroll      = Payroll::with('staff', 'payroll_benefits')->find($id);
+        $payroll      = Payroll::with('staff')->find($id);
         $working_days = Attendance::whereMonth('date', $payroll->month)
             ->whereYear('date', $payroll->year)
             ->groupBy('date')->get()->count();
+
         $absence = Attendance::where('employee_id', $payroll->employee_id)
             ->selectRaw("SUM(CASE WHEN attendance.leave_duration = 'half_day' THEN 0.5 ELSE 1 END) as absence")
             ->whereMonth('date', $payroll->month)
@@ -287,8 +299,14 @@ class PayrollController extends Controller
         $advance = $payroll->employee->employee_benefits()->where('month', $payroll->month)
             ->where('year', $payroll->year)->first()?->advance;
 
-        $currency_symbol = currency_symbol($request->activeBusiness->currency);
-        return view('backend.user.payroll.view', compact('payroll', 'id', 'currency_symbol', 'working_days', 'absence', 'allowances', 'deductions', 'advance'));
+        return Inertia::render('Backend/User/Payroll/View', [
+            'payroll' => $payroll,
+            'working_days' => $working_days,
+            'absence' => $absence,
+            'allowances' => $allowances,
+            'deductions' => $deductions,
+            'advance' => $advance,
+        ]);
     }
 
     /**
@@ -297,7 +315,7 @@ class PayrollController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit(Request $request, $id)
+    public function edit($id)
     {
         $payroll = Payroll::with('staff')
             ->with(['staff.employee_benefits' => function ($query) use ($id) {
@@ -306,7 +324,21 @@ class PayrollController extends Controller
                     ->with('salary_benefits');
             }])
             ->find($id);
-        return view('backend.user.payroll.edit', compact('payroll', 'id'));
+
+        $employee_benefits = EmployeeBenefit::where('month', $payroll->month)
+            ->where('year', $payroll->year)
+            ->where('employee_id', $payroll->employee_id)
+            ->with('salary_benefits')
+            ->first();
+        $decimalPlace = get_business_option('decimal_place', 2);
+        $accounts = Account::all();
+
+        return Inertia::render('Backend/User/Payroll/Edit', [
+            'payroll' => $payroll,
+            'employee_benefits' => $employee_benefits,
+            'accounts' => $accounts,
+            'decimalPlace' => $decimalPlace,
+        ]);
     }
 
     /**
@@ -322,7 +354,7 @@ class PayrollController extends Controller
 
         $payroll = Payroll::find($id);
         if ($payroll->status != 0) {
-            return back()->with('error', _lang('Sorry, Only unpaid payslip can be modify !'));
+            return redirect()->back()->with('error', _lang('Sorry, Only unpaid payslip can be modified !'));
         }
 
         // delete employee benefit where year and month is same as payroll
@@ -337,30 +369,30 @@ class PayrollController extends Controller
 
         $benefits = 0;
         if (isset($request->allowances)) {
-            for ($i = 0; $i < count($request->allowances['amount']); $i++) {
+            for ($i = 0; $i < count($request->allowances); $i++) {
                 $employee_benefit->salary_benefits()->save(new SalaryBenefit([
                     'employee_benefit_id' => $employee_benefit->id,
-                    'date'                => Carbon::parse($request->allowances['date'][$i])->format('Y-m-d'),
-                    'description'         => $request->allowances['description'][$i],
-                    'amount'              => $request->allowances['amount'][$i],
+                    'date'                => Carbon::parse($request->allowances[$i]['date'])->format('Y-m-d'),
+                    'description'         => $request->allowances[$i]['description'],
+                    'amount'              => $request->allowances[$i]['amount'],
                     'type'                => 'add',
                 ]));
-                $benefits += $request->allowances['amount'][$i];
+                $benefits += $request->allowances[$i]['amount'];
             }
         }
 
         $deductions = 0;
         if (isset($request->deductions)) {
-            for ($i = 0; $i < count($request->deductions['amount']); $i++) {
+            for ($i = 0; $i < count($request->deductions); $i++) {
                 $employee_benefit->salary_benefits()->save(new SalaryBenefit([
                     'employee_benefit_id' => $employee_benefit->id,
-                    'date'                => Carbon::parse($request->deductions['date'][$i])->format('Y-m-d'),
-                    'description'         => $request->deductions['description'][$i],
-                    'amount'              => $request->deductions['amount'][$i],
-                    'account_id'          => $request->deductions['account_id'][$i],
+                    'date'                => Carbon::parse($request->deductions[$i]['date'])->format('Y-m-d'),
+                    'description'         => $request->deductions[$i]['description'],
+                    'amount'              => $request->deductions[$i]['amount'],
+                    'account_id'          => $request->deductions[$i]['account_id'],
                     'type'                => 'deduct',
                 ]));
-                $deductions += $request->deductions['amount'][$i];
+                $deductions += $request->deductions[$i]['amount'];
             }
         }
 
@@ -383,11 +415,7 @@ class PayrollController extends Controller
         $audit->event = 'Updated Payslip for ' . $payroll->employee->name;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('payslips.index')->with('success', _lang('Updated Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $payroll, 'table' => '#payslips_table']);
-        }
+        return redirect()->route('payslips.index')->with('success', _lang('Updated Successfully'));
     }
 
     public function make_payment(Request $request)
@@ -397,7 +425,7 @@ class PayrollController extends Controller
             $taxCalculationMethods = TaxCalculationMethod::where('business_id', request()->activeBusiness->id)->get();
             // Get all taxes for the legacy tax system
             $taxes = Tax::where('business_id', request()->activeBusiness->id)->get();
-            
+
             return view('backend.user.payroll.make_payment', compact('taxCalculationMethods', 'taxes'));
         } else {
             $validator = Validator::make($request->all(), [
@@ -438,49 +466,51 @@ class PayrollController extends Controller
             $taxesList               = Tax::where('business_id', request()->activeBusiness->id)->get();
 
             return view('backend.user.payroll.make_payment', compact(
-                'payslips', 'currency_symbol', 'account_id', 'expense_account_id', 
-                'advance_account_id', 'method', 'tax_type', 'tax_calculation_method_id', 
-                'taxes', 'taxCalculationMethods', 'taxesList'
+                'payslips',
+                'currency_symbol',
+                'account_id',
+                'expense_account_id',
+                'advance_account_id',
+                'method',
+                'tax_type',
+                'tax_calculation_method_id',
+                'taxes',
+                'taxCalculationMethods',
+                'taxesList'
             ));
         }
     }
 
-    public function store_payment(Request $request)
+    public function bulk_payment(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'payslip_id'      => 'required',
+            'ids'      => 'required',
             'method'          => 'required',
-            'account_id'      => 'required',
-            'expense_account_id' => 'required',
+            'credit_account_id'      => 'required',
+            'debit_account_id' => 'required',
             'advance_account_id' => 'required',
-            'tax_type'        => 'required|in:legacy,method',
-            'tax_calculation_method_id' => 'required_if:tax_type,method',
-            'taxes'           => 'required_if:tax_type,legacy|array',
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
+            return redirect()->back()->withErrors($validator)->withInput();
         }
 
         DB::beginTransaction();
         try {
-            $payslips = Payroll::whereIn('id', $request->payslip_id)->get();
+            $payslips = Payroll::whereIn('id', $request->ids)->get();
 
             foreach ($payslips as $payslip) {
                 if ($payslip->status == 3) {
                     continue;
                 }
 
-                // Use the existing tax amount that was calculated during payroll generation
-                $taxes_amount = $payslip->tax_amount;
-                
                 // Set payment status
                 $payslip->status = 3;
                 $payslip->save();
 
                 $transaction                         = new Transaction();
                 $transaction->trans_date             = now();
-                $transaction->account_id             = $request->account_id;
+                $transaction->account_id             = $request->credit_account_id;
                 $transaction->dr_cr                  = 'dr';
                 $transaction->transaction_amount     = $payslip->net_salary;
                 $transaction->currency_rate          = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
@@ -496,26 +526,26 @@ class PayrollController extends Controller
 
                 $transaction                          = new Transaction();
                 $transaction->trans_date              = now();
-                $transaction->account_id              = $request->expense_account_id;
+                $transaction->account_id              = $request->debit_account_id;
                 $transaction->dr_cr                   = 'dr';
                 $transaction->transaction_amount      = $payslip->current_salary + $payslip->total_allowance;
                 $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
                 $transaction->base_currency_amount    = $payslip->employee->basic_salary + $payslip->total_allowance;
-                $transaction->description             = _lang('Staff Salary Expense ' . $payslip->month . '/' . $payslips->first()->year) . ' - ' . $payslip->employee->name;
+                $transaction->description             = _lang('Staff Salary ' . $payslip->month . '/' . $payslips->first()->year) . ' - ' . $payslip->employee->name;
                 $transaction->ref_id                  = $payslip->employee_id;
                 $transaction->ref_type                = 'payslip';
                 $transaction->employee_id             = $payslip->employee_id;
                 $transaction->save();
 
                 // Process deductions with specific accounts
-                $deductions = SalaryBenefit::whereHas('employee_benefit', function($query) use ($payslip) {
+                $deductions = SalaryBenefit::whereHas('employee_benefit', function ($query) use ($payslip) {
                     $query->where('employee_id', $payslip->employee_id)
-                          ->where('month', $payslip->month)
-                          ->where('year', $payslip->year);
+                        ->where('month', $payslip->month)
+                        ->where('year', $payslip->year);
                 })->where('type', 'deduct')
-                  ->whereNotNull('account_id')
-                  ->get();
-                  
+                    ->whereNotNull('account_id')
+                    ->get();
+
                 foreach ($deductions as $deduction) {
                     $transaction = new Transaction();
                     $transaction->trans_date = now();
@@ -545,22 +575,6 @@ class PayrollController extends Controller
                     $transaction->employee_id             = $payslip->employee_id;
                     $transaction->save();
                 }
-
-                // Create a transaction for tax deductions if tax amount is greater than 0
-                if ($taxes_amount > 0) {
-                    $transaction = new Transaction();
-                    $transaction->trans_date = now();
-                    $transaction->account_id = get_option('tax_account_id'); // You should have a tax account set in options
-                    $transaction->dr_cr = 'cr';
-                    $transaction->transaction_amount = $taxes_amount;
-                    $transaction->currency_rate = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                    $transaction->base_currency_amount = $taxes_amount;
-                    $transaction->description = _lang('Payroll Tax: ' . $payslip->month . '/' . $payslips->first()->year) . ' - ' . $payslip->employee->name;
-                    $transaction->ref_id = $payslip->employee_id;
-                    $transaction->ref_type = 'payslip_tax';
-                    $transaction->employee_id = $payslip->employee_id;
-                    $transaction->save();
-                }
             }
 
             DB::commit();
@@ -572,52 +586,21 @@ class PayrollController extends Controller
             $audit->event = 'Processed Payslip Payment for ' . count($payslips) . ' employees';
             $audit->save();
 
-            return response()->json(['result' => 'success', 'message' => 'Payment Processed Successfully']);
+            return redirect()->back()->with('success', _lang('Payment Processed Successfully'));
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['result' => 'error', 'message' => $e->getMessage()]);
+            return redirect()->back()->with('error', $e->getMessage());
         }
     }
 
-    public function accrue_payroll(Request $request) {
-        if ($request->isMethod('get')) {
-            return view('backend.user.payroll.accrue_payroll');
-        } else {
-            $validator = Validator::make($request->all(), [
-                'month'                   => 'required',
-                'year'                    => 'required',
-                'liability_account_id'    => 'required',
-                'expense_account_id'      => 'required',
-            ], [
-                'liability_account_id.required'         => 'You must select credit account',
-                'expense_account_id.required'           => 'Expense account is required',
-            ]);
-
-            if ($validator->fails()) {
-                return back()->withErrors($validator)->withInput();
-            }
-
-            $payslips = Payroll::with('staff')
-                ->where('month', $request->month)
-                ->where('year', $request->year)
-                ->where('status', 1)
-                ->get();
-            $currency_symbol         = currency_symbol($request->activeBusiness->currency);
-            $liability_account_id    = $request->liability_account_id;
-            $expense_account_id      = $request->expense_account_id;
-
-            return view('backend.user.payroll.accrue_payroll', compact('payslips', 'currency_symbol', 'liability_account_id', 'expense_account_id'));
-        }
-    }
-
-    public function store_accrual(Request $request)
+    public function bulk_accrue(Request $request)
     {
-        if (empty($request->payslip_ids)) {
+        if (empty($request->ids)) {
             return back()->with('error', _lang('You must select at least one employee'))->withInput();
         }
 
         $validator = Validator::make($request->all(), [
-            'liability_account_id'              => 'required',
+            'liability_account_id'    => 'required',
             'expense_account_id'      => 'required',
         ], [
             'liability_account_id.required'    => 'You must select debit account',
@@ -630,9 +613,13 @@ class PayrollController extends Controller
 
         DB::beginTransaction();
 
-        $payslips = Payroll::whereIn('id', $request->payslip_ids)
+        $payslips = Payroll::whereIn('id', $request->ids)
             ->where('status', 1)
             ->get();
+
+        if ($payslips->isEmpty()) {
+            return back()->with('error', _lang('No active payslips found'));
+        }
 
         foreach ($payslips as $payslip) {
             $transaction                          = new Transaction();
@@ -673,10 +660,10 @@ class PayrollController extends Controller
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Made payment for ' . count($payslips) . ' employees';
+        $audit->event = 'Accruement made for ' . count($payslips) . ' employees';
         $audit->save();
 
-        return redirect()->route('payslips.index')->with('success', _lang('Payment made successfully'));
+        return redirect()->route('payslips.index')->with('success', _lang('Accruement made successfully'));
     }
 
     /**
@@ -695,7 +682,7 @@ class PayrollController extends Controller
         $audit->changed_by = auth()->user()->id;
         $audit->event = 'Deleted Payslip for ' . $payroll->employee->name;
         $audit->save();
-        
+
         // delete transactions
         $transactions = Transaction::where('ref_id', $payroll->employee_id)->where('ref_type', 'payslip')->get();
         foreach ($transactions as $transaction) {
@@ -718,11 +705,10 @@ class PayrollController extends Controller
         return Excel::download(new PayslipsExport(session('month'), session('year')), 'Payroll ' . now()->format('d m Y') . '.xlsx');
     }
 
-    public function approve(Request $request)
+    public function bulk_approve(Request $request)
     {
         $payrolls = Payroll::where('status', 0)
-            ->where('month', session('month'))
-            ->where('year', session('year'))
+            ->whereIn('id', $request->ids)
             ->get();
 
         if ($payrolls->count() == 0) {
@@ -769,11 +755,10 @@ class PayrollController extends Controller
         }
     }
 
-    public function reject(Request $request)
+    public function bulk_reject(Request $request)
     {
-        $payrolls = Payroll::where('status', 1)
-            ->where('month', session('month'))
-            ->where('year', session('year'))
+        $payrolls = Payroll::whereIn('id', $request->ids)
+            ->where('status', 1)
             ->get();
 
         if ($payrolls->count() == 0) {
@@ -820,13 +805,13 @@ class PayrollController extends Controller
         }
     }
 
-    public function payslips_all(Request $request)
+    public function bulk_delete(Request $request)
     {
-        if ($request->payslips == null) {
+        if ($request->ids == null) {
             return redirect()->back()->with('error', _lang('Please Select Payslip'));
         }
 
-        $payslips = Payroll::whereIn('id', $request->payslips)->get();
+        $payslips = Payroll::whereIn('id', $request->ids)->get();
 
         // audit log
         $audit = new AuditLog();
