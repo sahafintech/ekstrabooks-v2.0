@@ -25,7 +25,6 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
@@ -127,7 +126,14 @@ class InvoiceController extends Controller
 
         $decimalPlace = get_business_option('decimal_place', 2);
 
-        return Inertia::render('Backend/User/Invoice/Create', compact('customers', 'currencies', 'products', 'taxes', 'invoice_title', 'decimalPlace'));
+        return Inertia::render('Backend/User/Invoice/Create', [
+            'customers' => $customers,
+            'currencies' => $currencies,
+            'products' => $products,
+            'taxes' => $taxes,
+            'invoice_title' => $invoice_title,
+            'decimalPlace' => $decimalPlace
+        ]);
     }
 
     /**
@@ -420,7 +426,7 @@ class InvoiceController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show(Request $request, $id)
+    public function show($id)
     {
         $invoice = Invoice::with([
             'business',

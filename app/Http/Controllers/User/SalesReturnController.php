@@ -4,8 +4,11 @@ namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\Account;
+use App\Models\Attachment;
 use App\Models\AuditLog;
 use App\Models\BusinessSetting;
+use App\Models\Currency;
+use App\Models\Customer;
 use App\Models\EmailTemplate;
 use App\Models\Product;
 use App\Models\SalesReturn;
@@ -18,6 +21,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Inertia\Inertia;
 
 class SalesReturnController extends Controller
 {
@@ -26,13 +30,65 @@ class SalesReturnController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        $salesReturns = SalesReturn::select('sales_returns.*')
-            ->with('customer')
-            ->get();
+        $query = SalesReturn::with('customer');
 
-        return view('backend.user.sales_return.list', compact('salesReturns'));
+        // Apply filters if any
+        if ($request->has('filters')) {
+            $filters = $request->filters;
+
+            // Filter by customer
+            if (!empty($filters['customer_id'])) {
+                $query->where('customer_id', $filters['customer_id']);
+            }
+
+            // Filter by status
+            if (isset($filters['status']) && $filters['status'] !== '') {
+                $query->where('status', $filters['status']);
+            }
+
+            // Filter by date range
+            if (!empty($filters['date_range'])) {
+                if (!empty($filters['date_range']['start'])) {
+                    $query->where('return_date', '>=', $filters['date_range']['start']);
+                }
+                if (!empty($filters['date_range']['end'])) {
+                    $query->where('return_date', '<=', $filters['date_range']['end']);
+                }
+            }
+        }
+
+        if (!empty($request->search)) {
+            $query->where('return_number', 'like', "%{$request->search}%")
+                ->whereHas('customer', function ($query) use ($request) {
+                    $query->where('name', 'like', "%{$request->search}%");
+                });
+        }
+
+        // Handle sorting
+        $sortField = $request->get('sort_field', 'id');
+        $sortDirection = $request->get('sort_direction', 'desc');
+        $query->orderBy($sortField, $sortDirection);
+
+        // Handle pagination
+        $perPage = $request->get('per_page', 10);
+        $returns = $query->paginate($perPage);
+        $accounts = Account::all();
+
+        return Inertia::render('Backend/User/SalesReturn/List', [
+            'returns' => $returns->items(),
+            'accounts' => $accounts,
+            'meta' => [
+                'total' => $returns->total(),
+                'per_page' => $returns->perPage(),
+                'current_page' => $returns->currentPage(),
+                'last_page' => $returns->lastPage(),
+                'from' => $returns->firstItem(),
+                'to' => $returns->lastItem(),
+            ],
+            'filters' => $request->filters ?? []
+        ]);
     }
 
     /**
@@ -42,7 +98,23 @@ class SalesReturnController extends Controller
      */
     public function create(Request $request)
     {
-        return view('backend.user.sales_return.create');
+        $sales_return_title = get_business_option('sales_return_title', 'Return');
+        $customers = Customer::all();
+        $currencies = Currency::all();
+        $products = Product::all();
+        $taxes = Tax::all();
+        $decimalPlace = get_business_option('decimal_place', 2);
+        $accounts = Account::all();
+
+        return Inertia::render('Backend/User/SalesReturn/Create', [
+            'sales_return_title' => $sales_return_title,
+            'customers' => $customers,
+            'currencies' => $currencies,
+            'products' => $products,
+            'taxes' => $taxes,
+            'decimalPlace' => $decimalPlace,
+            'accounts' => $accounts
+        ]);
     }
 
     /**
@@ -77,7 +149,7 @@ class SalesReturnController extends Controller
         $return                  = new SalesReturn();
         $return->customer_id     = $request->input('customer_id') ?? NULL;
         $return->title           = $request->input('title');
-        $return->return_number   = get_business_option('sales_return_number');
+        $return->return_number   = get_business_option('sales_return_number', 'SR');
         $return->return_date     = Carbon::parse($request->input('return_date'))->format('Y-m-d');
         $return->sub_total       = $summary['subTotal'];
         $return->grand_total     = $summary['grandTotal'];
@@ -196,8 +268,8 @@ class SalesReturnController extends Controller
                 $transaction->save();
             }
 
-            if (isset($request->taxes[$returnItem->product_id])) {
-                foreach ($request->taxes[$returnItem->product_id] as $taxId) {
+            if (isset($request->taxes)) {
+                foreach ($request->taxes as $taxId) {
                     $tax = Tax::find($taxId);
 
                     $returnItem->taxes()->save(new SalesReturnItemTax([
@@ -218,6 +290,7 @@ class SalesReturnController extends Controller
                     $transaction->description = _lang('Sales Return Tax') . ' #' . $return->return_number;
                     $transaction->ref_id      = $return->id;
                     $transaction->ref_type    = 's return tax';
+                    $transaction->tax_id      = $tax->id;
                     $transaction->save();
                 }
             }
@@ -294,11 +367,7 @@ class SalesReturnController extends Controller
         $audit->event = 'Sales Return Created' . ' ' . $return->return_number;
         $audit->save();
 
-        if ($return->id > 0) {
-            return redirect()->route('sales_returns.show', $return->id)->with('success', _lang('Saved Successfully'));
-        } else {
-            return back()->with('error', _lang('Something going wrong, Please try again'));
-        }
+        return redirect()->route('sales_returns.show', $return->id)->with('success', _lang('Saved Successfully'));
     }
 
     /**
@@ -307,17 +376,23 @@ class SalesReturnController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show(Request $request, $id)
+    public function show($id)
     {
-        $sales_return  = SalesReturn::with(['business', 'items'])->find($id);
-        return view('backend.user.sales_return.view', compact('sales_return'));
-    }
+        $sales_return = SalesReturn::with([
+            'business',
+            'items',
+            'customer',
+            'taxes'
+        ])->find($id);
 
-    public function refund(Request $request, $id)
-    {
-        $salesReturn = SalesReturn::with('customer')->where('id', $id)->first();
+        $attachments = Attachment::where('ref_id', $id)
+            ->where('ref_type', 'sales_return')
+            ->get();
 
-        return view('backend.user.sales_return.refund', compact('salesReturn'));
+        return Inertia::render('Backend/User/SalesReturn/View', [
+            'sales_return' => $sales_return,
+            'attachments' => $attachments,
+        ]);
     }
 
     public function refund_store(Request $request, $id)
@@ -509,13 +584,43 @@ class SalesReturnController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit(Request $request, $id)
+    public function edit($id)
     {
-        $return = SalesReturn::with('items')
+        $sales_return = SalesReturn::with('items')
             ->where('id', $id)
-            ->where('status', '!=', 2)
+            ->where('status', '!=', 1)
             ->first();
-        return view('backend.user.sales_return.edit', compact('return', 'id'));
+
+        if ($sales_return == null) {
+            return back()->with('error', _lang('This sales return is already paid'));
+        }
+
+        // Get required data for the edit form
+        $customers = Customer::all();
+        $currencies = Currency::all();
+        $products = Product::all();
+        $taxes = Tax::all();
+        $accounts = Account::all();
+
+        $paymentTransaction = Transaction::where('ref_type', 's refund')
+            ->where('ref_id', $id)
+            ->first();
+
+        $taxIds = $sales_return->taxes
+            ->pluck('tax_id')
+            ->map(fn($id) => (string) $id)
+            ->toArray();
+
+        return Inertia::render('Backend/User/SalesReturn/Edit', [
+            'sales_return' => $sales_return,
+            'customers' => $customers,
+            'currencies' => $currencies,
+            'products' => $products,
+            'taxes' => $taxes,
+            'accounts' => $accounts,
+            'paymentTransaction' => $paymentTransaction,
+            'taxIds' => $taxIds
+        ]);
     }
 
     /**
@@ -705,15 +810,14 @@ class SalesReturnController extends Controller
                 $transaction->save();
             }
 
-            if (isset($request->taxes[$returnItem->product_id])) {
+            if (isset($request->taxes)) {
                 $returnItem->taxes()->delete();
                 $transaction = Transaction::where('ref_id', $return->id)->where('ref_type', 's return tax')
                     ->get();
                 foreach ($transaction as $t) {
                     $t->delete();
                 }
-
-                foreach ($request->taxes[$returnItem->product_id] as $taxId) {
+                foreach ($request->taxes as $taxId) {
                     $tax = Tax::find($taxId);
 
                     $returnItem->taxes()->save(new SalesReturnItemTax([
@@ -863,11 +967,11 @@ class SalesReturnController extends Controller
         }
         // delete transactions
         $transactions = Transaction::where('ref_id', $return->id)
-			->where(function ($query) {
-				$query->where('ref_type', 's return')
-					->orWhere('ref_type', 's return tax');
-			})
-			->get();
+            ->where(function ($query) {
+                $query->where('ref_type', 's return')
+                    ->orWhere('ref_type', 's return tax');
+            })
+            ->get();
         foreach ($transactions as $transaction) {
             $transaction->delete();
         }

@@ -322,7 +322,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 		// Sales Return
 		Route::resource('sales_returns', SalesReturnController::class);
-		Route::get('sales_returns/refund/{id}', [SalesReturnController::class, 'refund'])->name('sales_returns.refund');
 		Route::post('sales_returns/refund/store/{id}', [SalesReturnController::class, 'refund_store'])->name('sales_returns.refund.store');
 		Route::get('sales_returns/{id}/export_pdf', [SalesReturnController::class, 'export_pdf'])->name('sales_returns.export_pdf');
 		Route::match(['get', 'post'], 'sales_returns/{id}/send_email', [SalesReturnController::class, 'send_email'])->name('sales_returns.send_email');

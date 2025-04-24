@@ -247,7 +247,6 @@ export default function Create({ customers = [], products = [], currencies = [],
         }, 0);
     };
 
-
     const calculateDiscount = () => {
         const subtotal = calculateSubtotal();
         if (data.discount_type === "0") {
@@ -878,7 +877,7 @@ export default function Create({ customers = [], products = [], currencies = [],
                         <SidebarSeparator className="my-4" />
 
                         <div className="grid grid-cols-12 mt-2">
-                            <Label htmlFor="discount_type" className="md:col-span-2 col-span-12">
+                            <Label htmlFor="taxes" className="md:col-span-2 col-span-12">
                                 Tax
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">

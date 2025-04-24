@@ -7,6 +7,7 @@ use App\Http\Middleware\Business;
 use App\Models\AuditLog;
 use App\Models\BusinessSetting;
 use App\Models\Currency;
+use App\Models\Customer;
 use App\Models\EmailTemplate;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
@@ -25,6 +26,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Inertia\Inertia;
 use Validator;
 
 class QuotationController extends Controller
@@ -69,13 +71,56 @@ class QuotationController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        $quotations = Quotation::select('quotations.*')
-            ->with('customer')
-            ->orderBy("quotations.id", "desc")
-            ->get();
-        return view('backend.user.quotation.list', compact('quotations'));
+        $query = Quotation::with('customer');
+
+        // Apply filters if any
+        if ($request->has('filters')) {
+            $filters = $request->filters;
+
+            // Filter by customer
+            if (!empty($filters['customer_id'])) {
+                $query->where('customer_id', $filters['customer_id']);
+            }
+
+            // Filter by status
+            if (isset($filters['status']) && $filters['status'] !== '') {
+                $query->where('status', $filters['status']);
+            }
+
+            // Filter by date range
+            if (!empty($filters['date_range'])) {
+                if (!empty($filters['date_range']['start'])) {
+                    $query->where('quotation_date', '>=', $filters['date_range']['start']);
+                }
+                if (!empty($filters['date_range']['end'])) {
+                    $query->where('quotation_date', '<=', $filters['date_range']['end']);
+                }
+            }
+        }
+
+        // Handle sorting
+        $sortField = $request->get('sort_field', 'id');
+        $sortDirection = $request->get('sort_direction', 'desc');
+        $query->orderBy($sortField, $sortDirection);
+
+        // Handle pagination
+        $perPage = $request->get('per_page', 10);
+        $quotations = $query->paginate($perPage);
+
+        return Inertia::render('Backend/User/Quotation/List', [
+            'quotations' => $quotations->items(),
+            'meta' => [
+                'total' => $quotations->total(),
+                'per_page' => $quotations->perPage(),
+                'current_page' => $quotations->currentPage(),
+                'last_page' => $quotations->lastPage(),
+                'from' => $quotations->firstItem(),
+                'to' => $quotations->lastItem(),
+            ],
+            'filters' => $request->filters ?? []
+        ]);
     }
 
     /**
@@ -83,9 +128,21 @@ class QuotationController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create(Request $request)
+    public function create()
     {
-        return view('backend.user.quotation.create');
+        $quotation_title = get_business_option('quotation_title', 'Quotation');
+        $customers = Customer::all();
+        $currencies = Currency::all();
+        $products = Product::all();
+        $taxes = Tax::all();
+
+        return Inertia::render('Backend/User/Quotation/Create', [
+            'customers' => $customers,
+            'currencies' => $currencies,
+            'products' => $products,
+            'taxes' => $taxes,
+            'quotation_title' => $quotation_title,
+        ]);
     }
 
     /**
@@ -102,7 +159,6 @@ class QuotationController extends Controller
             'quotation_date'   => 'required',
             'expired_date'     => 'required',
             'product_id'       => 'required',
-            'template'         => 'required',
             'currency'          => 'required',
         ], [
             'product_id.required' => _lang('You must add at least one item'),
@@ -144,7 +200,7 @@ class QuotationController extends Controller
         $quotation->discount_type    = $request->input('discount_type');
         $quotation->discount_value   = $request->input('discount_value') ?? 0;
         $quotation->template_type    = is_numeric($request->template) ? 1 : 0;
-        $quotation->template         = $request->input('template');
+        $quotation->template         = $request->input('template') ?? 'default';
         $quotation->note             = $request->input('note');
         $quotation->footer           = $request->input('footer');
         $quotation->short_code       = rand(100000, 9999999) . uniqid();
@@ -162,8 +218,8 @@ class QuotationController extends Controller
                 'sub_total'    => ($request->unit_cost[$i] * $request->quantity[$i]),
             ]));
 
-            if (isset($request->taxes[$quotationItem->product_id])) {
-                foreach ($request->taxes[$quotationItem->product_id] as $taxId) {
+            if (isset($request->taxes)) {
+                foreach ($request->taxes as $taxId) {
                     $tax = Tax::find($taxId);
 
                     $quotationItem->taxes()->save(new quotationItemTax([
@@ -199,10 +255,11 @@ class QuotationController extends Controller
      */
     public function show(Request $request, $id)
     {
-        $alert_col = 'col-lg-8 offset-lg-2';
-        $assets    = ['summernote'];
-        $quotation = quotation::with(['business', 'items'])->find($id);
-        return view('backend.user.quotation.view', compact('quotation', 'id', 'alert_col', 'assets'));
+        $quotation = quotation::with(['business', 'items', 'customer', 'taxes'])->find($id);
+
+        return Inertia::render('Backend/User/Quotation/View', [
+            'quotation' => $quotation,
+        ]);
     }
 
     public function get_quotation_link(Request $request, $id)
@@ -289,7 +346,28 @@ class QuotationController extends Controller
     public function edit(Request $request, $id)
     {
         $quotation = Quotation::with('items')->find($id);
-        return view('backend.user.quotation.edit', compact('quotation', 'id'));
+        $taxIds = $quotation->taxes
+            ->pluck('tax_id')
+            ->map(fn($id) => (string) $id)
+            ->toArray();
+
+        // Get required data for the edit form
+        $customers = Customer::all();
+        $currencies = Currency::all();
+        $products = Product::all();
+        $taxes = Tax::all();
+
+        $decimalPlace = get_business_option('decimal_place', 2);
+
+        return Inertia::render('Backend/User/Quotation/Edit', [
+            'quotation' => $quotation,
+            'customers' => $customers,
+            'currencies' => $currencies,
+            'products' => $products,
+            'taxes' => $taxes,
+            'decimalPlace' => $decimalPlace,
+            'taxIds' => $taxIds
+        ]);
     }
 
     /**
@@ -366,9 +444,9 @@ class QuotationController extends Controller
                 'sub_total'    => ($request->unit_cost[$i] * $request->quantity[$i]),
             ]));
 
-            if (isset($request->taxes[$quotationItem->product_id])) {
+            if (isset($request->taxes)) {
                 $quotationItem->taxes()->delete();
-                foreach ($request->taxes[$quotationItem->product_id] as $taxId) {
+                foreach ($request->taxes as $taxId) {
                     $tax = Tax::find($taxId);
 
                     $quotationItem->taxes()->save(new quotationItemTax([
@@ -390,11 +468,7 @@ class QuotationController extends Controller
         $audit->event = 'Quotation Updated' . ' ' . $quotation->quotation_number;
         $audit->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('quotations.index')->with('success', _lang('Updated Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $quotation, 'table' => '#quotations_table']);
-        }
+        return redirect()->route('quotations.index')->with('success', _lang('Updated Successfully'));
     }
 
     /** Duplicate Invoice */
