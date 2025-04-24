@@ -347,7 +347,7 @@ export function UserSidebar({ businesses, active_business, ...props }) {
             icon: Building2Icon,
             isActive: isRoute("reports.journal") || isRoute("reports.ledger") || isRoute("reports.income_statement") ||
                 isRoute("reports.trial_balance") || isRoute("reports.balance_sheet") || isRoute("reports.receivables") ||
-                isRoute("reports.payables") || isRoute("reports.payroll_summary") || isRoute("reports.payroll_report") || isRoute("reports.income_by_customer"),
+                isRoute("reports.payables") || isRoute("reports.payroll_summary") || isRoute("reports.payroll_cost") || isRoute("reports.income_by_customer"),
             items: [
                 {
                     title: "General Journal",
@@ -396,8 +396,8 @@ export function UserSidebar({ businesses, active_business, ...props }) {
                 },
                 {
                     title: "Monthly Payroll Cost",
-                    url: route("reports.payroll_report"),
-                    isActive: isRoute("reports.payroll_report"),
+                    url: route("reports.payroll_cost"),
+                    isActive: isRoute("reports.payroll_cost"),
                 }
             ]
         },

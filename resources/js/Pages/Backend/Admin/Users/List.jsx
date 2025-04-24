@@ -28,7 +28,8 @@ import {
 
 const DeleteUserModal = ({ show, onClose, onConfirm, processing }) => (
     <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm} className="p-6">
+        <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">   
                 Are you sure you want to delete this user?
             </h2>

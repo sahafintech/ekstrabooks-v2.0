@@ -47,7 +47,8 @@ import { cn } from "@/lib/utils";
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <form onSubmit={onConfirm} className="p-6">
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this leave record?
       </h2>
@@ -75,7 +76,8 @@ const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
 // Bulk Delete Confirmation Modal Component
 const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-    <form onSubmit={onConfirm} className="p-6">
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected leave record{count !== 1 ? 's' : ''}?
       </h2>

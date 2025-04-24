@@ -30,7 +30,8 @@ import Modal from "@/Components/Modal";
 // Delete Confirmation Modal Component
 const DeleteUserModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <form onSubmit={onConfirm} className="p-6">
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this user?
       </h2>
@@ -58,7 +59,8 @@ const DeleteUserModal = ({ show, onClose, onConfirm, processing }) => (
 // Bulk Delete Confirmation Modal Component
 const DeleteAllUsersModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-    <form onSubmit={onConfirm} className="p-6">
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected user{count !== 1 ? 's' : ''}?
       </h2>
@@ -86,7 +88,8 @@ const DeleteAllUsersModal = ({ show, onClose, onConfirm, processing, count }) =>
 // change role modal
 const ChangeRoleModal = ({ show, onClose, onConfirm, processing, user }) => (
   <Modal show={show} onClose={onClose}>
-    <form onSubmit={onConfirm} className="p-6">
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Change Role for {user.name}
       </h2>

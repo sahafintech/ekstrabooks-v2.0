@@ -46,7 +46,8 @@ import { format } from "date-fns";
 
 const DeleteSalesReturnModal = ({ show, onClose, onConfirm, processing }) => (
     <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm} className="p-6">
+        <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
                 Are you sure you want to delete this sales return?
             </h2>
@@ -73,7 +74,8 @@ const DeleteSalesReturnModal = ({ show, onClose, onConfirm, processing }) => (
 
 const RefundSalesReturnModal = ({ show, onClose, onConfirm, processing, accounts, refundDate, setRefundDate, refundAmount, setRefundAmount, paymentAccount, setPaymentAccount, errors }) => (
     <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm} className="p-6">
+        <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
             <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
                 <div>
                     <div className="grid grid-cols-12 mt-2">
@@ -235,7 +237,8 @@ const ImportSalesReturnModal = ({ show, onClose, onSubmit, processing }) => (
 
 const DeleteAllSalesReturnModal = ({ show, onClose, onConfirm, processing, count }) => (
     <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm} className="p-6">
+        <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
                 Are you sure you want to delete {count} selected sales return{count !== 1 ? 's' : ''}?
             </h2>

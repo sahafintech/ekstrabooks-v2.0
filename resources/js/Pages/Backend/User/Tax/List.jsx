@@ -39,7 +39,8 @@ import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
     <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm} className="p-6">
+        <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
                 Are you sure you want to delete this tax?
             </h2>
@@ -67,7 +68,8 @@ const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
 // Bulk Delete Confirmation Modal Component
 const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, count }) => (
     <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm} className="p-6">
+        <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
                 Are you sure you want to delete {count} selected tax{count !== 1 ? 'es' : ''}?
             </h2>

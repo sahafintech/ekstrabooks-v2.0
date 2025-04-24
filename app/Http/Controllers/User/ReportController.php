@@ -1001,14 +1001,14 @@ class ReportController extends Controller
 			@ini_set('max_execution_time', 0);
 			@set_time_limit(0);
 
-			$data = array();
+			$report_data = array();
 			$date1 = Carbon::now()->startOfMonth();
 			$date2 = Carbon::now();
 
 			session(['start_date' => $date1]);
 			session(['end_date' => $date2]);
 
-			$data['report_data']['fixed_asset'] = Account::where(function ($query) {
+			$report_data['fixed_asset'] = Account::where(function ($query) {
 				$query->where('account_type', 'Fixed Asset');
 			})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
@@ -1031,7 +1031,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['current_asset'] = Account::where(function ($query) {
+			$report_data['current_asset'] = Account::where(function ($query) {
 				$query->where('account_type', '=', 'Bank')
 					->orWhere('account_type', '=', 'Cash')
 					->orWhere('account_type', '=', 'Other Current Asset');
@@ -1056,7 +1056,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['current_liability'] = Account::where(function ($query) {
+			$report_data['current_liability'] = Account::where(function ($query) {
 				$query->where('account_type', 'Current Liability');
 			})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
@@ -1079,7 +1079,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['long_term_liability'] = Account::where(function ($query) {
+			$report_data['long_term_liability'] = Account::where(function ($query) {
 				$query->where('account_type', 'Long Term Liability');
 			})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
@@ -1102,7 +1102,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['equity'] = Account::where(function ($query) {
+			$report_data['equity'] = Account::where(function ($query) {
 				$query->where('account_type', 'Equity');
 			})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
@@ -1125,7 +1125,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['sales_and_income'] = Account::where(function ($query) {
+			$report_data['sales_and_income'] = Account::where(function ($query) {
 				$query->where('account_type', 'Other Income')
 					->orWhere('account_type', 'Sales');
 			})
@@ -1149,7 +1149,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['cost_of_sale'] = Account::where('account_type', 'Cost Of Sale')
+			$report_data['cost_of_sale'] = Account::where('account_type', 'Cost Of Sale')
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -1170,7 +1170,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['direct_expenses'] = Account::where('account_type', 'Direct Expenses')
+			$report_data['direct_expenses'] = Account::where('account_type', 'Direct Expenses')
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -1191,7 +1191,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['other_expenses'] = Account::where('account_type', 'Other Expenses')
+			$report_data['other_expenses'] = Account::where('account_type', 'Other Expenses')
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -1215,71 +1215,76 @@ class ReportController extends Controller
 			$total_debit = 0;
 			$total_credit = 0;
 
-			foreach ($data['report_data']['fixed_asset'] as $fixed_asset) {
+			foreach ($report_data['fixed_asset'] as $fixed_asset) {
 				$total_debit += $fixed_asset->dr_amount;
 				$total_credit += $fixed_asset->cr_amount;
 			}
 
-			foreach ($data['report_data']['current_asset'] as $current_asset) {
+			foreach ($report_data['current_asset'] as $current_asset) {
 				$total_debit += $current_asset->dr_amount;
 				$total_credit += $current_asset->cr_amount;
 			}
 
-			foreach ($data['report_data']['current_liability'] as $current_liability) {
+			foreach ($report_data['current_liability'] as $current_liability) {
 				$total_debit += $current_liability->dr_amount;
 				$total_credit += $current_liability->cr_amount;
 			}
 
-			foreach ($data['report_data']['long_term_liability'] as $long_term_liability) {
+			foreach ($report_data['long_term_liability'] as $long_term_liability) {
 				$total_debit += $long_term_liability->dr_amount;
 				$total_credit += $long_term_liability->cr_amount;
 			}
 
-			foreach ($data['report_data']['equity'] as $equity) {
+			foreach ($report_data['equity'] as $equity) {
 				$total_debit += $equity->dr_amount;
 				$total_credit += $equity->cr_amount;
 			}
 
-			foreach ($data['report_data']['sales_and_income'] as $sales_and_income) {
+			foreach ($report_data['sales_and_income'] as $sales_and_income) {
 				$total_debit += $sales_and_income->dr_amount;
 				$total_credit += $sales_and_income->cr_amount;
 			}
 
-			foreach ($data['report_data']['cost_of_sale'] as $cost_of_sale) {
+			foreach ($report_data['cost_of_sale'] as $cost_of_sale) {
 				$total_debit += $cost_of_sale->dr_amount;
 				$total_credit += $cost_of_sale->cr_amount;
 			}
 
-			foreach ($data['report_data']['direct_expenses'] as $direct_expenses) {
+			foreach ($report_data['direct_expenses'] as $direct_expenses) {
 				$total_debit += $direct_expenses->dr_amount;
 				$total_credit += $direct_expenses->cr_amount;
 			}
 
-			foreach ($data['report_data']['other_expenses'] as $other_expenses) {
+			foreach ($report_data['other_expenses'] as $other_expenses) {
 				$total_debit += $other_expenses->dr_amount;
 				$total_credit += $other_expenses->cr_amount;
 			}
 
-			$data['total_debit'] = $total_debit;
-			$data['total_credit'] = $total_credit;
+			$report_data['total_debit'] = $total_debit;
+			$report_data['total_credit'] = $total_credit;
 
-			$data['date1'] = $date1;
-			$data['date2'] = $date2;
-			$data['page_title'] = _lang('Trial Balance');
+			$base_currency = $request->activeBusiness->currency;
+			$business_name = $request->activeBusiness->name;
 
-			return view('backend.user.reports.trial_balance', $data);
+			return Inertia::render('Backend/User/Reports/TrialBalance', [
+				'report_data' => $report_data,
+				'base_currency' => $base_currency,
+				'business_name' => $business_name,
+				'date1' => $date1,
+				'date2' => $date2,
+			]);
 		} else if ($request->isMethod('post')) {
 			@ini_set('max_execution_time', 0);
 			@set_time_limit(0);
 
-			$data = array();
+			$report_data = array();
 			$date1 = Carbon::parse($request->date1)->format('Y-m-d');
 			$date2 = Carbon::parse($request->date2)->format('Y-m-d');
 
 			session(['start_date' => $date1]);
 			session(['end_date' => $date2]);
 
-			$data['report_data']['fixed_asset'] = Account::where(function ($query) {
+			$report_data['fixed_asset'] = Account::where(function ($query) {
 				$query->where('account_type', 'Fixed Asset');
 			})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
@@ -1302,7 +1307,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['current_asset'] = Account::where(function ($query) {
+			$report_data['current_asset'] = Account::where(function ($query) {
 				$query->where('account_type', '=', 'Bank')
 					->orWhere('account_type', '=', 'Cash')
 					->orWhere('account_type', '=', 'Other Current Asset');
@@ -1327,7 +1332,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['current_liability'] = Account::where(function ($query) {
+			$report_data['current_liability'] = Account::where(function ($query) {
 				$query->where('account_type', 'Current Liability');
 			})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
@@ -1350,7 +1355,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['long_term_liability'] = Account::where(function ($query) {
+			$report_data['long_term_liability'] = Account::where(function ($query) {
 				$query->where('account_type', 'Long Term Liability');
 			})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
@@ -1373,7 +1378,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['equity'] = Account::where(function ($query) {
+			$report_data['equity'] = Account::where(function ($query) {
 				$query->where('account_type', 'Equity');
 			})
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
@@ -1396,7 +1401,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['sales_and_income'] = Account::where(function ($query) {
+			$report_data['sales_and_income'] = Account::where(function ($query) {
 				$query->where('account_type', 'Other Income')
 					->orWhere('account_type', 'Sales');
 			})
@@ -1420,7 +1425,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['cost_of_sale'] = Account::where('account_type', 'Cost Of Sale')
+			$report_data['cost_of_sale'] = Account::where('account_type', 'Cost Of Sale')
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -1441,7 +1446,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['direct_expenses'] = Account::where('account_type', 'Direct Expenses')
+			$report_data['direct_expenses'] = Account::where('account_type', 'Direct Expenses')
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -1462,7 +1467,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['other_expenses'] = Account::where('account_type', 'Other Expenses')
+			$report_data['other_expenses'] = Account::where('account_type', 'Other Expenses')
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -1486,57 +1491,64 @@ class ReportController extends Controller
 			$total_debit = 0;
 			$total_credit = 0;
 
-			foreach ($data['report_data']['fixed_asset'] as $fixed_asset) {
+			foreach ($report_data['fixed_asset'] as $fixed_asset) {
 				$total_debit += $fixed_asset->dr_amount;
 				$total_credit += $fixed_asset->cr_amount;
 			}
 
-			foreach ($data['report_data']['current_asset'] as $current_asset) {
+			foreach ($report_data['current_asset'] as $current_asset) {
 				$total_debit += $current_asset->dr_amount;
 				$total_credit += $current_asset->cr_amount;
 			}
 
-			foreach ($data['report_data']['current_liability'] as $current_liability) {
+			foreach ($report_data['current_liability'] as $current_liability) {
 				$total_debit += $current_liability->dr_amount;
 				$total_credit += $current_liability->cr_amount;
 			}
 
-			foreach ($data['report_data']['long_term_liability'] as $long_term_liability) {
+			foreach ($report_data['long_term_liability'] as $long_term_liability) {
 				$total_debit += $long_term_liability->dr_amount;
 				$total_credit += $long_term_liability->cr_amount;
 			}
 
-			foreach ($data['report_data']['equity'] as $equity) {
+			foreach ($report_data['equity'] as $equity) {
 				$total_debit += $equity->dr_amount;
 				$total_credit += $equity->cr_amount;
 			}
 
-			foreach ($data['report_data']['sales_and_income'] as $sales_and_income) {
+			foreach ($report_data['sales_and_income'] as $sales_and_income) {
 				$total_debit += $sales_and_income->dr_amount;
 				$total_credit += $sales_and_income->cr_amount;
 			}
 
-			foreach ($data['report_data']['cost_of_sale'] as $cost_of_sale) {
+			foreach ($report_data['cost_of_sale'] as $cost_of_sale) {
 				$total_debit += $cost_of_sale->dr_amount;
 				$total_credit += $cost_of_sale->cr_amount;
 			}
 
-			foreach ($data['report_data']['direct_expenses'] as $direct_expenses) {
+			foreach ($report_data['direct_expenses'] as $direct_expenses) {
 				$total_debit += $direct_expenses->dr_amount;
 				$total_credit += $direct_expenses->cr_amount;
 			}
 
-			foreach ($data['report_data']['other_expenses'] as $other_expenses) {
+			foreach ($report_data['other_expenses'] as $other_expenses) {
 				$total_debit += $other_expenses->dr_amount;
 				$total_credit += $other_expenses->cr_amount;
 			}
 
-			$data['date1'] = Carbon::parse($request->date1);
-			$data['date2'] = Carbon::parse($request->date2);
-			$data['total_debit'] = $total_debit;
-			$data['total_credit'] = $total_credit;
-			$data['page_title'] = _lang('Trial Balance');
-			return view('backend.user.reports.trial_balance', $data);
+			$date1 = Carbon::parse($request->date1);
+			$date2 = Carbon::parse($request->date2);
+			$report_data['total_debit'] = $total_debit;
+			$report_data['total_credit'] = $total_credit;
+			$base_currency = $request->activeBusiness->currency;
+			$business_name = $request->activeBusiness->name;
+			return Inertia::render('Backend/User/Reports/TrialBalance', [
+				'report_data' => $report_data,
+				'date1' => $date1,
+				'date2' => $date2,
+				'base_currency' => $base_currency,
+				'business_name' => $business_name,
+			]);
 		}
 	}
 
@@ -1546,12 +1558,12 @@ class ReportController extends Controller
 			@ini_set('max_execution_time', 0);
 			@set_time_limit(0);
 
-			$data = array();
+			$report_data = array();
 			$date2 = Carbon::now();
 
 			session(['end_date' => $date2]);
 
-			$data['report_data']['fixed_asset'] = Account::where(function ($query) {
+			$report_data['fixed_asset'] = Account::where(function ($query) {
 				$query->where('account_type', 'Fixed Asset');
 			})
 				->whereHas('transactions', function ($query) use ($date2) {
@@ -1570,7 +1582,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['current_asset'] = Account::where(function ($query) {
+			$report_data['current_asset'] = Account::where(function ($query) {
 				$query->where('account_type', '=', 'Bank')
 					->orWhere('account_type', '=', 'Cash')
 					->orWhere('account_type', '=', 'Other Current Asset');
@@ -1594,7 +1606,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['current_liability'] = Account::where(function ($query) {
+			$report_data['current_liability'] = Account::where(function ($query) {
 				$query->where('account_type', 'Current Liability');
 			})
 				->where(function ($query) {
@@ -1617,7 +1629,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['long_term_liability'] = Account::where(function ($query) {
+			$report_data['long_term_liability'] = Account::where(function ($query) {
 				$query->where('account_type', 'Long Term Liability');
 			})
 				->where(function ($query) {
@@ -1640,7 +1652,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['equity'] = Account::where(function ($query) {
+			$report_data['equity'] = Account::where(function ($query) {
 				$query->where('account_type', 'Equity');
 			})
 				->where(function ($query) {
@@ -1663,7 +1675,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['sales_and_income'] = Account::where(function ($query) {
+			$report_data['sales_and_income'] = Account::where(function ($query) {
 				$query->where('account_type', 'Other Income')
 					->orWhere('account_type', 'Sales');
 			})
@@ -1683,7 +1695,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['cost_of_sale'] = Account::where('account_type', 'Cost Of Sale')
+			$report_data['cost_of_sale'] = Account::where('account_type', 'Cost Of Sale')
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
@@ -1700,7 +1712,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['direct_expenses'] = Account::where('account_type', 'Direct Expenses')
+			$report_data['direct_expenses'] = Account::where('account_type', 'Direct Expenses')
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
@@ -1717,7 +1729,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['other_expenses'] = Account::where('account_type', 'Other Expenses')
+			$report_data['other_expenses'] = Account::where('account_type', 'Other Expenses')
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
@@ -1755,83 +1767,84 @@ class ReportController extends Controller
 			$total_debit_other_expenses = 0;
 			$total_credit_other_expenses = 0;
 
-			foreach ($data['report_data']['sales_and_income'] as $sales_and_income) {
+			foreach ($report_data['sales_and_income'] as $sales_and_income) {
 				$total_debit_sales_and_income += $sales_and_income->dr_amount;
 				$total_credit_sales_and_income += $sales_and_income->cr_amount;
 			}
 
-			foreach ($data['report_data']['cost_of_sale'] as $cost_of_sale) {
+			foreach ($report_data['cost_of_sale'] as $cost_of_sale) {
 				$total_debit_cost_of_sale += $cost_of_sale->dr_amount;
 				$total_credit_cost_of_sale += $cost_of_sale->cr_amount;
 			}
 
-			foreach ($data['report_data']['direct_expenses'] as $direct_expenses) {
+			foreach ($report_data['direct_expenses'] as $direct_expenses) {
 				$total_debit_direct_expenses += $direct_expenses->dr_amount;
 				$total_credit_direct_expenses += $direct_expenses->cr_amount;
 			}
 
-			foreach ($data['report_data']['other_expenses'] as $other_expenses) {
+			foreach ($report_data['other_expenses'] as $other_expenses) {
 				$total_debit_other_expenses += $other_expenses->dr_amount;
 				$total_credit_other_expenses += $other_expenses->cr_amount;
 			}
 
-			$income_statement = (($data['report_data']['sales_and_income']->sum('cr_amount') - $data['report_data']['sales_and_income']->sum('dr_amount')) - ($data['report_data']['cost_of_sale']->sum('dr_amount') - $data['report_data']['cost_of_sale']->sum('cr_amount'))) - ((($data['report_data']['direct_expenses']->sum('dr_amount') - $data['report_data']['direct_expenses']->sum('cr_amount'))) + (($data['report_data']['other_expenses']->sum('dr_amount') - $data['report_data']['other_expenses']->sum('cr_amount'))));
+			$income_statement = (($report_data['sales_and_income']->sum('cr_amount') - $report_data['sales_and_income']->sum('dr_amount')) - ($report_data['cost_of_sale']->sum('dr_amount') - $report_data['cost_of_sale']->sum('cr_amount'))) - ((($report_data['direct_expenses']->sum('dr_amount') - $report_data['direct_expenses']->sum('cr_amount'))) + (($report_data['other_expenses']->sum('dr_amount') - $report_data['other_expenses']->sum('cr_amount'))));
 
-			foreach ($data['report_data']['fixed_asset'] as $fixed_asset) {
+			foreach ($report_data['fixed_asset'] as $fixed_asset) {
 				$total_debit_asset += $fixed_asset->dr_amount;
 				$total_credit_asset += $fixed_asset->cr_amount;
 			}
 
-			foreach ($data['report_data']['current_asset'] as $current_asset) {
+			foreach ($report_data['current_asset'] as $current_asset) {
 				$total_debit_asset += $current_asset->dr_amount;
 				$total_credit_asset += $current_asset->cr_amount;
 			}
 
-			foreach ($data['report_data']['current_liability'] as $current_liability) {
+			foreach ($report_data['current_liability'] as $current_liability) {
 				$total_debit_liability += $current_liability->dr_amount;
 				$total_credit_liability += $current_liability->cr_amount;
 			}
 
-			foreach ($data['report_data']['long_term_liability'] as $long_term_liability) {
+			foreach ($report_data['long_term_liability'] as $long_term_liability) {
 				$total_debit_liability += $long_term_liability->dr_amount;
 				$total_credit_liability += $long_term_liability->cr_amount;
 			}
 
-			foreach ($data['report_data']['equity'] as $equity) {
+			foreach ($report_data['equity'] as $equity) {
 				$total_debit_equity += $equity->dr_amount;
 				$total_credit_equity += $equity->cr_amount;
 			}
 
-			$data['report_data']['equity'][] = (object) [
+			$report_data['equity'][] = (object) [
 				'account_code' => '',
 				'account_name' => 'Profit & Loss',
 				'dr_amount' => $total_debit_sales_and_income + $total_debit_cost_of_sale + $total_debit_direct_expenses + $total_debit_other_expenses,
 				'cr_amount' => $total_credit_sales_and_income + $total_credit_cost_of_sale + $total_credit_direct_expenses + $total_credit_other_expenses,
 			];
 
-			$data['date2'] = $date2;
-			$data['total_debit_asset'] = $total_debit_asset;
-			$data['total_credit_asset'] = $total_credit_asset;
-			$data['total_debit_liability'] = $total_debit_liability;
-			$data['total_credit_liability'] = $total_credit_liability;
-			$data['total_debit_equity'] = $total_debit_equity;
-			$data['total_credit_equity'] = $total_credit_equity;
-			$data['income_statement'] = $income_statement;
-			$data['page_title'] = _lang('Balance Sheet');
+			$report_data['total_debit_asset'] = $total_debit_asset;
+			$report_data['total_credit_asset'] = $total_credit_asset;
+			$report_data['total_debit_liability'] = $total_debit_liability;
+			$report_data['total_credit_liability'] = $total_credit_liability;
+			$report_data['total_debit_equity'] = $total_debit_equity;
+			$report_data['total_credit_equity'] = $total_credit_equity;
+			$report_data['income_statement'] = $income_statement;
 
-			return view('backend.user.reports.balance_sheet', $data);
+			return Inertia::render('Backend/User/Reports/BalanceSheet', [
+				'report_data' => $report_data,
+				'date2' => $date2,
+				'base_currency' => $request->activeBusiness->currency,
+				'business_name' => $request->activeBusiness->name
+			]);
 		} else if ($request->isMethod('post')) {
 			@ini_set('max_execution_time', 0);
 			@set_time_limit(0);
 
-			$data = array();
-			$date1 = Carbon::parse($request->date1)->format('Y-m-d');
+			$report_data = array();
 			$date2 = Carbon::parse($request->date2)->format('Y-m-d');
 
-			session(['start_date' => $date1]);
 			session(['end_date' => $date2]);
 
-			$data['report_data']['fixed_asset'] = Account::where(function ($query) {
+			$report_data['fixed_asset'] = Account::where(function ($query) {
 				$query->where('account_type', 'Fixed Asset');
 			})
 				->whereHas('transactions', function ($query) use ($date2) {
@@ -1850,7 +1863,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['current_asset'] = Account::where(function ($query) {
+			$report_data['current_asset'] = Account::where(function ($query) {
 				$query->where('account_type', '=', 'Bank')
 					->orWhere('account_type', '=', 'Cash')
 					->orWhere('account_type', '=', 'Other Current Asset');
@@ -1874,7 +1887,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['current_liability'] = Account::where(function ($query) {
+			$report_data['current_liability'] = Account::where(function ($query) {
 				$query->where('account_type', 'Current Liability');
 			})
 				->where(function ($query) {
@@ -1897,7 +1910,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['long_term_liability'] = Account::where(function ($query) {
+			$report_data['long_term_liability'] = Account::where(function ($query) {
 				$query->where('account_type', 'Long Term Liability');
 			})
 				->where(function ($query) {
@@ -1920,7 +1933,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['equity'] = Account::where(function ($query) {
+			$report_data['equity'] = Account::where(function ($query) {
 				$query->where('account_type', 'Equity');
 			})
 				->where(function ($query) {
@@ -1943,7 +1956,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['sales_and_income'] = Account::where(function ($query) {
+			$report_data['sales_and_income'] = Account::where(function ($query) {
 				$query->where('account_type', 'Other Income')
 					->orWhere('account_type', 'Sales');
 			})
@@ -1963,7 +1976,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['cost_of_sale'] = Account::where('account_type', 'Cost Of Sale')
+			$report_data['cost_of_sale'] = Account::where('account_type', 'Cost Of Sale')
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
@@ -1980,7 +1993,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['direct_expenses'] = Account::where('account_type', 'Direct Expenses')
+			$report_data['direct_expenses'] = Account::where('account_type', 'Direct Expenses')
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
@@ -1997,7 +2010,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['other_expenses'] = Account::where('account_type', 'Other Expenses')
+			$report_data['other_expenses'] = Account::where('account_type', 'Other Expenses')
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
@@ -2035,72 +2048,75 @@ class ReportController extends Controller
 			$total_debit_other_expenses = 0;
 			$total_credit_other_expenses = 0;
 
-			foreach ($data['report_data']['sales_and_income'] as $sales_and_income) {
+			foreach ($report_data['sales_and_income'] as $sales_and_income) {
 				$total_debit_sales_and_income += $sales_and_income->dr_amount;
 				$total_credit_sales_and_income += $sales_and_income->cr_amount;
 			}
 
-			foreach ($data['report_data']['cost_of_sale'] as $cost_of_sale) {
+			foreach ($report_data['cost_of_sale'] as $cost_of_sale) {
 				$total_debit_cost_of_sale += $cost_of_sale->dr_amount;
 				$total_credit_cost_of_sale += $cost_of_sale->cr_amount;
 			}
 
-			foreach ($data['report_data']['direct_expenses'] as $direct_expenses) {
+			foreach ($report_data['direct_expenses'] as $direct_expenses) {
 				$total_debit_direct_expenses += $direct_expenses->dr_amount;
 				$total_credit_direct_expenses += $direct_expenses->cr_amount;
 			}
 
-			foreach ($data['report_data']['other_expenses'] as $other_expenses) {
+			foreach ($report_data['other_expenses'] as $other_expenses) {
 				$total_debit_other_expenses += $other_expenses->dr_amount;
 				$total_credit_other_expenses += $other_expenses->cr_amount;
 			}
 
 			$income_statement = $total_credit_sales_and_income + $total_credit_cost_of_sale + $total_credit_direct_expenses + $total_credit_other_expenses - ($total_debit_sales_and_income + $total_debit_cost_of_sale + $total_debit_direct_expenses + $total_debit_other_expenses);
 
-			foreach ($data['report_data']['fixed_asset'] as $fixed_asset) {
+			foreach ($report_data['fixed_asset'] as $fixed_asset) {
 				$total_debit_asset += $fixed_asset->dr_amount;
 				$total_credit_asset += $fixed_asset->cr_amount;
 			}
 
-			foreach ($data['report_data']['current_asset'] as $current_asset) {
+			foreach ($report_data['current_asset'] as $current_asset) {
 				$total_debit_asset += $current_asset->dr_amount;
 				$total_credit_asset += $current_asset->cr_amount;
 			}
 
-			foreach ($data['report_data']['current_liability'] as $current_liability) {
+			foreach ($report_data['current_liability'] as $current_liability) {
 				$total_debit_liability += $current_liability->dr_amount;
 				$total_credit_liability += $current_liability->cr_amount;
 			}
 
-			foreach ($data['report_data']['long_term_liability'] as $long_term_liability) {
+			foreach ($report_data['long_term_liability'] as $long_term_liability) {
 				$total_debit_liability += $long_term_liability->dr_amount;
 				$total_credit_liability += $long_term_liability->cr_amount;
 			}
 
-			foreach ($data['report_data']['equity'] as $equity) {
+			foreach ($report_data['equity'] as $equity) {
 				$total_debit_equity += $equity->dr_amount;
 				$total_credit_equity += $equity->cr_amount;
 			}
 
-			$data['report_data']['equity'][] = (object) [
+			$report_data['equity'][] = (object) [
 				'account_code' => '',
 				'account_name' => 'Profit & Loss',
 				'dr_amount' => $total_debit_sales_and_income + $total_debit_cost_of_sale + $total_debit_direct_expenses + $total_debit_other_expenses,
 				'cr_amount' => $total_credit_sales_and_income + $total_credit_cost_of_sale + $total_credit_direct_expenses + $total_credit_other_expenses,
 			];
 
-			$data['date1'] = Carbon::parse($date1);
-			$data['date2'] = Carbon::parse($date2);
-			$data['total_debit_asset'] = $total_debit_asset;
-			$data['total_credit_asset'] = $total_credit_asset;
-			$data['total_debit_liability'] = $total_debit_liability;
-			$data['total_credit_liability'] = $total_credit_liability;
-			$data['total_debit_equity'] = $total_debit_equity;
-			$data['total_credit_equity'] = $total_credit_equity;
-			$data['income_statement'] = $income_statement;
-			$data['page_title'] = _lang('Balance Sheet');
+			$date2 = Carbon::parse($date2);
+			$report_data['total_debit_asset'] = $total_debit_asset;
+			$report_data['total_credit_asset'] = $total_credit_asset;
+			$report_data['total_debit_liability'] = $total_debit_liability;
+			$report_data['total_credit_liability'] = $total_credit_liability;
+			$report_data['total_debit_equity'] = $total_debit_equity;
+			$report_data['total_credit_equity'] = $total_credit_equity;
+			$report_data['income_statement'] = $income_statement;
 
-			return view('backend.user.reports.balance_sheet', $data);
+			return Inertia::render('Backend/User/Reports/BalanceSheet', [
+				'report_data' => $report_data,
+				'date2' => $date2,
+				'base_currency' => $request->activeBusiness->base_currency,
+				'business_name' => $request->activeBusiness->name,
+			]);
 		}
 	}
 
@@ -2152,14 +2168,14 @@ class ReportController extends Controller
 	public function income_statement(Request $request)
 	{
 		if ($request->isMethod('get')) {
-			$data = array();
+			$report_data = array();
 
 			$date1 = $date1 = Carbon::now()->startOfMonth();
 			$date2 = Carbon::now();
 
 			session(['end_date' => $date2]);
 
-			$data['report_data']['sales_and_income'] = Account::where(function ($query) {
+			$report_data['sales_and_income'] = Account::where(function ($query) {
 				$query->where('account_type', 'Other Income')
 					->orWhere('account_type', 'Sales');
 			})
@@ -2183,7 +2199,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['cost_of_sale'] = Account::where('account_type', 'Cost Of Sale')
+			$report_data['cost_of_sale'] = Account::where('account_type', 'Cost Of Sale')
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -2204,7 +2220,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['direct_expenses'] = Account::where('account_type', 'Direct Expenses')
+			$report_data['direct_expenses'] = Account::where('account_type', 'Direct Expenses')
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -2225,7 +2241,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['other_expenses'] = Account::where('account_type', 'Other Expenses')
+			$report_data['other_expenses'] = Account::where('account_type', 'Other Expenses')
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -2246,11 +2262,13 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['date1'] = $date1;
-			$data['date2'] = $date2;
-			$data['page_title'] = _lang('Income Statement');
-
-			return view('backend.user.reports.income_statement', $data);
+			return Inertia::render('Backend/User/Reports/IncomeStatement', [
+				'report_data' => $report_data,
+				'date1' => $date1,
+				'date2' => $date2,
+				'base_currency' => $request->activeBusiness->currency,
+				'business_name' => $request->activeBusiness->name,
+			]);
 		} else if ($request->isMethod('post')) {
 			@ini_set('max_execution_time', 0);
 			@set_time_limit(0);
@@ -2261,7 +2279,7 @@ class ReportController extends Controller
 			session(['start_date' => $date1]);
 			session(['end_date' => $date2]);
 
-			$data['report_data']['sales_and_income'] = Account::where(function ($query) {
+			$report_data['sales_and_income'] = Account::where(function ($query) {
 				$query->where('account_type', 'Other Income')
 					->orWhere('account_type', 'Sales');
 			})
@@ -2285,7 +2303,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['cost_of_sale'] = Account::where('account_type', 'Cost Of Sale')
+			$report_data['cost_of_sale'] = Account::where('account_type', 'Cost Of Sale')
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -2306,7 +2324,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['direct_expenses'] = Account::where('account_type', 'Direct Expenses')
+			$report_data['direct_expenses'] = Account::where('account_type', 'Direct Expenses')
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -2327,7 +2345,7 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['report_data']['other_expenses'] = Account::where('account_type', 'Other Expenses')
+			$report_data['other_expenses'] = Account::where('account_type', 'Other Expenses')
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -2348,11 +2366,16 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
-			$data['date1'] = Carbon::parse($date1);
-			$data['date2'] = Carbon::parse($date2);
-			$data['page_title'] = _lang('Income Statement');
+			$date1 = Carbon::parse($date1);
+			$date2 = Carbon::parse($date2);
 
-			return view('backend.user.reports.income_statement', $data);
+			return Inertia::render('Backend/User/Reports/IncomeStatement', [
+				'report_data' => $report_data,
+				'date1' => $date1,
+				'date2' => $date2,
+				'base_currency' => $request->activeBusiness->currency,
+				'business_name' => $request->activeBusiness->name,
+			]);
 		}
 	}
 
@@ -2505,7 +2528,7 @@ class ReportController extends Controller
 
 		if ($request->isMethod('get')) {
 
-			$data = array();
+			$report_data = array();
 			$month = now()->month;
 			$year = now()->year;
 
@@ -2529,23 +2552,25 @@ class ReportController extends Controller
 				->where('year', $year)
 				->sum('tax_amount');
 
-			$data['current_salary'] = $current_salary;
-			$data['total_allowance'] = $total_allowance;
-			$data['total_deduction'] = $total_deduction;
-			$data['net_salary'] = $net_salary;
-			$data['total_tax'] = $total_tax;
+			$report_data['current_salary'] = $current_salary;
+			$report_data['total_allowance'] = $total_allowance;
+			$report_data['total_deduction'] = $total_deduction;
+			$report_data['net_salary'] = $net_salary;
+			$report_data['total_tax'] = $total_tax;
 
-			$data['month'] = $month;
-			$data['year'] = $year;
-			$data['currency'] = request()->activeBusiness->currency;
-			$data['page_title'] = _lang('Payroll Summary');
+			$currency = request()->activeBusiness->currency;
 
-			return view('backend.user.reports.payroll_summary', $data);
+			return Inertia::render('Backend/User/Reports/PayrollSummary', [
+				'report_data' => $report_data,
+				'month' => $month,
+				'year' => $year,
+				'currency' => $currency,
+			]);
 		} else if ($request->isMethod('post')) {
 			@ini_set('max_execution_time', 0);
 			@set_time_limit(0);
 
-			$data = array();
+			$report_data = array();
 			$month = $request->month;
 			$year = $request->year;
 
@@ -2569,17 +2594,22 @@ class ReportController extends Controller
 				->where('year', $year)
 				->sum('tax_amount');
 
-			$data['current_salary'] = $current_salary;
-			$data['total_allowance'] = $total_allowance;
-			$data['total_deduction'] = $total_deduction;
-			$data['net_salary'] = $net_salary;
-			$data['total_tax'] = $total_tax;
+			$report_data['current_salary'] = $current_salary;
+			$report_data['total_allowance'] = $total_allowance;
+			$report_data['total_deduction'] = $total_deduction;
+			$report_data['net_salary'] = $net_salary;
+			$report_data['total_tax'] = $total_tax;
 
-			$data['month'] = $request->month;
-			$data['year'] = $request->year;
-			$data['currency'] = request()->activeBusiness->currency;
-			$data['page_title'] = _lang('Payroll Summary');
-			return view('backend.user.reports.payroll_summary', $data);
+			$month = $request->month;
+			$year = $request->year;
+			$currency = request()->activeBusiness->currency;
+
+			return Inertia::render('Backend/User/Reports/PayrollSummary', [
+				'report_data' => $report_data,
+				'month' => $month,
+				'year' => $year,
+				'currency' => $currency,
+			]);
 		}
 	}
 
@@ -2595,54 +2625,63 @@ class ReportController extends Controller
 		}
 
 		if ($request->isMethod('get')) {
-			$data = array();
+			$report_data = array();
 			$month = now()->month;
 			$year = now()->year;
 
-			$data['report_data'] = Payroll::with('staff')
+			$report_data['payroll'] = Payroll::with('staff')
 				->select('payslips.*')
 				->where('month', $month)
 				->where('year', $year)
 				->get();
 
-			$data['total_netsalary'] = $data['report_data']->sum('net_salary');
-			$data['total_basicsalary'] = $data['report_data']->sum('current_salary');
-			$data['total_allowance'] = $data['report_data']->sum('total_allowance');
-			$data['total_deduction'] = $data['report_data']->sum('total_deduction');
-			$data['total_tax'] = $data['report_data']->sum('tax_amount');
-			$data['total_advance'] = $data['report_data']->sum('advance');
+			$report_data['total_netsalary'] = $report_data['payroll']->sum('net_salary');
+			$report_data['total_basicsalary'] = $report_data['payroll']->sum('current_salary');
+			$report_data['total_allowance'] = $report_data['payroll']->sum('total_allowance');
+			$report_data['total_deduction'] = $report_data['payroll']->sum('total_deduction');
+			$report_data['total_tax'] = $report_data['payroll']->sum('tax_amount');
+			$report_data['total_advance'] = $report_data['payroll']->sum('advance');
 
-			$data['month'] = now()->month;;
-			$data['year'] = now()->year;
-			$data['currency'] = request()->activeBusiness->currency;
-			$data['page_title'] = _lang('Payroll Cost');
-			return view('backend.user.reports.payroll_cost', $data);
+			$month = now()->month;;
+			$year = now()->year;
+			$currency = request()->activeBusiness->currency;
+			return Inertia::render('Backend/User/Reports/PayrollCost', [
+				'report_data' => $report_data,
+				'month' => $month,
+				'year' => $year,
+				'currency' => $currency,
+			]);
 		} else if ($request->isMethod('post')) {
 			@ini_set('max_execution_time', 0);
 			@set_time_limit(0);
 
-			$data = array();
+			$report_data = array();
 			$month = $request->month;
 			$year = $request->year;
 
-			$data['report_data'] = Payroll::with('staff')
+			$report_data['payroll'] = Payroll::with('staff')
 				->select('payslips.*')
 				->where('month', $month)
 				->where('year', $year)
 				->get();
 
-			$data['total_netsalary'] = $data['report_data']->sum('net_salary');
-			$data['total_basicsalary'] = $data['report_data']->sum('current_salary');
-			$data['total_allowance'] = $data['report_data']->sum('total_allowance');
-			$data['total_deduction'] = $data['report_data']->sum('total_deduction');
-			$data['total_tax'] = $data['report_data']->sum('tax_amount');
-			$data['total_advance'] = $data['report_data']->sum('advance');
+			$report_data['total_netsalary'] = $report_data['payroll']->sum('net_salary');
+			$report_data['total_basicsalary'] = $report_data['payroll']->sum('current_salary');
+			$report_data['total_allowance'] = $report_data['payroll']->sum('total_allowance');
+			$report_data['total_deduction'] = $report_data['payroll']->sum('total_deduction');
+			$report_data['total_tax'] = $report_data['payroll']->sum('tax_amount');
+			$report_data['total_advance'] = $report_data['payroll']->sum('advance');
 
-			$data['month'] = $request->month;
-			$data['year'] = $request->year;
-			$data['currency'] = request()->activeBusiness->currency;
-			$data['page_title'] = _lang('Payroll Cost');
-			return view('backend.user.reports.payroll_cost', $data);
+			$month = $request->month;
+			$year = $request->year;
+			$currency = request()->activeBusiness->currency;
+			
+			return Inertia::render('Backend/User/Reports/PayrollCost', [
+				'report_data' => $report_data,
+				'month' => $month,
+				'year' => $year,
+				'currency' => $currency,
+			]);
 		}
 	}
 

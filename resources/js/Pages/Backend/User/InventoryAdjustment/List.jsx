@@ -18,7 +18,8 @@ import {
 
 const DeleteAdjustmentModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <form onSubmit={onConfirm} className="p-6">
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this inventory adjustment?
       </h2>
@@ -45,7 +46,8 @@ const DeleteAdjustmentModal = ({ show, onClose, onConfirm, processing }) => (
 
 const DeleteSelectedModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <form onSubmit={onConfirm} className="p-6">
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete all selected inventory adjustments?
       </h2>

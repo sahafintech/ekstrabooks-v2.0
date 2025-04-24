@@ -35,7 +35,8 @@ import Modal from "@/Components/Modal";
 
 const DeleteQuotationModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <form onSubmit={onConfirm} className="p-6">
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this quotation?
       </h2>
@@ -125,7 +126,8 @@ const ImportQuotationModal = ({ show, onClose, onSubmit, processing }) => (
 
 const DeleteAllQuotationsModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-    <form onSubmit={onConfirm} className="p-6">
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected quotation{count !== 1 ? 's' : ''}?
       </h2>

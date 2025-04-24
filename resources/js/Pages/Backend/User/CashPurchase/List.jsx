@@ -36,7 +36,8 @@ import { format } from "date-fns";
 
 const DeleteCashPurchaseModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <form onSubmit={onConfirm} className="p-6">
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this cash purchase?
       </h2>
@@ -126,7 +127,8 @@ const ImportCashPurchasesModal = ({ show, onClose, onSubmit, processing }) => (
 
 const DeleteAllCashPurchasesModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-    <form onSubmit={onConfirm} className="p-6">
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected cash purchase{count !== 1 ? 's' : ''}?
       </h2>

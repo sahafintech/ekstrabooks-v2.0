@@ -35,7 +35,8 @@ import Modal from "@/Components/Modal";
 
 const DeleteInvoiceModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <form onSubmit={onConfirm} className="p-6">
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this invoice?
       </h2>
@@ -125,7 +126,8 @@ const ImportInvoicesModal = ({ show, onClose, onSubmit, processing }) => (
 
 const DeleteAllInvoicesModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-    <form onSubmit={onConfirm} className="p-6">
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected invoice{count !== 1 ? 's' : ''}?
       </h2>

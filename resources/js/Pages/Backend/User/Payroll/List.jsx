@@ -39,7 +39,7 @@ import { Label } from "@/Components/ui/label";
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
     <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm} className="p-6">
+        <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
                 Are you sure you want to delete this payslip?
             </h2>
@@ -67,7 +67,7 @@ const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
 // Bulk Delete Confirmation Modal Component
 const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, count }) => (
     <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm} className="p-6">
+        <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
                 Are you sure you want to delete {count} selected {count !== 1 ? 'payslips' : 'payslip'}?
             </h2>
@@ -94,7 +94,7 @@ const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, cou
 
 const BulkApproveConfirmationModal = ({ show, onClose, onConfirm, processing, count }) => (
     <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm} className="p-6">
+        <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
                 Are you sure you want to approve {count} selected {count !== 1 ? 'payslips' : 'payslip'}?
             </h2>
@@ -121,7 +121,7 @@ const BulkApproveConfirmationModal = ({ show, onClose, onConfirm, processing, co
 
 const BulkRejectConfirmationModal = ({ show, onClose, onConfirm, processing, count }) => (
     <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm} className="p-6">
+        <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
                 Are you sure you want to reject {count} selected {count !== 1 ? 'payslips' : 'payslip'}?
             </h2>
@@ -148,7 +148,7 @@ const BulkRejectConfirmationModal = ({ show, onClose, onConfirm, processing, cou
 
 const BulkAccrueConfirmationModal = ({ show, onClose, onConfirm, processing, count, accounts, liabilityAccountId, expenseAccountId, setLiabilityAccountId, setExpenseAccountId }) => (
     <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm} className="p-6">
+        <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
                 Are you sure you want to accrue {count} selected {count !== 1 ? 'payslips' : 'payslip'}?
             </h2>
@@ -211,7 +211,7 @@ const BulkAccrueConfirmationModal = ({ show, onClose, onConfirm, processing, cou
 
 const BulkPaymentConfirmationModal = ({ show, onClose, onConfirm, processing, count, accounts, methods, debitAccountId, creditAccountId, setDebitAccountId, setCreditAccountId, advanceAccountId, setAdvanceAccountId, paymentMethod, setPaymentMethod }) => (
     <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm} className="p-6">
+        <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
                 Are you sure you want to pay {count} selected {count !== 1 ? 'payslips' : 'payslip'}?
             </h2>
