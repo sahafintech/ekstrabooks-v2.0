@@ -14,14 +14,7 @@ import {
 } from "@/Components/ui/table";
 import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/Components/ui/select";
-import { cn, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 
 export default function PayrollSummary({ report_data, month, year, currency }) {

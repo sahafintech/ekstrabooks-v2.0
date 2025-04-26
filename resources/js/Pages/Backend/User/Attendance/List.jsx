@@ -36,7 +36,6 @@ import Modal from "@/Components/Modal";
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this attendance record?
@@ -65,7 +64,6 @@ const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
 // Bulk Delete Confirmation Modal Component
 const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-    <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected attendance {count !== 1 ? 'records' : 'record'}?

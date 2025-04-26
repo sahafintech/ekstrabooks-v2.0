@@ -12,7 +12,6 @@ import TableActions from "@/Components/shared/TableActions";
 
 const DeleteMedicalRecordsModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this medical record?
@@ -40,7 +39,6 @@ const DeleteMedicalRecordsModal = ({ show, onClose, onConfirm, processing }) => 
 
 const DeleteAllMedicalRecordsModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete all selected medical records?

@@ -16,6 +16,8 @@ import {
       lg: "sm:max-w-lg",
       xl: "sm:max-w-xl",
       "2xl": "sm:max-w-2xl",
+      "3xl": "sm:max-w-3xl",
+      "4xl": "sm:max-w-4xl",
     }[maxWidth];
   
     return (
@@ -31,7 +33,8 @@ import {
           id="modal"
           className={`
             mb-6
-            overflow-hidden
+            max-h-[calc(100vh-4rem)]
+            overflow-y-auto
             rounded-lg
             bg-white
             shadow-xl

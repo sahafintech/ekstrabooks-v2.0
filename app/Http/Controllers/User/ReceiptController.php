@@ -10,17 +10,21 @@ use App\Models\AuditLog;
 use App\Models\Business;
 use App\Models\BusinessSetting;
 use App\Models\Currency;
+use App\Models\Customer;
 use App\Models\HoldPosInvoice;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\InvoiceItemTax;
+use App\Models\Prescription;
 use App\Models\PrescriptionProduct;
 use App\Models\Product;
 use App\Models\Receipt;
 use App\Models\ReceiptItem;
 use App\Models\ReceiptItemTax;
+use App\Models\SubCategory;
 use App\Models\Tax;
 use App\Models\Transaction;
+use App\Models\TransactionMethod;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -834,7 +838,29 @@ class ReceiptController extends Controller
 
     public function pos()
     {
-        return Inertia::render('Backend/User/Pos/Pos');
+        $products = Product::all();
+        $categories = SubCategory::all();
+        $currencies = Currency::all();
+        $accounts = Account::where('account_type', 'cash')->orWhere('account_type', 'bank')->get();
+        $customers = Customer::all();
+        $methods = TransactionMethod::all();
+        $baseCurrency = Currency::where('base_currency', 1)->first();
+        $holdList = HoldPosInvoice::with('items')->get();
+        $todayList = Receipt::where('receipt_date', date('Y-m-d'))->get();
+        $prescriptionProducts = PrescriptionProduct::with('items', 'prescription')->where('status', 0)->get();
+
+        return Inertia::render('Backend/User/Pos/Pos', [
+            'products' => $products,
+            'categories' => $categories,
+            'currencies' => $currencies,
+            'accounts' => $accounts,
+            'customers' => $customers,
+            'methods' => $methods,
+            'baseCurrency' => $baseCurrency,
+            'holdList' => $holdList,
+            'todayList' => $todayList,
+            'prescriptionProducts' => $prescriptionProducts
+        ]);
     }
 
     public function import_receipts(Request $request)
@@ -957,7 +983,7 @@ class ReceiptController extends Controller
             'client_id'      => $request->credit_cash == 'credit' || $request->credit_cash == 'provider' ? 'required' : 'nullable',
             'product_id'     => 'required',
             'currency'       => 'required',
-            'account_id'     => $request->credit_cash == 'cas' ? 'required' : 'nullable',
+            'account_id'     => $request->credit_cash == 'cash' ? 'required' : 'nullable',
         ], [
             'product_id.required' => _lang('You must add at least one item'),
         ]);
@@ -1044,7 +1070,7 @@ class ReceiptController extends Controller
 
             $receipt                  = new Receipt();
             $receipt->customer_id     = $request->input('client_id') ?? NULL;
-            $receipt->title           = 'Cash Invoice';
+            $receipt->title           = get_business_option('receipt_title', 'Cash Invoice');
             $receipt->receipt_number  = get_business_option('receipt_number');
             $receipt->receipt_date    = Carbon::parse($request->input('invoice_date'))->format('Y-m-d');
             $receipt->sub_total       = $summary['subTotal'];
@@ -1228,7 +1254,7 @@ class ReceiptController extends Controller
 
             $invoice                  = new Invoice();
             $invoice->customer_id     = $request->input('client_id');
-            $invoice->title           = $request->input('title');
+            $invoice->title           = get_business_option('invoice_title', 'Invoice');
             $invoice->invoice_number  = get_business_option('invoice_number');
             $invoice->order_number    = $request->input('order_number');
             $invoice->invoice_date    = Carbon::parse($request->input('invoice_date'))->format('Y-m-d');
@@ -1413,7 +1439,7 @@ class ReceiptController extends Controller
 
             $invoice                  = new Invoice();
             $invoice->customer_id     = $request->input('customer_id');
-            $invoice->title           = $request->input('title');
+            $invoice->title           = get_business_option('invoice_title', 'Invoice');
             $invoice->invoice_number  = get_business_option('invoice_number');
             $invoice->order_number    = $request->input('order_number');
             $invoice->invoice_date    = Carbon::parse($request->input('invoice_date'))->format('Y-m-d');
@@ -1581,6 +1607,7 @@ class ReceiptController extends Controller
                 $transaction->save();
             }
 
+            // Delete hold pos invoice if exists
             if ($request->hold_pos_id != '') {
                 $holdPosInvoice = HoldPosInvoice::find($request->hold_pos_id);
 
@@ -1618,14 +1645,20 @@ class ReceiptController extends Controller
 
     public function invoice_pos($id)
     {
-        $receipt = Receipt::find($id);
-        return view('backend.user.pos.invoice_pos', compact('receipt'));
+        $receipt = Receipt::with(['items', 'taxes', 'customer'])->find($id);
+        return Inertia::render('Backend/User/Pos/InvoicePos', [
+            'receipt' => $receipt,
+            'business' => request()->activeBusiness
+        ]);
     }
 
     public function credit_invoice_pos($id)
     {
-        $invoice = Invoice::find($id);
-        return view('backend.user.pos.credit_invoice_pos', compact('invoice'));
+        $invoice = Invoice::with(['items', 'taxes', 'customer'])->find($id);
+        return Inertia::render('Backend/User/Pos/CreditInvoicePos', [
+            'invoice' => $invoice,
+            'business' => request()->activeBusiness
+        ]);
     }
 
     public function pos_products()

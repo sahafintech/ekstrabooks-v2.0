@@ -6,9 +6,7 @@ use App\Models\HoldPosInvoice;
 use App\Models\HoldPosInvoiceItem;
 use App\Models\HoldPosInvoiceItemTax;
 use App\Models\Tax;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class HoldPosInvoiceController extends Controller
 {
@@ -18,7 +16,6 @@ class HoldPosInvoiceController extends Controller
             'customer_id'    => 'nullable',
             'product_id'     => 'required',
             'currency'       => 'required',
-            'account_id'     => 'required',
         ], [
             'product_id.required' => _lang('You must add at least one item'),
         ]);

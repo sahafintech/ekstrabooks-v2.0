@@ -35,8 +35,7 @@ import Modal from "@/Components/Modal";
 
 const DeleteReceiptModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this cash invoice?
       </h2>
@@ -127,8 +126,7 @@ const ImportReceiptsModal = ({ show, onClose, onSubmit, processing }) => (
 
 const DeleteAllReceiptsModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-    <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected cash invoice{count !== 1 ? 's' : ''}?
       </h2>
@@ -243,9 +241,9 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
   const handleImport = (e) => {
     e.preventDefault();
     setProcessing(true);
-    
+
     const formData = new FormData(e.target);
-    
+
     router.post(route("receipts.import"), formData, {
       onSuccess: () => {
         toast({
@@ -385,8 +383,8 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
 
             <div className="mb-4 flex flex-col md:flex-row gap-4 justify-between">
               <div className="flex items-center gap-2">
-                <Select 
-                  value={selectedRows.length > 0 ? "delete" : ""} 
+                <Select
+                  value={selectedRows.length > 0 ? "delete" : ""}
                   onValueChange={(value) => {
                     if (value === "delete" && selectedRows.length > 0) {
                       openDeleteAllModal();
@@ -400,8 +398,8 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
                     <SelectItem value="delete">Delete Selected</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button 
-                  onClick={() => selectedRows.length > 0 && openDeleteAllModal()} 
+                <Button
+                  onClick={() => selectedRows.length > 0 && openDeleteAllModal()}
                   variant="outline"
                   disabled={selectedRows.length === 0}
                 >
@@ -479,6 +477,11 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
                                 label: "View",
                                 icon: <Eye className="h-4 w-4" />,
                                 href: route("receipts.show", receipt.id),
+                              },
+                              {
+                                label: "View POS",
+                                icon: <Eye className="h-4 w-4" />,
+                                href: route("receipts.invoice_pos", receipt.id),
                               },
                               {
                                 label: "Edit",

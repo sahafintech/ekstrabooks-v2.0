@@ -14,7 +14,6 @@ import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 
 const DeleteCategoryModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this subcategory?
@@ -138,7 +137,6 @@ const CategoryFormModal = ({ show, onClose, onSubmit, processing, category = nul
 
 const DeleteSelectedModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete all selected subcategories?

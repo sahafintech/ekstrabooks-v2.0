@@ -35,7 +35,6 @@ import Modal from "@/Components/Modal";
 
 const DeleteBillModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this bill?
@@ -63,7 +62,6 @@ const DeleteBillModal = ({ show, onClose, onConfirm, processing }) => (
 
 const ApproveBillModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to approve this bill?
@@ -91,7 +89,6 @@ const ApproveBillModal = ({ show, onClose, onConfirm, processing }) => (
 
 const RejectBillModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to reject this bill?
@@ -182,7 +179,6 @@ const ImportBillsModal = ({ show, onClose, onSubmit, processing }) => (
 
 const DeleteAllBillsModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-    <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected bill{count !== 1 ? 's' : ''}?

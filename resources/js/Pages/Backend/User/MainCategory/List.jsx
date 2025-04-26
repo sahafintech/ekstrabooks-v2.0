@@ -13,7 +13,6 @@ import { Input } from "@/Components/ui/input";
 
 const DeleteCategoryModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this category?
@@ -107,7 +106,6 @@ const CategoryFormModal = ({ show, onClose, onSubmit, processing, category = nul
 
 const DeleteSelectedModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete all selected categories?

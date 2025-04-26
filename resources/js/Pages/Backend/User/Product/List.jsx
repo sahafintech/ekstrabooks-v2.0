@@ -19,7 +19,6 @@ import {
 
 const DeleteProductModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this product?
@@ -110,7 +109,6 @@ const ImportProductsModal = ({ show, onClose, onSubmit, processing }) => (
 
 const DeleteAllProductsModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete all selected products?

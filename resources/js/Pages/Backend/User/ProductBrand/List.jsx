@@ -13,7 +13,6 @@ import { Input } from "@/Components/ui/input";
 
 const DeleteBrandModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this brand?
@@ -86,7 +85,6 @@ const BrandFormModal = ({ show, onClose, onSubmit, processing, brand = null }) =
 
 const DeleteSelectedModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete all selected brands?
