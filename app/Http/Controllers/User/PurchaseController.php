@@ -553,7 +553,7 @@ class PurchaseController extends Controller
 	public function show($id)
 	{
 		$bill = Purchase::with(['business', 'items', 'taxes', 'vendor'])->find($id);
-		$attachments = Attachment::where('ref_type', 'cash purchase')->where('ref_id', $id)->get();
+		$attachments = Attachment::where('ref_type', 'bill invoice')->where('ref_id', $id)->get();
 
 		return Inertia::render('Backend/User/Bill/View', [
 			'bill' => $bill,

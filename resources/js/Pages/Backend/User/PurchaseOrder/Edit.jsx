@@ -20,47 +20,44 @@ import { format } from "date-fns";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
 
-export default function Edit({ vendors = [], products = [], bill, currencies = [], taxes = [], accounts = [], decimalPlace, inventory }) {
-  const [billItems, setBillItems] = useState([]);
-  const [billAccounts, setBillAccounts] = useState([]);
+export default function Edit({ vendors = [], products = [], purchase_order, currencies = [], taxes = [], taxIds, accounts = [], inventory }) {
+  const [purchaseOrderItems, setPurchaseOrderItems] = useState([]);
+  const [purchaseOrderAccounts, setPurchaseOrderAccounts] = useState([]);
   const [exchangeRate, setExchangeRate] = useState(1);
   const [baseCurrencyInfo, setBaseCurrencyInfo] = useState(null);
 
   const { data, setData, post, processing, errors, reset } = useForm({
-    vendor_id: bill.vendor_id,
-    title: bill.title,
-    bill_no: bill.bill_no,
-    po_so_number: bill.po_so_number,
-    purchase_date: bill.purchase_date,
-    due_date: bill.due_date,
-    currency: bill.currency,
-    exchange_rate: bill.exchange_rate,
-    converted_total: bill.converted_total,
-    discount_type: bill.discount_type,
-    discount_value: bill.discount_value,
-    template: bill.template,
-    note: bill.note,
-    footer: bill.footer,
+    vendor_id: purchase_order.vendor_id,
+    title: purchase_order.title,
+    order_number: purchase_order.order_number,
+    order_date: purchase_order.order_date,
+    currency: purchase_order.currency,
+    exchange_rate: purchase_order.exchange_rate,
+    converted_total: purchase_order.converted_total,
+    discount_type: purchase_order.discount_type,
+    discount_value: purchase_order.discount_value,
+    template: purchase_order.template,
+    note: purchase_order.note,
+    footer: purchase_order.footer,
     attachment: null,
     product_id: [],
     product_name: [],
     description: [],
     quantity: [],
     unit_cost: [],
-    taxes: [],
+    taxes: taxIds,
     account_id: [],
-    benificiary: bill.benificiary,
     _method: 'PUT'
   });
 
-  // Initialize purchase items from existing bill
+  // Initialize purchase items from existing purchase order
   useEffect(() => {
-    if (bill && bill.items && bill.items.length > 0) {
+    if (purchase_order && purchase_order.items && purchase_order.items.length > 0) {
       // Separate product items and account items
       const productItems = [];
       const accountItems = [];
 
-      bill.items.forEach(item => {
+      purchase_order.items.forEach(item => {
         const formattedItem = {
           account_id: item.account_id,
           product_id: item.product_id,
@@ -68,7 +65,6 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
           description: item.description,
           quantity: item.quantity,
           unit_cost: item.unit_cost,
-          taxes: item.taxes || []
         };
 
         if (!item.product_id) {
@@ -79,8 +75,8 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
       });
 
       // Set the state directly instead of appending
-      setBillItems(productItems);
-      setBillAccounts(accountItems);
+      setPurchaseOrderItems(productItems);
+      setPurchaseOrderAccounts(accountItems);
 
       // Also update the form data with the loaded items
       setData({
@@ -90,14 +86,14 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
         description: [...productItems.map(item => item.description), ...accountItems.map(account => account.description || "")],
         quantity: [...productItems.map(item => item.quantity), ...accountItems.map(account => account.quantity || 1)],
         unit_cost: [...productItems.map(item => item.unit_cost), ...accountItems.map(account => account.unit_cost || 0)],
-        account_id: [...productItems.map(item => item.account_id || "Inventory"), ...accountItems.map(account => account.account_id)]
+        account_id: [...productItems.map(item => item.account_id), ...accountItems.map(account => account.account_id)]
       });
     }
 
     // Set the initial currency and exchange rate
-    if (bill && bill.currency) {
-      setData('currency', bill.currency);
-      setExchangeRate(bill.exchange_rate);
+    if (purchase_order && purchase_order.currency) {
+      setData('currency', purchase_order.currency);
+      setExchangeRate(purchase_order.exchange_rate);
     }
   }, []);  // Empty dependency array so it only runs once
 
@@ -121,13 +117,11 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
 
       // Check if date is valid
       if (isNaN(date.getTime())) {
-        console.warn("Invalid date:", dateString);
         return undefined;
       }
 
       return date;
     } catch (error) {
-      console.error("Error parsing date:", error, "for input:", dateString);
       return new Date();
     }
   };
@@ -145,31 +139,28 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
     }
   };
 
-  const addBillItem = () => {
-    setBillItems([...billItems, {
+  const addPurchaseOrderItem = () => {
+    setPurchaseOrderItems([...purchaseOrderItems, {
       product_id: "",
       product_name: "",
       description: "",
       quantity: 1,
       unit_cost: 0,
-      taxes: [],
-      account_id: "Inventory" // Default account_id for product rows
+      account_id: inventory.id // Default account_id for product rows
     }]);
     setData("product_id", [...data.product_id, ""]);
     setData("product_name", [...data.product_name, ""]);
     setData("description", [...data.description, ""]);
     setData("quantity", [...data.quantity, 1]);
     setData("unit_cost", [...data.unit_cost, 0]);
-    setData("taxes", [...data.taxes, []]);
   };
 
-  const addBillAccount = () => {
-    setBillAccounts([...billAccounts, {
+  const addPurchaseOrderAccount = () => {
+    setPurchaseOrderAccounts([...purchaseOrderAccounts, {
       account_id: "",
       unit_cost: 0,
       quantity: 1,
       description: "",
-      taxes: [],
       product_name: "" // Initialize product_name for account entries
     }]);
     setData("account_id", [...data.account_id || [], ""]);
@@ -177,21 +168,21 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
 
     // Update quantity and description arrays to include new account entries
     const updatedQuantities = [
-      ...billItems.map(item => item.quantity),
-      ...billAccounts.map(account => account.quantity || 1),
+      ...purchaseOrderItems.map(item => item.quantity),
+      ...purchaseOrderAccounts.map(account => account.quantity || 1),
       1  // for the new account
     ];
 
     const updatedDescriptions = [
-      ...billItems.map(item => item.description),
-      ...billAccounts.map(account => account.description || ""),
+      ...purchaseOrderItems.map(item => item.description),
+      ...purchaseOrderAccounts.map(account => account.description || ""),
       ""  // for the new account
     ];
 
     // Update product_name array to include new account entry
     const updatedProductNames = [
-      ...billItems.map(item => item.product_name),
-      ...billAccounts.map(account => account.product_name || ""),
+      ...purchaseOrderItems.map(item => item.product_name),
+      ...purchaseOrderAccounts.map(account => account.product_name || ""),
       ""  // for the new account
     ];
 
@@ -200,55 +191,53 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
     setData("product_name", updatedProductNames);
   };
 
-  const removeBillAccount = (index) => {
-    const updatedAccounts = billAccounts.filter((_, i) => i !== index);
-    setBillAccounts(updatedAccounts);
+  const removePurchaseOrderAccount = (index) => {
+    const updatedAccounts = purchaseOrderAccounts.filter((_, i) => i !== index);
+    setPurchaseOrderAccounts(updatedAccounts);
     setData("account_id", updatedAccounts.map(account => account.account_id));
     setData("unit_cost", updatedAccounts.map(account => account.unit_cost));
 
     // Update quantity and description arrays after removing an account
     setData("quantity", [
-      ...billItems.map(item => item.quantity),
+      ...purchaseOrderItems.map(item => item.quantity),
       ...updatedAccounts.map(account => account.quantity || 1)
     ]);
 
     setData("description", [
-      ...billItems.map(item => item.description),
+      ...purchaseOrderItems.map(item => item.description),
       ...updatedAccounts.map(account => account.description || "")
     ]);
 
     // Update product_name array after removing an account
     setData("product_name", [
-      ...billItems.map(item => item.product_name),
+      ...purchaseOrderItems.map(item => item.product_name),
       ...updatedAccounts.map(account => account.product_name || "")
     ]);
   };
 
-  const removeInvoiceItem = (index) => {
-    const updatedItems = billItems.filter((_, i) => i !== index);
-    setBillItems(updatedItems);
+  const removePurchaseOrderItem = (index) => {
+    const updatedItems = purchaseOrderItems.filter((_, i) => i !== index);
+    setPurchaseOrderItems(updatedItems);
     setData("product_id", updatedItems.map(item => item.product_id));
     setData("product_name", updatedItems.map(item => item.product_name));
     setData("description", [
       ...updatedItems.map(item => item.description),
-      ...billAccounts.map(account => account.description || "")
+      ...purchaseOrderAccounts.map(account => account.description || "")
     ]);
     setData("quantity", [
       ...updatedItems.map(item => item.quantity),
-      ...billAccounts.map(account => account.quantity || 1)
+      ...purchaseOrderAccounts.map(account => account.quantity || 1)
     ]);
     setData("unit_cost", updatedItems.map(item => item.unit_cost));
-    setData("taxes", updatedItems.map(item => item.taxes));
   };
 
-  const updateInvoiceItem = (index, field, value) => {
-    const updatedItems = [...billItems];
+  const updatePurchaseOrderItem = (index, field, value) => {
+    const updatedItems = [...purchaseOrderItems];
     updatedItems[index][field] = value;
 
     if (field === "product_id") {
       const product = products.find(p => p.id === parseInt(value, 10));
       if (product) {
-        console.log("Selected product:", product);
         updatedItems[index].product_name = product.name;
         updatedItems[index].unit_cost = product.selling_price;
         updatedItems[index].account_id = inventory.id;
@@ -262,27 +251,39 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
       }
     }
 
-    setBillItems(updatedItems);
+    setPurchaseOrderItems(updatedItems);
     setData("product_id", updatedItems.map(item => item.product_id));
     setData("product_name", updatedItems.map(item => item.product_name));
     setData("description", updatedItems.map(item => item.description));
     setData("quantity", updatedItems.map(item => item.quantity));
     setData("unit_cost", updatedItems.map(item => item.unit_cost));
-    setData("taxes", updatedItems.map(item => item.taxes));
     setData("account_id", updatedItems.map(item => item.account_id));
   };
 
   const calculateSubtotal = () => {
-    const productSubtotal = billItems.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
-    const accountSubtotal = billAccounts.reduce((sum, account) => sum + parseFloat(account.quantity * account.unit_cost || 0), 0);
+    const productSubtotal = purchaseOrderItems.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
+    const accountSubtotal = purchaseOrderAccounts.reduce((sum, account) => sum + parseFloat(account.quantity * account.unit_cost || 0), 0);
     return productSubtotal + accountSubtotal;
   };
 
+  // build this once, outside of calculateTaxes
+  const taxRateMap = new Map(taxes.map(t => [t.id, Number(t.rate)]));
+
   const calculateTaxes = () => {
-    return billItems.reduce((sum, item) => {
-      return sum + item.taxes.reduce((taxSum, tax) => {
-        return taxSum + (item.quantity * item.unit_cost * tax.rate) / 100;
+    return purchaseOrderItems.reduce((sum, item) => {
+      const base = Number(item.quantity) * Number(item.unit_cost);
+
+      const itemTax = data.taxes.reduce((taxSum, taxIdStr) => {
+        // convert the incoming tax‐ID string to a Number
+        const taxId = Number(taxIdStr);
+
+        // look up the rate; if missing, default to 0
+        const rate = taxRateMap.get(taxId) || 0;
+
+        return taxSum + (base * rate) / 100;
       }, 0);
+
+      return sum + itemTax;
     }, 0);
   };
 
@@ -348,7 +349,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
     const total = calculateTotal();
     const convertedTotal = total;
     setData('converted_total', convertedTotal);
-  }, [data.currency, data.discount_type, data.discount_value, exchangeRate, billItems, billAccounts]);
+  }, [data.currency, data.discount_type, data.discount_value, exchangeRate, purchaseOrderItems, purchaseOrderAccounts]);
 
   const renderTotal = () => {
     const total = calculateTotal();
@@ -373,9 +374,9 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
 
       return (
         <div>
-          <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
+          <h2 className="text-xl font-bold">Total: {formatCurrency({ amount: total, currency: selectedCurrency.name })}</h2>
           <p className="text-sm text-gray-600">
-            Equivalent to {formatCurrency(baseCurrencyTotal, baseCurrencyInfo.name, decimalPlace)}
+            Equivalent to {formatCurrency({ amount: baseCurrencyTotal, currency: baseCurrencyInfo.name })}
           </p>
         </div>
       );
@@ -383,52 +384,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
 
     return (
       <div>
-        <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
-      </div>
-    );
-  };
-
-  const TaxSelector = ({ index, isAccount = false }) => {
-    const item = isAccount ? billAccounts[index] : billItems[index];
-
-    // Handle undefined taxes array (safety check)
-    if (!item || !item.taxes) {
-      console.warn(`Item at index ${index} has no taxes array`);
-      return (
-        <div className="col-span-12 md:col-span-2">
-          <Label>Taxes</Label>
-          <div className="p-2 bg-white rounded mt-2">None</div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="col-span-12 md:col-span-2">
-        <Label>Taxes</Label>
-        <SearchableCombobox
-          multiple
-          options={taxes?.map(tax => ({
-            id: tax.id,
-            name: `${tax.name} (${tax.rate}%)`
-          })) || []}
-          value={item.taxes.map(t => t.id)}
-          onChange={(values) => {
-            if (isAccount) {
-              const updatedAccounts = [...billAccounts];
-              updatedAccounts[index].taxes = taxes
-                .filter(tax => values.includes(tax.id))
-                .map(tax => ({ id: tax.id, rate: tax.rate }));
-              setBillAccounts(updatedAccounts);
-            } else {
-              const updatedItems = [...billItems];
-              updatedItems[index].taxes = taxes
-                .filter(tax => values.includes(tax.id))
-                .map(tax => ({ id: tax.id, rate: tax.rate }));
-              setBillItems(updatedItems);
-            }
-          }}
-          placeholder="Select taxes"
-        />
+        <h2 className="text-xl font-bold">Total: {formatCurrency({ amount: total, currency: selectedCurrency.name })}</h2>
       </div>
     );
   };
@@ -449,46 +405,31 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
       ...data,
       currency: selectedCurrency.name,
       exchange_rate: exchangeRate,
-      product_id: billItems.map(item => item.product_id),
-      product_name: billItems.map(item => item.product_name),
+      product_id: purchaseOrderItems.map(item => item.product_id),
+      product_name: purchaseOrderItems.map(item => item.product_name),
       description: [
-        ...billItems.map(item => item.description || ""),
-        ...billAccounts.map(account => account.description || "")
+        ...purchaseOrderItems.map(item => item.description || ""),
+        ...purchaseOrderAccounts.map(account => account.description || "")
       ],
       quantity: [
-        ...billItems.map(item => item.quantity || 1),
-        ...billAccounts.map(account => account.quantity || 1)
+        ...purchaseOrderItems.map(item => item.quantity || 1),
+        ...purchaseOrderAccounts.map(account => account.quantity || 1)
       ],
       unit_cost: [
-        ...billItems.map(item => item.unit_cost * item.quantity),
-        ...billAccounts.map(account => account.unit_cost)
+        ...purchaseOrderItems.map(item => item.unit_cost * item.quantity),
+        ...purchaseOrderAccounts.map(account => account.unit_cost)
       ],
-      taxes: Object.fromEntries(
-        [
-          ...billItems.map(item => [
-            item.product_id,
-            item.taxes.map(tax => tax.id)
-          ]),
-          ...billAccounts.map(account => [
-            account.account_id,
-            account.taxes?.map(tax => tax.id) || []
-          ])
-        ].filter(entry => entry[0]) // Filter out any undefined keys
-      ),
       account_id: [
-        ...billItems.map(item => item.account_id || "Inventory"),
-        ...billAccounts.map(account => account.account_id)
+        ...purchaseOrderItems.map(item => item.account_id || "Inventory"),
+        ...purchaseOrderAccounts.map(account => account.account_id)
       ]
-    };
-
-    // Log the data being sent to help debug
-    console.log("Submitting form with data:", formData);
+    }
 
     // Post the form data directly instead of using setData first
-    post(route("bill_invoices.update", bill.id), formData, {
+    post(route("purchase_orders.update", purchase_order.id), formData, {
       preserveScroll: true,
       onSuccess: () => {
-        toast.success("Bill invoice updated successfully");
+        toast.success("Purchase order updated successfully");
       },
     });
   };
@@ -496,13 +437,13 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
   return (
     <AuthenticatedLayout>
       <SidebarInset>
-        <PageHeader page="Cash Purchases" subpage="Edit Cash Purchase" url="bill_invoices.index" />
+        <PageHeader page="Cash Purchases" subpage="Edit Cash Purchase" url="purchase_orders.index" />
 
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           <form onSubmit={submit}>
             <div className="grid grid-cols-12 mt-2">
               <Label htmlFor="vendor_id" className="md:col-span-2 col-span-12">
-                Suppliers
+                Suppliers *
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <div className="md:w-1/2 w-full">
@@ -514,6 +455,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                     value={data.vendor_id}
                     onChange={(value) => setData("vendor_id", value)}
                     placeholder="Select vendor"
+                    required
                   />
                 </div>
                 <InputError message={errors.vendor_id} className="text-sm" />
@@ -538,24 +480,8 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
             </div>
 
             <div className="grid grid-cols-12 mt-2">
-              <Label htmlFor="po_so_number" className="md:col-span-2 col-span-12">
-                Order Number
-              </Label>
-              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Input
-                  id="po_so_number"
-                  type="text"
-                  value={data.po_so_number}
-                  onChange={(e) => setData("po_so_number", e.target.value)}
-                  className="md:w-1/2 w-full"
-                />
-                <InputError message={errors.po_so_number} className="text-sm" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-12 mt-2">
-              <Label htmlFor="purchase_date" className="md:col-span-2 col-span-12">
-                Purchase Date *
+              <Label htmlFor="order_date" className="md:col-span-2 col-span-12">
+                Order Date *
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <Popover>
@@ -564,12 +490,12 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                       variant={"outline"}
                       className={cn(
                         "md:w-1/2 w-full justify-start text-left font-normal",
-                        !data.purchase_date && "text-muted-foreground"
+                        !data.order_date && "text-muted-foreground"
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {data.purchase_date ? (
-                        formatDateDisplay(data.purchase_date)
+                      {data.order_date ? (
+                        formatDateDisplay(data.order_date)
                       ) : (
                         <span>Pick a date</span>
                       )}
@@ -578,52 +504,15 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={data.purchase_date ? new Date(data.purchase_date) : undefined}
+                      selected={data.order_date ? new Date(data.order_date) : undefined}
                       onSelect={(date) =>
-                        setData("purchase_date", date ? format(date, "yyyy-MM-dd") : "")
+                        setData("order_date", date ? format(date, "yyyy-MM-dd") : "")
                       }
                       initialFocus
                     />
                   </PopoverContent>
                 </Popover>
-                <InputError message={errors.purchase_date} className="text-sm" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-12 mt-2">
-              <Label htmlFor="due_date" className="md:col-span-2 col-span-12">
-                Due Date *
-              </Label>
-              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "md:w-1/2 w-full justify-start text-left font-normal",
-                        !data.due_date && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {data.due_date ? (
-                        formatDateDisplay(data.due_date)
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={data.due_date ? new Date(data.due_date) : undefined}
-                      onSelect={(date) =>
-                        setData("due_date", date ? format(date, "yyyy-MM-dd") : "")
-                      }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                <InputError message={errors.purchase_date} className="text-sm" />
+                <InputError message={errors.order_date} className="text-sm" />
               </div>
             </div>
 
@@ -654,23 +543,6 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
               </div>
             </div>
 
-            <div className="grid grid-cols-12 mt-2">
-              <Label htmlFor="benificiary" className="md:col-span-2 col-span-12">
-                Benificiary *
-              </Label>
-              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <div className="md:w-1/2 w-full">
-                  <Textarea
-                    className="mt-1"
-                    value={data.benificiary}
-                    onChange={(e) => setData("benificiary", e.target.value)}
-                    placeholder="Enter benificiary details"
-                  />
-                </div>
-                <InputError message={errors.benificiary} className="text-sm" />
-              </div>
-            </div>
-
             <SidebarSeparator className="my-4" />
 
             <div className="space-y-4">
@@ -680,26 +552,22 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                   <Button
                     type="button"
                     variant="secondary"
-                    onClick={addBillItem}
+                    onClick={addPurchaseOrderItem}
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Add Item
                   </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={addBillAccount}
-                  >
+                  <Button type="button" variant="secondary" onClick={addPurchaseOrderAccount}>
                     <Plus className="w-4 h-4 mr-2" />
                     Add Account
                   </Button>
                 </div>
               </div>
 
-              {billItems.map((item, index) => (
+              {purchaseOrderItems.map((item, index) => (
                 <div key={index} className="border rounded-lg p-4 space-y-4 bg-gray-50">
                   {/* First Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <div>
                       <Label>Product *</Label>
                       <SearchableCombobox
@@ -708,7 +576,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                           name: product.name
                         }))}
                         value={item.product_id}
-                        onChange={(value) => updateInvoiceItem(index, "product_id", value)}
+                        onChange={(value) => updatePurchaseOrderItem(index, "product_id", value)}
                         placeholder="Select product"
                       />
                     </div>
@@ -719,7 +587,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                         type="number"
                         min="1"
                         value={item.quantity}
-                        onChange={(e) => updateInvoiceItem(index, "quantity", parseInt(e.target.value))}
+                        onChange={(e) => updatePurchaseOrderItem(index, "quantity", parseInt(e.target.value))}
                       />
                     </div>
 
@@ -729,40 +597,36 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                         type="number"
                         step="0.01"
                         value={item.unit_cost}
-                        onChange={(e) => updateInvoiceItem(index, "unit_cost", parseFloat(e.target.value))}
+                        onChange={(e) => updatePurchaseOrderItem(index, "unit_cost", parseFloat(e.target.value))}
                       />
                     </div>
                   </div>
 
                   {/* Second Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
                     <div className="md:col-span-6">
                       <Label>Description</Label>
                       <Textarea
                         value={item.description}
-                        onChange={(e) => updateInvoiceItem(index, "description", e.target.value)}
+                        onChange={(e) => updatePurchaseOrderItem(index, "description", e.target.value)}
                         rows={1}
                       />
                     </div>
 
                     <div className="md:col-span-3">
-                      <TaxSelector index={index} />
-                    </div>
-
-                    <div className="md:col-span-2">
                       <Label>Subtotal</Label>
-                      <div className="p-2 bg-white rounded mt-2 text-right">
+                      <div className="p-2 bg-white rounded text-right">
                         {(item.quantity * item.unit_cost).toFixed(2)}
                       </div>
                     </div>
 
-                    <div className="md:col-span-1 flex items-end justify-end">
+                    <div className="md:col-span-1 flex items-center justify-end">
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
                         className="text-red-500"
-                        onClick={() => removeInvoiceItem(index)}
+                        onClick={() => removePurchaseOrderItem(index)}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -771,11 +635,11 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                 </div>
               ))}
 
-              {billAccounts.map((accountItem, index) => (
+              {purchaseOrderAccounts.map((accountItem, index) => (
                 <div key={`account-${index}`} className="border rounded-lg p-4 space-y-4 bg-gray-50">
                   {/* First Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
+                  <div className="grid grid-cols-12 gap-2">
+                    <div className="md:col-span-4">
                       <Label>Account *</Label>
                       <SearchableCombobox
                         options={accounts.map(account => ({
@@ -784,26 +648,26 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                         }))}
                         value={accountItem.account_id}
                         onChange={(value) => {
-                          const updatedAccounts = [...billAccounts];
+                          const updatedAccounts = [...purchaseOrderAccounts];
                           updatedAccounts[index].account_id = value;
-                          setBillAccounts(updatedAccounts);
+                          setPurchaseOrderAccounts(updatedAccounts);
                           setData("account_id", updatedAccounts.map(account => account.account_id));
                         }}
                         placeholder="Select account"
                       />
                     </div>
 
-                    <div>
+                    <div className="md:col-span-4">
                       <Label>Product Name *</Label>
                       <Input
                         type="text"
                         value={accountItem.product_name || ""}
                         onChange={(e) => {
-                          const updatedAccounts = [...billAccounts];
+                          const updatedAccounts = [...purchaseOrderAccounts];
                           updatedAccounts[index].product_name = e.target.value;
-                          setBillAccounts(updatedAccounts);
+                          setPurchaseOrderAccounts(updatedAccounts);
                           setData("product_name", [
-                            ...billItems.map(item => item.product_name),
+                            ...purchaseOrderItems.map(item => item.product_name),
                             ...updatedAccounts.map(account => account.product_name || "")
                           ]);
                         }}
@@ -811,7 +675,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                       />
                     </div>
 
-                    <div>
+                    <div className="md:col-span-2">
                       <Label>Amount *</Label>
                       <Input
                         type="number"
@@ -819,45 +683,45 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                         min="0"
                         value={accountItem.unit_cost}
                         onChange={(e) => {
-                          const updatedAccounts = [...billAccounts];
+                          const updatedAccounts = [...purchaseOrderAccounts];
                           updatedAccounts[index].unit_cost = parseFloat(e.target.value);
-                          setBillAccounts(updatedAccounts);
+                          setPurchaseOrderAccounts(updatedAccounts);
                           setData("unit_cost", updatedAccounts.map(account => account.unit_cost));
                         }}
                       />
                     </div>
-                  </div>
 
-                  {/* Second Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                    <div className="md:col-span-3">
+                    <div className="md:col-span-2">
                       <Label>Quantity *</Label>
                       <Input
                         type="number"
                         min="1"
                         value={accountItem.quantity || 1}
                         onChange={(e) => {
-                          const updatedAccounts = [...billAccounts];
+                          const updatedAccounts = [...purchaseOrderAccounts];
                           updatedAccounts[index].quantity = parseInt(e.target.value);
-                          setBillAccounts(updatedAccounts);
+                          setPurchaseOrderAccounts(updatedAccounts);
                           setData("quantity", [
-                            ...billItems.map(item => item.quantity),
+                            ...purchaseOrderItems.map(item => item.quantity),
                             ...updatedAccounts.map(account => account.quantity)
                           ]);
                         }}
                       />
                     </div>
+                  </div>
 
+                  {/* Second Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
                     <div className="md:col-span-6">
                       <Label>Description</Label>
                       <Textarea
                         value={accountItem.description || ""}
                         onChange={(e) => {
-                          const updatedAccounts = [...billAccounts];
+                          const updatedAccounts = [...purchaseOrderAccounts];
                           updatedAccounts[index].description = e.target.value;
-                          setBillAccounts(updatedAccounts);
+                          setPurchaseOrderAccounts(updatedAccounts);
                           setData("description", [
-                            ...billItems.map(item => item.description),
+                            ...purchaseOrderItems.map(item => item.description),
                             ...updatedAccounts.map(account => account.description)
                           ]);
                         }}
@@ -865,29 +729,23 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                       />
                     </div>
 
-                    <div className="md:col-span-2">
-                      <TaxSelector index={index} isAccount={true} />
+                    <div className="md:col-span-5">
+                      <Label>Subtotal</Label>
+                      <div className="p-2 bg-white rounded mt-1 text-right">
+                        {(accountItem.quantity * accountItem.unit_cost).toFixed(2)}
+                      </div>
                     </div>
 
-                    <div className="md:col-span-1 flex items-end justify-end">
+                    <div className="md:col-span-1 flex items-center justify-end">
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
                         className="text-red-500"
-                        onClick={() => removeBillAccount(index)}
+                        onClick={() => removePurchaseOrderAccount(index)}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end">
-                    <div className="text-right">
-                      <Label>Subtotal</Label>
-                      <div className="p-2 bg-white rounded mt-1 text-right">
-                        {(accountItem.quantity * accountItem.unit_cost).toFixed(2)}
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -995,14 +853,14 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                   variant="secondary"
                   onClick={() => {
                     reset();
-                    setBillItems([]);
-                    setBillAccounts([]);
+                    setPurchaseOrderItems([]);
+                    setPurchaseOrderAccounts([]);
                   }}
                 >
                   Reset
                 </Button>
                 <Button type="submit" disabled={processing}>
-                  Update Bill
+                  Update Purchase Order
                 </Button>
               </div>
             </div>

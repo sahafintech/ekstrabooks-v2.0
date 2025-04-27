@@ -540,7 +540,6 @@ class DefferedInvoiceController extends Controller
             ->map(fn($id) => (string) $id)
             ->toArray();
 
-
         return Inertia::render('Backend/User/Invoice/Deffered/Edit', [
             'invoice' => $invoice,
             'attachments' => $attachments,

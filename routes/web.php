@@ -413,9 +413,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('reject_cash_purchase/{id}', [CashPurchaseController::class, 'reject'])->name('cash_purchases.reject');
 
 		// purchase orders
-		Route::match(['get', 'post'], 'purchase_orders/pay_bill', [PurchaseOrderController::class, 'pay_bill'])->name('purchase_orders.pay_bill');
 		Route::get('purchase_orders/{id}/duplicate', [PurchaseOrderController::class, 'duplicate'])->name('purchase_orders.duplicate');
-		Route::post('purchase_orders/get_table_data', [PurchaseOrderController::class, 'get_table_data']);
 		Route::resource('purchase_orders', PurchaseOrderController::class);
 		Route::post('import_purchase_orders', [PurchaseOrderController::class, 'import_purchase_orders'])->name('purchase_orders.import');
 		Route::post('purchase_orders/filter', [PurchaseOrderController::class, 'purchase_orders_filter'])->name('purchase_orders.filter');

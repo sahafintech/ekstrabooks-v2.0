@@ -6,15 +6,22 @@ use App\Models\Account;
 use App\Models\Attachment;
 use App\Models\AuditLog;
 use App\Models\BusinessSetting;
+use App\Models\Currency;
+use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
 use App\Models\PurchaseItemTax;
+use App\Models\PurchaseOrder;
+use App\Models\PurchaseOrderItem;
+use App\Models\PurchaseOrderItemTax;
 use App\Models\Tax;
 use App\Models\Transaction;
+use App\Models\Vendor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 
 class PurchaseOrderController extends Controller
@@ -31,15 +38,39 @@ class PurchaseOrderController extends Controller
 	 *
 	 * @return \Illuminate\Http\Response
 	 */
-	public function index()
+	public function index(Request $request)
 	{
-		$purchases = Purchase::select('purchases.*')
-			->with('vendor')
-			->where('order', 1)
-			->orderBy("purchases.id", "desc")
-			->get();
+		$search = $request->get('search', '');
+		$perPage = $request->get('per_page', 10);
 
-		return view('backend.user.purchase_order.list', compact('purchases'));
+		$query = PurchaseOrder::with('vendor')
+			->orderBy('id', 'desc');
+
+		if ($search) {
+			$query->where(function ($q) use ($search) {
+				$q->where('bill_no', 'like', "%$search%")
+					->orWhere('title', 'like', "%$search%")
+					->orWhereHas('vendor', function ($q) use ($search) {
+						$q->where('name', 'like', "%$search%");
+					});
+			});
+		}
+
+		$orders = $query->paginate($perPage)->withQueryString();
+
+		return Inertia::render('Backend/User/PurchaseOrder/List', [
+			'orders' => $orders->items(),
+			'meta' => [
+				'current_page' => $orders->currentPage(),
+				'per_page' => $orders->perPage(),
+				'last_page' => $orders->lastPage(),
+				'total' => $orders->total(),
+			],
+			'filters' => [
+				'search' => $search,
+				'per_page' => $perPage,
+			],
+		]);
 	}
 
 	/**
@@ -49,7 +80,40 @@ class PurchaseOrderController extends Controller
 	 */
 	public function create(Request $request)
 	{
-		return view('backend.user.purchase_order.create');
+		$vendors = Vendor::where('business_id', $request->activeBusiness->id)
+			->orderBy('id', 'desc')
+			->get();
+
+		$products = Product::where('business_id', $request->activeBusiness->id)
+			->orderBy('id', 'desc')
+			->get();
+
+		$currencies = Currency::orderBy('id', 'desc')
+			->get();
+
+		$taxes = Tax::orderBy('id', 'desc')
+			->get();
+
+		$accounts = Account::orderBy('id', 'desc')
+			->get();
+
+		$purchase_order_title = get_business_option('purchase_order_title', 'Purchase Order');
+
+		$inventory = Account::where('account_name', 'Inventory')->first();
+
+		$decimalPlace = get_business_option('decimal_place', 2);
+
+		return Inertia::render('Backend/User/PurchaseOrder/Create', [
+			'vendors' => $vendors,
+			'products' => $products,
+			'currencies' => $currencies,
+			'taxes' => $taxes,
+			'accounts' => $accounts,
+			'purchase_order_title' => $purchase_order_title,
+			'decimalPlace' => $decimalPlace,
+			'inventory' => $inventory,
+			'base_currency' => $request->activeBusiness->currency,
+		]);
 	}
 
 	/**
@@ -63,7 +127,7 @@ class PurchaseOrderController extends Controller
 		$validator = Validator::make($request->all(), [
 			'vendor_id' => 'required',
 			'title' => 'required',
-			'purchase_date' => 'required|date',
+			'order_date' => 'required|date',
 			'product_name' => 'required',
 			'currency'  =>  'required',
 		], [
@@ -71,7 +135,7 @@ class PurchaseOrderController extends Controller
 		]);
 
 		if ($validator->fails()) {
-			return redirect()->route('purchase_orders.create')
+			return redirect()->route('bill_invoices.create')
 				->withErrors($validator)
 				->withInput();
 		}
@@ -148,31 +212,28 @@ class PurchaseOrderController extends Controller
 
 		$summary = $this->calculateTotal($request);
 
-		$purchase = new Purchase();
+		$purchase = new PurchaseOrder();
 		$purchase->vendor_id = $request->input('vendor_id');
 		$purchase->title = $request->input('title');
-		$purchase->bill_no = get_business_option('purchase_number');
-		$purchase->po_so_number = $request->input('po_so_number');
-		$purchase->purchase_date = Carbon::parse($request->input('purchase_date'))->format('Y-m-d');
-		$purchase->due_date = Carbon::parse($request->input('purchase_date'))->format('Y-m-d');
+		$purchase->order_number = get_business_option('purchase_order_number');
+		$purchase->order_date = Carbon::parse($request->input('order_date'))->format('Y-m-d');
 		$purchase->sub_total = $summary['subTotal'];
 		$purchase->grand_total = $summary['grandTotal'];
 		$purchase->converted_total = $request->input('converted_total');
 		$purchase->exchange_rate   = $request->input('exchange_rate');
 		$purchase->currency   = $request->input('currency');
-		$purchase->paid = 0;
-		$purchase->order = 1;
 		$purchase->discount = $summary['discountAmount'];
 		$purchase->discount_type = $request->input('discount_type');
 		$purchase->discount_value = $request->input('discount_value') ?? 0;
 		$purchase->template_type = 0;
 		$purchase->template = $request->input('template');
 		$purchase->note = $request->input('note');
-		$purchase->withholding_tax = $request->input('withholding_tax') ?? 0;
 		$purchase->footer = $request->input('footer');
+		$purchase->created_by = auth()->user()->id;
 		$purchase->short_code = rand(100000, 9999999) . uniqid();
 
 		$purchase->save();
+
 
 		// if attachments then upload
 		if (isset($request->attachments['file'])) {
@@ -196,7 +257,7 @@ class PurchaseOrderController extends Controller
 		}
 
 		for ($i = 0; $i < count($request->product_name); $i++) {
-			$purchaseItem = $purchase->items()->save(new PurchaseItem([
+			$purchaseItem = $purchase->items()->save(new PurchaseOrderItem([
 				'purchase_id' => $purchase->id,
 				'product_id' => isset($request->product_id[$i]) ? $request->product_id[$i] : null,
 				'product_name' => $request->product_name[$i],
@@ -207,11 +268,11 @@ class PurchaseOrderController extends Controller
 				'account_id' => $request->account_id[$i],
 			]));
 
-			if (isset($request->taxes[$purchaseItem->product_name])) {
-				foreach ($request->taxes[$purchaseItem->product_name] as $taxId) {
+			if (isset($request->taxes)) {
+				foreach ($request->taxes as $taxId) {
 					$tax = Tax::find($taxId);
 
-					$purchaseItem->taxes()->save(new PurchaseItemTax([
+					$purchaseItem->taxes()->save(new PurchaseOrderItemTax([
 						'purchase_id' => $purchase->id,
 						'tax_id' => $taxId,
 						'name' => $tax->name . ' ' . $tax->rate . ' %',
@@ -222,7 +283,7 @@ class PurchaseOrderController extends Controller
 		}
 
 		//Increment Bill Number
-		BusinessSetting::where('name', 'purchase_number')->increment('value');
+		BusinessSetting::where('name', 'purchase_order_number')->increment('value');
 
 		DB::commit();
 
@@ -230,14 +291,10 @@ class PurchaseOrderController extends Controller
 		$audit = new AuditLog();
 		$audit->date_changed = date('Y-m-d H:i:s');
 		$audit->changed_by = auth()->user()->id;
-		$audit->event = 'Purchase Invoice Created' . ' ' . $purchase->bill_no;
+		$audit->event = 'Purchase Order Created' . ' ' . $purchase->bill_no;
 		$audit->save();
 
-		if ($purchase->id > 0) {
-			return redirect()->route('purchase_orders.show', $purchase->id)->with('success', _lang('Saved Successfully'));
-		} else {
-			return back()->with('error', _lang('Something going wrong, Please try again'));
-		}
+		return redirect()->route('purchase_orders.show', $purchase->id)->with('success', _lang('Saved Successfully'));
 	}
 
 	/**
@@ -246,12 +303,15 @@ class PurchaseOrderController extends Controller
 	 * @param  int  $id
 	 * @return \Illuminate\Http\Response
 	 */
-	public function show(Request $request, $id)
+	public function show($id)
 	{
-		$alert_col = 'col-lg-8 offset-lg-2';
-		$purchase = Purchase::with(['business', 'items'])->find($id);
+		$purchase_order = PurchaseOrder::with(['business', 'items', 'taxes', 'vendor'])->find($id);
 		$attachments = Attachment::where('ref_id', $id)->where('ref_type', 'purchase order')->get();
-		return view('backend.user.purchase_order.view', compact('purchase', 'id', 'alert_col', 'attachments'));
+
+		return Inertia::render('Backend/User/PurchaseOrder/View', [
+			'purchase_order' => $purchase_order,
+			'attachments' => $attachments,
+		]);
 	}
 
 	/**
@@ -262,13 +322,33 @@ class PurchaseOrderController extends Controller
 	 */
 	public function edit(Request $request, $id)
 	{
-		$purchase = Purchase::with('items')
+		$purchase_order = PurchaseOrder::with(['business', 'items', 'taxes', 'vendor'])
 			->where('id', $id)
 			->first();
 
 		$attachments = Attachment::where('ref_id', $id)->where('ref_type', 'purchase order')->get();
+		$accounts = Account::all();
+		$currencies = Currency::all();
+		$vendors = Vendor::all();
+		$products = Product::all();
+		$taxes = Tax::all();
+		$inventory = Account::where('account_name', 'Inventory')->first();
+		$taxIds = $purchase_order->taxes
+			->pluck('tax_id')
+			->map(fn($id) => (string) $id)
+			->toArray();
 
-		return view('backend.user.purchase_order.edit', compact('purchase', 'id', 'attachments'));
+		return Inertia::render('Backend/User/PurchaseOrder/Edit', [
+			'purchase_order' => $purchase_order,
+			'attachments' => $attachments,
+			'accounts' => $accounts,
+			'currencies' => $currencies,
+			'vendors' => $vendors,
+			'products' => $products,
+			'taxes' => $taxes,
+			'inventory' => $inventory,
+			'taxIds' => $taxIds,
+		]);
 	}
 
 	/**
@@ -283,7 +363,7 @@ class PurchaseOrderController extends Controller
 		$validator = Validator::make($request->all(), [
 			'vendor_id' => 'required',
 			'title' => 'required',
-			'purchase_date' => 'required|date',
+			'order_date' => 'required|date',
 			'product_id' => 'required',
 		], [
 			'product_id.required' => _lang('You must add at least one item'),
@@ -367,16 +447,11 @@ class PurchaseOrderController extends Controller
 
 		$summary = $this->calculateTotal($request);
 
-		$purchase = Purchase::where('id', $id)
+		$purchase = PurchaseOrder::where('id', $id)
 			->first();
 		$purchase->vendor_id = $request->input('vendor_id') ?? null;
 		$purchase->title = $request->input('title');
-		$purchase->po_so_number = $request->input('po_so_number');
-		if ($purchase->bill_no == null) {
-			$purchase->bill_no = get_business_option('purchase_number');
-		}
-		$purchase->purchase_date = Carbon::parse($request->input('purchase_date'))->format('Y-m-d');
-		$purchase->due_date = Carbon::parse($request->input('purchase_date'))->format('Y-m-d');
+		$purchase->order_date = Carbon::parse($request->input('order_date'))->format('Y-m-d');
 		$purchase->sub_total = $summary['subTotal'];
 		$purchase->grand_total = $summary['grandTotal'];
 		$purchase->converted_total = $request->input('converted_total');
@@ -387,7 +462,6 @@ class PurchaseOrderController extends Controller
 		$purchase->template_type = 0;
 		$purchase->template = $request->input('template');
 		$purchase->note = $request->input('note');
-		$purchase->withholding_tax = $request->input('withholding_tax') ?? 0;
 		$purchase->footer = $request->input('footer');
 		$purchase->save();
 
@@ -433,10 +507,8 @@ class PurchaseOrderController extends Controller
 			$purchase_item->delete();
 		}
 
-		$currentTime = Carbon::now();
-
 		for ($i = 0; $i < count($request->product_name); $i++) {
-			$purchaseItem = $purchase->items()->save(new PurchaseItem([
+			$purchaseItem = $purchase->items()->save(new PurchaseOrderItem([
 				'purchase_id' => $purchase->id,
 				'product_id' => null,
 				'product_name' => $request->product_name[$i],
@@ -446,6 +518,22 @@ class PurchaseOrderController extends Controller
 				'sub_total' => ($request->unit_cost[$i] * $request->quantity[$i]),
 				'account_id' => $request->account_id[$i],
 			]));
+
+			if (isset($request->taxes)) {
+
+				$purchaseItem->taxes()->delete();
+
+				foreach ($request->taxes as $taxId) {
+					$tax = Tax::find($taxId);
+
+					$purchaseItem->taxes()->save(new PurchaseOrderItemTax([
+						'purchase_id' => $purchase->id,
+						'tax_id' => $taxId,
+						'name' => $tax->name . ' ' . $tax->rate . ' %',
+						'amount' => ($purchaseItem->sub_total / 100) * $tax->rate,
+					]));
+				}
+			}
 		}
 
 		if ($purchase->bill_no == null) {
@@ -459,54 +547,10 @@ class PurchaseOrderController extends Controller
 		$audit = new AuditLog();
 		$audit->date_changed = date('Y-m-d H:i:s');
 		$audit->changed_by = auth()->user()->id;
-		$audit->event = 'Purchase Order Updated' . ' ' . $purchase->bill_no;
+		$audit->event = 'Purchase Order Updated' . ' ' . $purchase->order_number;
 		$audit->save();
 
-		if (!$request->ajax()) {
-			if ($purchase->status == 0) {
-				return redirect()->route('purchase_orders.show', $purchase->id)->with('success', _lang('Updated Successfully'));
-			} else {
-				return redirect()->route('purchase_orders.index')->with('success', _lang('Updated Successfully'));
-			}
-		} else {
-			return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $purchase, 'table' => '#invoices_table']);
-		}
-	}
-
-	/** Duplicate Invoice */
-	public function duplicate($id)
-	{
-		DB::beginTransaction();
-		$purchase = Purchase::find($id);
-		$newPurchase = $purchase->replicate();
-		$newPurchase->status = 0;
-		$newPurchase->paid = 0;
-		$newPurchase->short_code = rand(100000, 9999999) . uniqid();
-		$newPurchase->save();
-
-		foreach ($purchase->items as $purchaseItem) {
-			$newPurchaseItem = $purchaseItem->replicate();
-			$newPurchaseItem->purchase_id = $newPurchase->id;
-			$newPurchaseItem->save();
-
-			foreach ($purchaseItem->taxes as $PurchaseItemTax) {
-				$newPurchaseItemTax = $PurchaseItemTax->replicate();
-				$newPurchaseItemTax->purchase_id = $newPurchase->id;
-				$newPurchaseItemTax->purchase_item_id = $newPurchaseItem->id;
-				$newPurchaseItemTax->save();
-			}
-
-			//Update Stock
-			$product = $purchaseItem->product;
-			if ($product->type == 'product' && $product->stock_management == 1) {
-				$product->stock = $product->stock + $newPurchaseItem->quantity;
-				$product->save();
-			}
-		}
-
-		DB::commit();
-
-		return redirect()->route('purchase_orders.edit', $newPurchase->id);
+		return redirect()->route('purchase_orders.show', $purchase->id)->with('success', _lang('Updated Successfully'));
 	}
 
 	/**
@@ -517,17 +561,17 @@ class PurchaseOrderController extends Controller
 	 */
 	public function destroy($id)
 	{
-		$purchase = Purchase::find($id);
+		$purchase = PurchaseOrder::find($id);
 
 		// audit log
 		$audit = new AuditLog();
 		$audit->date_changed = date('Y-m-d H:i:s');
 		$audit->changed_by = auth()->user()->id;
-		$audit->event = 'Purchase Order Deleted' . ' ' . $purchase->bill_no;
+		$audit->event = 'Purchase Order Deleted' . ' ' . $purchase->order_number;
 		$audit->save();
 
 		// delete attachments
-		$attachments = Attachment::where('ref_id', $purchase->id)->where('ref_type', 'bill invoice')->get();
+		$attachments = Attachment::where('ref_id', $purchase->id)->where('ref_type', 'purchase order')->get();
 		foreach ($attachments as $attachment) {
 			$filePath = public_path($attachment->path);
 			if (file_exists($filePath)) {
@@ -714,31 +758,71 @@ class PurchaseOrderController extends Controller
 	{
 		DB::beginTransaction();
 		try {
-			$purchase = Purchase::find($id);
-			$purchase->order = 0;
-			$purchase->cash = 0;
-			$purchase->status = 0;
-			$purchase->approval_status = 1;
-			$purchase->save();
-			
+			$purchase_order = PurchaseOrder::find($id);
+			$purchase_order->status = 1;
+			$purchase_order->save();
+
+			$bill = new Purchase();
+			$bill->vendor_id = $purchase_order->vendor_id;
+			$bill->title = $purchase_order->title;
+			$bill->bill_no = get_business_option('purchase_number');
+			$bill->po_so_number = $purchase_order->po_so_number;
+			$bill->purchase_date = Carbon::parse($purchase_order->purchase_date)->format('Y-m-d');
+			$bill->due_date = Carbon::parse($purchase_order->due_date)->format('Y-m-d');
+			$bill->sub_total = $purchase_order->sub_total;
+			$bill->grand_total = $purchase_order->grand_total;
+			$bill->converted_total = $purchase_order->converted_total;
+			$bill->exchange_rate = $purchase_order->exchange_rate;
+			$bill->currency = $purchase_order->currency;
+			$bill->paid = 0;
+			$bill->discount = $purchase_order->discount;
+			$bill->discount_type = $purchase_order->discount_type;
+			$bill->discount_value = $purchase_order->discount_value;
+			$bill->template_type = 0;
+			$bill->template = $purchase_order->template;
+			$bill->note = $purchase_order->note;
+			$bill->footer = $purchase_order->footer;
+			if (has_permission('bill_invoices.approve') || request()->isOwner) {
+				$bill->approval_status = 1;
+			} else {
+				$bill->approval_status = 0;
+			}
+			$bill->created_by = auth()->user()->id;
+			if (has_permission('bill_invoices.approve') || request()->isOwner) {
+				$bill->approved_by = auth()->user()->id;
+			} else {
+				$bill->approved_by = null;
+			}
+			$bill->short_code = rand(100000, 9999999) . uniqid();
+
+			$bill->save();
+
 			// Set current time for transaction dates
 			$currentTime = Carbon::now();
-			
+
 			// Create transactions for each purchase item
-			foreach ($purchase->items as $purchaseItem) {
+			foreach ($purchase_order->items as $purchaseItem) {
+				$bill->items()->create([
+					'product_id' => $purchaseItem->product_id,
+					'quantity' => $purchaseItem->quantity,
+					'price' => $purchaseItem->price,
+					'sub_total' => $purchaseItem->sub_total,
+					'taxes' => $purchaseItem->taxes,
+					'total' => $purchaseItem->total,
+				]);
 				// Create transaction for the item
 				$transaction = new Transaction();
 				$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
 				$transaction->account_id = $purchaseItem->account_id;
 				$transaction->dr_cr = 'dr';
 				$transaction->transaction_amount = $purchaseItem->sub_total;
-				$transaction->transaction_currency = $purchase->currency;
-				$transaction->currency_rate = $purchase->exchange_rate;
-				$transaction->base_currency_amount = convert_currency($purchase->currency, $purchase->business->currency, $purchaseItem->sub_total);
+				$transaction->transaction_currency = $bill->currency;
+				$transaction->currency_rate = $bill->exchange_rate;
+				$transaction->base_currency_amount = convert_currency($bill->currency, $bill->business->currency, $purchaseItem->sub_total);
 				$transaction->ref_type = 'bill invoice';
-				$transaction->vendor_id = $purchase->vendor_id;
-				$transaction->ref_id = $purchase->id;
-				$transaction->description = 'Bill Invoice #' . $purchase->bill_no;
+				$transaction->vendor_id = $bill->vendor_id;
+				$transaction->ref_id = $bill->id;
+				$transaction->description = 'Bill Invoice #' . $bill->bill_no;
 				$transaction->save();
 
 				// increase product stock
@@ -749,16 +833,22 @@ class PurchaseOrderController extends Controller
 
 				// Create transactions for taxes if any
 				foreach ($purchaseItem->taxes as $tax) {
+					$bill->taxes()->create([
+						'purchase_id' => $bill->id,
+						'tax_id' => $tax->tax_id,
+						'name' => $tax->name . ' ' . $tax->rate . ' %',
+						'amount' => ($purchaseItem->sub_total / 100) * $tax->rate,
+					]);
 					$transaction = new Transaction();
 					$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
-					$transaction->account_id = $tax->tax->account_id;
+					$transaction->account_id = $tax->account_id;
 					$transaction->dr_cr = 'dr';
 					$transaction->transaction_amount = $tax->amount;
-					$transaction->transaction_currency = $purchase->currency;
-					$transaction->currency_rate = $purchase->exchange_rate;
-					$transaction->base_currency_amount = convert_currency($purchase->currency, $purchase->business->currency, $tax->amount);
-					$transaction->description = _lang('Bill Invoice Tax') . ' #' . $purchase->bill_no;
-					$transaction->ref_id = $purchase->id;
+					$transaction->transaction_currency = $bill->currency;
+					$transaction->currency_rate = $bill->exchange_rate;
+					$transaction->base_currency_amount = convert_currency($bill->currency, $bill->business->currency, $tax->amount);
+					$transaction->description = _lang('Bill Invoice Tax') . ' #' . $bill->bill_no;
+					$transaction->ref_id = $bill->id;
 					$transaction->ref_type = 'bill invoice tax';
 					$transaction->tax_id = $tax->tax_id;
 					$transaction->save();
@@ -770,34 +860,34 @@ class PurchaseOrderController extends Controller
 			$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
 			$transaction->account_id = get_account('Accounts Payable')->id;
 			$transaction->dr_cr = 'cr';
-			$transaction->transaction_amount = $purchase->grand_total;
-			$transaction->transaction_currency = $purchase->currency;
-			$transaction->currency_rate = $purchase->exchange_rate;
-			$transaction->base_currency_amount = convert_currency($purchase->currency, $purchase->business->currency, $purchase->grand_total);
+			$transaction->transaction_amount = $bill->grand_total;
+			$transaction->transaction_currency = $bill->currency;
+			$transaction->currency_rate = $bill->exchange_rate;
+			$transaction->base_currency_amount = convert_currency($bill->currency, $bill->business->currency, $bill->grand_total);
 			$transaction->ref_type = 'bill invoice';
-			$transaction->vendor_id = $purchase->vendor_id;
-			$transaction->ref_id = $purchase->id;
-			$transaction->description = 'Bill Invoice Payable #' . $purchase->bill_no;
+			$transaction->vendor_id = $bill->vendor_id;
+			$transaction->ref_id = $bill->id;
+			$transaction->description = 'Bill Invoice Payable #' . $bill->bill_no;
 			$transaction->save();
 
 			// Create discount transaction if applicable
-			if ($purchase->discount > 0) {
+			if ($bill->discount > 0) {
 				$transaction = new Transaction();
 				$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
 				$transaction->account_id = get_account('Purchase Discount Allowed')->id;
 				$transaction->dr_cr = 'cr';
-				$transaction->transaction_amount = $purchase->discount;
-				$transaction->transaction_currency = $purchase->currency;
-				$transaction->currency_rate = $purchase->exchange_rate;
-				$transaction->base_currency_amount = convert_currency($purchase->currency, $purchase->business->currency, $purchase->discount);
-				$transaction->description = _lang('Bill Invoice Discount') . ' #' . $purchase->bill_no;
-				$transaction->ref_id = $purchase->id;
+				$transaction->transaction_amount = $bill->discount;
+				$transaction->transaction_currency = $bill->currency;
+				$transaction->currency_rate = $bill->exchange_rate;
+				$transaction->base_currency_amount = convert_currency($bill->currency, $bill->business->currency, $bill->discount);
+				$transaction->description = _lang('Bill Invoice Discount') . ' #' . $bill->bill_no;
+				$transaction->ref_id = $bill->id;
 				$transaction->ref_type = 'bill invoice';
-				$transaction->vendor_id = $purchase->vendor_id;
+				$transaction->vendor_id = $bill->vendor_id;
 				$transaction->save();
 			}
 
-			$purchase->save();
+			$bill->save();
 
 			// audit log
 			$audit = new AuditLog();
@@ -817,104 +907,148 @@ class PurchaseOrderController extends Controller
 	public function convert_to_cash_purchase($id)
 	{
 		DB::beginTransaction();
-		try {
-			$purchase = Purchase::find($id);
-			$purchase->order = 0;
-			$purchase->cash = 1;
-			$purchase->paid = $purchase->grand_total;
-			$purchase->status = 2;
-			$purchase->approval_status = 1;
-			$purchase->save();
-			
-			// Set current time for transaction dates
-			$currentTime = Carbon::now();
-			
-			// Create transactions for each purchase item
-			foreach ($purchase->items as $purchaseItem) {
-				// Create transaction for the item
-				$transaction = new Transaction();
-				$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
-				$transaction->account_id = $purchaseItem->account_id;
-				$transaction->dr_cr = 'dr';
-				$transaction->transaction_amount = $purchaseItem->sub_total;
-				$transaction->transaction_currency = $purchase->currency;
-				$transaction->currency_rate = $purchase->exchange_rate;
-				$transaction->base_currency_amount = convert_currency($purchase->currency, $purchase->business->currency, $purchaseItem->sub_total);
-				$transaction->ref_type = 'cash purchase';
-				$transaction->vendor_id = $purchase->vendor_id;
-				$transaction->ref_id = $purchase->id;
-				$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
-				$transaction->save();
+		$purchase_order = PurchaseOrder::find($id);
+		$purchase_order->status = 1;
+		$purchase_order->save();
 
-				// increase product stock
-				if ($purchaseItem->product->type == 'product' && $purchaseItem->product->stock_management == 1) {
-					$purchaseItem->product->stock += $purchaseItem->quantity;
-					$purchaseItem->product->save();
-				}
+		$cash_purchase = new Purchase();
+		$cash_purchase->vendor_id = $purchase_order->vendor_id;
+		$cash_purchase->title = $purchase_order->title;
+		$cash_purchase->bill_no = get_business_option('purchase_number');
+		$cash_purchase->po_so_number = $purchase_order->po_so_number;
+		$cash_purchase->purchase_date = Carbon::parse($purchase_order->purchase_date)->format('Y-m-d');
+		$cash_purchase->due_date = Carbon::parse($purchase_order->purchase_date)->format('Y-m-d');
+		$cash_purchase->sub_total = $purchase_order->sub_total;
+		$cash_purchase->grand_total = $purchase_order->grand_total;
+		$cash_purchase->converted_total = $purchase_order->converted_total;
+		$cash_purchase->exchange_rate = $purchase_order->exchange_rate;
+		$cash_purchase->currency = $purchase_order->currency;
+		$cash_purchase->paid = 0;
+		$cash_purchase->discount = $purchase_order->discount;
+		$cash_purchase->cash = 1;
+		$cash_purchase->discount_type = $purchase_order->discount_type;
+		$cash_purchase->discount_value = $purchase_order->discount_value;
+		$cash_purchase->template_type = 0;
+		$cash_purchase->template = $purchase_order->template;
+		$cash_purchase->note = $purchase_order->note;
+		$cash_purchase->footer = $purchase_order->footer;
+		if (has_permission('cash_purchases.approve') || request()->isOwner) {
+			$cash_purchase->approval_status = 1;
+		} else {
+			$cash_purchase->approval_status = 0;
+		}
+		$cash_purchase->created_by = auth()->user()->id;
+		if (has_permission('cash_purchases.approve') || request()->isOwner) {
+			$cash_purchase->approved_by = auth()->user()->id;
+		} else {
+			$cash_purchase->approved_by = null;
+		}
+		$cash_purchase->short_code = rand(100000, 9999999) . uniqid();
+		$cash_purchase->status = 2;
 
-				// Create transactions for taxes if any
-				foreach ($purchaseItem->taxes as $tax) {
-					$transaction = new Transaction();
-					$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
-					$transaction->account_id = $tax->tax->account_id;
-					$transaction->dr_cr = 'dr';
-					$transaction->transaction_amount = $tax->amount;
-					$transaction->transaction_currency = $purchase->currency;
-					$transaction->currency_rate = $purchase->exchange_rate;
-					$transaction->base_currency_amount = convert_currency($purchase->currency, $purchase->business->currency, $tax->amount);
-					$transaction->description = _lang('Cash Purchase Tax') . ' #' . $purchase->bill_no;
-					$transaction->ref_id = $purchase->id;
-					$transaction->ref_type = 'cash purchase tax';
-					$transaction->tax_id = $tax->tax_id;
-					$transaction->save();
-				}
-			}
+		$cash_purchase->save();
 
-			// Create credit account transaction
+		// Set current time for transaction dates
+		$currentTime = Carbon::now();
+
+		// Create transactions for each purchase item
+		foreach ($purchase_order->items as $purchaseItem) {
+
+			$cash_purchase->items()->create([
+				'product_id' => $purchaseItem->product_id,
+				'quantity' => $purchaseItem->quantity,
+				'price' => $purchaseItem->price,
+				'sub_total' => $purchaseItem->sub_total,
+				'taxes' => $purchaseItem->taxes,
+				'total' => $purchaseItem->total,
+			]);
+			// Create transaction for the item
 			$transaction = new Transaction();
 			$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
-			$transaction->account_id = request()->input('credit_account_id');
-			$transaction->dr_cr = 'cr';
-			$transaction->transaction_amount = $purchase->grand_total;
-			$transaction->transaction_currency = $purchase->currency;
-			$transaction->currency_rate = $purchase->exchange_rate;
-			$transaction->base_currency_amount = convert_currency($purchase->currency, $purchase->business->currency, $purchase->grand_total);
-			$transaction->ref_type = 'cash purchase payment';
-			$transaction->ref_id = $purchase->id;
-			$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
+			$transaction->account_id = $purchaseItem->account_id;
+			$transaction->dr_cr = 'dr';
+			$transaction->transaction_amount = $purchaseItem->sub_total;
+			$transaction->transaction_currency = $cash_purchase->currency;
+			$transaction->currency_rate = $cash_purchase->exchange_rate;
+			$transaction->base_currency_amount = convert_currency($cash_purchase->currency, $cash_purchase->business->currency, $purchaseItem->sub_total);
+			$transaction->ref_type = 'cash purchase';
+			$transaction->vendor_id = $cash_purchase->vendor_id;
+			$transaction->ref_id = $cash_purchase->id;
+			$transaction->description = 'Cash Purchase #' . $cash_purchase->bill_no;
 			$transaction->save();
 
-			// Create discount transaction if applicable
-			if ($purchase->discount > 0) {
-				$transaction = new Transaction();
-				$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
-				$transaction->account_id = get_account('Purchase Discount Allowed')->id;
-				$transaction->dr_cr = 'cr';
-				$transaction->transaction_amount = $purchase->discount;
-				$transaction->transaction_currency = $purchase->currency;
-				$transaction->currency_rate = $purchase->exchange_rate;
-				$transaction->base_currency_amount = convert_currency($purchase->currency, $purchase->business->currency, $purchase->discount);
-				$transaction->description = _lang('Cash Purchase Discount') . ' #' . $purchase->bill_no;
-				$transaction->ref_id = $purchase->id;
-				$transaction->ref_type = 'cash purchase';
-				$transaction->vendor_id = $purchase->vendor_id;
-				$transaction->save();
+			// increase product stock
+			if ($purchaseItem->product->type == 'product' && $purchaseItem->product->stock_management == 1) {
+				$purchaseItem->product->stock += $purchaseItem->quantity;
+				$purchaseItem->product->save();
 			}
 
-			$purchase->save();
+			// Create transactions for taxes if any
+			foreach ($purchaseItem->taxes as $tax) {
 
-			// audit log
-			$audit = new AuditLog();
-			$audit->date_changed = date('Y-m-d H:i:s');
-			$audit->changed_by = auth()->user()->id;
-			$audit->event = 'Purchase Order Converted to Cash Purchase';
-			$audit->save();
-
-			DB::commit();
-			return redirect()->route('purchase_orders.index')->with('success', _lang('Converted Successfully'));
-		} catch (\Exception $e) {
-			DB::rollback();
-			return redirect()->route('purchase_orders.index')->with('error', _lang('An error occurred while converting the purchase order'));
+				$cash_purchase->taxes()->create([
+					'purchase_id' => $cash_purchase->id,
+					'tax_id' => $tax->tax_id,
+					'name' => $tax->name . ' ' . $tax->rate . ' %',
+					'amount' => ($purchaseItem->sub_total / 100) * $tax->rate,
+				]);
+				$transaction = new Transaction();
+				$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
+				$transaction->account_id = $tax->tax->account_id;
+				$transaction->dr_cr = 'dr';
+				$transaction->transaction_amount = $tax->amount;
+				$transaction->transaction_currency = $cash_purchase->currency;
+				$transaction->currency_rate = $cash_purchase->exchange_rate;
+				$transaction->base_currency_amount = convert_currency($cash_purchase->currency, $cash_purchase->business->currency, $tax->amount);
+				$transaction->description = _lang('Cash Purchase Tax') . ' #' . $cash_purchase->bill_no;
+				$transaction->ref_id = $cash_purchase->id;
+				$transaction->ref_type = 'cash purchase tax';
+				$transaction->tax_id = $tax->tax_id;
+				$transaction->save();
+			}
 		}
+
+		// Create credit account transaction
+		$transaction = new Transaction();
+		$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
+		$transaction->account_id = request()->input('credit_account_id');
+		$transaction->dr_cr = 'cr';
+		$transaction->transaction_amount = $cash_purchase->grand_total;
+		$transaction->transaction_currency = $cash_purchase->currency;
+		$transaction->currency_rate = $cash_purchase->exchange_rate;
+		$transaction->base_currency_amount = convert_currency($cash_purchase->currency, $cash_purchase->business->currency, $cash_purchase->grand_total);
+		$transaction->ref_type = 'cash purchase payment';
+		$transaction->ref_id = $cash_purchase->id;
+		$transaction->description = 'Cash Purchase #' . $cash_purchase->bill_no;
+		$transaction->save();
+
+		// Create discount transaction if applicable
+		if ($cash_purchase->discount > 0) {
+			$transaction = new Transaction();
+			$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
+			$transaction->account_id = get_account('Purchase Discount Allowed')->id;
+			$transaction->dr_cr = 'cr';
+			$transaction->transaction_amount = $cash_purchase->discount;
+			$transaction->transaction_currency = $cash_purchase->currency;
+			$transaction->currency_rate = $cash_purchase->exchange_rate;
+			$transaction->base_currency_amount = convert_currency($cash_purchase->currency, $cash_purchase->business->currency, $cash_purchase->discount);
+			$transaction->description = _lang('Cash Purchase Discount') . ' #' . $cash_purchase->bill_no;
+			$transaction->ref_id = $cash_purchase->id;
+			$transaction->ref_type = 'cash purchase';
+			$transaction->vendor_id = $cash_purchase->vendor_id;
+			$transaction->save();
+		}
+
+		$cash_purchase->save();
+
+		// audit log
+		$audit = new AuditLog();
+		$audit->date_changed = date('Y-m-d H:i:s');
+		$audit->changed_by = auth()->user()->id;
+		$audit->event = 'Purchase Order Converted to Cash Purchase';
+		$audit->save();
+
+		DB::commit();
+		return redirect()->route('purchase_orders.index')->with('success', _lang('Converted Successfully'));
 	}
 }

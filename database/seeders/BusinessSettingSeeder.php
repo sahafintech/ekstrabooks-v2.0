@@ -208,6 +208,27 @@ class BusinessSettingSeeder extends Seeder
                 'value' => '{"name":{"label":"Name","status":"1"},"description":{"status":"1"},"quantity":{"label":"Quantity","status":"1"},"price":{"label":"Price","status":"1"},"amount":{"label":"Amount","status":"1"}}',
                 'business_id' => $this->businessId
             ],
+            // purchase order
+            [
+                'name' => 'purchase_order_title',
+                'value' => 'Purchase Order',
+                'business_id' => $this->businessId
+            ],
+            [
+                'name' => 'purchase_order_number',
+                'value' => '1001',
+                'business_id' => $this->businessId
+            ],
+            [
+                'name' => 'purchase_order_footer',
+                'value' => null,
+                'business_id' => $this->businessId
+            ],
+            [
+                'name' => 'purchase_order_column',
+                'value' => '{"name":{"label":"Name","status":"1"},"description":{"status":"1"},"quantity":{"label":"Quantity","status":"1"},"price":{"label":"Price","status":"1"},"amount":{"label":"Amount","status":"1"}}',
+                'business_id' => $this->businessId
+            ],
             // purchase return
             [
                 'name' => 'purchase_return_title',
