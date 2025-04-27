@@ -6,7 +6,7 @@ import {
   ChevronsUpDown,
   CreditCard,
   LogOut,
-  Sparkles,
+  Shield,
 } from "lucide-react"
 
 import {
@@ -29,6 +29,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { Link } from "@inertiajs/react"
 
 export function NavUser({ user }) {
   const { isMobile } = useSidebar()
@@ -44,7 +45,7 @@ export function NavUser({ user }) {
             >
               <Avatar className="h-8 w-8 rounded-lg">
                 <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                <AvatarFallback className="rounded-lg">{user.name.charAt(0)}</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">{user.name}</span>
@@ -63,7 +64,7 @@ export function NavUser({ user }) {
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
                   <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                  <AvatarFallback className="rounded-lg">{user.name.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">{user.name}</span>
@@ -74,29 +75,38 @@ export function NavUser({ user }) {
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem>
-                <Sparkles />
-                Upgrade to Pro
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>
                 <BadgeCheck />
-                Account
+                <Link href={route('profile.edit')} className="text-sm w-full text-start">
+                  Account
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <CreditCard />
-                Billing
+                <Shield />
+                <Link href={route('profile.change_password')} className="text-sm w-full text-start">
+                  Change Password
+                </Link>
               </DropdownMenuItem>
+              {user.type == 'user' && (
+                <DropdownMenuItem>
+                  <CreditCard />
+                  <Link href={route('membership.index')} className="text-sm w-full text-start">
+                    Billing
+                  </Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem>
                 <Bell />
-                Notifications
+                <Link href={route('profile.show_notification', { id: user.id })} className="text-sm w-full text-start">
+                  Notifications
+                </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
-              <LogOut />
-              Log out
+              <LogOut className="text-destructive" />
+              <Link href={route('logout')} method="post" className="text-sm w-full text-destructive text-start">
+                Log out
+              </Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

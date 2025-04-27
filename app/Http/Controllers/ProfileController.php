@@ -9,6 +9,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
 use Intervention\Image\Facades\Image;
 
 class ProfileController extends Controller {
@@ -51,13 +52,16 @@ class ProfileController extends Controller {
     }
 
     public function edit() {
-        $alert_col = 'col-lg-6 offset-lg-3';
         $profile   = User::find(Auth::User()->id);
 
         if ($profile->user_type == 'admin') {
-            return view('backend.admin.profile.profile_edit', compact('profile', 'alert_col'));
+            return Inertia::render('Backend/Admin/Profile/ProfileEdit', [
+                'profile' => $profile
+            ]);
         } else if ($profile->user_type == 'user') {
-            return view('backend.user.profile.profile_edit', compact('profile'));
+            return Inertia::render('Backend/User/Profile/ProfileEdit', [
+                'profile' => $profile
+            ]);
         }
     }
 
@@ -95,7 +99,7 @@ class ProfileController extends Controller {
 
         DB::commit();
 
-        return redirect()->route('profile.index')->with('success', _lang('Information has been updated'));
+        return redirect()->back()->with('success', _lang('Information has been updated'));
     }
 
     /**
@@ -105,13 +109,12 @@ class ProfileController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function change_password() {
-        $alert_col = 'col-lg-6 offset-lg-3';
         $user_type = auth()->user()->user_type;
 
         if ($user_type == 'admin') {
-            return view('backend.admin.profile.change_password', compact('alert_col'));
+            return Inertia::render('Backend/Admin/Profile/ChangePassword');
         } else if ($user_type == 'user') {
-            return view('backend.user.profile.change_password', compact('alert_col'));
+            return Inertia::render('Backend/User/Profile/ChangePassword');
         }
     }
 
@@ -126,7 +129,7 @@ class ProfileController extends Controller {
         $user = auth()->user();
 
         $this->validate($request, [
-            'oldpassword' => $user->password != null ? 'required' : 'nullable',
+            'old_password' => $user->password != null ? 'required' : 'nullable',
             'password'    => 'required|string|min:6|confirmed',
         ]);
 
@@ -136,14 +139,14 @@ class ProfileController extends Controller {
             return redirect()->route('dashboard.index')->with('success', _lang('Password has been changed'));
         }
 
-        if (Hash::check($request->oldpassword, $user->password)) {
+        if (Hash::check($request->old_password, $user->password)) {
             $user->password = Hash::make($request->password);
             $user->save();
         } else {
-            return back()->with('error', _lang('Old Password did not match !'));
+            return redirect()->back()->with('error', _lang('Old Password did not match !'));
         }
 
-        return back()->with('success', _lang('Password has been changed'));
+        return redirect()->back()->with('success', _lang('Password has been changed'));
     }
 
 }

@@ -10,6 +10,7 @@ use Database\Seeders\CurrencySeeder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Inertia\Inertia;
 
 class MembershipController extends Controller
 {
@@ -27,9 +28,12 @@ class MembershipController extends Controller
     /** Show Active Subscription */
     public function index()
     {
-        $lastPayment = auth()->user()->subscriptionPayments()->orderBy('id', 'desc')->first();
-        $package     = UserPackage::where('user_id', auth()->id())->first();
-        return view('backend.guest.membership.index', compact('package', 'lastPayment'));
+        $lastPayments = auth()->user()->subscriptionPayments()->orderBy('id', 'desc')->first();
+        $pkg     = UserPackage::where('user_id', auth()->id())->first();
+        return Inertia::render('Backend/User/Profile/ActiveSubscription', [
+            'lastPayments' => $lastPayments,
+            'pkg'     => $pkg
+        ]);
     }
 
     /**

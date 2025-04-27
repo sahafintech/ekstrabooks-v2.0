@@ -35,16 +35,19 @@ import {
     SidebarRail,
 } from "@/components/ui/sidebar";
 
-const data = {
-    user: {
-        name: "shadcn",
-        email: "m@example.com",
-        avatar: "/avatars/shadcn.jpg",
-    },
-};
-
 export function UserSidebar({ businesses, active_business, ...props }) {
     const { url } = usePage();
+
+    const { auth } = usePage().props;
+
+    const data = {
+        user: {
+            id: auth.user.id,
+            name: auth.user.name,
+            email: auth.user.email,
+            avatar: '/uploads/media/' + auth.user.profile_picture,
+        }
+    }
 
     // Transform business objects to the required format
     const businessData = businesses.length > 0 ? businesses.map(business => ({

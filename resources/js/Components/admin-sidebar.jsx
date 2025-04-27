@@ -20,43 +20,27 @@ import { usePage } from "@inertiajs/react";
 import { NavMain } from "@/components/nav-main";
 import { NavSettings } from "@/components/nav-settings";
 import { NavUser } from "@/components/nav-user";
-import { TeamSwitcher } from "@/components/team-switcher";
 import { NavAdminDashboard } from "@/Components/nav-admin-dashboard";
 import {
     Sidebar,
     SidebarContent,
     SidebarFooter,
-    SidebarHeader,
     SidebarRail,
 } from "@/components/ui/sidebar";
 
-const data = {
-    user: {
-        name: "shadcn",
-        email: "m@example.com",
-        avatar: "/avatars/shadcn.jpg",
-    },
-    teams: [
-        {
-            name: "Acme Inc",
-            logo: GalleryVerticalEnd,
-            plan: "Enterprise",
-        },
-        {
-            name: "Acme Corp.",
-            logo: AudioWaveform,
-            plan: "Startup",
-        },
-        {
-            name: "Evil Corp.",
-            logo: Command,
-            plan: "Free",
-        },
-    ],
-};
-
 export function AdminSidebar({ ...props }) {
-    const { url, component } = usePage();
+    const { url } = usePage();
+
+    const { auth } = usePage().props;
+    
+    const data = {
+        user: {
+            id: auth.user.id,
+            name: auth.user.name,
+            email: auth.user.email,
+            avatar: '/uploads/media/' + auth.user.profile_picture,
+        }
+    }
 
     const isRoute = (name) => {
         return route().current(name) || url.startsWith(route(name));
@@ -212,9 +196,6 @@ export function AdminSidebar({ ...props }) {
 
     return (
         <Sidebar collapsible="icon" {...props}>
-            <SidebarHeader>
-                <TeamSwitcher teams={data.teams} />
-            </SidebarHeader>
             <SidebarContent>
                 <NavAdminDashboard items={dashboardItems} />
                 <NavMain items={navMainItems} />

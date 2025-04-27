@@ -28,9 +28,8 @@ import {
 
 const DeleteUserModal = ({ show, onClose, onConfirm, processing }) => (
     <Modal show={show} onClose={onClose}>
-        <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
-            <h2 className="text-lg font-medium">   
+            <h2 className="text-lg font-medium">
                 Are you sure you want to delete this user?
             </h2>
             <p className="mt-1 text-sm text-gray-600">
@@ -58,11 +57,10 @@ const DeleteUserModal = ({ show, onClose, onConfirm, processing }) => (
 );
 
 const UserStatusBadge = ({ status }) => (
-    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-        status === "active" 
-            ? "bg-green-50 text-green-700" 
+    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${status === "active"
+            ? "bg-green-50 text-green-700"
             : "bg-red-50 text-red-700"
-    }`}>
+        }`}>
         {status}
     </span>
 );
@@ -79,7 +77,7 @@ export default function List({ users }) {
         errors
     } = useFormSubmit(
         {},
-        null, 
+        null,
         {
             onSuccess: () => closeModal(),
             resetOnSuccess: true,
@@ -101,7 +99,7 @@ export default function List({ users }) {
     const handleDelete = (e) => {
         e.preventDefault();
         if (!selectedUserId) return;
-        
+
         submitForm(e, "delete", route("users.destroy", { user: selectedUserId }));
     };
 
@@ -197,7 +195,7 @@ export default function List({ users }) {
                     </TableWrapper>
                 </div>
 
-                <DeleteUserModal 
+                <DeleteUserModal
                     show={confirmingUserDeletion}
                     onClose={closeModal}
                     onConfirm={handleDelete}
