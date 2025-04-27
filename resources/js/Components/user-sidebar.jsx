@@ -2,22 +2,12 @@
 
 import * as React from "react";
 import {
-    AudioWaveform,
-    BookOpen,
-    Command,
-    GalleryVerticalEnd,
     PieChart,
-    Settings2,
-    Globe,
     Users,
-    Gift,
-    CreditCard,
-    BadgeDollarSign,
     Package,
     GroupIcon,
     ChartPieIcon,
-    Building2Icon,
-    FileText
+    Building2Icon
 } from "lucide-react";
 
 import { usePage } from "@inertiajs/react";
@@ -35,10 +25,10 @@ import {
     SidebarRail,
 } from "@/components/ui/sidebar";
 
-export function UserSidebar({ businesses, active_business, ...props }) {
+export function UserSidebar({ ...props }) {
     const { url } = usePage();
 
-    const { auth } = usePage().props;
+    const { auth, activeBusiness } = usePage().props;
 
     const data = {
         user: {
@@ -48,21 +38,6 @@ export function UserSidebar({ businesses, active_business, ...props }) {
             avatar: '/uploads/media/' + auth.user.profile_picture,
         }
     }
-
-    // Transform business objects to the required format
-    const businessData = businesses.length > 0 ? businesses.map(business => ({
-        name: business.name,
-        id: business.id,
-        logo: GalleryVerticalEnd,
-        plan: business.business_type_id ? "Business" : "Default"
-    })) : [
-        {
-            name: "Default Business",
-            id: 1,
-            logo: GalleryVerticalEnd,
-            plan: "Business"
-        }
-    ];
 
     // Enhanced isRoute function that handles routes with wildcards for parameters
     const isRoute = (name) => {
@@ -324,7 +299,7 @@ export function UserSidebar({ businesses, active_business, ...props }) {
                 },
                 {
                     title: "Business Settings",
-                    url: route("business.settings", active_business.id),
+                    url: route("business.settings", activeBusiness.id),
                     isActive: url.includes('/business/settings/'),
                 },
                 {
@@ -409,7 +384,7 @@ export function UserSidebar({ businesses, active_business, ...props }) {
     return (
         <Sidebar collapsible="icon" {...props}>
             <SidebarHeader>
-                <BusinessSwitcher businesses={businessData} active_business={active_business} />
+                <BusinessSwitcher />
             </SidebarHeader>
             <SidebarContent>
                 <NavUserDashboard items={dashboardItems} />

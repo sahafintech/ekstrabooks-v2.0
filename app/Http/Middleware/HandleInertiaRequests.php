@@ -32,11 +32,14 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
         $businesses = [];
-        $active_business = null;
+        $activeBusiness = null;
 
         if ($user && $user->user_type !== 'admin') {
             $businesses = Business::where('user_id', $user->id)->get();
-            $active_business = $request->session()->get('active_business') ?? $businesses->first();
+            $activeBusiness = $user->business()
+            ->withoutGlobalScopes()
+            ->wherePivot('is_active', 1)
+            ->first();
         }
 
         return [
@@ -45,7 +48,7 @@ class HandleInertiaRequests extends Middleware
                 'user' => $user,
             ],
             'businesses' => $businesses,
-            'active_business' => $active_business,
+            'activeBusiness' => $activeBusiness,
             'decimalPlace' => get_business_option('decimal_places', 2),
             'decimalSep' => get_business_option('decimal_sep', '.'),
             'thousandSep' => get_business_option('thousand_sep', ','),

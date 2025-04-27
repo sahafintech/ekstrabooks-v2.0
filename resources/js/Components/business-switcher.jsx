@@ -1,6 +1,5 @@
 "use client"
 
-import * as React from "react"
 import { ChevronsUpDown } from "lucide-react"
 import { Link } from "@inertiajs/react"
 
@@ -20,14 +19,12 @@ import {
 } from "@/components/ui/sidebar"
 
 import PropTypes from 'prop-types';
+import { usePage } from "@inertiajs/react";
 
-export function BusinessSwitcher({ businesses, active_business }) {
+export function BusinessSwitcher() {
   const { isMobile } = useSidebar()
-  const [activeBusiness, setActiveBusiness] = React.useState(() => {
-    const index = businesses.findIndex(b => b.id === active_business.id);
-    return businesses[index];
-  });
-
+  const { businesses, activeBusiness } = usePage().props;
+  
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -44,7 +41,6 @@ export function BusinessSwitcher({ businesses, active_business }) {
                 <span className="truncate font-semibold">
                   {activeBusiness.name}
                 </span>
-                <span className="truncate text-xs">{activeBusiness.plan}</span>
               </div>
               <ChevronsUpDown className="ml-auto" />
             </SidebarMenuButton>
@@ -61,7 +57,6 @@ export function BusinessSwitcher({ businesses, active_business }) {
             {businesses.map((business, index) => (
               <Link key={business.name} href={route('business.switch_business', business.id)}>
                 <DropdownMenuItem
-                  onClick={() => setActiveBusiness(business)}
                   className="gap-2 p-2"
                 >
                   <div className="flex size-6 items-center justify-center rounded-sm border">
@@ -85,7 +80,6 @@ BusinessSwitcher.propTypes = {
       id: PropTypes.number.isRequired,
       name: PropTypes.string.isRequired,
       logo: PropTypes.elementType.isRequired,
-      plan: PropTypes.string.isRequired,
     })
   ).isRequired,
 };
