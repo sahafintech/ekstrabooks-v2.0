@@ -5,17 +5,20 @@ namespace App\Http\Controllers;
 use App\Models\Account;
 use App\Models\AuditLog;
 use App\Models\BusinessSetting;
+use App\Models\Currency;
 use App\Models\Product;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
 use App\Models\PurchaseReturnItemTax;
 use App\Models\Tax;
 use App\Models\Transaction;
+use App\Models\Vendor;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Inertia\Inertia;
 
 class PurchaseReturnController extends Controller
 {
@@ -24,13 +27,65 @@ class PurchaseReturnController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        $purchaseReturns = PurchaseReturn::select('purchase_returns.*')
-            ->with('vendor')
-            ->get();
+        $query = PurchaseReturn::with('vendor');
 
-        return view('backend.user.purchase_return.list', compact('purchaseReturns'));
+        // Apply filters if any
+        if ($request->has('filters')) {
+            $filters = $request->filters;
+
+            // Filter by vendor
+            if (!empty($filters['vendor_id'])) {
+                $query->where('vendor_id', $filters['vendor_id']);
+            }
+
+            // Filter by status
+            if (isset($filters['status']) && $filters['status'] !== '') {
+                $query->where('status', $filters['status']);
+            }
+
+            // Filter by date range
+            if (!empty($filters['date_range'])) {
+                if (!empty($filters['date_range']['start'])) {
+                    $query->where('return_date', '>=', $filters['date_range']['start']);
+                }
+                if (!empty($filters['date_range']['end'])) {
+                    $query->where('return_date', '<=', $filters['date_range']['end']);
+                }
+            }
+        }
+
+        if (!empty($request->search)) {
+            $query->where('return_number', 'like', "%{$request->search}%")
+                ->whereHas('vendor', function ($query) use ($request) {
+                    $query->where('name', 'like', "%{$request->search}%");
+                });
+        }
+
+        // Handle sorting
+        $sortField = $request->get('sort_field', 'id');
+        $sortDirection = $request->get('sort_direction', 'desc');
+        $query->orderBy($sortField, $sortDirection);
+
+        // Handle pagination
+        $perPage = $request->get('per_page', 10);
+        $returns = $query->paginate($perPage);
+        $accounts = Account::all();
+
+        return Inertia::render('Backend/User/PurchaseReturn/List', [
+            'returns' => $returns->items(),
+            'accounts' => $accounts,
+            'meta' => [
+                'total' => $returns->total(),
+                'per_page' => $returns->perPage(),
+                'current_page' => $returns->currentPage(),
+                'last_page' => $returns->lastPage(),
+                'from' => $returns->firstItem(),
+                'to' => $returns->lastItem(),
+            ],
+            'filters' => $request->filters ?? []
+        ]);
     }
 
     /**
@@ -38,15 +93,34 @@ class PurchaseReturnController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create(Request $request)
+    public function create()
     {
-        return view('backend.user.purchase_return.create');
+        $purchase_return_title = get_business_option('purchase_return_title', 'Return');
+        $vendors = Vendor::all();
+        $currencies = Currency::all();
+        $products = Product::all();
+        $taxes = Tax::all();
+        $decimalPlace = get_business_option('decimal_place', 2);
+        $accounts = Account::all();
+
+        return Inertia::render('Backend/User/PurchaseReturn/Create', [
+            'purchase_return_title' => $purchase_return_title,
+            'vendors' => $vendors,
+            'currencies' => $currencies,
+            'products' => $products,
+            'taxes' => $taxes,
+            'decimalPlace' => $decimalPlace,
+            'accounts' => $accounts
+        ]);
     }
 
     public function show(Request $request, $id)
     {
-        $purchase_return  = PurchaseReturn::with(['business', 'items'])->find($id);
-        return view('backend.user.purchase_return.view', compact('purchase_return'));
+        $purchase_return  = PurchaseReturn::with(['business', 'items', 'taxes', 'vendor'])->find($id);
+
+        return Inertia::render('Backend/User/PurchaseReturn/View', [
+            'purchase_return' => $purchase_return,
+        ]);
     }
 
     public function store(Request $request)
@@ -161,8 +235,8 @@ class PurchaseReturnController extends Controller
                 $transaction->save();
             }
 
-            if (isset($request->taxes[$returnItem->product_id])) {
-                foreach ($request->taxes[$returnItem->product_id] as $taxId) {
+            if (isset($request->taxes)) {
+                foreach ($request->taxes as $taxId) {
                     $tax = Tax::find($taxId);
 
                     $returnItem->taxes()->save(new PurchaseReturnItemTax([
@@ -235,11 +309,7 @@ class PurchaseReturnController extends Controller
         $audit->event = 'Purchase Return Created: ' . $return->return_number;
         $audit->save();
 
-        if ($return->id > 0) {
-            return redirect()->route('purchase_returns.show', $return->id)->with('success', _lang('Saved Successfully'));
-        } else {
-            return back()->with('error', _lang('Something going wrong, Please try again'));
-        }
+        return redirect()->route('purchase_returns.show', $return->id)->with('success', _lang('Saved Successfully'));
     }
 
     private function calculateTotal(Request $request)
@@ -280,19 +350,44 @@ class PurchaseReturnController extends Controller
         $grandTotal = ($subTotal + $taxAmount) - $discountAmount;
 
         return array(
-			'subTotal' 				=> $subTotal,
-			'discountAmount' 		=> $discountAmount,
-			'grandTotal' 			=> $grandTotal,
-		);
+            'subTotal'                 => $subTotal,
+            'discountAmount'         => $discountAmount,
+            'grandTotal'             => $grandTotal,
+        );
     }
 
     public function edit(Request $request, $id)
     {
-        $return = PurchaseReturn::with('items')
+        $purchase_return = PurchaseReturn::with('items')
             ->where('id', $id)
             ->where('status', '!=', 2)
             ->first();
-        return view('backend.user.purchase_return.edit', compact('return', 'id'));
+
+        if ($purchase_return == null) {
+            return back()->with('error', _lang('This purchase return is already paid'));
+        }
+
+        // Get required data for the edit form
+        $vendors = Vendor::all();
+        $currencies = Currency::all();
+        $products = Product::all();
+        $taxes = Tax::all();
+        $accounts = Account::all();
+
+        $taxIds = $purchase_return->taxes
+            ->pluck('tax_id')
+            ->map(fn($id) => (string) $id)
+            ->toArray();
+
+        return Inertia::render('Backend/User/PurchaseReturn/Edit', [
+            'purchase_return' => $purchase_return,
+            'vendors' => $vendors,
+            'currencies' => $currencies,
+            'products' => $products,
+            'taxes' => $taxes,
+            'accounts' => $accounts,
+            'taxIds' => $taxIds
+        ]);
     }
 
     public function update(Request $request, $id)
@@ -423,7 +518,7 @@ class PurchaseReturnController extends Controller
                 $transaction->save();
             }
 
-            if (isset($request->taxes[$returnItem->product_id])) {
+            if (isset($request->taxes)) {
                 $returnItem->taxes()->delete();
                 $transaction = Transaction::where('ref_id', $return->id)->where('ref_type', 'p return tax')
                     ->get();
@@ -432,7 +527,7 @@ class PurchaseReturnController extends Controller
                     $t->delete();
                 }
 
-                foreach ($request->taxes[$returnItem->product_id] as $taxId) {
+                foreach ($request->taxes as $taxId) {
                     $tax = Tax::find($taxId);
 
                     $returnItem->taxes()->save(new PurchaseReturnItemTax([
@@ -549,24 +644,17 @@ class PurchaseReturnController extends Controller
 
         // delete p refund transactions
         $refund_transactions = Transaction::where('ref_id', $return->id)
-        ->where(function ($query) {
-            $query->where('ref_type', 'p return')
-                ->orWhere('ref_type', 'p return tax');
-        })
-        ->get();
+            ->where(function ($query) {
+                $query->where('ref_type', 'p return')
+                    ->orWhere('ref_type', 'p return tax');
+            })
+            ->get();
         foreach ($refund_transactions as $transaction) {
             $transaction->delete();
         }
 
         $return->delete();
         return redirect()->route('purchase_returns.index')->with('success', _lang('Deleted Successfully'));
-    }
-
-    public function refund(Request $request, $id)
-    {
-        $purchaseReturn = PurchaseReturn::with('vendor')->where('id', $id)->first();
-
-        return view('backend.user.purchase_return.refund', compact('purchaseReturn'));
     }
 
     public function refund_store(Request $request, $id)

@@ -96,7 +96,7 @@ class SalesReturnController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create(Request $request)
+    public function create()
     {
         $sales_return_title = get_business_option('sales_return_title', 'Return');
         $customers = Customer::all();
