@@ -1,11 +1,5 @@
 import { useState } from "react";
-import { Head, Link, usePage, router } from "@inertiajs/react";
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
+import { router } from "@inertiajs/react"
 import {
     Select,
     SelectContent,
@@ -27,18 +21,8 @@ import {
     BarChart,
     CartesianGrid,
     XAxis,
-    YAxis,
-    Tooltip,
-    Legend,
-    Line,
-    LineChart,
-    ResponsiveContainer,
     Area,
     AreaChart,
-    PieChart,
-    Pie,
-    Cell,
-    Label,
 } from "recharts";
 import {
     ChartContainer,
@@ -49,8 +33,9 @@ import TableWrapper from "@/Components/shared/TableWrapper";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import PageHeader from "@/Components/PageHeader";
+import { usePage } from "@inertiajs/react";
 
-export default function DashboardUser({
+export default function DashboardStaff({
     dashboard_type = 'accounting',
     custom,
     range,
@@ -68,6 +53,8 @@ export default function DashboardUser({
     const [selectedRange, setSelectedRange] = useState(range || 'all');
     const [customRange, setCustomRange] = useState(custom || '');
     const [dashboardType, setDashboardType] = useState(dashboard_type);
+
+    const { permissionList, auth } = usePage().props;
 
     // Transform data for charts
     const monthlyData = Array.from({ length: 12 }, (_, i) => ({
@@ -135,201 +122,237 @@ export default function DashboardUser({
                     subpage="Dashboard"
                     url="dashboard.index"
                 />
-                <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+                {permissionList?.some(p => p.permission === "dashboard.income_widget") ||
+                    permissionList?.some(p => p.permission === "dashboard.expense_widget") ||
+                    permissionList?.some(p => p.permission === "dashboard.accounts_receivable_amount_widget") ||
+                    permissionList?.some(p => p.permission === "dashboard.accounts_payable_amount_widget") ||
+                    permissionList?.some(p => p.permission === "dashboard.sales_overview_widget") ||
+                    permissionList?.some(p => p.permission === "dashboard.recent_transaction_widget") ||
+                    permissionList?.some(p => p.permission === "dashboard.cash_flow_widget") ? (
+                    <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+                        <div className="main-content space-y-8">
+                            <div className="block justify-between page-header md:flex">
+                                <div>
+                                    <h3 className="text-primary text-xl font-medium uppercase">
+                                        Dashboard
+                                    </h3>
+                                </div>
 
-                    <div className="main-content space-y-8">
-                        <div className="block justify-between page-header md:flex">
-                            <div>
-                                <h3 className="text-primary text-xl font-medium uppercase">
-                                    Dashboard
-                                </h3>
-                            </div>
+                                <div className="flex items-center justify-end space-x-4">
+                                    <Select value={dashboardType} onValueChange={handleDashboardTypeChange}>
+                                        <SelectTrigger className="w-[200px]">
+                                            <SelectValue placeholder="Select dashboard type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="accounting">Accounting Dashboard</SelectItem>
+                                            <SelectItem value="inventory">Inventory Dashboard</SelectItem>
+                                        </SelectContent>
+                                    </Select>
 
-                            <div className="flex items-center justify-end space-x-4">
-                                <Select value={dashboardType} onValueChange={handleDashboardTypeChange}>
-                                    <SelectTrigger className="w-[200px]">
-                                        <SelectValue placeholder="Select dashboard type" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="accounting">Accounting Dashboard</SelectItem>
-                                        <SelectItem value="inventory">Inventory Dashboard</SelectItem>
-                                    </SelectContent>
-                                </Select>
-
-                                <Select value={selectedRange} onValueChange={handleRangeChange}>
-                                    <SelectTrigger className="w-[200px]">
-                                        <SelectValue placeholder="Select range" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Time</SelectItem>
-                                        <SelectItem value="7">Last 7 Days</SelectItem>
-                                        <SelectItem value="30">Last 30 Days</SelectItem>
-                                        <SelectItem value="60">Last 60 Days</SelectItem>
-                                        <SelectItem value="360">Last Year</SelectItem>
-                                        <SelectItem value="custom">Custom Range</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-
-                        {/* Dashboard Stats */}
-                        <div className="grid auto-rows-min gap-6 md:grid-cols-2 lg:grid-cols-4">
-                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm">
-                                <div className="text-sm text-muted-foreground">Total Income</div>
-                                <div className="text-xl font-semibold">{current_month_income}</div>
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <DollarSign className="h-4 w-4" />
-                                    <span>Income</span>
+                                    <Select value={selectedRange} onValueChange={handleRangeChange}>
+                                        <SelectTrigger className="w-[200px]">
+                                            <SelectValue placeholder="Select range" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Time</SelectItem>
+                                            <SelectItem value="7">Last 7 Days</SelectItem>
+                                            <SelectItem value="30">Last 30 Days</SelectItem>
+                                            <SelectItem value="60">Last 60 Days</SelectItem>
+                                            <SelectItem value="360">Last Year</SelectItem>
+                                            <SelectItem value="custom">Custom Range</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
 
-                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm">
-                                <div className="text-sm text-muted-foreground">Total Expense</div>
-                                <div className="text-xl font-semibold">{current_month_expense}</div>
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <Wallet className="h-4 w-4" />
-                                    <span>Expense</span>
+                            {/* Dashboard Stats */}
+                            {permissionList?.some(p => p.permission === "dashboard.income_widget") && (
+                                <div className="grid auto-rows-min gap-6 md:grid-cols-2 lg:grid-cols-4">
+                                    <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm">
+                                        <div className="text-sm text-muted-foreground">Total Income</div>
+                                        <div className="text-xl font-semibold">{current_month_income}</div>
+                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <DollarSign className="h-4 w-4" />
+                                            <span>Income</span>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
-                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm">
-                                <div className="text-sm text-muted-foreground">Receivable</div>
-                                <div className="text-xl font-semibold">{AccountsReceivable}</div>
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <CreditCard className="h-4 w-4" />
-                                    <span>Receivable</span>
+                            {permissionList?.some(p => p.permission === "dashboard.expense_widget") && (
+                                <div className="grid auto-rows-min gap-6 md:grid-cols-2 lg:grid-cols-4">
+                                    <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm">
+                                        <div className="text-sm text-muted-foreground">Total Expense</div>
+                                        <div className="text-xl font-semibold">{current_month_expense}</div>
+                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <Wallet className="h-4 w-4" />
+                                            <span>Expense</span>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
-                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm">
-                                <div className="text-sm text-muted-foreground">Payable</div>
-                                <div className="text-xl font-semibold">{AccountsPayable}</div>
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <CreditCard className="h-4 w-4" />
-                                    <span>Payable</span>
+                            {permissionList?.some(p => p.permission === "dashboard.accounts_receivable_amount_widget") && (
+                                <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm">
+                                    <div className="text-sm text-muted-foreground">Receivable</div>
+                                    <div className="text-xl font-semibold">{AccountsReceivable}</div>
+                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <CreditCard className="h-4 w-4" />
+                                        <span>Receivable</span>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
+
+                            {permissionList?.some(p => p.permission === "dashboard.accounts_payable_amount_widget") && (
+                                <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm">
+                                    <div className="text-sm text-muted-foreground">Payable</div>
+                                    <div className="text-xl font-semibold">{AccountsPayable}</div>
+                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <CreditCard className="h-4 w-4" />
+                                        <span>Payable</span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Charts Section */}
                         <div className="flex flex-1 flex-col gap-6 p-4 pt-0">
                             <div className="grid auto-rows-min gap-6 md:grid-cols-2">
-                                <div className="flex flex-col gap-2 rounded-lg bg-background p-4 shadow-sm">
-                                    <div>
-                                        <div className="text-lg font-semibold">Income vs Expense</div>
-                                        <div className="text-sm text-muted-foreground">Monthly Overview</div>
-                                    </div>
-                                    <div className="flex-1">
-                                        <ChartContainer config={chartConfig}>
-                                            <BarChart accessibilityLayer data={monthlyData}>
-                                                <CartesianGrid vertical={false} />
-                                                <XAxis
-                                                    dataKey="month"
-                                                    tickLine={false}
-                                                    tickMargin={10}
-                                                    axisLine={false}
-                                                />
-                                                <ChartTooltip
-                                                    cursor={false}
-                                                    content={
-                                                        <ChartTooltipContent indicator="dashed" />
-                                                    }
-                                                />
-                                                <Bar
-                                                    dataKey="income"
-                                                    fill="var(--color-income)"
-                                                    radius={4}
-                                                />
-                                                <Bar
-                                                    dataKey="expense"
-                                                    fill="var(--color-expense)"
-                                                    radius={4}
-                                                />
-                                            </BarChart>
-                                        </ChartContainer>
-                                    </div>
-                                    <div className="flex flex-col gap-1 text-sm">
-                                        <div className="flex gap-2 font-medium leading-none">
-                                            Monthly comparison of income and expenses
-                                            <TrendingUp className="h-4 w-4" />
+                                {permissionList?.some(p => p.permission === "dashboard.sales_overview_widget") && (
+                                    <div className="flex flex-col gap-2 rounded-lg bg-background p-4 shadow-sm">
+                                        <div>
+                                            <div className="text-lg font-semibold">Income vs Expense</div>
+                                            <div className="text-sm text-muted-foreground">Monthly Overview</div>
                                         </div>
-                                        <div className="leading-none text-muted-foreground">
-                                            Showing total transactions for all months
+                                        <div className="flex-1">
+                                            <ChartContainer config={chartConfig}>
+                                                <BarChart accessibilityLayer data={monthlyData}>
+                                                    <CartesianGrid vertical={false} />
+                                                    <XAxis
+                                                        dataKey="month"
+                                                        tickLine={false}
+                                                        tickMargin={10}
+                                                        axisLine={false}
+                                                    />
+                                                    <ChartTooltip
+                                                        cursor={false}
+                                                        content={
+                                                            <ChartTooltipContent indicator="dashed" />
+                                                        }
+                                                    />
+                                                    <Bar
+                                                        dataKey="income"
+                                                        fill="var(--color-income)"
+                                                        radius={4}
+                                                    />
+                                                    <Bar
+                                                        dataKey="expense"
+                                                        fill="var(--color-expense)"
+                                                        radius={4}
+                                                    />
+                                                </BarChart>
+                                            </ChartContainer>
+                                        </div>
+                                        <div className="flex flex-col gap-1 text-sm">
+                                            <div className="flex gap-2 font-medium leading-none">
+                                                Monthly comparison of income and expenses
+                                                <TrendingUp className="h-4 w-4" />
+                                            </div>
+                                            <div className="leading-none text-muted-foreground">
+                                                Showing total transactions for all months
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                )}
 
-                                <div className="flex flex-col gap-2 rounded-lg bg-background p-4 shadow-sm">
-                                    <div>
-                                        <div className="text-lg font-semibold">Cash Flow</div>
-                                        <div className="text-sm text-muted-foreground">Monthly Overview</div>
-                                    </div>
-                                    <div className="flex-1">
-                                        <ChartContainer config={chartConfig}>
-                                            <AreaChart data={cashflowData}>
-                                                <CartesianGrid vertical={false} />
-                                                <XAxis
-                                                    dataKey="month"
-                                                    tickLine={false}
-                                                    tickMargin={10}
-                                                    axisLine={false}
-                                                />
-                                                <ChartTooltip
-                                                    cursor={false}
-                                                    content={
-                                                        <ChartTooltipContent indicator="dashed" />
-                                                    }
-                                                />
-                                                <Area
-                                                    type="monotone"
-                                                    dataKey="income"
-                                                    stroke="var(--color-income)"
-                                                    fill="var(--color-income)"
-                                                    fillOpacity={0.2}
-                                                    strokeWidth={2}
-                                                />
-                                                <Area
-                                                    type="monotone"
-                                                    dataKey="expense"
-                                                    stroke="var(--color-expense)"
-                                                    fill="var(--color-expense)"
-                                                    fillOpacity={0.2}
-                                                    strokeWidth={2}
-                                                />
-                                                <Area
-                                                    type="monotone"
-                                                    dataKey="balance"
-                                                    stroke="var(--color-balance)"
-                                                    fill="var(--color-balance)"
-                                                    fillOpacity={0.2}
-                                                    strokeWidth={2}
-                                                />
-                                            </AreaChart>
-                                        </ChartContainer>
-                                    </div>
-                                    <div className="flex flex-col gap-1 text-sm">
-                                        <div className="flex gap-2 font-medium leading-none">
-                                            Monthly cash flow analysis
-                                            <TrendingUp className="h-4 w-4" />
+                                {permissionList?.some(p => p.permission === "dashboard.cash_flow_widget") && (
+                                    <div className="flex flex-col gap-2 rounded-lg bg-background p-4 shadow-sm">
+                                        <div>
+                                            <div className="text-lg font-semibold">Cash Flow</div>
+                                            <div className="text-sm text-muted-foreground">Monthly Overview</div>
                                         </div>
-                                        <div className="leading-none text-muted-foreground">
-                                            Showing income, expenses and balance trends
+                                        <div className="flex-1">
+                                            <ChartContainer config={chartConfig}>
+                                                <AreaChart data={cashflowData}>
+                                                    <CartesianGrid vertical={false} />
+                                                    <XAxis
+                                                        dataKey="month"
+                                                        tickLine={false}
+                                                        tickMargin={10}
+                                                        axisLine={false}
+                                                    />
+                                                    <ChartTooltip
+                                                        cursor={false}
+                                                        content={
+                                                            <ChartTooltipContent indicator="dashed" />
+                                                        }
+                                                    />
+                                                    <Area
+                                                        type="monotone"
+                                                        dataKey="income"
+                                                        stroke="var(--color-income)"
+                                                        fill="var(--color-income)"
+                                                        fillOpacity={0.2}
+                                                        strokeWidth={2}
+                                                    />
+                                                    <Area
+                                                        type="monotone"
+                                                        dataKey="expense"
+                                                        stroke="var(--color-expense)"
+                                                        fill="var(--color-expense)"
+                                                        fillOpacity={0.2}
+                                                        strokeWidth={2}
+                                                    />
+                                                    <Area
+                                                        type="monotone"
+                                                        dataKey="balance"
+                                                        stroke="var(--color-balance)"
+                                                        fill="var(--color-balance)"
+                                                        fillOpacity={0.2}
+                                                        strokeWidth={2}
+                                                    />
+                                                </AreaChart>
+                                            </ChartContainer>
+                                        </div>
+                                        <div className="flex flex-col gap-1 text-sm">
+                                            <div className="flex gap-2 font-medium leading-none">
+                                                Monthly cash flow analysis
+                                                <TrendingUp className="h-4 w-4" />
+                                            </div>
+                                            <div className="leading-none text-muted-foreground">
+                                                Showing income, expenses and balance trends
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
                         </div>
 
                         {/* Recent Transactions */}
-                        <div className="mt-2">
-                            <TableWrapper>
-                                <RecentTransactionsTable transactions={recentTransactions} />
-                            </TableWrapper>
-                        </div>
+                        {permissionList?.some(p => p.permission === "dashboard.recent_transaction_widget") && (
+                            <div className="mt-2">
+                                <TableWrapper>
+                                    <RecentTransactionsTable transactions={recentTransactions} />
+                                </TableWrapper>
+                            </div>
+                        )}
                     </div>
-                </div>
+                ) : (
+                    <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+                        <div className="main-content space-y-8">
+                            <div className="block justify-between page-header md:flex">
+                                <div>
+                                    <h3 className="text-primary text-xl font-medium uppercase">
+                                        Dashboard
+                                    </h3>
+                                </div>
+                            </div>
+                        </div>
+                        <h2 className="text-xl font-bold">Welcome ! {auth.user.name}</h2>
+                    </div>
+                )}
             </SidebarInset>
-        </AuthenticatedLayout>
+        </AuthenticatedLayout >
     );
 }
 

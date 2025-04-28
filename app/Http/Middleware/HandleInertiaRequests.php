@@ -37,10 +37,19 @@ class HandleInertiaRequests extends Middleware
         if ($user && $user->user_type !== 'admin') {
             $businesses = Business::where('user_id', $user->id)->get();
             $activeBusiness = $user->business()
-            ->withoutGlobalScopes()
-            ->wherePivot('is_active', 1)
-            ->first();
+                ->withoutGlobalScopes()
+                ->wherePivot('is_active', 1)
+                ->first();
         }
+
+        $isOwner = $activeBusiness && $activeBusiness->pivot->owner_id == $user->id ? true : false;
+        $permissionList = $user?->select('permissions.*')
+            ->join('business_users', 'users.id', 'business_users.user_id')
+            ->join('business', 'business_users.business_id', 'business.id')
+            ->join('permissions', 'business_users.role_id', 'permissions.role_id')
+            ->where('business.id', $activeBusiness?->id)
+            ->where('users.id', $user->id)
+            ->get();
 
         return [
             ...parent::share($request),
@@ -54,6 +63,8 @@ class HandleInertiaRequests extends Middleware
             'thousandSep' => get_business_option('thousand_sep', ','),
             'baseCurrency' => get_business_option('base_currency', 'USD'),
             'currencyPosition' => get_business_option('currency_position', 'left'),
+            'isOwner' => $isOwner,
+            'permissionList' => $permissionList,
         ];
     }
 }
