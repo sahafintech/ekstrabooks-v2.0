@@ -21,12 +21,14 @@ use App\Models\Holiday;
 use App\Models\InventoryAdjustment;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\MainCategory;
 use App\Models\Payroll;
 use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
 use App\Models\Receipt;
 use App\Models\ReceiptItem;
+use App\Models\SubCategory;
 use App\Models\Transaction;
 use App\Models\Vendor;
 use Carbon\Carbon;
@@ -606,7 +608,8 @@ class ReportController extends Controller
 		return $this->generate_payables_report($date1, $date2, $vendor_id, $search, $per_page);
 	}
 
-	public function generate_payables_report($date1, $date2, $vendor_id, $search, $per_page) {
+	public function generate_payables_report($date1, $date2, $vendor_id, $search, $per_page)
+	{
 		// Get vendors list for dropdown
 		$vendors = Vendor::select('id', 'name', 'mobile', 'email')
 			->orderBy('name')
@@ -2675,7 +2678,7 @@ class ReportController extends Controller
 			$month = $request->month;
 			$year = $request->year;
 			$currency = request()->activeBusiness->currency;
-			
+
 			return Inertia::render('Backend/User/Reports/PayrollCost', [
 				'report_data' => $report_data,
 				'month' => $month,
@@ -2738,13 +2741,12 @@ class ReportController extends Controller
 	public function inventory_details(Request $request)
 	{
 		if ($request->isMethod('get')) {
-			$page_title = _lang('Inventory Details Report');
-			$data = array();
+			$categories = array();
 
 			$sub_category = 'all';
 			$main_category = 'all';
 
-			$date1 = Carbon::now()->subDays(30)->format('Y-m-d');
+			$date1 = Carbon::now()->startOfMonth()->format('Y-m-d');
 			$date2 = Carbon::now()->format('Y-m-d');
 
 			session(['start_date' => $date1]);
@@ -2854,16 +2856,23 @@ class ReportController extends Controller
 			$sortedCategories = $groupedByCategory->sortByDesc('total_sold')->values();
 
 			// Assign to your data array
-			$data['products'] = $sortedCategories;
+			$categories = $sortedCategories;
 
-			$data['page_title'] = $page_title;
-
-			return view('backend.user.reports.inventory_details', $data);
+			return Inertia::render('Backend/User/Reports/InventoryDetails', [
+				'categories' => $categories,
+				'date1' => $date1,
+				'date2' => $date2,
+				'sub_category' => $sub_category,
+				'main_category' => $main_category,
+				'business_name' => $request->activeBusiness->name,
+				'subCategories' => SubCategory::all(),
+				'mainCategories' => mainCategory::all(),
+			]);
 		} else {
 			@ini_set('max_execution_time', 0);
 			@set_time_limit(0);
 
-			$data = array();
+			$categories = array();
 			$sub_category = $request->sub_category;
 			$main_category = $request->main_category;
 
@@ -2989,26 +2998,27 @@ class ReportController extends Controller
 			$sortedCategories = $groupedByCategory->sortByDesc('total_sold')->values();
 
 			// Assign to your data array
-			$data['products'] = $sortedCategories;
+			$categories = $sortedCategories;
 
-			$data['date1'] = Carbon::parse($request->date1);
-			$data['date2'] = Carbon::parse($request->date2);
-
-			$data['page_title'] = _lang('Inventory Details Report');
-			$data['sub_category'] = $sub_category;
-			$data['main_category'] = $main_category;
-
-			return view('backend.user.reports.inventory_details', $data);
+			return Inertia::render('Backend/User/Reports/InventoryDetails', [
+				'categories' => $categories,
+				'date1' => $date1,
+				'date2' => $date2,
+				'sub_category' => $sub_category,
+				'main_category' => $main_category,
+				'business_name' => $request->activeBusiness->name,
+				'subCategories' => SubCategory::all(),
+				'mainCategories' => MainCategory::all(),
+			]);
 		}
 	}
 
 	public function inventory_summary(Request $request)
 	{
 		if ($request->isMethod('get')) {
-			$page_title = _lang('Inventory Summary Report');
-			$data = array();
+			$categories = array();
 
-			$date1 = Carbon::now()->subDays(30)->format('Y-m-d');
+			$date1 = Carbon::now()->startOfMonth()->format('Y-m-d');
 			$date2 = Carbon::now()->format('Y-m-d');
 
 			session(['start_date' => $date1]);
@@ -3113,16 +3123,19 @@ class ReportController extends Controller
 			$sortedCategories = $groupedByCategory->sortByDesc('total_sold')->values();
 
 			// Assign to your data array
-			$data['products'] = $sortedCategories;
+			$categories = $sortedCategories;
 
-			$data['page_title'] = $page_title;
-
-			return view('backend.user.reports.inventory_summary', $data);
+			return Inertia::render('Backend/User/Reports/InventorySummary', [
+				'categories' => $categories,
+				'date1' => $date1,
+				'date2' => $date2,
+				'business_name' => $request->activeBusiness->name,
+			]);
 		} else {
 			@ini_set('max_execution_time', 0);
 			@set_time_limit(0);
 
-			$data = array();
+			$categories = array();
 			$category = $request->category;
 
 			$date1 = Carbon::parse($request->date1)->format('Y-m-d');
@@ -3231,15 +3244,14 @@ class ReportController extends Controller
 			$sortedCategories = $groupedByCategory->sortByDesc('total_sold')->values();
 
 			// Assign to your data array
-			$data['products'] = $sortedCategories;
+			$categories = $sortedCategories;
 
-			$data['date1'] = Carbon::parse($request->date1);
-			$data['date2'] = Carbon::parse($request->date2);
-
-			$data['page_title'] = _lang('Inventory Details Report');
-			$data['category'] = $category;
-
-			return view('backend.user.reports.inventory_summary', $data);
+			return Inertia::render('Backend/User/Reports/InventorySummary', [
+				'categories' => $categories,
+				'date1' => $date1,
+				'date2' => $date2,
+				'business_name' => $request->activeBusiness->name,
+			]);
 		}
 	}
 
