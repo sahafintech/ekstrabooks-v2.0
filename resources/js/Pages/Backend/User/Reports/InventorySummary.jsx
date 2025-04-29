@@ -21,12 +21,13 @@ import {
 } from "@/Components/ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, parseDateObject } from "@/lib/utils";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function InventorySummary({ categories, date1, date2, business_name, currency }) {
-    const { data, setData, post, processing, errors, reset } = useForm({
-        date1: date1,
-        date2: date2,
+    const { data, setData, post, processing } = useForm({
+        date1: parseDateObject(date1),
+        date2: parseDateObject(date2),
     });
 
     const handleGenerate = (e) => {
@@ -49,123 +50,103 @@ export default function InventorySummary({ categories, date1, date2, business_na
         // Shared CSS
         const style = `
           <style>
-            body { font-family: Arial, sans-serif; }
-            table { width: 100%; border-collapse: collapse; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1, h2 { text-align: center; margin: 0.2em 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+            th, td { border: 1px solid #ddd; padding: 8px; }
             th { background-color: #f2f2f2; }
             .text-right { text-align: right; }
-            .total-row { font-weight: bold; background-color: #f9f9f9; }
-            h1, h2 { text-align: center; margin-bottom: 0.5em; }
           </style>
         `;
 
-        // Build header & table start
+        // Build header & tables
         let html = `
           <!DOCTYPE html>
-          <html><head><title>Inventory Details</title>${style}</head>
-          <body>
-            <h1>${business_name}</h1>
-            <h2>Inventory Details (${data.date1} – ${data.date2})</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Name</th>
-                  <th>Opening Stock</th>
-                  <th>Stock In</th>
-                  <th>Stock Out</th>
-                  <th>Adj Added</th>
-                  <th>Adj Deducted</th>
-                  <th>Balance</th>
-                  <th class="text-right">Total Cost (${currency})</th>
-                </tr>
-              </thead>
-              <tbody>
+          <html>
+            <head>
+              <title>Inventory Summary</title>
+              ${style}
+            </head>
+            <body>
+              <h1>${business_name}</h1>
+              <h2>Inventory Summary (${data.date1} – ${data.date2})</h2>
+      
+              <!-- Category Summary Table -->
+              <table>
+                <thead>
+                  <tr>
+                    <th>Category Name</th>
+                    <th class="text-right">Opening Stock</th>
+                    <th class="text-right">Stock In</th>
+                    <th class="text-right">Stock Out</th>
+                    <th class="text-right">Adj. Added</th>
+                    <th class="text-right">Adj. Deducted</th>
+                    <th class="text-right">Balance</th>
+                    <th class="text-right">Total Cost (${currency})</th>
+                  </tr>
+                </thead>
+                <tbody>
         `;
 
-        // Track grand totals
-        let grandCost = 0;
-
-        // Iterate categories → brands → products
         categories.forEach(cat => {
-            const catOpen = getTotalInitialStock(cat);
-            const catIn = getTotalStockIn(cat);
-            const catOut = cat.total_sold;
-            const catAdjAdd = getTotalStockAdjustmentAdded(cat);
-            const catAdjDed = getTotalStockAdjustmentDeducted(cat);
-            const catBal = getTotalStockBalance(cat);
-            const catCost = getTotalStockCost(cat);
-            grandCost += catCost;
-
-            // Category row
             html += `
-            <tr class="total-row">
-              <td></td>
-              <td><strong>${cat.category_name}</strong></td>
-              <td>${catOpen}</td>
-              <td>${catIn}</td>
-              <td>${catOut}</td>
-              <td>${catAdjAdd}</td>
-              <td>${catAdjDed}</td>
-              <td>${catBal}</td>
-              <td class="text-right">${formatCurrency({ amount: catCost })}</td>
+            <tr>
+              <td>${cat.category_name}</td>
+              <td class="text-right">${getTotalInitialStock(cat)}</td>
+              <td class="text-right">${getTotalStockIn(cat)}</td>
+              <td class="text-right">${cat.total_sold}</td>
+              <td class="text-right">${getTotalStockAdjustmentAdded(cat)}</td>
+              <td class="text-right">${getTotalStockAdjustmentDeducted(cat)}</td>
+              <td class="text-right">${getTotalStockBalance(cat)}</td>
+              <td class="text-right">${formatCurrency({ amount: getTotalStockCost(cat) })}</td>
             </tr>
           `;
+        });
 
-            // Brands
+        html += `
+                </tbody>
+              </table>
+      
+              <!-- Brand Summary Table -->
+              <table>
+                <thead>
+                  <tr>
+                    <th>Category Name</th>
+                    <th>Brand Name</th>
+                    <th class="text-right">Opening Stock</th>
+                    <th class="text-right">Stock In</th>
+                    <th class="text-right">Stock Out</th>
+                    <th class="text-right">Adj. Added</th>
+                    <th class="text-right">Adj. Deducted</th>
+                    <th class="text-right">Balance</th>
+                    <th class="text-right">Total Cost (${currency})</th>
+                  </tr>
+                </thead>
+                <tbody>
+        `;
+
+        categories.forEach(cat => {
             cat.brands.forEach(brand => {
-                const bOpen = getTotalInitialStock(brand);
-                const bIn = getTotalStockIn(brand);
-                const bOut = brand.total_sold;
-                const bAdjAdd = getTotalStockAdjustmentAdded(brand);
-                const bAdjDed = getTotalStockAdjustmentDeducted(brand);
-                const bBal = getTotalStockBalance(brand);
-                const bCost = getTotalStockCost(brand);
-
                 html += `
               <tr>
-                <td></td>
-                <td style="padding-left:20px;"><strong>${brand.brand_name}</strong></td>
-                <td>${bOpen}</td>
-                <td>${bIn}</td>
-                <td>${bOut}</td>
-                <td>${bAdjAdd}</td>
-                <td>${bAdjDed}</td>
-                <td>${bBal}</td>
-                <td class="text-right">${formatCurrency({ amount: bCost })}</td>
+                <td>${cat.category_name}</td>
+                <td>${brand.brand_name}</td>
+                <td class="text-right">${getTotalInitialStock(brand)}</td>
+                <td class="text-right">${getTotalStockIn(brand)}</td>
+                <td class="text-right">${brand.total_sold}</td>
+                <td class="text-right">${getTotalStockAdjustmentAdded(brand)}</td>
+                <td class="text-right">${getTotalStockAdjustmentDeducted(brand)}</td>
+                <td class="text-right">${getTotalStockBalance(brand)}</td>
+                <td class="text-right">${formatCurrency({ amount: getTotalStockCost(brand) })}</td>
               </tr>
             `;
-
-                // Products
-                brand.products.forEach(prod => {
-                    const pCost = prod.stock * prod.purchase_cost;
-                    grandCost += pCost;
-                    html += `
-                <tr>
-                  <td>${prod.code}</td>
-                  <td style="padding-left:40px;">${prod.name}</td>
-                  <td>${prod.initial_stock}</td>
-                  <td>${prod.total_stock_in}</td>
-                  <td>${prod.total_sold}</td>
-                  <td>${prod.total_stock_adjustment_added}</td>
-                  <td>${prod.total_stock_adjustment_deducted}</td>
-                  <td>${prod.stock}</td>
-                  <td class="text-right">${formatCurrency({ amount: pCost })}</td>
-                </tr>
-              `;
-                });
             });
         });
 
-        // Grand total row
         html += `
-              <tr class="total-row">
-                <td colspan="8">Grand Total</td>
-                <td class="text-right">${formatCurrency({ amount: grandCost })}</td>
-              </tr>
-            </tbody>
-          </table>
-          </body>
+                </tbody>
+              </table>
+            </body>
           </html>
         `;
 
@@ -173,6 +154,7 @@ export default function InventorySummary({ categories, date1, date2, business_na
         printWindow.document.open();
         printWindow.document.write(html);
         printWindow.document.close();
+
         setTimeout(() => {
             printWindow.print();
             printWindow.onafterprint = () => printWindow.close();
@@ -303,51 +285,19 @@ export default function InventorySummary({ categories, date1, date2, business_na
                             <div className="flex flex-col md:flex-row gap-4">
                                 <form onSubmit={handleGenerate} className="flex flex-col md:flex-row gap-4 w-full">
                                     <div className="flex items-center gap-2">
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className={cn(
-                                                        "w-full md:w-auto justify-start text-left font-normal",
-                                                        !data.date1 && "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {data.date1 ? format(new Date(data.date1), "PPP") : <span>From date</span>}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={data.date1 ? new Date(data.date1) : undefined}
-                                                    onSelect={(date) => setData('date1', date ? format(date, "yyyy-MM-dd") : '')}
-                                                    initialFocus
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
+                                        <DateTimePicker
+                                            value={data.date1}
+                                            onChange={(date) => setData("date1", date)}
+                                            className="md:w-1/2 w-full"
+                                            required
+                                        />
 
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className={cn(
-                                                        "w-full md:w-auto justify-start text-left font-normal",
-                                                        !data.date2 && "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {data.date2 ? format(new Date(data.date2), "PPP") : <span>To date</span>}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={data.date2 ? new Date(data.date2) : undefined}
-                                                    onSelect={(date) => setData('date2', date ? format(date, "yyyy-MM-dd") : '')}
-                                                    initialFocus
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
+                                        <DateTimePicker
+                                            value={data.date2}
+                                            onChange={(date) => setData("date2", date)}
+                                            className="md:w-1/2 w-full"
+                                            required
+                                        />
 
                                         <Button type="submit" disabled={processing}>{processing ? 'Generating...' : 'Generate'}</Button>
                                     </div>

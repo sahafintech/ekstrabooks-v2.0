@@ -22,25 +22,18 @@ import {
 import { Input } from "@/Components/ui/input";
 import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function Receivables({ report_data, date1, date2, meta = {}, filters = {}, business_name, currency, grand_total, paid_amount, due_amount, customers = [], customer_id = '' }) {
     const [search, setSearch] = useState(filters.search || "");
     const [perPage, setPerPage] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
-    
-    const { data, setData, post, processing, errors, reset } = useForm({
-        date1: date1,
-        date2: date2,
+
+    const { data, setData, post, processing } = useForm({
+        date1: parseDateObject(date1),
+        date2: parseDateObject(date2),
         customer_id: customer_id,
     });
 
@@ -126,23 +119,23 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
 
     const ItemStatusBadge = ({ status }) => {
         const statusMap = {
-          0: { label: "Draft", className: "text-gray-500" },
-          1: { label: "Unpaid", className: "text-red-500" },
-          2: { label: "Paid", className: "text-green-500" },
-          3: { label: "Partial Paid", className: "text-blue-500" },
+            0: { label: "Draft", className: "text-gray-500" },
+            1: { label: "Unpaid", className: "text-red-500" },
+            2: { label: "Paid", className: "text-green-500" },
+            3: { label: "Partial Paid", className: "text-blue-500" },
         };
-    
+
         return (
-          <span className={statusMap[status].className}>
-            {statusMap[status].label}
-          </span>
+            <span className={statusMap[status].className}>
+                {statusMap[status].label}
+            </span>
         );
-      };
+    };
 
     const handlePrint = () => {
         // Create a new window for printing
         const printWindow = window.open('', '_blank', 'width=800,height=600');
-        
+
         // Generate CSS for the print window
         const style = `
             <style>
@@ -155,7 +148,7 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                 .total-row { font-weight: bold; background-color: #f9f9f9; }
             </style>
         `;
-        
+
         // Start building the HTML content for the print window
         let printContent = `
             <!DOCTYPE html>
@@ -178,27 +171,27 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                     </thead>
                     <tbody>
         `;
-        
+
         // Add table rows from report_data
         if (report_data.length > 0) {
             report_data.forEach(item => {
                 printContent += `
                     <tr>
                         <td>${item.customer_name || 'N/A'}</td>
-                        <td class="text-right">${item.total_income}</td>
-                        <td class="text-right">${item.total_paid}</td>
-                        <td class="text-right">${item.total_due}</td>
+                        <td class="text-right">${formatCurrency(item.total_income)}</td>
+                        <td class="text-right">${formatCurrency(item.total_paid)}</td>
+                        <td class="text-right">${formatCurrency(item.total_due)}</td>
                     </tr>
                 `;
             });
-            
+
             // Add totals row
             printContent += `
                 <tr class="total-row">
                     <td>Total</td>
-                    <td class="text-right">${grand_total}</td>
-                    <td class="text-right">${paid_amount}</td>
-                    <td class="text-right">${due_amount}</td>
+                    <td class="text-right">${formatCurrency(grand_total)}</td>
+                    <td class="text-right">${formatCurrency(paid_amount)}</td>
+                    <td class="text-right">${formatCurrency(due_amount)}</td>
                 </tr>
             `;
         } else {
@@ -208,7 +201,7 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                 </tr>
             `;
         }
-        
+
         // Complete the HTML content
         printContent += `
                     </tbody>
@@ -216,17 +209,17 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
             </body>
             </html>
         `;
-        
+
         // Write the content to the print window and trigger print
         printWindow.document.open();
         printWindow.document.write(printContent);
         printWindow.document.close();
-        
+
         // Wait for content to load before printing
         setTimeout(() => {
             printWindow.print();
             // Close the window after printing
-            printWindow.onafterprint = function() {
+            printWindow.onafterprint = function () {
                 printWindow.close();
             };
         }, 300);
@@ -248,53 +241,21 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                             <div className="flex flex-col md:flex-row gap-4">
                                 <form onSubmit={handleGenerate} className="flex flex-col md:flex-row gap-4 w-full">
                                     <div className="flex items-center gap-2">
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className={cn(
-                                                        "w-full md:w-auto justify-start text-left font-normal",
-                                                        !data.date1 && "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {data.date1 ? format(new Date(data.date1), "PPP") : <span>From date</span>}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={data.date1 ? new Date(data.date1) : undefined}
-                                                    onSelect={(date) => setData('date1', date ? format(date, "yyyy-MM-dd") : '')}
-                                                    initialFocus
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
+                                        <DateTimePicker
+                                            value={data.date1}
+                                            onChange={(date) => setData("date1", date)}
+                                            className="md:w-1/2 w-full"
+                                            required
+                                        />
 
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className={cn(
-                                                        "w-full md:w-auto justify-start text-left font-normal",
-                                                        !data.date2 && "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {data.date2 ? format(new Date(data.date2), "PPP") : <span>To date</span>}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={data.date2 ? new Date(data.date2) : undefined}
-                                                    onSelect={(date) => setData('date2', date ? format(date, "yyyy-MM-dd") : '')}
-                                                    initialFocus
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
+                                        <DateTimePicker
+                                            value={data.date2}
+                                            onChange={(date) => setData("date2", date)}
+                                            className="md:w-1/2 w-full"
+                                            required
+                                        />
                                     </div>
-                                    
+
                                     <div className="flex items-center gap-2 w-full md:w-72">
                                         <SearchableCombobox
                                             options={[
@@ -377,9 +338,9 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                                                     <TableCell>{item.customer_name || 'N/A'}</TableCell>
                                                     <TableCell>{item.client_name || 'N/A'}</TableCell>
                                                     <TableCell>{item.invoice_number || 'N/A'}</TableCell>
-                                                    <TableCell className="text-right">{item.grand_total_formatted}</TableCell>
-                                                    <TableCell className="text-right">{item.paid_amount_formatted}</TableCell>
-                                                    <TableCell className="text-right">{item.due_amount_formatted}</TableCell>
+                                                    <TableCell className="text-right">{formatCurrency(item.grand_total)}</TableCell>
+                                                    <TableCell className="text-right">{formatCurrency(item.paid_amount)}</TableCell>
+                                                    <TableCell className="text-right">{formatCurrency(item.due_amount)}</TableCell>
                                                     <TableCell>{item.due_date}</TableCell>
                                                     <TableCell>{<ItemStatusBadge status={item.status} />}</TableCell>
                                                 </TableRow>
@@ -389,9 +350,9 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                                                 <TableCell></TableCell>
                                                 <TableCell></TableCell>
                                                 <TableCell></TableCell>
-                                                <TableCell className="text-right">{grand_total}</TableCell>
-                                                <TableCell className="text-right">{paid_amount}</TableCell>
-                                                <TableCell className="text-right">{due_amount}</TableCell>
+                                                <TableCell className="text-right">{formatCurrency(grand_total)}</TableCell>
+                                                <TableCell className="text-right">{formatCurrency(paid_amount)}</TableCell>
+                                                <TableCell className="text-right">{formatCurrency(due_amount)}</TableCell>
                                                 <TableCell></TableCell>
                                                 <TableCell></TableCell>
                                             </TableRow>

@@ -25,6 +25,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
+import { formatCurrency } from "@/lib/utils";
 
 export default function List({ journals = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
@@ -267,7 +268,7 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
                     <TableHead>Date</TableHead>
                     <TableHead>Journal #</TableHead>
                     <TableHead className="text-right">Transaction Amount</TableHead>
-                    <TableHead>Currency Rate</TableHead>
+                    <TableHead className="text-right">Currency Rate</TableHead>
                     <TableHead className="text-right">Base Currency Amount</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -302,13 +303,13 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
                           </Link>
                         </TableCell>
                         <TableCell className="text-right">
-                          {journal.transaction_amount}
+                          {formatCurrency({ amount: journal.transaction_amount, currency: journal.transaction_currency })}
                         </TableCell>
                         <TableCell className="text-right">
-                          {journal.currency_rate}
+                          {formatCurrency({ amount: journal.currency_rate, currency: journal.transaction_currency })}
                         </TableCell>
                         <TableCell className="text-right">
-                          {journal.base_currency_amount}
+                          {formatCurrency({ amount: journal.base_currency_amount })}
                         </TableCell>
                         <TableCell className="text-center">
                           <JournalStatusBadge status={journal.status} />

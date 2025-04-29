@@ -7,7 +7,7 @@ import {
     DropdownMenuGroup,
     DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
-import { MoreVertical } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { Link } from "@inertiajs/react";
 
 export default function TableActions({ actions = [] }) {
@@ -22,9 +22,12 @@ export default function TableActions({ actions = [] }) {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0">
+                <Button variant="outline">
                     <span className="sr-only">Open menu</span>
-                    <MoreVertical className="h-4 w-4" />
+                    <span className="flex items-center">
+                        Actions
+                        <ChevronDown className="ml-1" />
+                    </span>
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">

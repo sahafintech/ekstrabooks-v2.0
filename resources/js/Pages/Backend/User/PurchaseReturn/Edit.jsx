@@ -9,17 +9,11 @@ import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon, Plus, Trash2 } from "lucide-react";
-import { format } from "date-fns";
-import { cn, formatCurrency } from "@/lib/utils";
+import { Plus, Trash2 } from "lucide-react";
+import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function Edit({ vendors = [], products = [], currencies = [], taxes = [], purchase_return, taxIds = [] }) {
     const [purchaseReturnItems, setPurchaseReturnItems] = useState([{
@@ -37,7 +31,7 @@ export default function Edit({ vendors = [], products = [], currencies = [], tax
         vendor_id: purchase_return.vendor_id || "",
         title: purchase_return.title || "",
         return_number: purchase_return.return_number || "",
-        return_date: purchase_return.return_date || "",
+        return_date: parseDateObject(purchase_return.return_date) || "",
         currency: purchase_return.currency || "",
         exchange_rate: purchase_return.exchange_rate || 1,
         converted_total: purchase_return.converted_total || 0,
@@ -410,34 +404,12 @@ export default function Edit({ vendors = [], products = [], currencies = [], tax
                                 Return Date *
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant={"outline"}
-                                            className={cn(
-                                                "md:w-1/2 w-full justify-start text-left font-normal",
-                                                !data.return_date && "text-muted-foreground"
-                                            )}
-                                        >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {data.return_date ? (
-                                                formatDateDisplay(data.return_date)
-                                            ) : (
-                                                <span>Pick a date</span>
-                                            )}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                        <Calendar
-                                            mode="single"
-                                            selected={parseDate(data.return_date)}
-                                            onSelect={(date) =>
-                                                setData("return_date", date ? format(date, "yyyy-MM-dd") : "")
-                                            }
-                                            initialFocus
-                                        />
-                                    </PopoverContent>
-                                </Popover>
+                                <DateTimePicker
+                                    value={data.return_date}
+                                    onChange={(date) => setData("return_date", date)}
+                                    className="md:w-1/2 w-full"
+                                    required
+                                />
                                 <InputError message={errors.return_date} className="text-sm" />
                             </div>
                         </div>

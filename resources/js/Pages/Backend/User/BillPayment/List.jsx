@@ -26,6 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
+import { formatCurrency } from "@/lib/utils";
 
 // Delete Confirmation Modal Component
 const DeletePaymentModal = ({ show, onClose, onConfirm, processing }) => (
@@ -350,7 +351,7 @@ export default function List({ payments = [], meta = {}, filters = {} }) {
                                                 <TableCell>{payment.purchases.length + " " + "Invoices"}</TableCell>
                                                 <TableCell>{payment.method || "-"}</TableCell>
                                                 <TableCell>{payment.type || "-"}</TableCell>
-                                                <TableCell className="text-right">{payment.amount}</TableCell>
+                                                <TableCell className="text-right">{formatCurrency({ amount: payment.amount })}</TableCell>
                                                 <TableCell className="text-right">
                                                     <TableActions
                                                         actions={[

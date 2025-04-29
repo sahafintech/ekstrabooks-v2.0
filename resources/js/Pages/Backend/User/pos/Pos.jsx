@@ -1472,10 +1472,13 @@ export default function POS({ products, categories, currencies, accounts, custom
                     {filteredProducts.map(product => (
                       <div
                         key={product.id}
-                        className="border rounded-md h-20 flex flex-col items-center justify-center text-center p-2 hover:bg-gray-50 cursor-pointer transition-colors"
+                        className="border rounded-md flex flex-col items-center justify-center text-center p-2 hover:bg-gray-50 cursor-pointer transition-colors"
                         onClick={() => addToCart(product)}
                       >
-                        <div className="font-medium truncate w-full">{product.name}</div>
+                        <div className="w-14">
+                          <img src={`/uploads/media/${product.image}`} alt={product.name} />
+                        </div>
+                        <div className="font-medium w-full">{product.name}</div>
                         {product.code && (
                           <div className="text-xs text-gray-500">{product.code}</div>
                         )}

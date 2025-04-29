@@ -13,15 +13,16 @@ import { Calendar } from "@/Components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/Components/ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/Components/ui/table";
+import DateTimePicker from "@/Components/DateTimePicker";
 
-export default function Edit({ payment, customers = [], decimalPlace, accounts, methods }) {
+export default function Edit({ payment, customers = [], accounts, methods }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         customer_id: payment.customer_id,
-        trans_date: payment.trans_date,
+        trans_date: parseDateObject(payment.date),
         account_id: payment.account_id,
-        method: payment.method,
+        method: payment.payment_method,
         reference: payment.reference,
         attachment: payment.attachment,
         invoices: [],
@@ -107,30 +108,12 @@ export default function Edit({ payment, customers = [], decimalPlace, accounts, 
                                 Payment Date *
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant={"outline"}
-                                            className={cn(
-                                                "md:w-1/2 w-full justify-start text-left font-normal",
-                                                !data.trans_date && "text-muted-foreground"
-                                            )}
-                                        >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {data.trans_date ? format(new Date(data.trans_date), "PPP") : "Pick a date"}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                        <Calendar
-                                            mode="single"
-                                            selected={data.trans_date ? new Date(data.trans_date) : undefined}
-                                            onSelect={(date) =>
-                                                setData("trans_date", date ? format(date, "yyyy-MM-dd") : "")
-                                            }
-                                            initialFocus
-                                        />
-                                    </PopoverContent>
-                                </Popover>
+                                <DateTimePicker
+                                    value={data.trans_date}
+                                    onChange={(date) => setData("trans_date", date)}
+                                    className="md:w-1/2 w-full"
+                                    required
+                                />
                                 <InputError message={errors.trans_date} className="text-sm" />
                             </div>
                         </div>
@@ -204,7 +187,7 @@ export default function Edit({ payment, customers = [], decimalPlace, accounts, 
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                 <div className="md:w-1/2 w-full">
                                     <span>
-                                        {computedTotalAmount.toFixed(decimalPlace)}
+                                        {formatCurrency(computedTotalAmount)}
                                     </span>
                                 </div>
                             </div>

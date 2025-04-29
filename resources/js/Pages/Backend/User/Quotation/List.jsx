@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
@@ -32,6 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
+import { formatCurrency } from "@/lib/utils";
 
 const DeleteQuotationModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
@@ -465,7 +466,7 @@ export default function List({ quotations = [], meta = {}, filters = {} }) {
                         <TableCell>{quotation.customer ? quotation.customer.name : "-"}</TableCell>
                         <TableCell>{quotation.quotation_date}</TableCell>
                         <TableCell>{quotation.expired_date}</TableCell>
-                        <TableCell className="text-right">{quotation.grand_total}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(quotation.grand_total)}</TableCell>
                         <TableCell>
                           <QuotationStatusBadge expired_date={quotation.expired_date} />
                         </TableCell>

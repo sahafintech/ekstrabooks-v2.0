@@ -15,7 +15,7 @@ export default {
     	extend: {
     		fontFamily: {
     			sans: [
-    				'Geist',
+    				'Inter',
                     ...defaultTheme.fontFamily.sans
                 ]
     		},

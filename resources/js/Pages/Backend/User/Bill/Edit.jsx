@@ -9,18 +9,12 @@ import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon, Plus, Trash2 } from "lucide-react";
-import { format } from "date-fns";
-import { cn, formatCurrency } from "@/lib/utils";
+import { Plus, Trash2 } from "lucide-react";
+import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import DateTimePicker from "@/Components/DateTimePicker";
 
-export default function Edit({ vendors = [], products = [], bill, currencies = [], taxes = [], accounts = [], decimalPlace, inventory }) {
+export default function Edit({ vendors = [], products = [], bill, currencies = [], taxes = [], accounts = [], inventory }) {
   const [billItems, setBillItems] = useState([]);
   const [billAccounts, setBillAccounts] = useState([]);
   const [exchangeRate, setExchangeRate] = useState(1);
@@ -31,8 +25,8 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
     title: bill.title,
     bill_no: bill.bill_no,
     po_so_number: bill.po_so_number,
-    purchase_date: bill.purchase_date,
-    due_date: bill.due_date,
+    purchase_date: parseDateObject(bill.purchase_date),
+    due_date: parseDateObject(bill.due_date),
     currency: bill.currency,
     exchange_rate: bill.exchange_rate,
     converted_total: bill.converted_total,
@@ -100,50 +94,6 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
       setExchangeRate(bill.exchange_rate);
     }
   }, []);  // Empty dependency array so it only runs once
-
-  // Parse date strings safely for the date picker
-  const parseDate = (dateString) => {
-    if (!dateString) return undefined;
-
-    try {
-      // Handle dd/mm/yyyy format
-      if (typeof dateString === 'string' && dateString.includes('/')) {
-        const [day, month, year] = dateString.split('/');
-        const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-
-        if (!isNaN(parsedDate.getTime())) {
-          return parsedDate;
-        }
-      }
-
-      // Try to parse the date directly
-      const date = new Date(dateString);
-
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
-        console.warn("Invalid date:", dateString);
-        return undefined;
-      }
-
-      return date;
-    } catch (error) {
-      console.error("Error parsing date:", error, "for input:", dateString);
-      return new Date();
-    }
-  };
-
-  // Format date to display format (dd/mm/yyyy)
-  const formatDateDisplay = (date) => {
-    if (!date) return "";
-    try {
-      const parsedDate = parseDate(date);
-      if (!parsedDate) return "";
-      return format(parsedDate, "dd/MM/yyyy");
-    } catch (error) {
-      console.error("Error formatting date for display:", error);
-      return "";
-    }
-  };
 
   const addBillItem = () => {
     setBillItems([...billItems, {
@@ -373,9 +323,9 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
 
       return (
         <div>
-          <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
+          <h2 className="text-xl font-bold">Total: {formatCurrency({ amount: total, currency: selectedCurrency.name })}</h2>
           <p className="text-sm text-gray-600">
-            Equivalent to {formatCurrency(baseCurrencyTotal, baseCurrencyInfo.name, decimalPlace)}
+            Equivalent to {formatCurrency({ amount: baseCurrencyTotal, currency: baseCurrencyInfo.name })}
           </p>
         </div>
       );
@@ -383,7 +333,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
 
     return (
       <div>
-        <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
+        <h2 className="text-xl font-bold">Total: {formatCurrency({ amount: total, currency: selectedCurrency.name })}</h2>
       </div>
     );
   };
@@ -481,9 +431,6 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
       ]
     };
 
-    // Log the data being sent to help debug
-    console.log("Submitting form with data:", formData);
-
     // Post the form data directly instead of using setData first
     post(route("bill_invoices.update", bill.id), formData, {
       preserveScroll: true,
@@ -558,34 +505,12 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                 Purchase Date *
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "md:w-1/2 w-full justify-start text-left font-normal",
-                        !data.purchase_date && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {data.purchase_date ? (
-                        formatDateDisplay(data.purchase_date)
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={data.purchase_date ? new Date(data.purchase_date) : undefined}
-                      onSelect={(date) =>
-                        setData("purchase_date", date ? format(date, "yyyy-MM-dd") : "")
-                      }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DateTimePicker
+                  value={data.purchase_date}
+                  onChange={(date) => setData("purchase_date", date)}
+                  className="md:w-1/2 w-full"
+                  required
+                />
                 <InputError message={errors.purchase_date} className="text-sm" />
               </div>
             </div>
@@ -595,35 +520,13 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                 Due Date *
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "md:w-1/2 w-full justify-start text-left font-normal",
-                        !data.due_date && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {data.due_date ? (
-                        formatDateDisplay(data.due_date)
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={data.due_date ? new Date(data.due_date) : undefined}
-                      onSelect={(date) =>
-                        setData("due_date", date ? format(date, "yyyy-MM-dd") : "")
-                      }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                <InputError message={errors.purchase_date} className="text-sm" />
+                <DateTimePicker
+                  value={data.due_date}
+                  onChange={(date) => setData("due_date", date)}
+                  className="md:w-1/2 w-full"
+                  required
+                />
+                <InputError message={errors.due_date} className="text-sm" />
               </div>
             </div>
 
@@ -699,7 +602,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
               {billItems.map((item, index) => (
                 <div key={index} className="border rounded-lg p-4 space-y-4 bg-gray-50">
                   {/* First Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <div>
                       <Label>Product *</Label>
                       <SearchableCombobox
@@ -735,7 +638,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                   </div>
 
                   {/* Second Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
                     <div className="md:col-span-6">
                       <Label>Description</Label>
                       <Textarea
@@ -756,7 +659,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                       </div>
                     </div>
 
-                    <div className="md:col-span-1 flex items-end justify-end">
+                    <div className="md:col-span-1 flex items-center justify-end">
                       <Button
                         type="button"
                         variant="ghost"
@@ -774,7 +677,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
               {billAccounts.map((accountItem, index) => (
                 <div key={`account-${index}`} className="border rounded-lg p-4 space-y-4 bg-gray-50">
                   {/* First Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <div>
                       <Label>Account *</Label>
                       <SearchableCombobox
@@ -829,7 +732,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                   </div>
 
                   {/* Second Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
                     <div className="md:col-span-3">
                       <Label>Quantity *</Label>
                       <Input
@@ -869,7 +772,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                       <TaxSelector index={index} isAccount={true} />
                     </div>
 
-                    <div className="md:col-span-1 flex items-end justify-end">
+                    <div className="md:col-span-1 flex items-center justify-end">
                       <Button
                         type="button"
                         variant="ghost"

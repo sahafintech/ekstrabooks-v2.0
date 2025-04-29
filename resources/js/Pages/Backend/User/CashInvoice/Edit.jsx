@@ -9,18 +9,12 @@ import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon, Plus, Trash2 } from "lucide-react";
-import { format } from "date-fns";
-import { cn, formatCurrency } from "@/lib/utils";
+import { Plus, Trash2 } from "lucide-react";
+import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import DateTimePicker from "@/Components/DateTimePicker";
 
-export default function Edit({ customers = [], products = [], currencies = [], taxes = [], receipt, decimalPlace, accounts, transaction }) {
+export default function Edit({ customers = [], products = [], currencies = [], taxes = [], receipt, accounts, transaction }) {
   const [receiptItems, setReceiptItems] = useState([{
     product_id: "",
     product_name: "",
@@ -38,7 +32,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     title: receipt.title || "",
     receipt_number: receipt.receipt_number || "",
     order_number: receipt.order_number || "",
-    receipt_date: receipt.receipt_date || "",
+    receipt_date: parseDateObject(receipt.receipt_date) || "",
     currency: receipt.currency || "",
     exchange_rate: receipt.exchange_rate || 1,
     converted_total: receipt.converted_total || 0,
@@ -220,52 +214,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     setData('converted_total', convertedTotal);
   }, [data.currency, receiptItems, data.discount_type, data.discount_value, exchangeRate]);
 
-  // Parse date strings safely for the date picker
-  const parseDate = (dateString) => {
-    if (!dateString) return undefined;
-
-    try {
-      // Handle dd/mm/yyyy format
-      if (typeof dateString === 'string' && dateString.includes('/')) {
-        const [day, month, year] = dateString.split('/');
-        const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-
-        if (!isNaN(parsedDate.getTime())) {
-          console.log("Successfully parsed date:", dateString, "to", parsedDate);
-          return parsedDate;
-        }
-      }
-
-      // Try to parse the date directly
-      const date = new Date(dateString);
-
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
-        console.warn("Invalid date:", dateString);
-        return undefined;
-      }
-
-      console.log("Parsed date:", dateString, "to", date);
-      return date;
-    } catch (error) {
-      console.error("Error parsing date:", error, "for input:", dateString);
-      return undefined;
-    }
-  };
-
-  // Format date to display format (dd/mm/yyyy)
-  const formatDateDisplay = (date) => {
-    if (!date) return "";
-    try {
-      const parsedDate = parseDate(date);
-      if (!parsedDate) return "";
-      return format(parsedDate, "dd/MM/yyyy");
-    } catch (error) {
-      console.error("Error formatting date for display:", error);
-      return "";
-    }
-  };
-
   const renderTotal = () => {
     const total = calculateTotal();
     const selectedCurrency = currencies.find(c => c.name === data.currency);
@@ -289,9 +237,9 @@ export default function Edit({ customers = [], products = [], currencies = [], t
 
       return (
         <div>
-          <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
+          <h2 className="text-xl font-bold">Total: {formatCurrency({ amount: total, currency: selectedCurrency.name })}</h2>
           <p className="text-sm text-gray-600">
-            Equivalent to {formatCurrency(baseCurrencyTotal, baseCurrencyInfo.name, decimalPlace)}
+            Equivalent to {formatCurrency({ amount: baseCurrencyTotal, currency: baseCurrencyInfo.name })}
           </p>
         </div>
       );
@@ -299,7 +247,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
 
     return (
       <div>
-        <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
+        <h2 className="text-xl font-bold">Total: {formatCurrency({ amount: total, currency: selectedCurrency.name })}</h2>
       </div>
     );
   };
@@ -339,24 +287,9 @@ export default function Edit({ customers = [], products = [], currencies = [], t
       toast.error("Please select a valid currency");
       return;
     }
-
-    // Format dates properly for submission
-    let receipt_date = data.receipt_date;
-
-    // If they're already in dd/mm/yyyy format, don't change them
-    if (typeof receipt_date === 'string' && receipt_date.includes('/')) {
-    } else {
-      // Otherwise, ensure they're in the right format
-      const parsedReceiptDate = parseDate(receipt_date);
-      if (parsedReceiptDate) {
-        receipt_date = format(parsedReceiptDate, "dd/MM/yyyy");
-      }
-    }
-
     // Create a new data object with all the required fields
     const formData = {
       ...data,
-      receipt_date,
       currency: selectedCurrency.name,
       exchange_rate: exchangeRate,
       product_id: receiptItems.map(item => item.product_id),
@@ -371,9 +304,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
         ])
       )
     };
-
-    // Log the data being sent to help debug
-    console.log("Submitting form with data:", formData);
 
     // Put the form data instead of post for updating
     put(route("receipts.update", receipt.id), formData, {
@@ -453,34 +383,12 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                 Invoice Date *
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "md:w-1/2 w-full justify-start text-left font-normal",
-                        !data.receipt_date && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {data.receipt_date ? (
-                        formatDateDisplay(data.receipt_date)
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={parseDate(data.receipt_date)}
-                      onSelect={(date) =>
-                        setData("receipt_date", date ? format(date, "yyyy-MM-dd") : "")
-                      }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DateTimePicker
+                  value={data.receipt_date}
+                  onChange={(date) => setData("receipt_date", date)}
+                  className="md:w-1/2 w-full"
+                  required
+                />
                 <InputError message={errors.receipt_date} className="text-sm" />
               </div>
             </div>

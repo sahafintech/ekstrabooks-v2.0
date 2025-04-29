@@ -12,19 +12,11 @@ import {
     TableHeader,
     TableRow,
 } from "@/Components/ui/table";
-import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
-import { cn, formatCurrency } from "@/lib/utils";
+import { formatCurrency, parseDateObject } from "@/lib/utils";
+import DateTimePicker from "@/Components/DateTimePicker";
 
-export default function IncomeStatement({ report_data, date1, date2, meta = {}, base_currency, business_name }) {
+export default function IncomeStatement({ report_data, date1, date2, business_name }) {
     // Calculate summary values
     const getTotalIncome = () => {
         if (!report_data.sales_and_income || report_data.sales_and_income.length === 0) return 0;
@@ -114,8 +106,8 @@ export default function IncomeStatement({ report_data, date1, date2, meta = {}, 
     );
 
     const { data, setData, post, processing } = useForm({
-        date1: date1,
-        date2: date2,
+        date1: parseDateObject(date1),
+        date2: parseDateObject(date2),
     });
 
     const handleExport = () => {
@@ -307,58 +299,27 @@ export default function IncomeStatement({ report_data, date1, date2, meta = {}, 
                     />
                     <div className="p-4">
                         <div className="mx-auto">
-                            <div className="bg-white overflow-hidden sm:rounded-lg">
-                                <form onSubmit={handleGenerate}>
-                                    <div className="flex flex-col md:flex-row gap-4 items-end">
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className={cn(
-                                                        "w-full md:w-auto justify-start text-left font-normal",
-                                                        !data.date1 && "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {data.date1 ? format(new Date(data.date1), "PPP") : <span>From date</span>}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={data.date1 ? new Date(data.date1) : undefined}
-                                                    onSelect={(date) => setData('date1', date ? format(date, "yyyy-MM-dd") : '')}
-                                                    initialFocus
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
+                            <div className="flex flex-col justify-between items-start mb-6 gap-4">
+                                <div className="flex flex-col md:flex-row gap-4">
+                                    <form onSubmit={handleGenerate} className="flex gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <DateTimePicker
+                                                value={data.date1}
+                                                onChange={(date) => setData("date1", date)}
+                                                className="md:w-1/2 w-full"
+                                                required
+                                            />
 
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className={cn(
-                                                        "w-full md:w-auto justify-start text-left font-normal",
-                                                        !data.date2 && "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {data.date2 ? format(new Date(data.date2), "PPP") : <span>To date</span>}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={data.date2 ? new Date(data.date2) : undefined}
-                                                    onSelect={(date) => setData('date2', date ? format(date, "yyyy-MM-dd") : '')}
-                                                    initialFocus
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
-
-                                        <Button type="submit" disabled={processing}>{processing ? 'Generating...' : 'Generate'}</Button>
-                                    </div>
-                                </form>
+                                            <DateTimePicker
+                                                value={data.date2}
+                                                onChange={(date) => setData("date2", date)}
+                                                className="md:w-1/2 w-full"
+                                                required
+                                            />
+                                            <Button type="submit" disabled={processing}>{processing ? 'Generating...' : 'Generate'}</Button>
+                                        </div>
+                                    </form>
+                                </div>
                             </div>
 
                             <div className="flex items-center gap-2 print-buttons mt-6">

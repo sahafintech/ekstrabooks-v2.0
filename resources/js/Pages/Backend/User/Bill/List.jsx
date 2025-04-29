@@ -26,12 +26,13 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, Check, X } from "lucide-react";
+import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
+import { formatCurrency } from "@/lib/utils";
 
 const DeleteBillModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
@@ -54,60 +55,6 @@ const DeleteBillModal = ({ show, onClose, onConfirm, processing }) => (
           disabled={processing}
         >
           Delete Bill
-        </Button>
-      </div>
-    </form>
-  </Modal>
-);
-
-const ApproveBillModal = ({ show, onClose, onConfirm, processing }) => (
-  <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
-      <h2 className="text-lg font-medium">
-        Are you sure you want to approve this bill?
-      </h2>
-      <div className="mt-6 flex justify-end">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={onClose}
-          className="mr-3"
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          variant="default"
-          disabled={processing}
-        >
-          Approve Bill
-        </Button>
-      </div>
-    </form>
-  </Modal>
-);
-
-const RejectBillModal = ({ show, onClose, onConfirm, processing }) => (
-  <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
-      <h2 className="text-lg font-medium">
-        Are you sure you want to reject this bill?
-      </h2>
-      <div className="mt-6 flex justify-end">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={onClose}
-          className="mr-3"
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          variant="destructive"
-          disabled={processing}
-        >
-          Reject Bill
         </Button>
       </div>
     </form>
@@ -251,10 +198,6 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [billToDelete, setBillToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
-  const [billToApprove, setBillToApprove] = useState(null);
-  const [billToReject, setBillToReject] = useState(null);
-  const [showApproveModal, setShowApproveModal] = useState(false);
-  const [showRejectModal, setShowRejectModal] = useState(false);
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -293,16 +236,6 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
     setShowDeleteModal(true);
   };
 
-  const handleApproveConfirm = (billId) => {
-    setBillToApprove(billId);
-    setShowApproveModal(true);
-  };
-
-  const handleRejectConfirm = (billId) => {
-    setBillToReject(billId);
-    setShowRejectModal(true);
-  };
-
   const handleDelete = (e) => {
     e.preventDefault();
     setProcessing(true);
@@ -324,58 +257,6 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
           variant: "destructive",
           title: "Error",
           description: "There was an error deleting the bill.",
-        });
-      }
-    });
-  };
-
-  const handleApprove = (e) => {
-    e.preventDefault();
-    setProcessing(true);
-
-    router.post(route("bill_invoices.approve", billToApprove), {
-      onSuccess: () => {
-        setShowApproveModal(false);
-        setBillToApprove(null);
-        setProcessing(false);
-        setSelectedBills(prev => prev.filter(id => id !== billToApprove));
-        toast({
-          title: "Bill Approved",
-          description: "bill has been approved successfully.",
-        });
-      },
-      onError: () => {
-        setProcessing(false);
-        toast({
-          variant: "default",
-          title: "Error",
-          description: "There was an error approving the bill.",
-        });
-      }
-    });
-  };
-
-  const handleReject = (e) => {
-    e.preventDefault();
-    setProcessing(true);
-
-    router.post(route("bill_invoices.reject", billToReject), {
-      onSuccess: () => {
-        setShowRejectModal(false);
-        setBillToReject(null);
-        setProcessing(false);
-        setSelectedBills(prev => prev.filter(id => id !== billToReject));
-        toast({
-          title: "Bill Rejected",
-          description: "bill has been rejected successfully.",
-        });
-      },
-      onError: () => {
-        setProcessing(false);
-        toast({
-          variant: "default",
-          title: "Error",
-          description: "There was an error approving the bill.",
         });
       }
     });
@@ -614,13 +495,13 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
                         <TableCell>{bill.purchase_date}</TableCell>
                         <TableCell>{bill.due_date}</TableCell>
                         <TableCell className="text-right">
-                          {bill.grand_total}
+                          {formatCurrency({ amount: bill.grand_total })}
                         </TableCell>
                         <TableCell className="text-right">
-                          {bill.paid}
+                          {formatCurrency({ amount: bill.paid })}
                         </TableCell>
                         <TableCell className="text-right">
-                          {bill.grand_total - bill.paid}
+                          {formatCurrency({ amount: bill.grand_total - bill.paid })}
                         </TableCell>
                         <TableCell>
                           <BillApprovalStatusBadge status={bill.approval_status} />
@@ -640,16 +521,6 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
                                 label: "Edit",
                                 icon: <Edit className="h-4 w-4" />,
                                 href: route("bill_invoices.edit", bill.id),
-                              },
-                              {
-                                label: "Approve",
-                                icon: <Check className="h-4 w-4" />,
-                                onclick: () => handleApproveConfirm(bill.id),
-                              },
-                              {
-                                label: "Reject",
-                                icon: <X className="h-4 w-4" />,
-                                onclick: () => handleRejectConfirm(bill.id)
                               },
                               {
                                 label: "Delete",
@@ -723,20 +594,6 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
         show={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleDelete}
-        processing={processing}
-      />
-
-      <ApproveBillModal
-        show={showApproveModal}
-        onClose={() => setShowApproveModal(false)}
-        onConfirm={handleApprove}
-        processing={processing}
-      />
-
-      <RejectBillModal
-        show={showRejectModal}
-        onClose={() => setShowRejectModal(false)}
-        onConfirm={handleReject}
         processing={processing}
       />
 

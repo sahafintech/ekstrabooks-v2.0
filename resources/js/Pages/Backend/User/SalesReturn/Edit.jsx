@@ -9,17 +9,11 @@ import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon, Plus, Trash2 } from "lucide-react";
-import { format } from "date-fns";
-import { cn, formatCurrency } from "@/lib/utils";
+import { Plus, Trash2 } from "lucide-react";
+import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function Edit({ customers = [], products = [], currencies = [], taxes = [], sales_return, taxIds = [], accounts = [], paymentTransaction }) {
     const [salesReturnItems, setSalesReturnItems] = useState([{
@@ -37,7 +31,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
         customer_id: sales_return.customer_id || "",
         title: sales_return.title || "",
         return_number: sales_return.return_number || "",
-        return_date: sales_return.return_date || "",
+        return_date: parseDateObject(sales_return.return_date),
         currency: sales_return.currency || "",
         exchange_rate: sales_return.exchange_rate || 1,
         converted_total: sales_return.converted_total || 0,
@@ -227,52 +221,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
         setData('converted_total', convertedTotal);
     }, [data.currency, salesReturnItems, data.discount_type, data.discount_value, exchangeRate]);
 
-    // Parse date strings safely for the date picker
-    const parseDate = (dateString) => {
-        if (!dateString) return undefined;
-
-        try {
-            // Handle dd/mm/yyyy format
-            if (typeof dateString === 'string' && dateString.includes('/')) {
-                const [day, month, year] = dateString.split('/');
-                const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-
-                if (!isNaN(parsedDate.getTime())) {
-                    console.log("Successfully parsed date:", dateString, "to", parsedDate);
-                    return parsedDate;
-                }
-            }
-
-            // Try to parse the date directly
-            const date = new Date(dateString);
-
-            // Check if date is valid
-            if (isNaN(date.getTime())) {
-                console.warn("Invalid date:", dateString);
-                return undefined;
-            }
-
-            console.log("Parsed date:", dateString, "to", date);
-            return date;
-        } catch (error) {
-            console.error("Error parsing date:", error, "for input:", dateString);
-            return undefined;
-        }
-    };
-
-    // Format date to display format (dd/mm/yyyy)
-    const formatDateDisplay = (date) => {
-        if (!date) return "";
-        try {
-            const parsedDate = parseDate(date);
-            if (!parsedDate) return "";
-            return format(parsedDate, "dd/MM/yyyy");
-        } catch (error) {
-            console.error("Error formatting date for display:", error);
-            return "";
-        }
-    };
-
     const renderTotal = () => {
         const total = calculateTotal();
         const selectedCurrency = currencies.find(c => c.name === data.currency);
@@ -321,24 +269,10 @@ export default function Edit({ customers = [], products = [], currencies = [], t
             toast.error("Please select a valid currency");
             return;
         }
-
-        // Format dates properly for submission
-        let invoice_date = data.invoice_date;
-
-        // If they're already in dd/mm/yyyy format, don't change them
-        if (typeof invoice_date === 'string' && invoice_date.includes('/')) {
-        } else {
-            // Otherwise, ensure they're in the right format
-            const parsedInvoiceDate = parseDate(invoice_date);
-            if (parsedInvoiceDate) {
-                invoice_date = format(parsedInvoiceDate, "dd/MM/yyyy");
-            }
-        }
-
+        
         // Create a new data object with all the required fields
         const formData = {
             ...data,
-            invoice_date,
             currency: selectedCurrency.name,
             exchange_rate: exchangeRate,
             product_id: salesReturnItems.map(item => item.product_id),
@@ -430,34 +364,12 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                                 Return Date *
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant={"outline"}
-                                            className={cn(
-                                                "md:w-1/2 w-full justify-start text-left font-normal",
-                                                !data.return_date && "text-muted-foreground"
-                                            )}
-                                        >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {data.return_date ? (
-                                                formatDateDisplay(data.return_date)
-                                            ) : (
-                                                <span>Pick a date</span>
-                                            )}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                        <Calendar
-                                            mode="single"
-                                            selected={parseDate(data.return_date)}
-                                            onSelect={(date) =>
-                                                setData("return_date", date ? format(date, "yyyy-MM-dd") : "")
-                                            }
-                                            initialFocus
-                                        />
-                                    </PopoverContent>
-                                </Popover>
+                                <DateTimePicker
+                                    value={data.return_date}
+                                    onChange={(date) => setData("return_date", date)}
+                                    className="md:w-1/2 w-full"
+                                    required
+                                />
                                 <InputError message={errors.return_date} className="text-sm" />
                             </div>
                         </div>

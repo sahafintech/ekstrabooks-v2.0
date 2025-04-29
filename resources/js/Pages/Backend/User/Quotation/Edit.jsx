@@ -9,19 +9,13 @@ import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon, Plus, Trash2 } from "lucide-react";
-import { format } from "date-fns";
-import { cn, formatCurrency } from "@/lib/utils";
+import { Plus, Trash2 } from "lucide-react";
+import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
+import DateTimePicker from "@/Components/DateTimePicker";
 
-export default function Edit({ customers = [], products = [], currencies = [], taxes = [], taxIds, quotation, decimalPlace }) {
+export default function Edit({ customers = [], products = [], currencies = [], taxes = [], taxIds, quotation }) {
   const [quotationItems, setQuotationItems] = useState([{
     product_id: "",
     product_name: "",
@@ -38,8 +32,8 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     title: quotation.title,
     quotation_number: quotation.quotation_number,
     order_number: quotation.order_number,
-    quotation_date: format(new Date(), "yyyy-MM-dd"),
-    expired_date: quotation.expired_date,
+    quotation_date: parseDateObject(quotation.quotation_date),
+    expired_date: parseDateObject(quotation.expired_date),
     currency: quotation.currency,
     exchange_rate: quotation.exchange_rate,
     converted_total: 0,
@@ -229,52 +223,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     setData('converted_total', convertedTotal);
   }, [data.currency, quotationItems, data.discount_type, data.discount_value, exchangeRate]);
 
-  // Parse date strings safely for the date picker
-  const parseDate = (dateString) => {
-    if (!dateString) return undefined;
-
-    try {
-      // Handle dd/mm/yyyy format
-      if (typeof dateString === 'string' && dateString.includes('/')) {
-        const [day, month, year] = dateString.split('/');
-        const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-
-        if (!isNaN(parsedDate.getTime())) {
-          console.log("Successfully parsed date:", dateString, "to", parsedDate);
-          return parsedDate;
-        }
-      }
-
-      // Try to parse the date directly
-      const date = new Date(dateString);
-
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
-        console.warn("Invalid date:", dateString);
-        return undefined;
-      }
-
-      console.log("Parsed date:", dateString, "to", date);
-      return date;
-    } catch (error) {
-      console.error("Error parsing date:", error, "for input:", dateString);
-      return undefined;
-    }
-  };
-
-  // Format date to display format (dd/mm/yyyy)
-  const formatDateDisplay = (date) => {
-    if (!date) return "";
-    try {
-      const parsedDate = parseDate(date);
-      if (!parsedDate) return "";
-      return format(parsedDate, "dd/MM/yyyy");
-    } catch (error) {
-      console.error("Error formatting date for display:", error);
-      return "";
-    }
-  };
-
   const renderTotal = () => {
     const total = calculateTotal();
     const selectedCurrency = currencies.find(c => c.name === data.currency);
@@ -298,9 +246,9 @@ export default function Edit({ customers = [], products = [], currencies = [], t
 
       return (
         <div>
-          <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
+          <h2 className="text-xl font-bold">Total: {formatCurrency({ amount: total, currency: selectedCurrency.name })}</h2>
           <p className="text-sm text-gray-600">
-            Equivalent to {formatCurrency(baseCurrencyTotal, baseCurrencyInfo.name, decimalPlace)}
+            Equivalent to {formatCurrency({ amount: baseCurrencyTotal, currency: baseCurrencyInfo.name })}
           </p>
         </div>
       );
@@ -308,7 +256,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
 
     return (
       <div>
-        <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
+        <h2 className="text-xl font-bold">Total: {formatCurrency({ amount: total, currency: selectedCurrency.name })}</h2>
       </div>
     );
   };
@@ -318,35 +266,10 @@ export default function Edit({ customers = [], products = [], currencies = [], t
 
     // Find the selected currency object to get its name
     const selectedCurrency = currencies.find(c => c.name === data.currency);
-    
+
     if (!selectedCurrency) {
       toast.error("Please select a valid currency");
       return;
-    }
-
-    // Format dates properly for submission
-    let quotation_date = data.quotation_date;
-    let expired_date = data.expired_date;
-    
-    // If they're already in dd/mm/yyyy format, don't change them
-    if (typeof quotation_date === 'string' && quotation_date.includes('/')) {
-      console.log("Quotation date already in correct format:", quotation_date);
-    } else {
-      // Otherwise, ensure they're in the right format
-      const parsedQuotationDate = parseDate(quotation_date);
-      if (parsedQuotationDate) {
-        quotation_date = format(parsedQuotationDate, "dd/MM/yyyy");
-      }
-    }
-    
-    if (typeof expired_date === 'string' && expired_date.includes('/')) {
-      console.log("Expired date already in correct format:", expired_date);
-    } else {
-      // Otherwise, ensure they're in the right format
-      const parsedExpiredDate = parseDate(expired_date);
-      if (parsedExpiredDate) {
-        expired_date = format(parsedExpiredDate, "dd/MM/yyyy");
-      }
     }
 
     // Create a new data object with all the required fields
@@ -443,34 +366,12 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                 Quotation Date *
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "md:w-1/2 w-full justify-start text-left font-normal",
-                        !data.quotation_date && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {data.quotation_date ? (
-                        formatDateDisplay(data.quotation_date)
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={parseDate(data.quotation_date)}
-                      onSelect={(date) =>
-                        setData("quotation_date", date ? format(date, "yyyy-MM-dd") : "")
-                      }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DateTimePicker
+                  value={data.quotation_date}
+                  onChange={(date) => setData("quotation_date", date)}
+                  className="md:w-1/2 w-full"
+                  required
+                />
                 <InputError message={errors.quotation_date} className="text-sm" />
               </div>
             </div>
@@ -480,34 +381,12 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                 Expired Date *
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "md:w-1/2 w-full justify-start text-left font-normal",
-                        !data.expired_date && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {data.expired_date ? (
-                        formatDateDisplay(data.expired_date)
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={parseDate(data.expired_date)}
-                      onSelect={(date) =>
-                        setData("expired_date", date ? format(date, "yyyy-MM-dd") : "")
-                      }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DateTimePicker
+                  value={data.expired_date}
+                  onChange={(date) => setData("expired_date", date)}
+                  className="md:w-1/2 w-full"
+                  required
+                />
                 <InputError message={errors.expired_date} className="text-sm" />
               </div>
             </div>
@@ -718,9 +597,9 @@ export default function Edit({ customers = [], products = [], currencies = [], t
 
             <div className="mt-6 space-y-2">
               <div className="space-y-2">
-                <div className="text-sm">Subtotal: {Number(calculateSubtotal()).toFixed(decimalPlace)}</div>
-                <div className="text-sm">Taxes: {Number(calculateTaxes()).toFixed(decimalPlace)}</div>
-                <div className="text-sm">Discount: {Number(calculateDiscount()).toFixed(decimalPlace)}</div>
+                <div className="text-sm">Subtotal: {Number(calculateSubtotal()).toFixed(2)}</div>
+                <div className="text-sm">Taxes: {Number(calculateTaxes()).toFixed(2)}</div>
+                <div className="text-sm">Discount: {Number(calculateDiscount()).toFixed(2)}</div>
                 {renderTotal()}
               </div>
 

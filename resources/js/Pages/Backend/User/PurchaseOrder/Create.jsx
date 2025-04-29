@@ -9,17 +9,11 @@ import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon, Plus, Trash2 } from "lucide-react";
-import { format } from "date-fns";
-import { cn, convertCurrency, formatCurrency } from "@/lib/utils";
+import { Plus, Trash2 } from "lucide-react";
+import { convertCurrency, formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function Create({ vendors = [], products = [], currencies = [], taxes = [], accounts = [], purchase_order_title, inventory, base_currency }) {
   const [purchaseOrderItems, setPurchaseOrderItems] = useState([{
@@ -28,6 +22,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     description: "",
     quantity: 1,
     unit_cost: 0,
+    account_id: "",
   }]);
 
   const [purchaseOrderAccounts, setPurchaseOrderAccounts] = useState([]);
@@ -37,7 +32,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
   const { data, setData, post, processing, errors, reset } = useForm({
     vendor_id: "",
     title: purchase_order_title,
-    order_date: format(new Date(), "yyyy-MM-dd"),
+    order_date: new Date(),
     currency: base_currency,
     exchange_rate: 1,
     converted_total: 0,
@@ -70,6 +65,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     setData("description", [...data.description, ""]);
     setData("quantity", [...data.quantity, 1]);
     setData("unit_cost", [...data.unit_cost, 0]);
+    setData("account_id", [...data.account_id, ""]);
   };
 
   const addPurchaseOrderAccount = () => {
@@ -86,7 +82,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     // Update quantity and description arrays to include new account entries
     const updatedQuantities = [
       ...purchaseOrderItems.map(item => item.quantity),
-      ...purchaseOrderAccounts.map(account => account.quantity || 1),
+      ...purchaseOrderAccounts.map(account => account.quantity),
       1  // for the new account
     ];
 
@@ -146,16 +142,16 @@ export default function Create({ vendors = [], products = [], currencies = [], t
       ...purchaseOrderAccounts.map(account => account.quantity || 1)
     ]);
     setData("unit_cost", updatedItems.map(item => item.unit_cost));
+    setData("account_id", updatedItems.map(item => item.account_id));
   };
 
-  const updatPurchaseOrderItem = (index, field, value) => {
+  const updatePurchaseOrderItem = (index, field, value) => {
     const updatedItems = [...purchaseOrderItems];
     updatedItems[index][field] = value;
 
     if (field === "product_id") {
       const product = products.find(p => p.id === parseInt(value, 10));
       if (product) {
-        console.log("Selected product:", product);
         updatedItems[index].product_name = product.name;
         updatedItems[index].unit_cost = product.selling_price;
         updatedItems[index].account_id = inventory.id;
@@ -402,34 +398,12 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                 Order Date *
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "md:w-1/2 w-full justify-start text-left font-normal",
-                        !data.order_date && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {data.order_date ? (
-                        format(new Date(data.order_date), "PPP")
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={data.order_date ? new Date(data.order_date) : undefined}
-                      onSelect={(date) =>
-                        setData("order_date", date ? format(date, "yyyy-MM-dd") : "")
-                      }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DateTimePicker
+                  value={data.order_date}
+                  onChange={(date) => setData("order_date", date)}
+                  className="md:w-1/2 w-full"
+                  required
+                />
                 <InputError message={errors.order_date} className="text-sm" />
               </div>
             </div>
@@ -498,7 +472,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                           name: product.name
                         }))}
                         value={item.product_id}
-                        onChange={(value) => updatPurchaseOrderItem(index, "product_id", value)}
+                        onChange={(value) => updatePurchaseOrderItem(index, "product_id", value)}
                         placeholder="Select product"
                       />
                     </div>
@@ -509,7 +483,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                         type="number"
                         min="1"
                         value={item.quantity}
-                        onChange={(e) => updatPurchaseOrderItem(index, "quantity", parseInt(e.target.value))}
+                        onChange={(e) => updatePurchaseOrderItem(index, "quantity", parseInt(e.target.value))}
                       />
                     </div>
 
@@ -519,7 +493,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                         type="number"
                         step="0.01"
                         value={item.unit_cost}
-                        onChange={(e) => updatPurchaseOrderItem(index, "unit_cost", parseFloat(e.target.value))}
+                        onChange={(e) => updatePurchaseOrderItem(index, "unit_cost", parseFloat(e.target.value))}
                       />
                     </div>
                   </div>
@@ -530,7 +504,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                       <Label>Description</Label>
                       <Textarea
                         value={item.description}
-                        onChange={(e) => updatPurchaseOrderItem(index, "description", e.target.value)}
+                        onChange={(e) => updatePurchaseOrderItem(index, "description", e.target.value)}
                         rows={1}
                       />
                     </div>

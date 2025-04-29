@@ -8,28 +8,20 @@ import InputError from "@/Components/InputError";
 import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import axios from "axios";
 // Ensure all necessary table components are imported
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/Components/ui/table";
 import { Checkbox } from "@/Components/ui/checkbox";
+import DateTimePicker from "@/Components/DateTimePicker";
 
-export default function Create({ vendors = [], decimalPlace, accounts, methods }) {
+export default function Create({ vendors = [], accounts, methods }) {
     const [invoices, setInvoices] = useState([]);
     const [selectedInvoices, setSelectedInvoices] = useState([]);
 
     const { data, setData, post, processing, errors, reset } = useForm({
         vendor_id: "",
-        trans_date: format(new Date(), "yyyy-MM-dd"),
+        trans_date: new Date(),
         account_id: "",
         method: "",
         reference: "",
@@ -155,30 +147,12 @@ export default function Create({ vendors = [], decimalPlace, accounts, methods }
                                 Payment Date *
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant={"outline"}
-                                            className={cn(
-                                                "md:w-1/2 w-full justify-start text-left font-normal",
-                                                !data.trans_date && "text-muted-foreground"
-                                            )}
-                                        >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {data.trans_date ? format(new Date(data.trans_date), "PPP") : "Pick a date"}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                        <Calendar
-                                            mode="single"
-                                            selected={data.trans_date ? new Date(data.trans_date) : undefined}
-                                            onSelect={(date) =>
-                                                setData("trans_date", date ? format(date, "yyyy-MM-dd") : "")
-                                            }
-                                            initialFocus
-                                        />
-                                    </PopoverContent>
-                                </Popover>
+                                <DateTimePicker
+                                    value={data.trans_date}
+                                    onChange={(date) => setData("trans_date", date)}
+                                    className="md:w-1/2 w-full"
+                                    required
+                                />
                                 <InputError message={errors.trans_date} className="text-sm" />
                             </div>
                         </div>
@@ -252,11 +226,11 @@ export default function Create({ vendors = [], decimalPlace, accounts, methods }
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                 <div className="md:w-1/2 w-full">
                                     <span>
-                                        {selectedInvoices.reduce((total, invoiceId) => {
+                                        {formatCurrency(selectedInvoices.reduce((total, invoiceId) => {
                                             const inv = invoices.find(inv => inv.id === invoiceId);
                                             // Use the current amount or the default due amount if not modified
                                             return total + (inv ? (inv.amount !== undefined ? inv.amount : (inv.grand_total - inv.paid)) : 0);
-                                        }, 0).toFixed(decimalPlace)}
+                                        }, 0))}
                                     </span>
                                 </div>
                             </div>

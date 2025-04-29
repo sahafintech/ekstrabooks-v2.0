@@ -157,7 +157,7 @@ export default function View({ sales_return, attachments, decimalPlace }) {
 
                             {/* Customer Information */}
                             <div className="mb-8">
-                                <h3 className="font-medium text-lg mb-2">Returned To:</h3>
+                                <h3 className="font-medium text-lg mb-2">Returned From:</h3>
                                 <div className="text-sm">
                                     <p className="font-medium">{sales_return.customer?.name}</p>
                                     {sales_return.customer?.company_name && <p>{sales_return.customer?.company_name}</p>}

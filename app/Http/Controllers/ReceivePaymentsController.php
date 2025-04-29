@@ -66,12 +66,10 @@ class ReceivePaymentsController extends Controller
             $query->where('account_type', 'Bank')
                 ->orWhere('account_type', 'Cash');
         })->get();
-        $decimalPlace = get_business_option('decimal_place', 2);
         $methods = TransactionMethod::all();
 
         return Inertia::render('Backend/User/ReceivePayment/Create', [
             'customers' => $customers,
-            'decimalPlace' => $decimalPlace,
             'accounts' => $accounts,
             'methods' => $methods,
         ]);
@@ -434,12 +432,10 @@ class ReceivePaymentsController extends Controller
             $query->where('account_type', 'Bank')
                 ->orWhere('account_type', 'Cash');
         })->get();
-        $decimalPlace = get_business_option('decimal_place', 2);
         $methods = TransactionMethod::all();
 
         return Inertia::render('Backend/User/ReceivePayment/Edit', [
             'customers' => $customers,
-            'decimalPlace' => $decimalPlace,
             'accounts' => $accounts,
             'methods' => $methods,
             'payment' => $payment,

@@ -9,18 +9,12 @@ import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon, Plus, Trash2 } from "lucide-react";
-import { format } from "date-fns";
-import { cn, formatCurrency } from "@/lib/utils";
+import { Plus, Trash2 } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import DateTimePicker from "@/Components/DateTimePicker";
 
-export default function Create({ customers = [], products = [], currencies = [], taxes = [], invoice_title, decimalPlace }) {
+export default function Create({ customers = [], products = [], currencies = [], taxes = [], invoice_title, base_currency }) {
   const [invoiceItems, setInvoiceItems] = useState([{
     product_id: "",
     product_name: "",
@@ -38,9 +32,9 @@ export default function Create({ customers = [], products = [], currencies = [],
     title: invoice_title,
     invoice_number: "",
     order_number: "",
-    invoice_date: format(new Date(), "yyyy-MM-dd"),
+    invoice_date: new Date(),
     due_date: "",
-    currency: "",
+    currency: base_currency,
     exchange_rate: 1,
     converted_total: 0,
     discount_type: "0",
@@ -94,7 +88,7 @@ export default function Create({ customers = [], products = [], currencies = [],
       if (product) {
         updatedItems[index].product_name = product.name;
         updatedItems[index].unit_cost = product.selling_price;
-        
+
         // Also update the description if it's empty
         if (!updatedItems[index].description) {
           updatedItems[index].description = product.description || "";
@@ -142,12 +136,12 @@ export default function Create({ customers = [], products = [], currencies = [],
   useEffect(() => {
     // First try to find a currency with base_currency flag set to 1
     let baseC = currencies.find(c => c.base_currency === 1);
-    
+
     // If still none found, just take the first currency as a fallback
     if (!baseC && currencies.length > 0) {
       baseC = currencies[0];
     }
-    
+
     if (baseC) {
       setBaseCurrencyInfo(baseC);
     }
@@ -157,14 +151,14 @@ export default function Create({ customers = [], products = [], currencies = [],
   const handleCurrencyChange = (currencyName) => {
     // Find currency object by name
     const currencyObj = currencies.find(currency => currency.name === currencyName);
-    
+
     if (currencyObj) {
-      
+
       // Set the exchange rate directly from the selected currency object first as a fallback
       const currentRate = parseFloat(currencyObj.exchange_rate);
       setExchangeRate(currentRate);
       setData('exchange_rate', currentRate);
-      
+
       // Then try to fetch the updated exchange rate from the API
       fetch(`/user/find_currency/${currencyObj.name}`)
         .then(response => response.json())
@@ -192,7 +186,7 @@ export default function Create({ customers = [], products = [], currencies = [],
   const renderTotal = () => {
     const total = calculateTotal();
     const selectedCurrency = currencies.find(c => c.name === data.currency);
-    
+
     if (!selectedCurrency) {
       return (
         <div>
@@ -200,29 +194,29 @@ export default function Create({ customers = [], products = [], currencies = [],
         </div>
       );
     }
-    
+
     // If we have a base currency AND the selected currency is different from base
-    if (baseCurrencyInfo && 
-        selectedCurrency.name !== baseCurrencyInfo.name && 
-        exchangeRate && 
-        exchangeRate !== 1) {
-      
+    if (baseCurrencyInfo &&
+      selectedCurrency.name !== baseCurrencyInfo.name &&
+      exchangeRate &&
+      exchangeRate !== 1) {
+
       // Calculate the base currency equivalent
       const baseCurrencyTotal = total / exchangeRate;
-      
+
       return (
         <div>
-          <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
+          <h2 className="text-xl font-bold">Total: {formatCurrency({ amount: total, currency: selectedCurrency.name })}</h2>
           <p className="text-sm text-gray-600">
-            Equivalent to {formatCurrency(baseCurrencyTotal, baseCurrencyInfo.name, decimalPlace)}
+            Equivalent to {formatCurrency({ amount: baseCurrencyTotal, currency: baseCurrencyInfo.name })}
           </p>
         </div>
       );
     }
-    
+
     return (
       <div>
-        <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
+        <h2 className="text-xl font-bold">Total: {formatCurrency({ amount: total, currency: selectedCurrency.name })}</h2>
       </div>
     );
   };
@@ -257,7 +251,7 @@ export default function Create({ customers = [], products = [], currencies = [],
 
     // Find the selected currency object to get its name
     const selectedCurrency = currencies.find(c => c.name === data.currency);
-    
+
     if (!selectedCurrency) {
       toast.error("Please select a valid currency");
       return;
@@ -367,34 +361,12 @@ export default function Create({ customers = [], products = [], currencies = [],
                 Invoice Date *
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "md:w-1/2 w-full justify-start text-left font-normal",
-                        !data.invoice_date && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {data.invoice_date ? (
-                        format(new Date(data.invoice_date), "PPP")
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={data.invoice_date ? new Date(data.invoice_date) : undefined}
-                      onSelect={(date) =>
-                        setData("invoice_date", date ? format(date, "yyyy-MM-dd") : "")
-                      }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DateTimePicker
+                  value={data.invoice_date}
+                  onChange={(date) => setData("invoice_date", date)}
+                  className="md:w-1/2 w-full"
+                  required
+                />
                 <InputError message={errors.invoice_date} className="text-sm" />
               </div>
             </div>
@@ -404,34 +376,12 @@ export default function Create({ customers = [], products = [], currencies = [],
                 Due Date *
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "md:w-1/2 w-full justify-start text-left font-normal",
-                        !data.due_date && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {data.due_date ? (
-                        format(new Date(data.due_date), "PPP")
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={data.due_date ? new Date(data.due_date) : undefined}
-                      onSelect={(date) =>
-                        setData("due_date", date ? format(date, "yyyy-MM-dd") : "")
-                      }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DateTimePicker
+                  value={data.due_date}
+                  onChange={(date) => setData("due_date", date)}
+                  className="md:w-1/2 w-full"
+                  required
+                />
                 <InputError message={errors.due_date} className="text-sm" />
               </div>
             </div>
@@ -477,7 +427,7 @@ export default function Create({ customers = [], products = [], currencies = [],
               {invoiceItems.map((item, index) => (
                 <div key={index} className="border rounded-lg p-4 space-y-4 bg-gray-50">
                   {/* First Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <div>
                       <Label>Product *</Label>
                       <SearchableCombobox
@@ -490,7 +440,7 @@ export default function Create({ customers = [], products = [], currencies = [],
                         placeholder="Select product"
                       />
                     </div>
-                    
+
                     <div>
                       <Label>Quantity *</Label>
                       <Input
@@ -500,7 +450,7 @@ export default function Create({ customers = [], products = [], currencies = [],
                         onChange={(e) => updateInvoiceItem(index, "quantity", parseInt(e.target.value))}
                       />
                     </div>
-                    
+
                     <div>
                       <Label>Unit Cost *</Label>
                       <Input
@@ -513,7 +463,7 @@ export default function Create({ customers = [], products = [], currencies = [],
                   </div>
 
                   {/* Second Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
                     <div className="md:col-span-6">
                       <Label>Description</Label>
                       <Textarea
@@ -522,19 +472,19 @@ export default function Create({ customers = [], products = [], currencies = [],
                         rows={1}
                       />
                     </div>
-                    
+
                     <div className="md:col-span-3">
                       <TaxSelector index={index} />
                     </div>
-                    
+
                     <div className="md:col-span-2">
                       <Label>Subtotal</Label>
-                      <div className="p-2 bg-white rounded mt-2 text-right">
+                      <div className="p-2 bg-white rounded text-right">
                         {(item.quantity * item.unit_cost).toFixed(2)}
                       </div>
                     </div>
-                    
-                    <div className="md:col-span-1 flex items-end justify-end">
+
+                    <div className="md:col-span-1 flex items-center justify-end">
                       {invoiceItems.length > 1 && (
                         <Button
                           type="button"

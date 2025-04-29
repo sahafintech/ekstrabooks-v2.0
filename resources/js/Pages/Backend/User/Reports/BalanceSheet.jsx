@@ -22,10 +22,11 @@ import {
 } from "@/Components/ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, parseDateObject } from "@/lib/utils";
 import { Label } from "@/Components/ui/label";
+import DateTimePicker from "@/Components/DateTimePicker";
 
-export default function BalanceSheet({ report_data, date2, meta = {}, base_currency, business_name }) {
+export default function BalanceSheet({ report_data, date2, business_name }) {
     // Calculate summary values for assets
     const getTotalAssets = () => {
         let totalFixedAssets = 0;
@@ -148,7 +149,7 @@ export default function BalanceSheet({ report_data, date2, meta = {}, base_curre
     );
 
     const { data, setData, post, processing } = useForm({
-        date2: date2,
+        date2: parseDateObject(date2),
     });
 
     const handleExport = () => {
@@ -355,115 +356,98 @@ export default function BalanceSheet({ report_data, date2, meta = {}, base_curre
                         url="reports.balance_sheet"
                     />
                     <div className="p-4">
-                        <div className="mx-auto">
-                            <div className="bg-white overflow-hidden sm:rounded-lg">
+                        <div className="flex flex-col justify-between items-start mb-6 gap-4">
+                            <div className="flex flex-col md:flex-row gap-4">
                                 <Label>As of</Label>
                                 <form onSubmit={handleGenerate}>
-                                    <div className="flex flex-col md:flex-row gap-4 items-end">
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className={cn(
-                                                        "w-full md:w-auto justify-start text-left font-normal",
-                                                        !data.date2 && "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {data.date2 ? format(new Date(data.date2), "PPP") : <span>As of date</span>}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={data.date2 ? new Date(data.date2) : undefined}
-                                                    onSelect={(date) => setData('date2', date ? format(date, "yyyy-MM-dd") : '')}
-                                                    initialFocus
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
-
+                                    <div className="flex items-center gap-2">
+                                        <DateTimePicker
+                                            value={data.date2}
+                                            onChange={(date) => setData("date2", date)}
+                                            className="md:w-1/2 w-full"
+                                            required
+                                        />
                                         <Button type="submit" disabled={processing}>{processing ? 'Generating...' : 'Generate'}</Button>
                                     </div>
                                 </form>
                             </div>
+                        </div>
 
-                            <div className="flex items-center gap-2 print-buttons mt-6">
-                                <Button variant="outline" onClick={handlePrint}>
-                                    Print
-                                </Button>
-                                <Button variant="outline" onClick={handleExport}>Export</Button>
-                            </div>
+                        <div className="flex items-center gap-2 print-buttons mt-6">
+                            <Button variant="outline" onClick={handlePrint}>
+                                Print
+                            </Button>
+                            <Button variant="outline" onClick={handleExport}>Export</Button>
+                        </div>
 
-                            <div className="rounded-md border printable-table mt-4">
-                                {/* ASSETS SECTION */}
-                                <div className="p-3 bg-gray-100 font-bold text-lg border-b">ASSETS</div>
+                        <div className="rounded-md border printable-table mt-4">
+                            {/* ASSETS SECTION */}
+                            <div className="p-3 bg-gray-100 font-bold text-lg border-b">ASSETS</div>
 
-                                {/* Fixed Assets */}
-                                {renderAccountTypeTable(report_data, 'fixed_asset', 'Fixed Assets', true)}
+                            {/* Fixed Assets */}
+                            {renderAccountTypeTable(report_data, 'fixed_asset', 'Fixed Assets', true)}
 
-                                {/* Current Assets */}
-                                {renderAccountTypeTable(report_data, 'current_asset', 'Current Assets', true)}
+                            {/* Current Assets */}
+                            {renderAccountTypeTable(report_data, 'current_asset', 'Current Assets', true)}
 
-                                {/* Total Assets Summary */}
-                                <Table className="mt-2 mb-6">
-                                    <TableBody>
-                                        <SummaryRow label="TOTAL ASSETS:" value={totalAssets} isTotal={true} isAsset={true} />
-                                    </TableBody>
-                                </Table>
+                            {/* Total Assets Summary */}
+                            <Table className="mt-2 mb-6">
+                                <TableBody>
+                                    <SummaryRow label="TOTAL ASSETS:" value={totalAssets} isTotal={true} isAsset={true} />
+                                </TableBody>
+                            </Table>
 
-                                {/* LIABILITIES SECTION */}
-                                <div className="p-3 bg-gray-100 font-bold text-lg border-b border-t">LIABILITIES</div>
+                            {/* LIABILITIES SECTION */}
+                            <div className="p-3 bg-gray-100 font-bold text-lg border-b border-t">LIABILITIES</div>
 
-                                {/* Current Liabilities */}
-                                {renderAccountTypeTable(report_data, 'current_liability', 'Current Liabilities', false)}
+                            {/* Current Liabilities */}
+                            {renderAccountTypeTable(report_data, 'current_liability', 'Current Liabilities', false)}
 
-                                {/* Long Term Liabilities */}
-                                {renderAccountTypeTable(report_data, 'long_term_liability', 'Long Term Liabilities', false)}
+                            {/* Long Term Liabilities */}
+                            {renderAccountTypeTable(report_data, 'long_term_liability', 'Long Term Liabilities', false)}
 
-                                {/* Total Liabilities Summary */}
-                                <Table className="mt-2 mb-6">
-                                    <TableBody>
-                                        <SummaryRow label="TOTAL LIABILITIES:" value={totalLiabilities} isTotal={true} isAsset={false} />
-                                    </TableBody>
-                                </Table>
+                            {/* Total Liabilities Summary */}
+                            <Table className="mt-2 mb-6">
+                                <TableBody>
+                                    <SummaryRow label="TOTAL LIABILITIES:" value={totalLiabilities} isTotal={true} isAsset={false} />
+                                </TableBody>
+                            </Table>
 
-                                {/* EQUITY SECTION */}
-                                <div className="p-3 bg-gray-100 font-bold text-lg border-b border-t">EQUITY</div>
+                            {/* EQUITY SECTION */}
+                            <div className="p-3 bg-gray-100 font-bold text-lg border-b border-t">EQUITY</div>
 
-                                {/* Equity */}
-                                {renderAccountTypeTable(report_data, 'equity', 'Equity', false)}
+                            {/* Equity */}
+                            {renderAccountTypeTable(report_data, 'equity', 'Equity', false)}
 
-                                {/* Total Equity Summary */}
-                                <Table className="mt-2">
-                                    <TableBody>
-                                        <SummaryRow label="TOTAL EQUITY:" value={totalEquity} isTotal={true} isAsset={false} />
-                                    </TableBody>
-                                </Table>
+                            {/* Total Equity Summary */}
+                            <Table className="mt-2">
+                                <TableBody>
+                                    <SummaryRow label="TOTAL EQUITY:" value={totalEquity} isTotal={true} isAsset={false} />
+                                </TableBody>
+                            </Table>
 
-                                {/* Balance Verification */}
-                                <Table className="mt-8 mb-4">
-                                    <TableBody>
-                                        <SummaryRow label="TOTAL LIABILITIES AND EQUITY:" value={liabilitiesPlusEquity} isTotal={true} isAsset={false} />
-                                        <TableRow className="font-bold">
-                                            <TableCell colSpan={4} className="text-right">DIFFERENCE:</TableCell>
-                                            <TableCell className={totalAssets - liabilitiesPlusEquity === 0 ? "text-green-600" : "text-red-600"}>
-                                                {formatCurrency({ amount: totalAssets - liabilitiesPlusEquity })}
-                                            </TableCell>
-                                        </TableRow>
-                                        <TableRow className="font-bold">
-                                            <TableCell colSpan={4} className="text-right">BALANCE CHECK:</TableCell>
-                                            <TableCell className={isBalanced ? "text-green-600" : "text-red-600"}>
-                                                {isBalanced ? "Balanced" : "Not Balanced"}
-                                            </TableCell>
-                                        </TableRow>
-                                    </TableBody>
-                                </Table>
-                            </div>
+                            {/* Balance Verification */}
+                            <Table className="mt-8 mb-4">
+                                <TableBody>
+                                    <SummaryRow label="TOTAL LIABILITIES AND EQUITY:" value={liabilitiesPlusEquity} isTotal={true} isAsset={false} />
+                                    <TableRow className="font-bold">
+                                        <TableCell colSpan={4} className="text-right">DIFFERENCE:</TableCell>
+                                        <TableCell className={totalAssets - liabilitiesPlusEquity === 0 ? "text-green-600" : "text-red-600"}>
+                                            {formatCurrency({ amount: totalAssets - liabilitiesPlusEquity })}
+                                        </TableCell>
+                                    </TableRow>
+                                    <TableRow className="font-bold">
+                                        <TableCell colSpan={4} className="text-right">BALANCE CHECK:</TableCell>
+                                        <TableCell className={isBalanced ? "text-green-600" : "text-red-600"}>
+                                            {isBalanced ? "Balanced" : "Not Balanced"}
+                                        </TableCell>
+                                    </TableRow>
+                                </TableBody>
+                            </Table>
                         </div>
                     </div>
                 </div>
             </SidebarInset>
-        </AuthenticatedLayout>
+        </AuthenticatedLayout >
     );
 }

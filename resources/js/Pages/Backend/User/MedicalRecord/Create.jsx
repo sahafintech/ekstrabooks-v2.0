@@ -16,6 +16,7 @@ import {
 } from "@/Components/ui/popover";
 import { format } from "date-fns";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function Create({ customers = [] }) {
     const { data, setData, post, processing, errors } = useForm({
@@ -146,25 +147,11 @@ export default function Create({ customers = [] }) {
                                         <Label htmlFor="date" className="text-right">Date</Label>
                                     </div>
                                     <div className="col-span-9">
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant={"outline"}
-                                                    className="w-full justify-start text-left font-normal"
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {data.date ? format(new Date(data.date), "PPP") : <span>Pick a date</span>}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={data.date ? new Date(data.date) : undefined}
-                                                    onSelect={(date) => setData("date", date ? format(date, "yyyy-MM-dd") : "")}
-                                                    initialFocus
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
+                                        <DateTimePicker
+                                            value={data.date}
+                                            onChange={(date) => setData("date", date)}
+                                            required
+                                        />
                                         {errors.date && <p className="text-sm text-red-600 mt-1">{errors.date}</p>}
                                     </div>
                                 </div>

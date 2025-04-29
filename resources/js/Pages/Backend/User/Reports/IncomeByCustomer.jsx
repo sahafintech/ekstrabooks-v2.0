@@ -29,18 +29,18 @@ import {
     PopoverTrigger,
 } from "@/Components/ui/popover";
 import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import { formatCurrency, parseDateObject } from "@/lib/utils";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function IncomeByCustomer({ report_data, date1, date2, meta = {}, filters = {}, business_name, currency, grand_total_income, grand_total_paid, grand_total_due, customers = [], customer_id = '' }) {
     const [search, setSearch] = useState(filters.search || "");
     const [perPage, setPerPage] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
-    
-    const { data, setData, post, processing, errors, reset } = useForm({
-        date1: date1,
-        date2: date2,
+
+    const { data, setData, post, processing } = useForm({
+        date1: parseDateObject(date1),
+        date2: parseDateObject(date2),
         customer_id: customer_id,
     });
 
@@ -127,7 +127,7 @@ export default function IncomeByCustomer({ report_data, date1, date2, meta = {},
     const handlePrint = () => {
         // Create a new window for printing
         const printWindow = window.open('', '_blank', 'width=800,height=600');
-        
+
         // Generate CSS for the print window
         const style = `
             <style>
@@ -140,7 +140,7 @@ export default function IncomeByCustomer({ report_data, date1, date2, meta = {},
                 .total-row { font-weight: bold; background-color: #f9f9f9; }
             </style>
         `;
-        
+
         // Start building the HTML content for the print window
         let printContent = `
             <!DOCTYPE html>
@@ -163,27 +163,27 @@ export default function IncomeByCustomer({ report_data, date1, date2, meta = {},
                     </thead>
                     <tbody>
         `;
-        
+
         // Add table rows from report_data
         if (report_data.length > 0) {
             report_data.forEach(item => {
                 printContent += `
                     <tr>
                         <td>${item.customer_name || 'N/A'}</td>
-                        <td class="text-right">${item.total_income}</td>
-                        <td class="text-right">${item.total_paid}</td>
-                        <td class="text-right">${item.total_due}</td>
+                        <td class="text-right">${formatCurrency(item.total_income)}</td>
+                        <td class="text-right">${formatCurrency(item.total_paid)}</td>
+                        <td class="text-right">${formatCurrency(item.total_due)}</td>
                     </tr>
                 `;
             });
-            
+
             // Add totals row
             printContent += `
                 <tr class="total-row">
                     <td>Total</td>
-                    <td class="text-right">${grand_total_income}</td>
-                    <td class="text-right">${grand_total_paid}</td>
-                    <td class="text-right">${grand_total_due}</td>
+                    <td class="text-right">${formatCurrency(grand_total_income)}</td>
+                    <td class="text-right">${formatCurrency(grand_total_paid)}</td>
+                    <td class="text-right">${formatCurrency(grand_total_due)}</td>
                 </tr>
             `;
         } else {
@@ -193,7 +193,7 @@ export default function IncomeByCustomer({ report_data, date1, date2, meta = {},
                 </tr>
             `;
         }
-        
+
         // Complete the HTML content
         printContent += `
                     </tbody>
@@ -201,17 +201,17 @@ export default function IncomeByCustomer({ report_data, date1, date2, meta = {},
             </body>
             </html>
         `;
-        
+
         // Write the content to the print window and trigger print
         printWindow.document.open();
         printWindow.document.write(printContent);
         printWindow.document.close();
-        
+
         // Wait for content to load before printing
         setTimeout(() => {
             printWindow.print();
             // Close the window after printing
-            printWindow.onafterprint = function() {
+            printWindow.onafterprint = function () {
                 printWindow.close();
             };
         }, 300);
@@ -233,53 +233,21 @@ export default function IncomeByCustomer({ report_data, date1, date2, meta = {},
                             <div className="flex flex-col md:flex-row gap-4">
                                 <form onSubmit={handleGenerate} className="flex flex-col md:flex-row gap-4 w-full">
                                     <div className="flex items-center gap-2">
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className={cn(
-                                                        "w-full md:w-auto justify-start text-left font-normal",
-                                                        !data.date1 && "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {data.date1 ? format(new Date(data.date1), "PPP") : <span>From date</span>}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={data.date1 ? new Date(data.date1) : undefined}
-                                                    onSelect={(date) => setData('date1', date ? format(date, "yyyy-MM-dd") : '')}
-                                                    initialFocus
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
+                                        <DateTimePicker
+                                            value={data.date1}
+                                            onChange={(date) => setData("date1", date)}
+                                            className="md:w-1/2 w-full"
+                                            required
+                                        />
 
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className={cn(
-                                                        "w-full md:w-auto justify-start text-left font-normal",
-                                                        !data.date2 && "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {data.date2 ? format(new Date(data.date2), "PPP") : <span>To date</span>}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={data.date2 ? new Date(data.date2) : undefined}
-                                                    onSelect={(date) => setData('date2', date ? format(date, "yyyy-MM-dd") : '')}
-                                                    initialFocus
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
+                                        <DateTimePicker
+                                            value={data.date2}
+                                            onChange={(date) => setData("date2", date)}
+                                            className="md:w-1/2 w-full"
+                                            required
+                                        />
                                     </div>
-                                    
+
                                     <div className="flex items-center gap-2 w-full md:w-72">
                                         <SearchableCombobox
                                             options={[
@@ -354,16 +322,16 @@ export default function IncomeByCustomer({ report_data, date1, date2, meta = {},
                                             {report_data.map((item) => (
                                                 <TableRow key={item.customer_id}>
                                                     <TableCell>{item.customer_name || 'N/A'}</TableCell>
-                                                    <TableCell className="text-right">{item.total_income}</TableCell>
-                                                    <TableCell className="text-right">{item.total_paid}</TableCell>
-                                                    <TableCell className="text-right">{item.total_due}</TableCell>
+                                                    <TableCell className="text-right">{formatCurrency(item.total_income)}</TableCell>
+                                                    <TableCell className="text-right">{formatCurrency(item.total_paid)}</TableCell>
+                                                    <TableCell className="text-right">{formatCurrency(item.total_due)}</TableCell>
                                                 </TableRow>
                                             ))}
                                             <TableRow className="bg-muted/50 font-medium">
                                                 <TableCell>Total</TableCell>
-                                                <TableCell className="text-right">{grand_total_income}</TableCell>
-                                                <TableCell className="text-right">{grand_total_paid}</TableCell>
-                                                <TableCell className="text-right">{grand_total_due}</TableCell>
+                                                <TableCell className="text-right">{formatCurrency(grand_total_income)}</TableCell>
+                                                <TableCell className="text-right">{formatCurrency(grand_total_paid)}</TableCell>
+                                                <TableCell className="text-right">{formatCurrency(grand_total_due)}</TableCell>
                                             </TableRow>
                                         </>
                                     ) : (

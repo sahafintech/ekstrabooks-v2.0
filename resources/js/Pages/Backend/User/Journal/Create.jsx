@@ -7,32 +7,20 @@ import { Label } from "@/Components/ui/label";
 import { Input } from "@/Components/ui/input";
 import { Textarea } from "@/Components/ui/textarea";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
-import { format } from "date-fns";
-import { CalendarIcon, PlusCircle, Trash } from "lucide-react";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/Components/ui/popover";
-import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import PageHeader from "@/Components/PageHeader";
+import DateTimePicker from "@/Components/DateTimePicker";
+import { PlusCircle, Trash } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 
-export default function Create({
-  currencies = [],
-  accounts = [],
-  customers = [],
-  vendors = [],
-  journal_number,
-}) {
+export default function Create({ currencies = [], accounts = [], customers = [], vendors = [], journal_number, base_currency }) {
 
   const { toast } = useToast();
 
   const { data, setData, post, processing, errors } = useForm({
     date: new Date(),
     journal_number: journal_number,
-    trans_currency: "",
+    trans_currency: base_currency,
     journal_entries: [
       {
         account_id: "",
@@ -160,35 +148,18 @@ export default function Create({
             ))}
           </div>
           <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-            <form onSubmit={submit} className="space-y-6">
+            <form onSubmit={submit}>
               <div className="grid grid-cols-12 mt-2">
                 <Label htmlFor="date" className="md:col-span-2 col-span-12">
                   Journal Date *
                 </Label>
                 <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className="md:w-1/2 w-full"
-                      >
-                        {data.date ? (
-                          format(new Date(data.date), "PP")
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={new Date(data.date)}
-                        onSelect={(date) => setData("date", date)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DateTimePicker
+                    value={data.date}
+                    onChange={(date) => setData("date", date)}
+                    className="md:w-1/2 w-full"
+                    required
+                  />
                   <InputError message={errors.date} className="mt-2" />
                 </div>
               </div>
@@ -258,32 +229,11 @@ export default function Create({
                       <div className="grid grid-cols-7 gap-2 mb-2 items-start">
                         {/* Transaction Date */}
                         <div className="col-span-2">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant={"outline"}
-                                className={cn(
-                                  "w-full pl-3 text-left font-normal text-sm truncate",
-                                  !entry.date && "text-muted-foreground"
-                                )}
-                              >
-                                {entry.date ? (
-                                  format(new Date(entry.date), "PP")
-                                ) : (
-                                  <span>Pick a date</span>
-                                )}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50 flex-shrink-0" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={new Date(entry.date)}
-                                onSelect={(date) => handleFieldChange(index, "date", date)}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
+                          <DateTimePicker
+                            value={entry.date}
+                            onChange={(date) => handleFieldChange(index, "date", date)}
+                            required
+                          />
                           <InputError message={errors[`journal_entries.${index}.date`]} className="mt-1" />
                         </div>
 
@@ -444,15 +394,15 @@ export default function Create({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="font-medium text-right">Total Debit:</div>
                     <div className="text-right font-medium">
-                      {totals.totalDebit}
+                      {formatCurrency({ amount: totals.totalDebit, currency: data.trans_currency })}
                     </div>
                     <div className="font-medium text-right">Total Credit:</div>
                     <div className="text-right font-medium">
-                      {totals.totalCredit}
+                      {formatCurrency({ amount: totals.totalCredit, currency: data.trans_currency })}
                     </div>
                     <div className="font-medium text-right">Difference:</div>
                     <div className={`text-right font-medium ${isFormBalanced ? "text-green-600" : "text-red-600"}`}>
-                      {totals.difference}
+                      {formatCurrency({ amount: totals.difference, currency: data.trans_currency })}
                     </div>
                   </div>
                 </div>

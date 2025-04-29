@@ -17,13 +17,14 @@ import {
     PopoverTrigger,
 } from "@/Components/ui/popover";
 import { format } from "date-fns";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function Create({ customers = [], products = [] }) {
     const { data, setData, post, processing, errors } = useForm({
         customer_id: "",
-        date: "",
-        result_date: "",
-        
+        date: new Date(),
+        result_date: new Date(),
+
         dist_sph_re: "",
         dist_cyl_re: "",
         dist_axis_re: "",
@@ -32,7 +33,7 @@ export default function Create({ customers = [], products = [] }) {
         dist_cyl_le: "",
         dist_axis_le: "",
         dist_va_le: "",
-        
+
         near_sph_re: "",
         near_cyl_re: "",
         near_axis_re: "",
@@ -41,7 +42,7 @@ export default function Create({ customers = [], products = [] }) {
         near_cyl_le: "",
         near_axis_le: "",
         near_va_le: "",
-        
+
         ipd: "",
         glasses: false,
         plastic: false,
@@ -55,9 +56,9 @@ export default function Create({ customers = [], products = [] }) {
         bi_focal_lenses: false,
         single_vision: false,
         blue_cut: false,
-        
+
         description: "",
-        
+
         // Arrays for product data that will be sent to the server
         product_id: [],
         product_name: [],
@@ -77,7 +78,7 @@ export default function Create({ customers = [], products = [] }) {
 
     // State to track selected products for display in the UI
     const [selectedProducts, setSelectedProducts] = useState([]);
-    
+
     // Calculate totals
     const calculateTotals = () => {
         let subTotal = 0;
@@ -103,19 +104,19 @@ export default function Create({ customers = [], products = [] }) {
             });
         }
     };
-    
+
     // Add a product to the list
     const addProduct = () => {
         if (productForm.product_id) {
             const sub_total = parseFloat(productForm.quantity) * parseFloat(productForm.unit_cost);
-            
+
             // Add to selectedProducts for UI display
             setSelectedProducts([...selectedProducts, {
                 id: Date.now(),
                 ...productForm,
                 sub_total
             }]);
-            
+
             // Add to form data arrays for submission
             setData({
                 ...data,
@@ -125,7 +126,7 @@ export default function Create({ customers = [], products = [] }) {
                 quantity: [...data.quantity, productForm.quantity],
                 unit_cost: [...data.unit_cost, productForm.unit_cost],
             });
-            
+
             // Reset product form
             setProductForm({
                 product_id: "",
@@ -142,7 +143,7 @@ export default function Create({ customers = [], products = [] }) {
         const newSelectedProducts = [...selectedProducts];
         newSelectedProducts.splice(index, 1);
         setSelectedProducts(newSelectedProducts);
-        
+
         // Update form data arrays
         setData({
             ...data,
@@ -195,34 +196,11 @@ export default function Create({ customers = [], products = [] }) {
                                     <Label className="text-sm">Prescription Date</Label>
                                     <div className="md:w-1/2 w-full">
                                         <div className="relative">
-                                            <Input
-                                                type="text"
-                                                value={data.date ? format(new Date(data.date), "dd/MM/yyyy") : ""}
-                                                placeholder="dd/mm/yyyy"
-                                                readOnly
-                                                onClick={() => document.getElementById("prescription_date_trigger").click()}
-                                                className="pr-10"
+                                            <DateTimePicker
+                                                value={data.date}
+                                                onChange={(date) => setData("date", date)}
+                                                required
                                             />
-                                            <Popover>
-                                                <PopoverTrigger asChild>
-                                                    <Button
-                                                        id="prescription_date_trigger"
-                                                        variant="ghost"
-                                                        className="absolute right-0 top-0 h-full px-3"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    >
-                                                        <CalendarIcon className="h-4 w-4" />
-                                                    </Button>
-                                                </PopoverTrigger>
-                                                <PopoverContent className="w-auto p-0">
-                                                    <Calendar
-                                                        mode="single"
-                                                        selected={data.date ? new Date(data.date) : undefined}
-                                                        onSelect={(date) => setData("date", date ? format(date, "yyyy-MM-dd") : "")}
-                                                        initialFocus
-                                                    />
-                                                </PopoverContent>
-                                            </Popover>
                                         </div>
                                         {errors.date && <p className="text-sm text-red-600 mt-1">{errors.date}</p>}
                                     </div>
@@ -233,39 +211,16 @@ export default function Create({ customers = [], products = [] }) {
                                     <Label className="text-sm">Result Date</Label>
                                     <div className="md:w-1/2 w-full">
                                         <div className="relative">
-                                            <Input
-                                                type="text"
-                                                value={data.result_date ? format(new Date(data.result_date), "dd/MM/yyyy") : ""}
-                                                placeholder="dd/mm/yyyy"
-                                                readOnly
-                                                onClick={() => document.getElementById("result_date_trigger").click()}
-                                                className="pr-10"
+                                            <DateTimePicker
+                                                value={data.result_date}
+                                                onChange={(date) => setData("result_date", date)}
+                                                required
                                             />
-                                            <Popover>
-                                                <PopoverTrigger asChild>
-                                                    <Button
-                                                        id="result_date_trigger"
-                                                        variant="ghost"
-                                                        className="absolute right-0 top-0 h-full px-3"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    >
-                                                        <CalendarIcon className="h-4 w-4" />
-                                                    </Button>
-                                                </PopoverTrigger>
-                                                <PopoverContent className="w-auto p-0">
-                                                    <Calendar
-                                                        mode="single"
-                                                        selected={data.result_date ? new Date(data.result_date) : undefined}
-                                                        onSelect={(date) => setData("result_date", date ? format(date, "yyyy-MM-dd") : "")}
-                                                        initialFocus
-                                                    />
-                                                </PopoverContent>
-                                            </Popover>
                                         </div>
                                         {errors.result_date && <p className="text-sm text-red-600 mt-1">{errors.result_date}</p>}
                                     </div>
                                 </div>
-                                
+
                                 {/* Prescription Table */}
                                 <div className="grid grid-cols-1 gap-2">
                                     <div className="grid grid-cols-2 gap-2 mt-4">
@@ -380,7 +335,7 @@ export default function Create({ customers = [], products = [] }) {
                                             className="h-9 text-sm"
                                         />
                                     </div>
-                                    
+
                                     {/* IPD */}
                                     <div className="mt-4">
                                         <div className="grid grid-cols-[70px_1fr] gap-2 items-center">
@@ -527,7 +482,7 @@ export default function Create({ customers = [], products = [] }) {
                                                     type="number"
                                                     placeholder="Quantity"
                                                     value={productForm.quantity}
-                                                    onChange={(e) => setProductForm({...productForm, quantity: e.target.value})}
+                                                    onChange={(e) => setProductForm({ ...productForm, quantity: e.target.value })}
                                                     min="1"
                                                     className="h-9"
                                                 />
@@ -537,7 +492,7 @@ export default function Create({ customers = [], products = [] }) {
                                                     type="number"
                                                     placeholder="Price"
                                                     value={productForm.unit_cost}
-                                                    onChange={(e) => setProductForm({...productForm, unit_cost: e.target.value})}
+                                                    onChange={(e) => setProductForm({ ...productForm, unit_cost: e.target.value })}
                                                     min="0"
                                                     step="0.01"
                                                     className="h-9"
@@ -545,9 +500,9 @@ export default function Create({ customers = [], products = [] }) {
                                             </div>
                                         </div>
                                         <div className="mt-2">
-                                            <Button 
-                                                type="button" 
-                                                variant="outline" 
+                                            <Button
+                                                type="button"
+                                                variant="outline"
                                                 onClick={addProduct}
                                                 disabled={!productForm.product_id}
                                                 className="text-xs"
@@ -568,7 +523,7 @@ export default function Create({ customers = [], products = [] }) {
                                             <div className="text-xs uppercase font-medium">Price</div>
                                             <div className="text-xs uppercase font-medium">Amount</div>
                                         </div>
-                                        
+
                                         {selectedProducts.length > 0 ? (
                                             <>
                                                 {selectedProducts.map((product, index) => (
@@ -579,10 +534,10 @@ export default function Create({ customers = [], products = [] }) {
                                                         <div className="text-sm">{parseFloat(product.unit_cost).toFixed(2)}</div>
                                                         <div className="flex justify-between">
                                                             <span className="text-sm">{parseFloat(product.sub_total).toFixed(2)}</span>
-                                                            <Button 
+                                                            <Button
                                                                 type="button"
                                                                 variant="ghost"
-                                                                className="h-6 w-6 p-0 text-red-500" 
+                                                                className="h-6 w-6 p-0 text-red-500"
                                                                 onClick={() => removeProduct(index)}
                                                             >
                                                                 &times;
@@ -590,7 +545,7 @@ export default function Create({ customers = [], products = [] }) {
                                                         </div>
                                                     </div>
                                                 ))}
-                                                
+
                                                 {/* Totals */}
                                                 <div className="mt-4 flex justify-end">
                                                     <div className="w-1/2">

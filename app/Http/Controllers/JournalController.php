@@ -42,12 +42,7 @@ class JournalController extends Controller
         $journals = $query->paginate($perPage);
         
         return Inertia::render('Backend/User/Journal/List', [
-            'journals' => collect($journals->items())->map(function ($journal) {
-                $journal->transaction_amount = formatAmount($journal->transaction_amount, currency_symbol($journal->transaction_currency));
-                $journal->currency_rate = formatAmount($journal->currency_rate, currency_symbol($journal->transaction_currency));
-                $journal->base_currency_amount = formatAmount($journal->base_currency_amount, currency_symbol($journal->base_currency));
-                return $journal;
-            }),
+            'journals' => $journals->items(),
             'meta' => [
                 'total' => $journals->total(),
                 'per_page' => $journals->perPage(),
@@ -75,7 +70,8 @@ class JournalController extends Controller
             'currencies' => $currencies,
             'customers' => $customers,
             'vendors' => $vendors,
-            'journal_number' => $journal_number
+            'journal_number' => $journal_number,
+            'base_currency' => get_business_option('currency')
         ]);
     }
 

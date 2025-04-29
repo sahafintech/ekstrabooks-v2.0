@@ -103,7 +103,6 @@ class SalesReturnController extends Controller
         $currencies = Currency::all();
         $products = Product::all();
         $taxes = Tax::all();
-        $decimalPlace = get_business_option('decimal_place', 2);
         $accounts = Account::all();
 
         return Inertia::render('Backend/User/SalesReturn/Create', [
@@ -112,8 +111,8 @@ class SalesReturnController extends Controller
             'currencies' => $currencies,
             'products' => $products,
             'taxes' => $taxes,
-            'decimalPlace' => $decimalPlace,
-            'accounts' => $accounts
+            'accounts' => $accounts,
+            'base_currency' => get_business_option('currency')
         ]);
     }
 

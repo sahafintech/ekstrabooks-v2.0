@@ -65,12 +65,10 @@ class BillPaymentsController extends Controller
             $query->where('account_type', 'Bank')
                 ->orWhere('account_type', 'Cash');
         })->get();
-        $decimalPlace = get_business_option('decimal_place', 2);
         $methods = TransactionMethod::all();
 
         return Inertia::render('Backend/User/BillPayment/Create', [
             'vendors' => $vendors,
-            'decimalPlace' => $decimalPlace,
             'accounts' => $accounts,
             'methods' => $methods,
         ]);
@@ -207,12 +205,10 @@ class BillPaymentsController extends Controller
             $query->where('account_type', 'Bank')
                 ->orWhere('account_type', 'Cash');
         })->get();
-        $decimalPlace = get_business_option('decimal_place', 2);
         $methods = TransactionMethod::all();
 
         return Inertia::render('Backend/User/BillPayment/Edit', [
             'vendors' => $vendors,
-            'decimalPlace' => $decimalPlace,
             'accounts' => $accounts,
             'methods' => $methods,
             'payment' => $payment,

@@ -32,6 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
+import { formatCurrency } from "@/lib/utils";
 
 const DeleteReceiptModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
@@ -445,8 +446,8 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
                     <TableHead>Invoice Number</TableHead>
                     <TableHead>Customer</TableHead>
                     <TableHead>Date</TableHead>
-                    <TableHead>Grand Total</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead className="text-right">Grand Total</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -467,10 +468,10 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
                         <TableCell>
                           {receipt.receipt_date}
                         </TableCell>
-                        <TableCell>
-                          {receipt.grand_total}
+                        <TableCell className="text-right">
+                          {formatCurrency(receipt.grand_total)}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-right">
                           <TableActions
                             actions={[
                               {

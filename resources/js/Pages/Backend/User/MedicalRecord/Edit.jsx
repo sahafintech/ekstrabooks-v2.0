@@ -16,24 +16,15 @@ import {
 } from "@/Components/ui/popover";
 import { format, parseISO, isValid } from "date-fns";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import { parseDateObject } from "@/lib/utils";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function Create({ customers = [], medicalRecord }) {
-    // Helper function to safely parse dates
-    const safelyParseDate = (dateString) => {
-        try {
-            const parsedDate = dateString ? parseISO(dateString) : null;
-            return parsedDate && isValid(parsedDate) ? parsedDate : null;
-        } catch (e) {
-            return null;
-        }
-    };
 
     const { data, setData, post, processing, errors } = useForm({
         customer_id: medicalRecord.customer_id,
         patient_id: medicalRecord.patient_id,
-        date: medicalRecord.date && safelyParseDate(medicalRecord.date)
-            ? format(safelyParseDate(medicalRecord.date), "yyyy-MM-dd")
-            : format(new Date(), "yyyy-MM-dd"),
+        date: parseDateObject(medicalRecord.date),
         ocular_history: medicalRecord.ocular_history,
         occupation: medicalRecord.occupation,
 
@@ -159,25 +150,11 @@ export default function Create({ customers = [], medicalRecord }) {
                                         <Label htmlFor="date" className="text-right">Date</Label>
                                     </div>
                                     <div className="col-span-9">
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant={"outline"}
-                                                    className="w-full justify-start text-left font-normal"
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {data.date && safelyParseDate(data.date) ? format(safelyParseDate(data.date), "PPP") : <span>Pick a date</span>}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={safelyParseDate(data.date)}
-                                                    onSelect={(date) => setData("date", date ? format(date, "yyyy-MM-dd") : "")}
-                                                    initialFocus
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
+                                        <DateTimePicker
+                                            value={data.date}
+                                            onChange={(date) => setData("date", date)}
+                                            required
+                                        />
                                         {errors.date && <p className="text-sm text-red-600 mt-1">{errors.date}</p>}
                                     </div>
                                 </div>

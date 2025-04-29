@@ -13,7 +13,7 @@ import {
   CheckCircle,
   XCircle
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 
 export default function View({ journal, transactions, pending_transactions }) {
   const printRef = useRef();
@@ -37,14 +37,6 @@ export default function View({ journal, transactions, pending_transactions }) {
     window.print();
     document.body.innerHTML = originalContents;
     window.location.reload();
-  };
-
-  // Format currency values
-  const formatCurrency = (amount, currency) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency || 'USD'
-    }).format(amount);
   };
 
   return (
@@ -133,7 +125,7 @@ export default function View({ journal, transactions, pending_transactions }) {
                 <div>
                   <div className="text-sm text-gray-600 mb-1">Amount</div>
                   <div className="font-medium">
-                    {formatCurrency(journal.transaction_amount, journal.transaction_currency)}
+                    {formatCurrency({ amount: journal.transaction_amount, currency: journal.transaction_currency })}
                   </div>
                 </div>
                 <div>
@@ -194,12 +186,12 @@ export default function View({ journal, transactions, pending_transactions }) {
                           </td>
                           <td className="px-4 py-3 text-sm text-right font-medium border-b">
                             {transaction.dr_cr === 'dr'
-                              ? formatCurrency(transaction.transaction_amount, journal.transaction_currency)
+                              ? formatCurrency({ amount: transaction.transaction_amount, currency: journal.transaction_currency })
                               : ''}
                           </td>
                           <td className="px-4 py-3 text-sm text-right font-medium border-b">
                             {transaction.dr_cr === 'cr'
-                              ? formatCurrency(transaction.transaction_amount, journal.transaction_currency)
+                              ? formatCurrency({ amount: transaction.transaction_amount, currency: journal.transaction_currency })
                               : ''}
                           </td>
                         </tr>
@@ -211,10 +203,10 @@ export default function View({ journal, transactions, pending_transactions }) {
                           Total:
                         </td>
                         <td className="px-4 py-3 text-sm text-right font-bold border-t-2 border-gray-300">
-                          {formatCurrency(totalDebit, journal.transaction_currency)}
+                          {formatCurrency({ amount: totalDebit, currency: journal.transaction_currency })}
                         </td>
                         <td className="px-4 py-3 text-sm text-right font-bold border-t-2 border-gray-300">
-                          {formatCurrency(totalCredit, journal.transaction_currency)}
+                          {formatCurrency({ amount: totalCredit, currency: journal.transaction_currency })}
                         </td>
                       </tr>
                     </tbody>

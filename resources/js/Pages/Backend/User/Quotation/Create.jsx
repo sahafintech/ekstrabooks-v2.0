@@ -9,19 +9,13 @@ import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon, Plus, Trash2 } from "lucide-react";
-import { format } from "date-fns";
-import { cn, formatCurrency } from "@/lib/utils";
+import { Plus, Trash2 } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
+import DateTimePicker from "@/Components/DateTimePicker";
 
-export default function Create({ customers = [], products = [], currencies = [], taxes = [], quotation_title, decimalPlace }) {
+export default function Create({ customers = [], products = [], currencies = [], taxes = [], quotation_title, base_currency }) {
     const [quotationItems, setQuotationItems] = useState([{
         product_id: "",
         product_name: "",
@@ -38,9 +32,9 @@ export default function Create({ customers = [], products = [], currencies = [],
         title: quotation_title,
         quotation_number: "",
         order_number: "",
-        quotation_date: format(new Date(), "yyyy-MM-dd"),
+        quotation_date: new Date(),
         expired_date: "",
-        currency: "",
+        currency: base_currency,
         exchange_rate: 1,
         converted_total: 0,
         discount_type: "0",
@@ -221,9 +215,9 @@ export default function Create({ customers = [], products = [], currencies = [],
 
             return (
                 <div>
-                    <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
+                    <h2 className="text-xl font-bold">Total: {formatCurrency({ amount: total, currency: selectedCurrency.name })}</h2>
                     <p className="text-sm text-gray-600">
-                        Equivalent to {formatCurrency(baseCurrencyTotal, baseCurrencyInfo.name, decimalPlace)}
+                        Equivalent to {formatCurrency({ amount: baseCurrencyTotal, currency: baseCurrencyInfo.name })}
                     </p>
                 </div>
             );
@@ -231,7 +225,7 @@ export default function Create({ customers = [], products = [], currencies = [],
 
         return (
             <div>
-                <h2 className="text-xl font-bold">Total: {formatCurrency(total, selectedCurrency.name, decimalPlace)}</h2>
+                <h2 className="text-xl font-bold">Total: {formatCurrency({ amount: total, currency: selectedCurrency.name })}</h2>
             </div>
         );
     };
@@ -344,34 +338,12 @@ export default function Create({ customers = [], products = [], currencies = [],
                                 Quotation Date *
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant={"outline"}
-                                            className={cn(
-                                                "md:w-1/2 w-full justify-start text-left font-normal",
-                                                !data.quotation_date && "text-muted-foreground"
-                                            )}
-                                        >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {data.quotation_date ? (
-                                                format(new Date(data.quotation_date), "PPP")
-                                            ) : (
-                                                <span>Pick a date</span>
-                                            )}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                        <Calendar
-                                            mode="single"
-                                            selected={data.quotation_date ? new Date(data.quotation_date) : undefined}
-                                            onSelect={(date) =>
-                                                setData("quotation_date", date ? format(date, "yyyy-MM-dd") : "")
-                                            }
-                                            initialFocus
-                                        />
-                                    </PopoverContent>
-                                </Popover>
+                                <DateTimePicker
+                                    value={data.quotation_date}
+                                    onChange={(date) => setData("quotation_date", date)}
+                                    className="md:w-1/2 w-full"
+                                    required
+                                />
                                 <InputError message={errors.quotation_date} className="text-sm" />
                             </div>
                         </div>
@@ -381,34 +353,12 @@ export default function Create({ customers = [], products = [], currencies = [],
                                 Expired Date *
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant={"outline"}
-                                            className={cn(
-                                                "md:w-1/2 w-full justify-start text-left font-normal",
-                                                !data.expired_date && "text-muted-foreground"
-                                            )}
-                                        >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {data.expired_date ? (
-                                                format(new Date(data.expired_date), "PPP")
-                                            ) : (
-                                                <span>Pick a date</span>
-                                            )}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                        <Calendar
-                                            mode="single"
-                                            selected={data.expired_date ? new Date(data.expired_date) : undefined}
-                                            onSelect={(date) =>
-                                                setData("expired_date", date ? format(date, "yyyy-MM-dd") : "")
-                                            }
-                                            initialFocus
-                                        />
-                                    </PopoverContent>
-                                </Popover>
+                                <DateTimePicker
+                                    value={data.expired_date}
+                                    onChange={(date) => setData("expired_date", date)}
+                                    className="md:w-1/2 w-full"
+                                    required
+                                />
                                 <InputError message={errors.expired_date} className="text-sm" />
                             </div>
                         </div>

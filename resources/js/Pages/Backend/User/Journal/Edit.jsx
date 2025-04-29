@@ -7,95 +7,26 @@ import { Label } from "@/Components/ui/label";
 import { Input } from "@/Components/ui/input";
 import { Textarea } from "@/Components/ui/textarea";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
-import { format } from "date-fns";
-import { CalendarIcon, PlusCircle, Trash } from "lucide-react";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/Components/ui/popover";
-import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import PageHeader from "@/Components/PageHeader";
+import DateTimePicker from "@/Components/DateTimePicker";
+import { formatCurrency, parseDateObject } from "@/lib/utils";
+import { PlusCircle, Trash } from "lucide-react";
 
-export default function Edit({
-  currencies = [],
-  accounts = [],
-  customers = [],
-  vendors = [],
-  transactions = [],
-  journal,
-}) {
+export default function Edit({ currencies = [], accounts = [], customers = [], vendors = [], transactions = [], journal, }) {
 
   const { toast } = useToast();
 
-  // Parse date strings safely for the date picker
-  const parseDate = (dateString) => {
-    if (!dateString) return undefined;
-    
-    try {
-      // Handle dd/mm/yyyy format
-      if (typeof dateString === 'string' && dateString.includes('/')) {
-        const [day, month, year] = dateString.split('/');
-        const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-        
-        if (!isNaN(parsedDate.getTime())) {
-          return parsedDate;
-        }
-      }
-      
-      // Try to parse the date directly
-      const date = new Date(dateString);
-      
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
-        console.warn("Invalid date:", dateString);
-        return undefined;
-      }
-      
-      return date;
-    } catch (error) {
-      console.error("Error parsing date:", error, "for input:", dateString);
-      return new Date();
-    }
-  };
-
-  // Format date to display format (dd/mm/yyyy)
-  const formatDateDisplay = (date) => {
-    if (!date) return "";
-    try {
-      const parsedDate = parseDate(date);
-      if (!parsedDate) return "";
-      return format(parsedDate, "dd/MM/yyyy");
-    } catch (error) {
-      console.error("Error formatting date for display:", error);
-      return "";
-    }
-  };
-
-  // Format date for submission (yyyy-MM-dd)
-  const formatDateForSubmission = (date) => {
-    if (!date) return "";
-    try {
-      const parsedDate = parseDate(date);
-      if (!parsedDate) return "";
-      return format(parsedDate, "yyyy-MM-dd");
-    } catch (error) {
-      console.error("Error formatting date for submission:", error);
-      return "";
-    }
-  };
 
   const { data, setData, post, processing, errors } = useForm({
-    date: parseDate(journal.date),
+    date: parseDateObject(journal.date),
     journal_number: journal.journal_number,
     trans_currency: journal.transaction_currency,
     journal_entries: transactions.map(transaction => ({
       account_id: transaction.account_id,
       debit: transaction.dr_cr === 'dr' ? transaction.transaction_amount : '',
       credit: transaction.dr_cr === 'cr' ? transaction.transaction_amount : '',
-      date: parseDate(transaction.trans_date),
+      date: parseDateObject(transaction.trans_date),
       description: transaction.description,
       customer_id: transaction.customer_id,
       vendor_id: transaction.vendor_id,
@@ -142,18 +73,8 @@ export default function Edit({
   // Handle form submission
   const submit = (e) => {
     e.preventDefault();
-    
-    // Format dates for submission
-    const formattedData = {
-      ...data,
-      date: formatDateForSubmission(data.date),
-      journal_entries: data.journal_entries.map(entry => ({
-        ...entry,
-        date: formatDateForSubmission(entry.date)
-      }))
-    };
 
-    post(route("journals.update", journal.id), formattedData, {
+    post(route("journals.update", journal.id), {
       onSuccess: () => {
         toast({
           title: "Success",
@@ -233,35 +154,18 @@ export default function Edit({
             ))}
           </div>
           <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-            <form onSubmit={submit} className="space-y-6">
+            <form onSubmit={submit}>
               <div className="grid grid-cols-12 mt-2">
                 <Label htmlFor="date" className="md:col-span-2 col-span-12">
                   Journal Date *
                 </Label>
                 <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className="md:w-1/2 w-full"
-                      >
-                        {data.date ? (
-                          formatDateDisplay(data.date)
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={new Date(data.date)}
-                        onSelect={(date) => setData("date", date)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DateTimePicker
+                    value={data.date}
+                    onChange={(date) => setData("date", date)}
+                    className="md:w-1/2 w-full"
+                    required
+                  />
                   <InputError message={errors.date} className="mt-2" />
                 </div>
               </div>
@@ -331,32 +235,11 @@ export default function Edit({
                       <div className="grid grid-cols-7 gap-2 mb-2 items-start">
                         {/* Transaction Date */}
                         <div className="col-span-2">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant={"outline"}
-                                className={cn(
-                                  "w-full pl-3 text-left font-normal text-sm truncate",
-                                  !entry.date && "text-muted-foreground"
-                                )}
-                              >
-                                {entry.date ? (
-                                  formatDateDisplay(entry.date)
-                                ) : (
-                                  <span>Pick a date</span>
-                                )}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50 flex-shrink-0" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={new Date(entry.date)}
-                                onSelect={(date) => handleFieldChange(index, "date", date)}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
+                          <DateTimePicker
+                            value={entry.date}
+                            onChange={(date) => handleFieldChange(index, "date", date)}
+                            required
+                          />
                           <InputError message={errors[`journal_entries.${index}.date`]} className="mt-1" />
                         </div>
 
@@ -517,15 +400,15 @@ export default function Edit({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="font-medium text-right">Total Debit:</div>
                     <div className="text-right font-medium">
-                      {totals.totalDebit}
+                      {formatCurrency({ amount: totals.totalDebit, currency: data.trans_currency })}
                     </div>
                     <div className="font-medium text-right">Total Credit:</div>
                     <div className="text-right font-medium">
-                      {totals.totalCredit}
+                      {formatCurrency({ amount: totals.totalCredit, currency: data.trans_currency })}
                     </div>
                     <div className="font-medium text-right">Difference:</div>
                     <div className={`text-right font-medium ${isFormBalanced ? "text-green-600" : "text-red-600"}`}>
-                      {totals.difference}
+                      {formatCurrency({ amount: totals.difference, currency: data.trans_currency })}
                     </div>
                   </div>
                 </div>

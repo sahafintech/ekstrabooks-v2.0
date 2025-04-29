@@ -116,7 +116,7 @@ class InvoiceController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create(Request $request)
+    public function create()
     {
         $invoice_title = get_business_option('invoice_title', 'Invoice');
         $customers = Customer::all();
@@ -124,15 +124,13 @@ class InvoiceController extends Controller
         $products = Product::all();
         $taxes = Tax::all();
 
-        $decimalPlace = get_business_option('decimal_place', 2);
-
         return Inertia::render('Backend/User/Invoice/Create', [
             'customers' => $customers,
             'currencies' => $currencies,
             'products' => $products,
             'taxes' => $taxes,
             'invoice_title' => $invoice_title,
-            'decimalPlace' => $decimalPlace
+            'base_currency' => get_business_option('currency'),
         ]);
     }
 
@@ -567,15 +565,12 @@ class InvoiceController extends Controller
         $products = Product::all();
         $taxes = Tax::all();
 
-        $decimalPlace = get_business_option('decimal_place', 2);
-
         return Inertia::render('Backend/User/Invoice/Edit', [
             'invoice' => $invoice,
             'customers' => $customers,
             'currencies' => $currencies,
             'products' => $products,
             'taxes' => $taxes,
-            'decimalPlace' => $decimalPlace
         ]);
     }
 

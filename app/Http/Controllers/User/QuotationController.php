@@ -142,6 +142,7 @@ class QuotationController extends Controller
             'products' => $products,
             'taxes' => $taxes,
             'quotation_title' => $quotation_title,
+            'base_currency' => get_business_option('base_currency')
         ]);
     }
 

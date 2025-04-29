@@ -107,8 +107,6 @@ class PurchaseController extends Controller
 
 		$inventory = Account::where('account_name', 'Inventory')->first();
 
-		$decimalPlace = get_business_option('decimal_place', 2);
-
 		return Inertia::render('Backend/User/Bill/Create', [
 			'vendors' => $vendors,
 			'products' => $products,
@@ -116,8 +114,8 @@ class PurchaseController extends Controller
 			'taxes' => $taxes,
 			'accounts' => $accounts,
 			'purchase_title' => $purchase_title,
-			'decimalPlace' => $decimalPlace,
 			'inventory' => $inventory,
+			'base_currency' => get_business_option('currency'),
 		]);
 	}
 
@@ -578,7 +576,6 @@ class PurchaseController extends Controller
 		$attachments = Attachment::where('ref_id', $id)->where('ref_type', 'bill invoice')->get();
 		$accounts = Account::all();
 		$currencies = Currency::all();
-		$decimalPlace = get_business_option('decimal_place', 2);
 		$vendors = Vendor::all();
 		$products = Product::all();
 		$taxes = Tax::all();
@@ -587,7 +584,6 @@ class PurchaseController extends Controller
 		return Inertia::render('Backend/User/Bill/Edit', [
 			'bill' => $bill,
 			'attachments' => $attachments,
-			'decimalPlace' => $decimalPlace,
 			'accounts' => $accounts,
 			'currencies' => $currencies,
 			'vendors' => $vendors,

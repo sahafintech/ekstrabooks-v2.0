@@ -105,7 +105,6 @@ class ReceiptController extends Controller
         })->get();
 
         $receipt_title = get_business_option('receipt_title', 'Cash Invoice');
-        $decimalPlace = get_business_option('decimal_place', 2);
         $accounts = Account::where(function ($query) {
             $query->where('account_type', 'Bank')
                 ->orWhere('account_type', 'Cash');
@@ -118,8 +117,8 @@ class ReceiptController extends Controller
             'taxes' => $taxes,
             'accounts' => $accounts,
             'receipt_title' => $receipt_title,
-            'decimalPlace' => $decimalPlace,
-            'accounts' => $accounts
+            'accounts' => $accounts,
+            'base_currency' => get_business_option('base_currency')
         ]);
     }
 
@@ -160,7 +159,6 @@ class ReceiptController extends Controller
             $query->where('account_type', 'Bank')
                 ->orWhere('account_type', 'Cash');
         })->get();
-        $decimalPlace = get_business_option('decimal_place', 2);
 
         return Inertia::render('Backend/User/CashInvoice/Edit', [
             'receipt' => $receipt,
@@ -170,7 +168,6 @@ class ReceiptController extends Controller
             'currencies' => $currencies,
             'taxes' => $taxes,
             'accounts' => $accounts,
-            'decimalPlace' => $decimalPlace
         ]);
     }
 

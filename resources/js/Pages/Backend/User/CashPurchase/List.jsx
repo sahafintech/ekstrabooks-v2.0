@@ -32,7 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
-import { format } from "date-fns";
+import { formatCurrency } from "@/lib/utils";
 
 const DeleteCashPurchaseModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
@@ -475,7 +475,7 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
                         <TableCell>{purchase.vendor ? purchase.vendor.name : "-"}</TableCell>
                         <TableCell>{purchase.purchase_date}</TableCell>
                         <TableCell className="text-right">
-                          {purchase.grand_total}
+                          {formatCurrency({ amount: purchase.grand_total })}
                         </TableCell>
                         <TableCell>
                           <PurchaseApprovalStatusBadge status={purchase.approval_status} />

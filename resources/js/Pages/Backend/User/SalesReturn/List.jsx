@@ -40,7 +40,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/Components/ui/popover";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import InputError from "@/Components/InputError";
 import { format } from "date-fns";
 
@@ -594,7 +594,7 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                                         <TableHead>Date</TableHead>
                                         <TableHead className="text-right">Grand Total</TableHead>
                                         <TableHead className="text-right">Refunded</TableHead>
-                                        <TableHead className="text-right">Partially Refunded</TableHead>
+                                        <TableHead className="text-right">Due Amount</TableHead>
                                         <TableHead>Status</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
@@ -612,9 +612,9 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                                                 <TableCell>{sales_return.return_number}</TableCell>
                                                 <TableCell>{sales_return.customer ? sales_return.customer.name : "-"}</TableCell>
                                                 <TableCell>{sales_return.return_date}</TableCell>
-                                                <TableCell className="text-right">{sales_return.grand_total}</TableCell>
-                                                <TableCell className="text-right">{sales_return.paid}</TableCell>
-                                                <TableCell className="text-right">{sales_return.grand_total - sales_return.paid}</TableCell>
+                                                <TableCell className="text-right">{formatCurrency(sales_return.grand_total)}</TableCell>
+                                                <TableCell className="text-right">{formatCurrency(sales_return.paid)}</TableCell>
+                                                <TableCell className="text-right">{formatCurrency(sales_return.grand_total - sales_return.paid)}</TableCell>
                                                 <TableCell>
                                                     <SalesReturnStatusBadge status={sales_return.status} />
                                                 </TableCell>

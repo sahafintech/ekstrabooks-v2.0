@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
@@ -32,6 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
+import { formatCurrency } from "@/lib/utils";
 
 const DeleteInvoiceModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
@@ -474,9 +475,9 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
                         <TableCell>{invoice.customer ? invoice.customer.name : "-"}</TableCell>
                         <TableCell>{invoice.invoice_date}</TableCell>
                         <TableCell>{invoice.due_date}</TableCell>
-                        <TableCell className="text-right">{invoice.grand_total}</TableCell>
-                        <TableCell className="text-right">{invoice.paid}</TableCell>
-                        <TableCell className="text-right">{invoice.grand_total - invoice.paid}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(invoice.grand_total)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(invoice.paid)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(invoice.grand_total - invoice.paid)}</TableCell>
                         <TableCell>
                           <InvoiceStatusBadge status={invoice.status} />
                         </TableCell>

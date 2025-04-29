@@ -61,10 +61,11 @@ class HandleInertiaRequests extends Middleware
             'decimalPlace' => get_business_option('decimal_places', 2),
             'decimalSep' => get_business_option('decimal_sep', '.'),
             'thousandSep' => get_business_option('thousand_sep', ','),
-            'baseCurrency' => get_business_option('base_currency', 'USD'),
+            'baseCurrency' => get_business_option('currency', 'USD'),
             'currencyPosition' => get_business_option('currency_position', 'left'),
             'isOwner' => $isOwner,
             'permissionList' => $permissionList,
+            'date_format' => get_business_option('date_format', 'Y-m-d'),
         ];
     }
 }

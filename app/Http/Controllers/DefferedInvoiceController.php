@@ -108,7 +108,8 @@ class DefferedInvoiceController extends Controller
             'decimalPlace' => $decimalPlace,
             'familySizes' => $familySizes,
             'benefits' => $benefits,
-            'dateFormat' => $dateFormat
+            'dateFormat' => $dateFormat,
+            'base_currency' => get_business_option('currency')
         ]);
     }
 

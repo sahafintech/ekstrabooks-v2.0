@@ -1,66 +1,11 @@
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge"
 import { format as formatDateFns } from 'date-fns';
-import { usePage } from "@inertiajs/react";
+import * as chrono from 'chrono-node';
+import { getSettings } from './settings';
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
-}
-
-/**
- * Get the Inertia app settings if available
- * Returns default values if not in a React context
- */
-function getSettings() {
-  try {
-    // Try to access Inertia page props
-    if (typeof window !== 'undefined' && window.__INERTIA) {
-      return window.__INERTIA.page.props;
-    }
-    return {
-      decimalPlace: 2,
-      decimalSep: '.',
-      thousandSep: ',',
-      baseCurrency: 'USD',
-      currencyPosition: 'left'
-    };
-  } catch (e) {
-    // Return defaults if Inertia is not available
-    return {
-      decimalPlace: 2,
-      decimalSep: '.',
-      thousandSep: ',',
-      baseCurrency: 'USD',
-      currencyPosition: 'left'
-    };
-  }
-}
-
-// Custom hook for React components
-export function useFormatUtils() {
-  const props = usePage().props;
-  
-  return {
-    formatCurrency: (amount, currency) => {
-      // Pass the amount and currency, using the props for all other settings
-      if (typeof amount === 'object') {
-        // If using object style, merge with props
-        const options = amount;
-        return formatCurrency({
-          ...options,
-          currency: options.currency || props.baseCurrency,
-          decimalPlaces: options.decimalPlaces || props.decimalPlace,
-          thousandSeparator: options.thousandSeparator || props.thousandSep,
-          decimalSeparator: options.decimalSeparator || props.decimalSep,
-          codePosition: options.codePosition || props.currencyPosition
-        });
-      }
-      // Using direct parameters style
-      return formatCurrency(amount, currency || props.baseCurrency, 
-                           props.decimalPlace, props.thousandSep, 
-                           props.decimalSep, props.currencyPosition);
-    }
-  };
 }
 
 /**
@@ -77,17 +22,14 @@ export function useFormatUtils() {
  */
 export function formatCurrency(amount, currency, decimalPlaces, 
   thousandSeparator, decimalSeparator, codePosition) {
-  // Get default settings from Inertia if available
   const settings = getSettings();
   
-  // Set defaults using settings from Inertia
   currency = currency || settings.baseCurrency;
   decimalPlaces = decimalPlaces !== undefined ? decimalPlaces : settings.decimalPlace;
   thousandSeparator = thousandSeparator || settings.thousandSep;
   decimalSeparator = decimalSeparator || settings.decimalSep;
   codePosition = codePosition || settings.currencyPosition;
   
-  // Check if first argument is an object (new style)
   if (typeof amount === 'object' && amount !== null) {
     const options = amount;
     return formatCurrency(
@@ -100,8 +42,6 @@ export function formatCurrency(amount, currency, decimalPlaces,
     );
   }
 
-  // Regular parameter processing (old and new style)
-  // Prepare the fixed‑decimal string
   const fixed = amount == null
     ? (0).toFixed(decimalPlaces)
     : parseFloat(amount).toFixed(decimalPlaces);
@@ -157,23 +97,22 @@ const phpToDateFnsFormat = (phpFmt) => {
   return phpFmt.replace(/Y|y|m|n|d|j|M|F/g, t => tokenMap[t] || t);
 };
 
-/**
- * formatDate now accepts PHP‐style formats:
- *
- *   formatDate('2025-04-17', 'd/m/Y')  → "17/04/2025"
- *   formatDate('2025-12-01', 'M d, Y') → "Dec 01, 2025"
- */
-export function formatDate(dateString, phpFormat = 'Y-m-d') {
-  if (!dateString) return '';
+export function parseDateObject(dateString) {
+  if (!dateString) return null;
 
-  try {
-    const date = new Date(dateString);
-    const dfnsFormat = phpToDateFnsFormat(phpFormat);
-    return formatDateFns(date, dfnsFormat);
-  } catch (error) {
-    console.error('Error formatting date:', error);
-    return dateString;
+  // Try chrono first (it returns a JS Date or null)
+  let date = chrono.parseDate(dateString);
+
+  // Fallback to native Date if chrono couldn't figure it out
+  if (!date || isNaN(date)) {
+    date = new Date(dateString);
   }
+
+  // If still invalid, log and return null
+  if (isNaN(date)) {
+    console.error('Invalid date:', dateString);
+    return null;
+  }
+
+  return date;
 }
-
-

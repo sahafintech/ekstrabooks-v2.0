@@ -403,14 +403,6 @@ class ReportController extends Controller
 
 		// Get currency information
 		$currency = request()->activeBusiness->currency;
-		$currency_symbol = currency_symbol($currency);
-
-		// Format each customer's amounts
-		foreach ($data_array as &$item) {
-			$item['total_income'] = formatAmount($item['total_income'], $currency_symbol);
-			$item['total_paid'] = formatAmount($item['total_paid'], $currency_symbol);
-			$item['total_due'] = formatAmount($item['total_due'], $currency_symbol);
-		}
 
 		// Create paginator from filtered array
 		$page = request('page', 1);
@@ -435,9 +427,9 @@ class ReportController extends Controller
 			'currency' => $currency,
 			'customer_id' => $customer_id,
 			'customers' => $customers,
-			'grand_total_income' => formatAmount($grand_total_income, currency_symbol($currency)),
-			'grand_total_paid' => formatAmount($grand_total_paid, currency_symbol($currency)),
-			'grand_total_due' => formatAmount($grand_total_due, currency_symbol($currency)),
+			'grand_total_income' => $grand_total_income,
+			'grand_total_paid' => $grand_total_paid,
+			'grand_total_due' => $grand_total_due,
 			'meta' => [
 				'current_page' => $paginator->currentPage(),
 				'from' => $paginator->firstItem(),
@@ -537,14 +529,6 @@ class ReportController extends Controller
 
 		// Get currency information
 		$currency = request()->activeBusiness->currency;
-		$currency_symbol = currency_symbol($currency);
-
-		// Format currency amounts
-		foreach ($data_array as &$item) {
-			$item['grand_total_formatted'] = formatAmount($item['grand_total'], $currency_symbol);
-			$item['paid_amount_formatted'] = formatAmount($item['paid_amount'], $currency_symbol);
-			$item['due_amount_formatted'] = formatAmount($item['due_amount'], $currency_symbol);
-		}
 
 		// Create paginator from array
 		$page = request('page', 1);
@@ -557,11 +541,6 @@ class ReportController extends Controller
 			['path' => request()->url(), 'query' => request()->query()]
 		);
 
-		// Format total amounts
-		$total_grand_formatted = formatAmount($total_grand, $currency_symbol);
-		$total_paid_formatted = formatAmount($total_paid, $currency_symbol);
-		$total_due_formatted = formatAmount($total_due, $currency_symbol);
-
 		// Get business information
 		$business_name = request()->activeBusiness->name;
 
@@ -569,9 +548,9 @@ class ReportController extends Controller
 			'report_data' => $paginator->items(),
 			'customers' => $customers,
 			'currency' => $currency,
-			'grand_total' => $total_grand_formatted,
-			'paid_amount' => $total_paid_formatted,
-			'due_amount' => $total_due_formatted,
+			'grand_total' => $total_grand,
+			'paid_amount' => $total_paid,
+			'due_amount' => $total_due,
 			'business_name' => $business_name,
 			'date1' => $date1,
 			'date2' => $date2,
@@ -671,14 +650,6 @@ class ReportController extends Controller
 
 		// Get currency information
 		$currency = request()->activeBusiness->currency;
-		$currency_symbol = currency_symbol($currency);
-
-		// Format currency amounts
-		foreach ($data_array as &$item) {
-			$item['grand_total_formatted'] = formatAmount($item['grand_total'], $currency_symbol);
-			$item['paid_amount_formatted'] = formatAmount($item['paid_amount'], $currency_symbol);
-			$item['due_amount_formatted'] = formatAmount($item['due_amount'], $currency_symbol);
-		}
 
 		// Create paginator from array
 		$page = request('page', 1);
@@ -691,11 +662,6 @@ class ReportController extends Controller
 			['path' => request()->url(), 'query' => request()->query()]
 		);
 
-		// Format total amounts
-		$total_grand_formatted = formatAmount($total_grand, $currency_symbol);
-		$total_paid_formatted = formatAmount($total_paid, $currency_symbol);
-		$total_due_formatted = formatAmount($total_due, $currency_symbol);
-
 		// Get business information
 		$business_name = request()->activeBusiness->name;
 
@@ -703,9 +669,9 @@ class ReportController extends Controller
 			'report_data' => $paginator->items(),
 			'vendors' => $vendors,
 			'currency' => $currency,
-			'grand_total' => $total_grand_formatted,
-			'paid_amount' => $total_paid_formatted,
-			'due_amount' => $total_due_formatted,
+			'grand_total' => $total_grand,
+			'paid_amount' => $total_paid,
+			'due_amount' => $total_due,
 			'business_name' => $business_name,
 			'date1' => $date1,
 			'date2' => $date2,

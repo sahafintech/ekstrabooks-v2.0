@@ -9,16 +9,10 @@ import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon, Plus, Trash2 } from "lucide-react";
-import { format } from "date-fns";
-import { cn, formatCurrency } from "@/lib/utils";
+import { Plus, Trash2 } from "lucide-react";
+import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function Edit({ vendors = [], products = [], purchase_order, currencies = [], taxes = [], taxIds, accounts = [], inventory }) {
   const [purchaseOrderItems, setPurchaseOrderItems] = useState([]);
@@ -30,7 +24,7 @@ export default function Edit({ vendors = [], products = [], purchase_order, curr
     vendor_id: purchase_order.vendor_id,
     title: purchase_order.title,
     order_number: purchase_order.order_number,
-    order_date: purchase_order.order_date,
+    order_date: parseDateObject(purchase_order.order_date),
     currency: purchase_order.currency,
     exchange_rate: purchase_order.exchange_rate,
     converted_total: purchase_order.converted_total,
@@ -96,48 +90,6 @@ export default function Edit({ vendors = [], products = [], purchase_order, curr
       setExchangeRate(purchase_order.exchange_rate);
     }
   }, []);  // Empty dependency array so it only runs once
-
-  // Parse date strings safely for the date picker
-  const parseDate = (dateString) => {
-    if (!dateString) return undefined;
-
-    try {
-      // Handle dd/mm/yyyy format
-      if (typeof dateString === 'string' && dateString.includes('/')) {
-        const [day, month, year] = dateString.split('/');
-        const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-
-        if (!isNaN(parsedDate.getTime())) {
-          return parsedDate;
-        }
-      }
-
-      // Try to parse the date directly
-      const date = new Date(dateString);
-
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
-        return undefined;
-      }
-
-      return date;
-    } catch (error) {
-      return new Date();
-    }
-  };
-
-  // Format date to display format (dd/mm/yyyy)
-  const formatDateDisplay = (date) => {
-    if (!date) return "";
-    try {
-      const parsedDate = parseDate(date);
-      if (!parsedDate) return "";
-      return format(parsedDate, "dd/MM/yyyy");
-    } catch (error) {
-      console.error("Error formatting date for display:", error);
-      return "";
-    }
-  };
 
   const addPurchaseOrderItem = () => {
     setPurchaseOrderItems([...purchaseOrderItems, {
@@ -484,34 +436,12 @@ export default function Edit({ vendors = [], products = [], purchase_order, curr
                 Order Date *
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "md:w-1/2 w-full justify-start text-left font-normal",
-                        !data.order_date && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {data.order_date ? (
-                        formatDateDisplay(data.order_date)
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={data.order_date ? new Date(data.order_date) : undefined}
-                      onSelect={(date) =>
-                        setData("order_date", date ? format(date, "yyyy-MM-dd") : "")
-                      }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DateTimePicker
+                  value={data.order_date}
+                  onChange={(date) => setData("order_date", date)}
+                  className="md:w-1/2 w-full"
+                  required
+                />
                 <InputError message={errors.order_date} className="text-sm" />
               </div>
             </div>

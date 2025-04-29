@@ -22,15 +22,8 @@ import {
 import { Input } from "@/Components/ui/input";
 import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { parseDateObject } from "@/lib/utils";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function Ledger({
     report_data,
@@ -47,12 +40,12 @@ export default function Ledger({
     const [search, setSearch] = useState(filters.search || "");
     const [perPage, setPerPage] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
-    
+
 
 
     const { data, setData, post, processing, errors, reset } = useForm({
-        date1: date1,
-        date2: date2
+        date1: parseDateObject(date1),
+        date2: parseDateObject(date2)
     });
 
     const handleSearch = (e) => {
@@ -196,8 +189,8 @@ export default function Ledger({
                 `;
 
                 // Add transactions
-                    if (account.transactions.length > 0) {
-                        printContent += `
+                if (account.transactions.length > 0) {
+                    printContent += `
                             <tr>
                                 <td colspan="4">
                                     <table class="transaction" style="width: 100%;">
@@ -213,8 +206,8 @@ export default function Ledger({
                                         <tbody>
                         `;
 
-                        account.transactions.forEach(transaction => {
-                            printContent += `
+                    account.transactions.forEach(transaction => {
+                        printContent += `
                                 <tr>
                                     <td>${transaction.trans_date}</td>
                                     <td>${transaction.description}</td>
@@ -223,19 +216,19 @@ export default function Ledger({
                                     <td class="text-right">${transaction.credit_amount_formatted}</td>
                                 </tr>
                             `;
-                        });
+                    });
 
-                        printContent += `
+                    printContent += `
                                         </tbody>
                                     </table>
                                 </td>
                             </tr>
                         `;
-                    }
-                });
+                }
+            });
 
-                // Add account type totals
-                printContent += `
+            // Add account type totals
+            printContent += `
                     <tr class="total-row">
                         <td>Total for ${accountType.type}</td>
                         <td class="text-right">${accountType.total_debit_formatted}</td>
@@ -244,7 +237,7 @@ export default function Ledger({
                     </tr>
                 `;
 
-                printContent += `
+            printContent += `
                             </tbody>
                         </table>
                     </div>
@@ -303,51 +296,19 @@ export default function Ledger({
                             <div className="flex flex-col md:flex-row gap-4">
                                 <form onSubmit={handleGenerate} className="flex flex-col md:flex-row gap-4 w-full">
                                     <div className="flex items-center gap-2">
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className={cn(
-                                                        "w-full md:w-auto justify-start text-left font-normal",
-                                                        !data.date1 && "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {data.date1 ? format(new Date(data.date1), "PPP") : <span>From date</span>}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={data.date1 ? new Date(data.date1) : undefined}
-                                                    onSelect={(date) => setData('date1', date ? format(date, "yyyy-MM-dd") : '')}
-                                                    initialFocus
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
+                                        <DateTimePicker
+                                            value={data.date1}
+                                            onChange={(date) => setData("date1", date)}
+                                            className="md:w-1/2 w-full"
+                                            required
+                                        />
 
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className={cn(
-                                                        "w-full md:w-auto justify-start text-left font-normal",
-                                                        !data.date2 && "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {data.date2 ? format(new Date(data.date2), "PPP") : <span>To date</span>}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={data.date2 ? new Date(data.date2) : undefined}
-                                                    onSelect={(date) => setData('date2', date ? format(date, "yyyy-MM-dd") : '')}
-                                                    initialFocus
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
+                                        <DateTimePicker
+                                            value={data.date2}
+                                            onChange={(date) => setData("date2", date)}
+                                            className="md:w-1/2 w-full"
+                                            required
+                                        />
                                         <Button type="submit" disabled={processing}>{processing ? 'Generating...' : 'Generate'}</Button>
                                     </div>
                                 </form>
@@ -445,13 +406,13 @@ export default function Ledger({
                                                                                 <TableCell>{transaction.ref_type === 'receipt' ? 'Cash Invoice' : transaction.ref_type}</TableCell>
                                                                                 <TableCell className="text-right">{transaction.payee_name || 'N/A'}</TableCell>
                                                                                 <TableCell>{transaction.transaction_currency}</TableCell>
-                                                                                <TableCell className="text-right">{transaction.dr_cr === 'dr' ? transaction.transaction_amount_formatted : 0 }</TableCell>
-                                                                                <TableCell className="text-right">{transaction.dr_cr === 'cr' ? transaction.transaction_amount_formatted : 0 }</TableCell>
+                                                                                <TableCell className="text-right">{transaction.dr_cr === 'dr' ? transaction.transaction_amount_formatted : 0}</TableCell>
+                                                                                <TableCell className="text-right">{transaction.dr_cr === 'cr' ? transaction.transaction_amount_formatted : 0}</TableCell>
                                                                                 <TableCell className="text-right">{transaction.currency}</TableCell>
                                                                                 <TableCell className="text-right">{transaction.currency_rate}</TableCell>
                                                                                 <TableCell>{currency}</TableCell>
-                                                                                <TableCell className="text-right">{transaction.dr_cr === 'dr' ? transaction.base_currency_amount_formatted : 0 }</TableCell>
-                                                                                <TableCell className="text-right">{transaction.dr_cr === 'cr' ? transaction.base_currency_amount_formatted : 0 }</TableCell>
+                                                                                <TableCell className="text-right">{transaction.dr_cr === 'dr' ? transaction.base_currency_amount_formatted : 0}</TableCell>
+                                                                                <TableCell className="text-right">{transaction.dr_cr === 'cr' ? transaction.base_currency_amount_formatted : 0}</TableCell>
                                                                             </TableRow>
                                                                         ))}
                                                                     </TableBody>
@@ -462,7 +423,7 @@ export default function Ledger({
                                                 )}
                                             </React.Fragment>
                                         ))}
-                                        
+
                                         <TableRow className="bg-muted/50 font-medium">
                                             <TableCell>Grand Total</TableCell>
                                             <TableCell className="text-right">{grand_total_debit}</TableCell>

@@ -85,7 +85,7 @@ class CashPurchaseController extends Controller
 
 		$purchase_title = get_business_option('purchase_title', 'Cash Purchase');
 
-		$decimalPlace = get_business_option('decimal_place', 2);
+		$base_currency = get_business_option('currency');
             
 		return Inertia::render('Backend/User/CashPurchase/Create', [
             'vendors' => $vendors,
@@ -95,8 +95,8 @@ class CashPurchaseController extends Controller
             'taxes' => $taxes,
             'accounts' => $accounts,
             'purchase_title' => $purchase_title,
-            'decimalPlace' => $decimalPlace,
-        ]);
+            'base_currency' => $base_currency,
+	        ]);
 	}
 
 	/**
@@ -599,7 +599,6 @@ class CashPurchaseController extends Controller
 		$attachments = Attachment::where('ref_id', $id)->where('ref_type', 'cash purchase')->get();
 		$accounts = Account::all();
 		$currencies = Currency::all();
-		$decimalPlace = get_business_option('decimal_place', 2);
 		$vendors = Vendor::all();
 		$products = Product::all();
 		$taxes = Tax::all();
@@ -609,7 +608,6 @@ class CashPurchaseController extends Controller
 			'bill' => $bill,
 			'attachments' => $attachments,
 			'credit_account' => $credit_account->account_id,
-			'decimalPlace' => $decimalPlace,
 			'accounts' => $accounts,
 			'currencies' => $currencies,
 			'vendors' => $vendors,
