@@ -25,12 +25,10 @@ import PageHeader from "@/Components/PageHeader";
 import { formatAmount, parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
 
-export default function GeneralJournal({ transactions, date1, date2, meta = {}, filters = {}, base_currency, business_name }) {
+export default function GeneralJournal({ transactions, date1, date2, meta = {}, base_currency, business_name }) {
     const [search, setSearch] = useState("");
-    const [perPage, setPerPage] = useState(10);
+    const [perPage, setPerPage] = useState(50);
     const [currentPage, setCurrentPage] = useState(1);
-
-
 
     const { data, setData, post, processing } = useForm({
         date1: parseDateObject(date1),
@@ -294,38 +292,38 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
                             <ReportTable>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Account</TableHead>
-                                        <TableHead>Description</TableHead>
-                                        <TableHead>Type</TableHead>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Transaction Currency</TableHead>
-                                        <TableHead>Transaction Amount[Debit]</TableHead>
-                                        <TableHead>Transaction Amount[Credit]</TableHead>
-                                        <TableHead>Currency Rate</TableHead>
-                                        <TableHead>Rate</TableHead>
-                                        <TableHead>Base Currency</TableHead>
-                                        <TableHead>Base Amount[Debit]</TableHead>
-                                        <TableHead>Base Amount[Credit]</TableHead>
+                                        <TableHead className="!text-[10px]">Date</TableHead>
+                                        <TableHead className="!text-[10px]">Account</TableHead>
+                                        <TableHead className="!text-[10px]">Description</TableHead>
+                                        <TableHead className="!text-[10px]">Type</TableHead>
+                                        <TableHead className="!text-[10px]">Name</TableHead>
+                                        <TableHead className="!text-[10px]">Transaction Currency</TableHead>
+                                        <TableHead className="!text-[10px]">Transaction Amount[Debit]</TableHead>
+                                        <TableHead className="!text-[10px]">Transaction Amount[Credit]</TableHead>
+                                        <TableHead className="!text-[10px]">Currency Rate</TableHead>
+                                        <TableHead className="!text-[10px]">Rate</TableHead>
+                                        <TableHead className="!text-[10px]">Base Currency</TableHead>
+                                        <TableHead className="!text-[10px]">Base Amount[Debit]</TableHead>
+                                        <TableHead className="!text-[10px]">Base Amount[Credit]</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {transactions.length > 0 ? (
                                         transactions.map((transaction) => (
                                             <TableRow key={transaction.id}>
-                                                <TableCell>{transaction.trans_date || 'N/A'}</TableCell>
-                                                <TableCell>{transaction.account.account_name || 'N/A'}</TableCell>
-                                                <TableCell>{transaction.description || 'N/A'}</TableCell>
-                                                <TableCell>{transaction.ref_type === 'receipt' ? 'cash invoice' : transaction.ref_type || 'N/A'}</TableCell>
-                                                <TableCell>{transaction.payee_name || 'N/A'}</TableCell>
-                                                <TableCell className="text-right">{formatAmount(transaction.transaction_amount) || 'N/A'}</TableCell>
-                                                <TableCell className="text-right">{transaction.dr_cr === 'dr' ? formatAmount(transaction.transaction_amount) : 0}</TableCell>
-                                                <TableCell className="text-right">{transaction.dr_cr === 'cr' ? formatAmount(transaction.transaction_amount) : 0}</TableCell>
-                                                <TableCell>{transaction.transaction_currency || 'N/A'}</TableCell>
-                                                <TableCell className="text-right">{formatAmount(transaction.currency_rate) || 'N/A'}</TableCell>
-                                                <TableCell>{base_currency}</TableCell>
-                                                <TableCell className="text-right">{transaction.dr_cr === 'dr' ? formatAmount(transaction.base_currency_amount) : 0}</TableCell>
-                                                <TableCell className="text-right">{transaction.dr_cr === 'cr' ? formatAmount(transaction.base_currency_amount) : 0}</TableCell>
+                                                <TableCell className="!text-[10px]">{transaction.trans_date || 'N/A'}</TableCell>
+                                                <TableCell className="!text-[10px]">{transaction.account.account_name || 'N/A'}</TableCell>
+                                                <TableCell className="!text-[10px]">{transaction.description || 'N/A'}</TableCell>
+                                                <TableCell className="!text-[10px]">{transaction.ref_type === 'receipt' ? 'cash invoice' : transaction.ref_type || 'N/A'}</TableCell>
+                                                <TableCell className="!text-[10px]">{transaction.payee_name || 'N/A'}</TableCell>
+                                                <TableCell className="text-right !text-[10px]">{formatAmount(transaction.transaction_amount) || 'N/A'}</TableCell>
+                                                <TableCell className="text-right !text-[10px]">{transaction.dr_cr === 'dr' ? formatAmount(transaction.transaction_amount) : 0}</TableCell>
+                                                <TableCell className="text-right !text-[10px]">{transaction.dr_cr === 'cr' ? formatAmount(transaction.transaction_amount) : 0}</TableCell>
+                                                <TableCell className="!text-[10px]">{transaction.transaction_currency || 'N/A'}</TableCell>
+                                                <TableCell className="text-right !text-[10px]">{formatAmount(transaction.currency_rate) || 'N/A'}</TableCell>
+                                                <TableCell className="!text-[10px]">{base_currency}</TableCell>
+                                                <TableCell className="text-right !text-[10px]">{transaction.dr_cr === 'dr' ? formatAmount(transaction.base_currency_amount) : 0}</TableCell>
+                                                <TableCell className="text-right !text-[10px]">{transaction.dr_cr === 'cr' ? formatAmount(transaction.base_currency_amount) : 0}</TableCell>
                                             </TableRow>
                                         ))
                                     ) : (

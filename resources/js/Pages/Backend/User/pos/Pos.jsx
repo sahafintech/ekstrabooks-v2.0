@@ -8,18 +8,11 @@ import { Input } from "@/components/ui/input";
 import Modal from "@/Components/Modal";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Link } from "@inertiajs/react";
-import { CalendarIcon, Trash2 } from "lucide-react";
-import { cn, formatCurrency } from "@/lib/utils";
+import { Trash2 } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 import { useForm } from "@inertiajs/react";
-import { format } from "date-fns";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Label } from "@/Components/ui/label";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/Components/ui/popover";
 import { toast } from "sonner";
 import InputError from "@/Components/InputError";
 
@@ -31,7 +24,7 @@ export default function POS({ products, categories, currencies, accounts, custom
 
   const { data, setData, post, processing, errors, reset } = useForm({
     customer_id: "",
-    invoice_date: format(new Date(), "yyyy-MM-dd"),
+    invoice_date: new Date(),
     currency: baseCurrency.name,
     exchange_rate: 1,
     converted_total: 0,
@@ -77,7 +70,7 @@ export default function POS({ products, categories, currencies, accounts, custom
     // Reset to default values
     setData({
       customer_id: "",
-      invoice_date: format(new Date(), "yyyy-MM-dd"),
+      invoice_date: new Date(),
       currency: baseCurrency.name,
       exchange_rate: 1,
       converted_total: 0,
@@ -114,7 +107,7 @@ export default function POS({ products, categories, currencies, accounts, custom
       discount_type: data.discount_type,
       discount_value: data.discount_value,
       grand_total: calculateTotal(),
-      description: holdDescription || `Hold from ${format(new Date(), "PPP")}`,
+      description: holdDescription || `Hold from ${new Date()}`,
     };
 
     // empty cart
@@ -176,7 +169,7 @@ export default function POS({ products, categories, currencies, accounts, custom
       description: holdItem.items.map(item => item.description || ""),
       quantity: holdItem.items.map(item => parseFloat(item.quantity)),
       unit_cost: holdItem.items.map(item => parseFloat(item.unit_cost)),
-      invoice_date: holdItem.receipt_date || format(new Date(), "yyyy-MM-dd"),
+      invoice_date: holdItem.receipt_date || new Date(),
       sub_total: holdItem.sub_total || 0,
       grand_total: holdItem.grand_total || 0
     });
@@ -221,7 +214,7 @@ export default function POS({ products, categories, currencies, accounts, custom
       description: prescriptionProduct.items.map(item => item.description || ""),
       quantity: prescriptionProduct.items.map(item => parseFloat(item.quantity)),
       unit_cost: prescriptionProduct.items.map(item => parseFloat(item.unit_cost)),
-      invoice_date: format(new Date(), "yyyy-MM-dd"),
+      invoice_date: new Date(),
     });
 
     console.log(prescription);
@@ -303,7 +296,7 @@ export default function POS({ products, categories, currencies, accounts, custom
   }
 
   const addTax = () => {
-    if(pos_default_taxes) {
+    if (pos_default_taxes) {
       setData("taxes", pos_default_taxes)
     }
   }
@@ -565,7 +558,7 @@ export default function POS({ products, categories, currencies, accounts, custom
                             <tr key={hold.id || index} className="hover:bg-gray-50">
                               <td className="px-6 py-4 whitespace-nowrap text-sm">
                                 {hold.id || `Hold-${index + 1}`}
-                                <div className="text-xs text-gray-500">{hold.description || format(new Date(hold.created_at || new Date()), "PPP")}</div>
+                                <div className="text-xs text-gray-500">{hold.description || new Date(hold.created_at || new Date())}</div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm">
                                 {hold.customer_name || 'No Customer'}
@@ -857,34 +850,12 @@ export default function POS({ products, categories, currencies, accounts, custom
                     <div className="flex justify-between items-center">
                       <Label>Invoice Date</Label>
                       <div className="w-[70%]">
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "w-full justify-start text-left font-normal",
-                                !data.invoice_date && "text-muted-foreground"
-                              )}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {data.invoice_date ? (
-                                format(new Date(data.invoice_date), "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={data.invoice_date ? new Date(data.invoice_date) : undefined}
-                              onSelect={(date) =>
-                                setData("invoice_date", date ? format(date, "yyyy-MM-dd") : "")
-                              }
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
+                        <DateTimePicker
+                          value={data.invoice_date}
+                          onChange={(date) => setData("invoice_date", date)}
+                          className="md:w-1/2 w-full"
+                          required
+                        />
                       </div>
                     </div>
 
@@ -892,34 +863,12 @@ export default function POS({ products, categories, currencies, accounts, custom
                       <div className="flex justify-between items-center">
                         <Label>Due Date</Label>
                         <div className="w-[70%]">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant={"outline"}
-                                className={cn(
-                                  "w-full justify-start text-left font-normal",
-                                  !data.due_date && "text-muted-foreground"
-                                )}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {data.due_date ? (
-                                  format(new Date(data.due_date), "PPP")
-                                ) : (
-                                  <span>Pick a date</span>
-                                )}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={data.due_date ? new Date(data.due_date) : undefined}
-                                onSelect={(date) =>
-                                  setData("due_date", date ? format(date, "yyyy-MM-dd") : "")
-                                }
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
+                          <DateTimePicker
+                            value={data.due_date}
+                            onChange={(date) => setData("due_date", date)}
+                            className="md:w-1/2 w-full"
+                            required
+                          />
                         </div>
                       </div>
                     )}
@@ -1295,34 +1244,12 @@ export default function POS({ products, categories, currencies, accounts, custom
                       <div className="flex justify-between items-center">
                         <Label>Invoice Date</Label>
                         <div className="w-[70%]">
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant={"outline"}
-                                className={cn(
-                                  "w-full justify-start text-left font-normal",
-                                  !data.invoice_date && "text-muted-foreground"
-                                )}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {data.invoice_date ? (
-                                  format(new Date(data.invoice_date), "PPP")
-                                ) : (
-                                  <span>Pick a date</span>
-                                )}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={data.invoice_date ? new Date(data.invoice_date) : undefined}
-                                onSelect={(date) =>
-                                  setData("invoice_date", date ? format(date, "yyyy-MM-dd") : "")
-                                }
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
+                          <DateTimePicker
+                            value={data.invoice_date}
+                            onChange={(date) => setData("invoice_date", date)}
+                            className="md:w-1/2 w-full"
+                            required
+                          />
                         </div>
                       </div>
 
@@ -1330,34 +1257,12 @@ export default function POS({ products, categories, currencies, accounts, custom
                         <div className="flex justify-between items-center">
                           <Label>Due Date</Label>
                           <div className="w-[70%]">
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant={"outline"}
-                                  className={cn(
-                                    "w-full justify-start text-left font-normal",
-                                    !data.due_date && "text-muted-foreground"
-                                  )}
-                                >
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {data.due_date ? (
-                                    format(new Date(data.due_date), "PPP")
-                                  ) : (
-                                    <span>Pick a date</span>
-                                  )}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                  mode="single"
-                                  selected={data.due_date ? new Date(data.due_date) : undefined}
-                                  onSelect={(date) =>
-                                    setData("due_date", date ? format(date, "yyyy-MM-dd") : "")
-                                  }
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
+                            <DateTimePicker
+                              value={data.invoice_date}
+                              onChange={(date) => setData("invoice_date", date)}
+                              className="md:w-1/2 w-full"
+                              required
+                            />
                           </div>
                         </div>
                       )}

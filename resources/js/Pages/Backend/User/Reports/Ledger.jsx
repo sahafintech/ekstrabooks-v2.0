@@ -43,7 +43,7 @@ export default function Ledger({
 
 
 
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, post, processing } = useForm({
         date1: parseDateObject(date1),
         date2: parseDateObject(date2)
     });
@@ -358,21 +358,21 @@ export default function Ledger({
                                     <TableBody>
                                         {report_data.map((account) => (
                                             <React.Fragment key={account.id}>
-                                                <TableRow className="bg-gray-200">
+                                                <TableRow className="bg-gray-200 !text-[10px]">
                                                     <TableCell>Account</TableCell>
-                                                    <TableCell className="text-right">Debit ({currency})</TableCell>
-                                                    <TableCell className="text-right">Credit ({currency})</TableCell>
-                                                    <TableCell className="text-right">Balance ({currency})</TableCell>
+                                                    <TableCell className="text-right !text-[10px]">Debit ({currency})</TableCell>
+                                                    <TableCell className="text-right !text-[10px]">Credit ({currency})</TableCell>
+                                                    <TableCell className="text-right !text-[10px]">Balance ({currency})</TableCell>
                                                 </TableRow>
                                                 <TableRow>
-                                                    <TableCell className="bg-gray-100">
+                                                    <TableCell className="bg-gray-100 !text-[10px]">
                                                         <div className="font-medium">
                                                             {account.account_number} - {account.account_name}
                                                         </div>
                                                     </TableCell>
-                                                    <TableCell className="text-right bg-gray-100">{formatAmount(account.debit_amount)}</TableCell>
-                                                    <TableCell className="text-right bg-gray-100">{formatAmount(account.credit_amount)}</TableCell>
-                                                    <TableCell className="text-right bg-gray-100">{formatAmount(account.balance)}</TableCell>
+                                                    <TableCell className="text-right bg-gray-100 !text-[10px]">{formatAmount(account.debit_amount)}</TableCell>
+                                                    <TableCell className="text-right bg-gray-100 !text-[10px]">{formatAmount(account.credit_amount)}</TableCell>
+                                                    <TableCell className="text-right bg-gray-100 !text-[10px]">{formatAmount(account.balance)}</TableCell>
                                                 </TableRow>
 
                                                 {account.transactions.length > 0 && (
@@ -382,35 +382,35 @@ export default function Ledger({
                                                                 <ReportTable>
                                                                     <TableHeader>
                                                                         <TableRow>
-                                                                            <TableHead>Date</TableHead>
-                                                                            <TableHead>Description</TableHead>
-                                                                            <TableHead>Type</TableHead>
-                                                                            <TableHead>Name</TableHead>
-                                                                            <TableHead>Transaction Currency</TableHead>
-                                                                            <TableHead>Transaction Currency[Debit]</TableHead>
-                                                                            <TableHead>Transaction Currency[Credit]</TableHead>
-                                                                            <TableHead>Currency Rate</TableHead>
-                                                                            <TableHead>Rate</TableHead>
-                                                                            <TableHead>Base Currency</TableHead>
-                                                                            <TableHead>Base Currency[Debit]</TableHead>
-                                                                            <TableHead>Base Currency[Credit]</TableHead>
+                                                                            <TableHead className="!text-[10px]">Date</TableHead>
+                                                                            <TableHead className="!text-[10px]">Description</TableHead>
+                                                                            <TableHead className="!text-[10px]">Type</TableHead>
+                                                                            <TableHead className="!text-[10px]">Name</TableHead>
+                                                                            <TableHead className="!text-[10px]">Transaction Currency</TableHead>
+                                                                            <TableHead className="!text-[10px]">Transaction Currency[Debit]</TableHead>
+                                                                            <TableHead className="!text-[10px]">Transaction Currency[Credit]</TableHead>
+                                                                            <TableHead className="!text-[10px]">Currency Rate</TableHead>
+                                                                            <TableHead className="!text-[10px]">Rate</TableHead>
+                                                                            <TableHead className="!text-[10px]">Base Currency</TableHead>
+                                                                            <TableHead className="!text-[10px]">Base Currency[Debit]</TableHead>
+                                                                            <TableHead className="!text-[10px]">Base Currency[Credit]</TableHead>
                                                                         </TableRow>
                                                                     </TableHeader>
                                                                     <TableBody>
                                                                         {account.transactions.map((transaction) => (
                                                                             <TableRow key={transaction.id}>
-                                                                                <TableCell>{transaction.trans_date}</TableCell>
-                                                                                <TableCell>{transaction.description}</TableCell>
-                                                                                <TableCell>{transaction.ref_type === 'receipt' ? 'Cash Invoice' : transaction.ref_type}</TableCell>
-                                                                                <TableCell>{transaction.payee_name || 'N/A'}</TableCell>
-                                                                                <TableCell>{transaction.transaction_currency}</TableCell>
-                                                                                <TableCell className="text-right">{transaction.dr_cr === 'dr' ? formatAmount(transaction.transaction_amount) : 0}</TableCell>
-                                                                                <TableCell className="text-right">{transaction.dr_cr === 'cr' ? formatAmount(transaction.transaction_amount) : 0}</TableCell>
-                                                                                <TableCell className="text-right">{transaction.transaction_currency}</TableCell>
-                                                                                <TableCell className="text-right">{formatAmount(transaction.currency_rate)}</TableCell>
-                                                                                <TableCell>{currency}</TableCell>
-                                                                                <TableCell className="text-right">{transaction.dr_cr === 'dr' ? formatAmount(transaction.base_currency_amount) : 0}</TableCell>
-                                                                                <TableCell className="text-right">{transaction.dr_cr === 'cr' ? formatAmount(transaction.base_currency_amount) : 0}</TableCell>
+                                                                                <TableCell className="!text-[10px]">{transaction.trans_date}</TableCell>
+                                                                                <TableCell className="!text-[10px]">{transaction.description}</TableCell>
+                                                                                <TableCell className="!text-[10px]">{transaction.ref_type === 'receipt' ? 'Cash Invoice' : transaction.ref_type}</TableCell>
+                                                                                <TableCell className="!text-[10px]">{transaction.payee_name || 'N/A'}</TableCell>
+                                                                                <TableCell className="!text-[10px]">{transaction.transaction_currency}</TableCell>
+                                                                                <TableCell className="text-right !text-[10px]">{transaction.dr_cr === 'dr' ? formatAmount(transaction.transaction_amount) : 0}</TableCell>
+                                                                                <TableCell className="text-right !text-[10px]">{transaction.dr_cr === 'cr' ? formatAmount(transaction.transaction_amount) : 0}</TableCell>
+                                                                                <TableCell className="text-right !text-[10px]">{transaction.transaction_currency}</TableCell>
+                                                                                <TableCell className="text-right !text-[10px]">{formatAmount(transaction.currency_rate)}</TableCell>
+                                                                                <TableCell className="!text-[10px]">{currency}</TableCell>
+                                                                                <TableCell className="text-right !text-[10px]">{transaction.dr_cr === 'dr' ? formatAmount(transaction.base_currency_amount) : 0}</TableCell>
+                                                                                <TableCell className="text-right !text-[10px]">{transaction.dr_cr === 'cr' ? formatAmount(transaction.base_currency_amount) : 0}</TableCell>
                                                                             </TableRow>
                                                                         ))}
                                                                     </TableBody>
@@ -423,10 +423,10 @@ export default function Ledger({
                                         ))}
 
                                         <TableRow className="bg-muted/50 font-medium">
-                                            <TableCell>Grand Total</TableCell>
-                                            <TableCell className="text-right">{grand_total_debit}</TableCell>
-                                            <TableCell className="text-right">{grand_total_credit}</TableCell>
-                                            <TableCell className="text-right">{grand_total_balance}</TableCell>
+                                            <TableCell className="!text-[10px]">Grand Total</TableCell>
+                                            <TableCell className="text-right !text-[10px]">{grand_total_debit}</TableCell>
+                                            <TableCell className="text-right !text-[10px]">{grand_total_credit}</TableCell>
+                                            <TableCell className="text-right !text-[10px]">{grand_total_balance}</TableCell>
                                         </TableRow>
                                     </TableBody>
                                 </ReportTable>

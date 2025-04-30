@@ -12,17 +12,9 @@ import {
     TableHeader,
     TableRow,
 } from "@/Components/ui/table";
-import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
-import { cn, formatCurrency, parseDateObject } from "@/lib/utils";
+import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { Label } from "@/Components/ui/label";
 import DateTimePicker from "@/Components/DateTimePicker";
 
@@ -83,71 +75,6 @@ export default function BalanceSheet({ report_data, date2, business_name }) {
     const liabilitiesPlusEquity = totalLiabilities + totalEquity;
     const isBalanced = Math.abs(totalAssets - liabilitiesPlusEquity) < 0.01; // Allow small rounding differences
 
-    // Function to render account tables by type
-    const renderAccountTypeTable = (reportData, accountType, title, isDebitMinusCredit = true) => {
-        if (!reportData[accountType] || reportData[accountType].length === 0) return null;
-
-        return (
-            <div className="mb-6">
-                <h1 className="text-lg font-bold p-3 underline">{title}</h1>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Account Code</TableHead>
-                            <TableHead>Account Name</TableHead>
-                            <TableHead>Debit</TableHead>
-                            <TableHead>Credit</TableHead>
-                            <TableHead>Balance</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {reportData[accountType].map((account) => {
-                            // Calculate balance based on account type
-                            const balance = isDebitMinusCredit
-                                ? account.dr_amount - account.cr_amount
-                                : account.cr_amount - account.dr_amount;
-
-                            return (
-                                <TableRow key={account.id || account.account_name}>
-                                    <TableCell>{account.account_code || 'N/A'}</TableCell>
-                                    <TableCell>{account.account_name || 'N/A'}</TableCell>
-                                    <TableCell>{formatCurrency({ amount: account.dr_amount || 0 })}</TableCell>
-                                    <TableCell>{formatCurrency({ amount: account.cr_amount || 0 })}</TableCell>
-                                    <TableCell>{formatCurrency({ amount: balance || 0 })}</TableCell>
-                                </TableRow>
-                            );
-                        })}
-
-                        {/* Section Total */}
-                        <TableRow className="font-bold bg-slate-50">
-                            <TableCell colSpan={4} className="text-right">Total {title}:</TableCell>
-                            <TableCell>
-                                {formatCurrency({
-                                    amount: reportData[accountType].reduce((sum, account) => {
-                                        const balance = isDebitMinusCredit
-                                            ? account.dr_amount - account.cr_amount
-                                            : account.cr_amount - account.dr_amount;
-                                        return sum + balance;
-                                    }, 0) || 0
-                                })}
-                            </TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
-            </div>
-        );
-    };
-
-    // Create summary row
-    const SummaryRow = ({ label, value, isTotal = false, isAsset = true }) => (
-        <TableRow className={isTotal ? "font-bold bg-slate-100" : ""}>
-            <TableCell colSpan={4} className="text-right">{label}</TableCell>
-            <TableCell className={isAsset ? "" : value < 0 ? "text-red-600" : ""}>
-                {formatCurrency({ amount: value || 0 })}
-            </TableCell>
-        </TableRow>
-    );
-
     const { data, setData, post, processing } = useForm({
         date2: parseDateObject(date2),
     });
@@ -176,19 +103,29 @@ export default function BalanceSheet({ report_data, date2, business_name }) {
         const style = `
             <style>
                 body { font-family: Arial, sans-serif; margin: 20px; }
-                table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f2f2f2; }
-                h2, h1 { text-align: center; margin-bottom: 20px; }
-                h3 { margin-top: 20px; margin-bottom: 10px; font-size: 18px; text-decoration: underline; }
+                h1 { text-align: center; margin-bottom: 20px; }
+                .logo { text-align: center; margin-bottom: 20px; }
+                .company-details { text-align: center; margin-bottom: 30px; }
+                .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+                td { padding: 5px 2px; }
+                .border-top { border-top: 1px solid #000; }
+                .border-bottom { border-bottom: 1px solid #000; }
                 .text-right { text-align: right; }
-                .negative { color: red; }
-                .total-row { font-weight: bold; background-color: #f9f9f9; }
-                .section { margin-bottom: 30px; }
-                .summary { font-size: 16px; font-weight: bold; margin-top: 20px; }
-                .section-title { font-size: 20px; font-weight: bold; margin-top: 30px; margin-bottom: 10px; }
+                .total-row td { font-weight: bold; }
+                .section-title { font-weight: bold; text-decoration: underline; margin: 15px 0 10px 0; }
+                .section-container { margin-bottom: 25px; }
                 .balanced { color: green; }
                 .unbalanced { color: red; }
+                
+                /* Make it responsive on smaller screens */
+                @media (max-width: 768px) {
+                    .grid-container {
+                        display: grid;
+                        grid-template-columns: 1fr;
+                        gap: 20px;
+                    }
+                }
             </style>
         `;
 
@@ -203,147 +140,198 @@ export default function BalanceSheet({ report_data, date2, business_name }) {
             <body>
                 <h1>${business_name}</h1>
                 <h2>Balance Sheet (as of ${format(new Date(data.date2), "PPP")})</h2>
+                
+                <div class="grid-container">
+                    <!-- Left Column - Assets -->
+                    <div class="column">
+                        <!-- Fixed Assets -->
+                        <div class="section">
+                            <h3>FIXED ASSETS</h3>
+                            <table>
+                                <tbody>
         `;
 
-        // Function to create a table for each account type
-        const createAccountTable = (accounts, title, isDebitMinusCredit = true) => {
-            if (!accounts || accounts.length === 0) return '';
-
-            let tableHtml = `
-                <div class="section">
-                    <h3>${title}</h3>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Account Code</th>
-                                <th>Account Name</th>
-                                <th>Debit</th>
-                                <th>Credit</th>
-                                <th>Balance</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-            `;
-
-            // Add rows for this account type
-            let sectionTotal = 0;
-            accounts.forEach(account => {
-                const balance = isDebitMinusCredit
-                    ? account.dr_amount - account.cr_amount
-                    : account.cr_amount - account.dr_amount;
-
-                sectionTotal += balance;
-
-                const formattedDr = formatCurrency(account.dr_amount || 0);
-                const formattedCr = formatCurrency(account.cr_amount || 0);
-                const formattedBalance = formatCurrency(balance || 0);
-
-                tableHtml += `
+        // Add Fixed Assets
+        if (report_data.fixed_asset && report_data.fixed_asset.length > 0) {
+            report_data.fixed_asset.forEach(asset => {
+                const balance = asset.dr_amount - asset.cr_amount;
+                printContent += `
                     <tr>
-                        <td>${account.account_code || 'N/A'}</td>
-                        <td>${account.account_name || 'N/A'}</td>
-                        <td class="text-right">${formattedDr}</td>
-                        <td class="text-right">${formattedCr}</td>
-                        <td class="text-right">${formattedBalance}</td>
+                        <td>${asset.account_name}</td>
+                        <td class="text-right">${formatCurrency({ amount: balance })}</td>
                     </tr>
                 `;
             });
 
-            // Add section total
-            tableHtml += `
-                <tr class="total-row">
-                    <td colspan="4" class="text-right">Total ${title}:</td>
-                    <td class="text-right">${formatCurrency(sectionTotal)}</td>
-                </tr>
+            // Fixed Assets Total
+            const fixedAssetsTotal = report_data.fixed_asset.reduce((sum, asset) =>
+                sum + (asset.dr_amount - asset.cr_amount), 0);
+
+            printContent += `
+                    <tr class="total-row">
+                        <td>Total Of Fixed Assets</td>
+                        <td class="text-right border-top">${formatCurrency({ amount: fixedAssetsTotal })}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Current Assets -->
+        <div class="section">
+            <h3>CURRENT ASSETS</h3>
+            <table>
+                <tbody>
             `;
-
-            tableHtml += `
-                        </tbody>
-                    </table>
-                </div>
-            `;
-
-            return tableHtml;
-        };
-
-        // Add Assets section
-        printContent += `<div class="section-title">ASSETS</div>`;
-
-        if (report_data.fixed_asset && report_data.fixed_asset.length > 0) {
-            printContent += createAccountTable(report_data.fixed_asset, 'Fixed Assets', true);
         }
 
+        // Add Current Assets
         if (report_data.current_asset && report_data.current_asset.length > 0) {
-            printContent += createAccountTable(report_data.current_asset, 'Current Assets', true);
+            report_data.current_asset.forEach(asset => {
+                const balance = asset.dr_amount - asset.cr_amount;
+                printContent += `
+                    <tr>
+                        <td>${asset.account_name}</td>
+                        <td class="text-right">${formatCurrency({ amount: balance })}</td>
+                    </tr>
+                `;
+            });
+
+            // Current Assets Total
+            const currentAssetsTotal = report_data.current_asset.reduce((sum, asset) =>
+                sum + (asset.dr_amount - asset.cr_amount), 0);
+
+            printContent += `
+                    <tr class="total-row">
+                        <td>Total Of Current Assets</td>
+                        <td class="text-right border-top">${formatCurrency({ amount: currentAssetsTotal })}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Total Assets -->
+        <table>
+            <tbody>
+                <tr class="total-row">
+                    <td>TOTAL OF ASSETS</td>
+                    <td class="text-right border-top border-bottom">${formatCurrency({ amount: totalAssets })}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Right Column - Liabilities and Equity -->
+    <div class="column">
+        <!-- Current Liability -->
+        <div class="section">
+            <h3>CURRENT LIABILITY</h3>
+            <table>
+                <tbody>
+            `;
         }
 
-        // Add total assets summary
-        printContent += `
-            <div class="summary">
-                <p class="text-right">TOTAL ASSETS: ${formatCurrency(totalAssets)}</p>
-            </div>
-        `;
-
-        // Add Liabilities section
-        printContent += `<div class="section-title">LIABILITIES</div>`;
-
+        // Add Current Liabilities
         if (report_data.current_liability && report_data.current_liability.length > 0) {
-            printContent += createAccountTable(report_data.current_liability, 'Current Liabilities', false);
+            report_data.current_liability.forEach(liability => {
+                const balance = liability.cr_amount - liability.dr_amount;
+                printContent += `
+                    <tr>
+                        <td>${liability.account_name}</td>
+                        <td class="text-right">${formatCurrency({ amount: balance })}</td>
+                    </tr>
+                `;
+            });
+
+            // Current Liabilities Total
+            const currentLiabilitiesTotal = report_data.current_liability.reduce((sum, liability) =>
+                sum + (liability.cr_amount - liability.dr_amount), 0);
+
+            printContent += `
+                    <tr class="total-row">
+                        <td>Total Of Current Liability</td>
+                        <td class="text-right border-top">${formatCurrency({ amount: currentLiabilitiesTotal })}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Equity -->
+        <div class="section">
+            <h3>EQUITY</h3>
+            <table>
+                <tbody>
+            `;
         }
 
-        if (report_data.long_term_liability && report_data.long_term_liability.length > 0) {
-            printContent += createAccountTable(report_data.long_term_liability, 'Long Term Liabilities', false);
-        }
-
-        // Add total liabilities summary
-        printContent += `
-            <div class="summary">
-                <p class="text-right">TOTAL LIABILITIES: ${formatCurrency(totalLiabilities)}</p>
-            </div>
-        `;
-
-        // Add Equity section
-        printContent += `<div class="section-title">EQUITY</div>`;
-
+        // Add Equity
         if (report_data.equity && report_data.equity.length > 0) {
-            printContent += createAccountTable(report_data.equity, 'Equity', false);
-        }
+            report_data.equity.forEach(equity => {
+                const balance = equity.cr_amount - equity.dr_amount;
+                printContent += `
+                    <tr>
+                        <td>${equity.account_name}</td>
+                        <td class="text-right">${formatCurrency({ amount: balance })}</td>
+                    </tr>
+                `;
+            });
 
-        // Add total equity summary
-        printContent += `
-            <div class="summary">
-                <p class="text-right">TOTAL EQUITY: ${formatCurrency(totalEquity)}</p>
-            </div>
-        `;
+            // Equity Total
+            const equityTotal = report_data.equity.reduce((sum, equity) =>
+                sum + (equity.cr_amount - equity.dr_amount), 0);
 
-        // Add balance verification
-        printContent += `
-            <div class="summary">
-                <p class="text-right">TOTAL LIABILITIES AND EQUITY: ${formatCurrency(liabilitiesPlusEquity)}</p>
-                <p class="text-right ${isBalanced ? 'balanced' : 'unbalanced'}">BALANCE CHECK: ${isBalanced ? 'Balanced' : 'Not Balanced'}</p>
-            </div>
-        `;
+            printContent += `
+                    <tr class="total-row">
+                        <td>Total Of Equity</td>
+                        <td class="text-right border-top">${formatCurrency({ amount: equityTotal })}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Total Liability & Equity -->
+        <table>
+            <tbody>
+                <tr class="total-row">
+                    <td>TOTAL OF LIABILITY & EQUITY</td>
+                    <td class="text-right border-top border-bottom">${formatCurrency({ amount: liabilitiesPlusEquity })}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
 
-        // Complete the HTML content
-        printContent += `
+<!-- Balance Check -->
+${`
+<div style="margin-top: 20px;">
+    <span style="font-weight: bold; margin-right: 20px;">DIFFERENCE:</span>
+    <span style="font-weight: bold;" class="${isBalanced ? 'balanced' : 'unbalanced'}">
+        ${formatCurrency({ amount: totalAssets - liabilitiesPlusEquity })}
+    </span>
+</div>`}
+            `;
+
+            // Complete the HTML content
+            printContent += `
             </body>
             </html>
         `;
 
-        // Write the content to the print window and trigger print
-        printWindow.document.open();
-        printWindow.document.write(printContent);
-        printWindow.document.close();
+            // Write the content to the print window and trigger print
+            printWindow.document.open();
+            printWindow.document.write(printContent);
+            printWindow.document.close();
 
-        // Wait for content to load before printing
-        setTimeout(() => {
-            printWindow.print();
-            // Close the window after printing (optional)
-            printWindow.onafterprint = function () {
-                printWindow.close();
-            };
-        }, 500);
-    };
+            // Wait for content to load before printing
+            setTimeout(() => {
+                printWindow.print();
+                // Close the window after printing (optional)
+                printWindow.onafterprint = function () {
+                    printWindow.close();
+                };
+            }, 500);
+        };
+
+    }
 
     return (
         <AuthenticatedLayout>
@@ -357,7 +345,7 @@ export default function BalanceSheet({ report_data, date2, business_name }) {
                     />
                     <div className="p-4">
                         <div className="flex flex-col justify-between items-start mb-6 gap-4">
-                            <div className="flex flex-col md:flex-row gap-4">
+                            <div>
                                 <Label>As of</Label>
                                 <form onSubmit={handleGenerate}>
                                     <div className="flex items-center gap-2">
@@ -380,70 +368,155 @@ export default function BalanceSheet({ report_data, date2, business_name }) {
                             <Button variant="outline" onClick={handleExport}>Export</Button>
                         </div>
 
-                        <div className="rounded-md border printable-table mt-4">
-                            {/* ASSETS SECTION */}
-                            <div className="p-3 bg-gray-100 font-bold text-lg border-b">ASSETS</div>
+                        <div className="rounded-md border printable-table mt-4 p-4">
+                            {/* Simple 2-column grid layout */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                {/* Left Column - All Assets */}
+                                <div>
+                                    {/* FIXED ASSETS */}
+                                    <div className="mb-8">
+                                        <h3 className="text-left underline font-bold mb-2">FIXED ASSETS</h3>
+                                        <table className="w-full !text-[12px]">
+                                            <tbody>
+                                                {report_data.fixed_asset && report_data.fixed_asset.map((asset, index) => (
+                                                    <tr key={`fixed-${asset.id || index}`}>
+                                                        <td>{asset.account_name}</td>
+                                                        <td className="text-right">
+                                                            {formatCurrency({ amount: asset.dr_amount - asset.cr_amount })}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                <tr>
+                                                    <td className="font-bold">Total Of Fixed Assets</td>
+                                                    <td className="text-right font-bold border-t border-black">
+                                                        {formatCurrency({
+                                                            amount: report_data.fixed_asset ? report_data.fixed_asset.reduce((sum, asset) =>
+                                                                sum + (asset.dr_amount - asset.cr_amount), 0) : 0
+                                                        })}
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
 
-                            {/* Fixed Assets */}
-                            {renderAccountTypeTable(report_data, 'fixed_asset', 'Fixed Assets', true)}
+                                    {/* CURRENT ASSETS */}
+                                    <div className="mb-8">
+                                        <h3 className="text-left underline font-bold mb-2">CURRENT ASSETS</h3>
+                                        <table className="w-full !text-[12px]">
+                                            <tbody>
+                                                {report_data.current_asset && report_data.current_asset.map((asset, index) => (
+                                                    <tr key={`current-${asset.id || index}`}>
+                                                        <td>{asset.account_name}</td>
+                                                        <td className="text-right">
+                                                            {formatCurrency({ amount: asset.dr_amount - asset.cr_amount })}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                <tr>
+                                                    <td className="font-bold">Total Of Current Assets</td>
+                                                    <td className="text-right font-bold border-t border-black">
+                                                        {formatCurrency({
+                                                            amount: report_data.current_asset ? report_data.current_asset.reduce((sum, asset) =>
+                                                                sum + (asset.dr_amount - asset.cr_amount), 0) : 0
+                                                        })}
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
 
-                            {/* Current Assets */}
-                            {renderAccountTypeTable(report_data, 'current_asset', 'Current Assets', true)}
+                                    {/* TOTAL ASSETS */}
+                                    <div>
+                                        <table className="w-full !text-[12px]">
+                                            <tbody>
+                                                <tr>
+                                                    <td className="font-bold">TOTAL OF ASSETS</td>
+                                                    <td className="text-right font-bold border-t border-b border-black">
+                                                        {formatCurrency({ amount: totalAssets })}
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
 
-                            {/* Total Assets Summary */}
-                            <Table className="mt-2 mb-6">
-                                <TableBody>
-                                    <SummaryRow label="TOTAL ASSETS:" value={totalAssets} isTotal={true} isAsset={true} />
-                                </TableBody>
-                            </Table>
+                                {/* Right Column - All Liabilities and Equity */}
+                                <div>
+                                    {/* CURRENT LIABILITY */}
+                                    <div className="mb-8">
+                                        <h3 className="text-left underline font-bold mb-2">CURRENT LIABILITY</h3>
+                                        <table className="w-full !text-[12px]">
+                                            <tbody>
+                                                {report_data.current_liability && report_data.current_liability.map((liability, index) => (
+                                                    <tr key={`liability-${liability.id || index}`}>
+                                                        <td>{liability.account_name}</td>
+                                                        <td className="text-right">
+                                                            {formatCurrency({ amount: liability.cr_amount - liability.dr_amount })}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                <tr>
+                                                    <td className="font-bold">Total Of Current Liability</td>
+                                                    <td className="text-right font-bold border-t border-black">
+                                                        {formatCurrency({
+                                                            amount: report_data.current_liability ? report_data.current_liability.reduce((sum, liability) =>
+                                                                sum + (liability.cr_amount - liability.dr_amount), 0) : 0
+                                                        })}
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
 
-                            {/* LIABILITIES SECTION */}
-                            <div className="p-3 bg-gray-100 font-bold text-lg border-b border-t">LIABILITIES</div>
+                                    {/* EQUITY */}
+                                    <div className="mb-8">
+                                        <h3 className="text-left underline font-bold mb-2">EQUITY</h3>
+                                        <table className="w-full !text-[12px]">
+                                            <tbody>
+                                                {report_data.equity && report_data.equity.map((equity, index) => (
+                                                    <tr key={`equity-${equity.id || index}`}>
+                                                        <td>{equity.account_name}</td>
+                                                        <td className="text-right">
+                                                            {formatCurrency({ amount: equity.cr_amount - equity.dr_amount })}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                <tr>
+                                                    <td className="font-bold">Total Of Equity</td>
+                                                    <td className="text-right font-bold border-t border-black">
+                                                        {formatCurrency({
+                                                            amount: report_data.equity ? report_data.equity.reduce((sum, equity) =>
+                                                                sum + (equity.cr_amount - equity.dr_amount), 0) : 0
+                                                        })}
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
 
-                            {/* Current Liabilities */}
-                            {renderAccountTypeTable(report_data, 'current_liability', 'Current Liabilities', false)}
+                                    {/* TOTAL LIABILITY & EQUITY */}
+                                    <div>
+                                        <table className="w-full !text-[12px]">
+                                            <tbody>
+                                                <tr>
+                                                    <td className="font-bold">TOTAL OF LIABILITY & EQUITY</td>
+                                                    <td className="text-right font-bold border-t border-b border-black">
+                                                        {formatCurrency({ amount: liabilitiesPlusEquity })}
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
 
-                            {/* Long Term Liabilities */}
-                            {renderAccountTypeTable(report_data, 'long_term_liability', 'Long Term Liabilities', false)}
-
-                            {/* Total Liabilities Summary */}
-                            <Table className="mt-2 mb-6">
-                                <TableBody>
-                                    <SummaryRow label="TOTAL LIABILITIES:" value={totalLiabilities} isTotal={true} isAsset={false} />
-                                </TableBody>
-                            </Table>
-
-                            {/* EQUITY SECTION */}
-                            <div className="p-3 bg-gray-100 font-bold text-lg border-b border-t">EQUITY</div>
-
-                            {/* Equity */}
-                            {renderAccountTypeTable(report_data, 'equity', 'Equity', false)}
-
-                            {/* Total Equity Summary */}
-                            <Table className="mt-2">
-                                <TableBody>
-                                    <SummaryRow label="TOTAL EQUITY:" value={totalEquity} isTotal={true} isAsset={false} />
-                                </TableBody>
-                            </Table>
-
-                            {/* Balance Verification */}
-                            <Table className="mt-8 mb-4">
-                                <TableBody>
-                                    <SummaryRow label="TOTAL LIABILITIES AND EQUITY:" value={liabilitiesPlusEquity} isTotal={true} isAsset={false} />
-                                    <TableRow className="font-bold">
-                                        <TableCell colSpan={4} className="text-right">DIFFERENCE:</TableCell>
-                                        <TableCell className={totalAssets - liabilitiesPlusEquity === 0 ? "text-green-600" : "text-red-600"}>
-                                            {formatCurrency({ amount: totalAssets - liabilitiesPlusEquity })}
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow className="font-bold">
-                                        <TableCell colSpan={4} className="text-right">BALANCE CHECK:</TableCell>
-                                        <TableCell className={isBalanced ? "text-green-600" : "text-red-600"}>
-                                            {isBalanced ? "Balanced" : "Not Balanced"}
-                                        </TableCell>
-                                    </TableRow>
-                                </TableBody>
-                            </Table>
+                            {/* BALANCE CHECK */}
+                            <div className="mt-4">
+                                <span className="mr-4 font-bold">DIFFERENCE:</span>
+                                <span className={"font-bold " + (isBalanced ? "text-green-600" : "text-red-600")}>
+                                    {formatCurrency({ amount: totalAssets - liabilitiesPlusEquity })}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -855,7 +855,7 @@ class ReportController extends Controller
 			session(['start_date' => $date1]);
 			session(['end_date' => $date2]);
 
-			$per_page = $request->get('per_page', 10);
+			$per_page = $request->get('per_page', 50);
 			$search = $request->get('search', '');
 
 			$query = Transaction::with('account')
@@ -904,7 +904,7 @@ class ReportController extends Controller
 			session(['start_date' => $date1]);
 			session(['end_date' => $date2]);
 
-			$per_page = $request->get('per_page', 10);
+			$per_page = $request->get('per_page', 50);
 			$search = $request->get('search', '');
 
 			$query = Transaction::with('account')

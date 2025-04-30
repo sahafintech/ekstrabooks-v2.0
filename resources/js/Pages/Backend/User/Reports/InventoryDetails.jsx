@@ -361,15 +361,15 @@ export default function InventoryDetails({ categories, date1, date2, business_na
                             <ReportTable>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Code</TableHead>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Opening Stock</TableHead>
-                                        <TableHead>Stock In</TableHead>
-                                        <TableHead>Stock Out</TableHead>
-                                        <TableHead>Stock Adjustment Added</TableHead>
-                                        <TableHead>Stock Adjustment Deducted</TableHead>
-                                        <TableHead>Stock Balance</TableHead>
-                                        <TableHead className="text-right">Total Stock Cost</TableHead>
+                                        <TableHead className="!text-[10px]">Code</TableHead>
+                                        <TableHead className="!text-[10px]">Name</TableHead>
+                                        <TableHead className="!text-[10px]">Opening Stock</TableHead>
+                                        <TableHead className="!text-[10px]">Stock In</TableHead>
+                                        <TableHead className="!text-[10px]">Stock Out</TableHead>
+                                        <TableHead className="!text-[10px]">Stock Adjustment Added</TableHead>
+                                        <TableHead className="!text-[10px]">Stock Adjustment Deducted</TableHead>
+                                        <TableHead className="!text-[10px]">Stock Balance</TableHead>
+                                        <TableHead className="text-right !text-[10px]">Total Stock Cost</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -378,29 +378,29 @@ export default function InventoryDetails({ categories, date1, date2, business_na
                                             <React.Fragment key={cat.id}>
                                                 {/* Category row */}
                                                 <TableRow className="bg-gray-100">
-                                                    <TableCell></TableCell>
-                                                    <TableCell>
+                                                    <TableCell className="!text-[10px]"></TableCell>
+                                                    <TableCell className="!text-[10px]">
                                                         <strong>{cat.category_name}</strong>
                                                     </TableCell>
-                                                    <TableCell>
+                                                    <TableCell className="!text-[10px]">
                                                         <strong>{getTotalInitialStock(cat)}</strong>
                                                     </TableCell>
-                                                    <TableCell>
+                                                    <TableCell className="!text-[10px]">
                                                         <strong>{getTotalStockIn(cat)}</strong>
                                                     </TableCell>
-                                                    <TableCell>
+                                                    <TableCell className="!text-[10px]">
                                                         <strong>{cat.total_sold}</strong>
                                                     </TableCell>
-                                                    <TableCell>
+                                                    <TableCell className="!text-[10px]">
                                                         <strong>{getTotalStockAdjustmentAdded(cat)}</strong>
                                                     </TableCell>
-                                                    <TableCell>
+                                                    <TableCell className="!text-[10px]">
                                                         <strong>{getTotalStockAdjustmentDeducted(cat)}</strong>
                                                     </TableCell>
-                                                    <TableCell>
+                                                    <TableCell className="!text-[10px]">
                                                         <strong>{getTotalStockBalance(cat)}</strong>
                                                     </TableCell>
-                                                    <TableCell>
+                                                    <TableCell className="!text-[10px]">
                                                         <strong>{formatCurrency({ amount: getTotalStockCost(cat) })}</strong>
                                                     </TableCell>
                                                 </TableRow>
@@ -408,30 +408,30 @@ export default function InventoryDetails({ categories, date1, date2, business_na
                                                 {/* Brands */}
                                                 {cat.brands.map((brand) => (
                                                     <React.Fragment key={brand.id}>
-                                                        <TableRow className="bg-gray-100">
-                                                            <TableCell></TableCell>
-                                                            <TableCell>
+                                                        <TableRow className="bg-gray-100 !text-[10px]">
+                                                            <TableCell className="!text-[10px]"></TableCell>
+                                                            <TableCell className="!text-[10px]">
                                                                 <strong>{brand.brand_name}</strong>
                                                             </TableCell>
-                                                            <TableCell>
+                                                            <TableCell className="!text-[10px]">
                                                                 <strong>{getTotalInitialStock(brand)}</strong>
                                                             </TableCell>
-                                                            <TableCell>
+                                                            <TableCell className="!text-[10px]">
                                                                 <strong>{getTotalStockIn(brand)}</strong>
                                                             </TableCell>
-                                                            <TableCell>
+                                                            <TableCell className="!text-[10px]">
                                                                 <strong>{brand.total_sold}</strong>
                                                             </TableCell>
-                                                            <TableCell>
+                                                            <TableCell className="!text-[10px]">
                                                                 <strong>{getTotalStockAdjustmentAdded(brand)}</strong>
                                                             </TableCell>
-                                                            <TableCell>
+                                                            <TableCell className="!text-[10px]">
                                                                 <strong>{getTotalStockAdjustmentDeducted(brand)}</strong>
                                                             </TableCell>
-                                                            <TableCell>
+                                                            <TableCell className="!text-[10px]">
                                                                 <strong>{getTotalStockBalance(brand)}</strong>
                                                             </TableCell>
-                                                            <TableCell>
+                                                            <TableCell className="!text-[10px]">
                                                                 <strong>{formatCurrency({ amount: getTotalStockCost(brand) })}</strong>
                                                             </TableCell>
                                                         </TableRow>
@@ -439,31 +439,31 @@ export default function InventoryDetails({ categories, date1, date2, business_na
                                                         {/* Products */}
                                                         {brand.products.map((prod) => (
                                                             <TableRow key={prod.id}>
-                                                                <TableCell>
+                                                                <TableCell className="!text-[10px]">
                                                                     {prod.code}
                                                                 </TableCell>
-                                                                <TableCell>
+                                                                <TableCell className="!text-[10px]">
                                                                     {prod.name}
                                                                 </TableCell>
-                                                                <TableCell>
+                                                                <TableCell className="!text-[10px]">
                                                                     {prod.initial_stock}
                                                                 </TableCell>
-                                                                <TableCell>
+                                                                <TableCell className="!text-[10px]">
                                                                     {prod.total_stock_in}
                                                                 </TableCell>
-                                                                <TableCell>
+                                                                <TableCell className="!text-[10px]">
                                                                     {prod.total_sold}
                                                                 </TableCell>
-                                                                <TableCell>
+                                                                <TableCell className="!text-[10px]">
                                                                     {prod.total_stock_adjustment_added}
                                                                 </TableCell>
-                                                                <TableCell>
+                                                                <TableCell className="!text-[10px]">
                                                                     {prod.total_stock_adjustment_deducted}
                                                                 </TableCell>
-                                                                <TableCell>
+                                                                <TableCell className="!text-[10px]">
                                                                     {prod.stock}
                                                                 </TableCell>
-                                                                <TableCell className="text-right">
+                                                                <TableCell className="text-right !text-[10px]">
                                                                     {formatCurrency({ amount: prod.stock * prod.purchase_cost })}
                                                                 </TableCell>
                                                             </TableRow>

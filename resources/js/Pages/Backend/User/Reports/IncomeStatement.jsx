@@ -1,20 +1,25 @@
 import React from "react";
-import { Head, useForm } from "@inertiajs/react";
+import { useForm } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/Components/ui/table";
 import PageHeader from "@/Components/PageHeader";
 import { formatCurrency, parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
+
+const SectionHeading = ({ children }) => (
+    <tr>
+        <td colSpan="2" className="text-left font-bold text-sm uppercase py-1 underline">{children}</td>
+    </tr>
+);
+
+const SectionTotal = ({ label, value, underlined = false, bold = false }) => (
+    <tr>
+        <td className={`text-right py-1 ${bold ? "font-bold" : ""} ${underlined ? "border-t border-black" : ""}`}>{label}</td>
+        <td className={`text-right py-1 ${bold ? "font-bold" : ""} ${underlined ? "border-t border-black" : ""}`}>{value}</td>
+    </tr>
+);
 
 export default function IncomeStatement({ report_data, date1, date2, business_name }) {
     // Calculate summary values
@@ -55,55 +60,7 @@ export default function IncomeStatement({ report_data, date1, date2, business_na
     const totalOtherExpenses = getTotalOtherExpenses();
     const netProfit = operatingProfit - totalOtherExpenses;
 
-    // Function to render account tables by type
-    const renderAccountTypeTable = (reportData, accountType, title, isDebitMinusCredit = true) => {
-        if (!reportData[accountType] || reportData[accountType].length === 0) return null;
-
-        return (
-            <>
-                <h1 className="text-lg font-bold p-3 underline">{title}</h1>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Account Code</TableHead>
-                            <TableHead>Account Name</TableHead>
-                            <TableHead>Debit</TableHead>
-                            <TableHead>Credit</TableHead>
-                            <TableHead>Balance</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {reportData[accountType].map((account) => {
-                            // Calculate balance based on account type
-                            const balance = isDebitMinusCredit
-                                ? account.dr_amount - account.cr_amount
-                                : account.cr_amount - account.dr_amount;
-
-                            return (
-                                <TableRow key={account.id}>
-                                    <TableCell>{account.account_code || 'N/A'}</TableCell>
-                                    <TableCell>{account.account_name || 'N/A'}</TableCell>
-                                    <TableCell>{formatCurrency({ amount: account.dr_amount || 0 })}</TableCell>
-                                    <TableCell>{formatCurrency({ amount: account.cr_amount || 0 })}</TableCell>
-                                    <TableCell>{formatCurrency({ amount: balance || 0 })}</TableCell>
-                                </TableRow>
-                            );
-                        })}
-                    </TableBody>
-                </Table>
-            </>
-        );
-    };
-
-    // Create summary row
-    const SummaryRow = ({ label, value, isTotal = false, positive = true }) => (
-        <TableRow className={isTotal ? "font-bold bg-slate-100" : ""}>
-            <TableCell colSpan={4} className="text-right">{label}</TableCell>
-            <TableCell className={positive ? "text-green-600" : "text-red-600"}>
-                {formatCurrency({ amount: value || 0 })}
-            </TableCell>
-        </TableRow>
-    );
+    // Simplified rendering approach for the income statement based on the image format
 
     const { data, setData, post, processing } = useForm({
         date1: parseDateObject(date1),
@@ -136,16 +93,13 @@ export default function IncomeStatement({ report_data, date1, date2, business_na
             <style>
                 body { font-family: Arial, sans-serif; margin: 20px; }
                 table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f2f2f2; }
-                h2, h1 { text-align: center; margin-bottom: 20px; }
-                h3 { margin-top: 20px; margin-bottom: 10px; font-size: 18px; text-decoration: underline; }
+                td { padding: 4px 8px; text-align: left; }
                 .text-right { text-align: right; }
-                .positive { color: green; }
-                .negative { color: red; }
-                .total-row { font-weight: bold; background-color: #f9f9f9; }
-                .section { margin-bottom: 30px; }
-                .summary { font-size: 16px; font-weight: bold; margin-top: 20px; }
+                .uppercase { text-transform: uppercase; }
+                .section-heading { font-weight: medium; text-decoration: underline; text-transform: uppercase; }
+                .total-row { font-weight: bold; border-top: 1px solid #000; }
+                h1, h2 { text-align: center; margin-bottom: 20px; }
+                .currency { text-align: right; }
             </style>
         `;
 
@@ -160,115 +114,101 @@ export default function IncomeStatement({ report_data, date1, date2, business_na
             <body>
                 <h1>${business_name}</h1>
                 <h2>Income Statement (${data.date1} - ${data.date2})</h2>
+                <table>
+                    <tbody>
+                        <tr>
+                            <td colspan="2" class="section-heading">SALES AND INCOME</td>
+                        </tr>
         `;
 
-        // Function to create a table for each account type
-        const createAccountTable = (accounts, title) => {
-            if (!accounts || accounts.length === 0) return '';
-
-            let tableHtml = `
-                <div class="section">
-                    <h3>${title}</h3>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Account Code</th>
-                                <th>Account Name</th>
-                                <th>Debit</th>
-                                <th>Credit</th>
-                                <th>Balance</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-            `;
-
-            // Add rows for this account type
-            accounts.forEach(account => {
-                let balance;
-                let balanceClass = "";
-
-                if (title === 'Sales and Income') {
-                    balance = account.cr_amount - account.dr_amount;
-                    balanceClass = balance >= 0 ? "positive" : "negative";
-                } else {
-                    balance = account.dr_amount - account.cr_amount;
-                    balanceClass = balance >= 0 ? "" : "positive";
-                }
-
-                const formattedDr = formatCurrency(account.dr_amount || 0);
-                const formattedCr = formatCurrency(account.cr_amount || 0);
-                const formattedBalance = formatCurrency(balance || 0);
-
-                tableHtml += `
+        // Add Sales and Income rows
+        if (report_data.sales_and_income && report_data.sales_and_income.length > 0) {
+            report_data.sales_and_income.forEach(account => {
+                const amount = account.cr_amount - account.dr_amount;
+                printContent += `
                     <tr>
-                        <td>${account.account_code || 'N/A'}</td>
-                        <td>${account.account_name || 'N/A'}</td>
-                        <td class="text-right">${formattedDr}</td>
-                        <td class="text-right">${formattedCr}</td>
-                        <td class="text-right ${balanceClass}">${formattedBalance}</td>
+                        <td>${account.account_name}</td>
+                        <td class="text-right">${formatCurrency({ amount })}</td>
                     </tr>
                 `;
             });
-
-            tableHtml += `
-                        </tbody>
-                    </table>
-                </div>
-            `;
-
-            return tableHtml;
-        };
-
-        // Add each account section
-        if (report_data.sales_and_income && report_data.sales_and_income.length > 0) {
-            printContent += createAccountTable(report_data.sales_and_income, 'Sales and Income');
         }
 
-        // Add total income summary
+        // Add Cost of Sale section
         printContent += `
-            <div class="summary">
-                <p class="text-right">Total Income: <span class="positive">${formatCurrency(totalIncome)}</span></p>
-            </div>
+            <tr>
+                <td colspan="2" class="section-heading">COST OF SALE</td>
+            </tr>
         `;
 
+        // Add Cost of Sale rows
         if (report_data.cost_of_sale && report_data.cost_of_sale.length > 0) {
-            printContent += createAccountTable(report_data.cost_of_sale, 'Cost Of Sale');
+            report_data.cost_of_sale.forEach(account => {
+                const amount = account.dr_amount - account.cr_amount;
+                printContent += `
+                    <tr>
+                        <td>${account.account_name}</td>
+                        <td class="text-right">${formatCurrency({ amount })}</td>
+                    </tr>
+                `;
+            });
         }
 
-        // Add gross profit summary
+        // Add Gross Profit row
         printContent += `
-            <div class="summary">
-                <p class="text-right">Less: Cost of Sales: <span>${formatCurrency(totalCostOfSales)}</span></p>
-                <p class="text-right">Gross Profit: <span class="${grossProfit >= 0 ? 'positive' : 'negative'}">${formatCurrency(grossProfit)}</span></p>
-            </div>
+            <tr class="total-row">
+                <td class="text-right">Gross Profit</td>
+                <td class="text-right">${formatCurrency({ amount: grossProfit })}</td>
+            </tr>
         `;
 
-        if (report_data.direct_expenses && report_data.direct_expenses.length > 0) {
-            printContent += createAccountTable(report_data.direct_expenses, 'Direct Expenses');
-        }
-
-        // Add operating profit summary
+        // Add Other Expenses section
         printContent += `
-            <div class="summary">
-                <p class="text-right">Less: Direct Expenses: <span>${formatCurrency(totalDirectExpenses)}</span></p>
-                <p class="text-right">Operating Profit: <span class="${operatingProfit >= 0 ? 'positive' : 'negative'}">${formatCurrency(operatingProfit)}</span></p>
-            </div>
+            <tr>
+                <td colspan="2" class="section-heading">OTHER EXPENSES</td>
+            </tr>
         `;
 
+        // Add Other Expenses rows
         if (report_data.other_expenses && report_data.other_expenses.length > 0) {
-            printContent += createAccountTable(report_data.other_expenses, 'Other Expenses');
+            report_data.other_expenses.forEach(account => {
+                const amount = account.dr_amount - account.cr_amount;
+                printContent += `
+                    <tr>
+                        <td>${account.account_name}</td>
+                        <td class="text-right">${formatCurrency({ amount })}</td>
+                    </tr>
+                `;
+            });
         }
 
-        // Add net profit summary
-        printContent += `
-            <div class="summary total-row">
-                <p class="text-right">Less: Other Expenses: <span>${formatCurrency(totalOtherExpenses)}</span></p>
-                <p class="text-right">Net Profit: <span class="${netProfit >= 0 ? 'positive' : 'negative'}">${formatCurrency(netProfit)}</span></p>
-            </div>
-        `;
+        // Add Direct Expenses if available
+        if (report_data.direct_expenses && report_data.direct_expenses.length > 0) {
+            printContent += `
+                <tr>
+                    <td colspan="2" class="section-heading">DIRECT EXPENSES</td>
+                </tr>
+            `;
+            
+            report_data.direct_expenses.forEach(account => {
+                const amount = account.dr_amount - account.cr_amount;
+                printContent += `
+                    <tr>
+                        <td>${account.account_name}</td>
+                        <td class="text-right">${formatCurrency({ amount })}</td>
+                    </tr>
+                `;
+            });
+        }
 
-        // Complete the HTML content
+        // Add Net Income row
         printContent += `
+            <tr class="total-row">
+                <td class="text-right">Net Income</td>
+                <td class="text-right">${formatCurrency({ amount: netProfit })}</td>
+            </tr>
+            </tbody>
+            </table>
             </body>
             </html>
         `;
@@ -329,49 +269,68 @@ export default function IncomeStatement({ report_data, date1, date2, business_na
                                 <Button variant="outline" onClick={handleExport}>Export</Button>
                             </div>
 
-                            <div className="rounded-md border printable-table mt-4">
-                                {/* Income Section */}
-                                {renderAccountTypeTable(report_data, 'sales_and_income', 'Sales and Income', false)}
-
-                                {/* Income Summary */}
-                                <Table className="mt-2">
-                                    <TableBody>
-                                        <SummaryRow label="Total Income:" value={totalIncome} positive={true} />
-                                    </TableBody>
-                                </Table>
-
-                                {/* Cost of Sales Section */}
-                                {renderAccountTypeTable(report_data, 'cost_of_sale', 'Cost Of Sale', true)}
-
-                                {/* Gross Profit Summary */}
-                                <Table className="mt-2">
-                                    <TableBody>
-                                        <SummaryRow label="Less: Cost of Sales:" value={totalCostOfSales} positive={false} />
-                                        <SummaryRow label="Gross Profit:" value={grossProfit} isTotal={true} positive={grossProfit >= 0} />
-                                    </TableBody>
-                                </Table>
-
-                                {/* Direct Expenses Section */}
-                                {renderAccountTypeTable(report_data, 'direct_expenses', 'Direct Expenses', true)}
-
-                                {/* Operating Profit Summary */}
-                                <Table className="mt-2">
-                                    <TableBody>
-                                        <SummaryRow label="Less: Direct Expenses:" value={totalDirectExpenses} positive={false} />
-                                        <SummaryRow label="Operating Profit:" value={operatingProfit} isTotal={true} positive={operatingProfit >= 0} />
-                                    </TableBody>
-                                </Table>
-
-                                {/* Other Expenses Section */}
-                                {renderAccountTypeTable(report_data, 'other_expenses', 'Other Expenses', true)}
-
-                                {/* Net Profit Summary - Final Result */}
-                                <Table className="mt-8">
-                                    <TableBody>
-                                        <SummaryRow label="Less: Other Expenses:" value={totalOtherExpenses} positive={false} />
-                                        <SummaryRow label="Net Profit:" value={netProfit} isTotal={true} positive={netProfit >= 0} />
-                                    </TableBody>
-                                </Table>
+                            <div className="rounded-md border printable-table mt-4 p-4">
+                                <table className="w-full !text-[12px]">
+                                    <tbody>
+                                        {/* SALES AND INCOME SECTION */}
+                                        <SectionHeading>SALES AND INCOME</SectionHeading>
+                                        
+                                        {report_data.sales_and_income && report_data.sales_and_income.map(account => (
+                                            <tr key={account.id}>
+                                                <td className="py-1">{account.account_name}</td>
+                                                <td className="text-right py-1">{formatCurrency({ amount: account.cr_amount - account.dr_amount })}</td>
+                                            </tr>
+                                        ))}
+                                        
+                                        {/* COST OF SALE SECTION */}
+                                        <SectionHeading>COST OF SALE</SectionHeading>
+                                        
+                                        {report_data.cost_of_sale && report_data.cost_of_sale.map(account => (
+                                            <tr key={account.id}>
+                                                <td className="py-1">{account.account_name}</td>
+                                                <td className="text-right py-1">{formatCurrency({ amount: account.dr_amount - account.cr_amount })}</td>
+                                            </tr>
+                                        ))}
+                                        
+                                        <SectionTotal 
+                                            label="Gross Profit" 
+                                            value={formatCurrency({ amount: grossProfit })} 
+                                            underlined={true}
+                                            bold={true}
+                                        />
+                                        
+                                        {/* OTHER EXPENSES SECTION */}
+                                        <SectionHeading>OTHER EXPENSES</SectionHeading>
+                                        
+                                        {report_data.other_expenses && report_data.other_expenses.map(account => (
+                                            <tr key={account.id}>
+                                                <td className="py-1">{account.account_name}</td>
+                                                <td className="text-right py-1">{formatCurrency({ amount: account.dr_amount - account.cr_amount })}</td>
+                                            </tr>
+                                        ))}
+                                        
+                                        {/* DIRECT EXPENSES SECTION (if needed) */}
+                                        {report_data.direct_expenses && report_data.direct_expenses.length > 0 && (
+                                            <>
+                                                <SectionHeading>DIRECT EXPENSES</SectionHeading>
+                                                {report_data.direct_expenses.map(account => (
+                                                    <tr key={account.id}>
+                                                        <td className="py-1">{account.account_name}</td>
+                                                        <td className="text-right py-1">{formatCurrency({ amount: account.dr_amount - account.cr_amount })}</td>
+                                                    </tr>
+                                                ))}
+                                            </>
+                                        )}
+                                        
+                                        {/* NET INCOME */}
+                                        <SectionTotal 
+                                            label="Net Income" 
+                                            value={formatCurrency({ amount: netProfit })} 
+                                            underlined={true}
+                                            bold={true}
+                                        />
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
