@@ -27,6 +27,7 @@ export default function POS({ products, categories, currencies, accounts, custom
   // State to track which category is currently active
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [lastInputTime, setLastInputTime] = useState(0);
 
   const { data, setData, post, processing, errors, reset } = useForm({
     customer_id: "",
@@ -352,6 +353,7 @@ export default function POS({ products, categories, currencies, accounts, custom
   };
 
   // Filter products based on active category and search query
+
   const filteredProducts = products.filter(product => {
     // If search query exists, filter by name/code search
     if (searchQuery.trim() !== "") {
@@ -443,7 +445,44 @@ export default function POS({ products, categories, currencies, accounts, custom
             placeholder="search product / name / item code / scan bar code"
             className="flex-1"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              
+              // Record time of input for barcode detection
+              const currentTime = new Date().getTime();
+              const timeSinceLastInput = currentTime - lastInputTime;
+              setLastInputTime(currentTime);
+              
+              // If typing is very fast (like from a barcode scanner)
+              // and the input has sufficient length to be a barcode
+              if (timeSinceLastInput < 50 && e.target.value.length > 5) {
+                // Try to find exact product match for the barcode
+                const exactProduct = products.find(product => 
+                  product.code === e.target.value.trim()
+                );
+                
+                if (exactProduct) {
+                  // Found exact match, add to cart immediately
+                  addToCart(exactProduct);
+                  // Clear the search input
+                  setTimeout(() => setSearchQuery(''), 100);
+                }
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                // When Enter is pressed, check for exact barcode match
+                const exactProduct = products.find(product => 
+                  product.code === searchQuery.trim()
+                );
+                
+                if (exactProduct) {
+                  addToCart(exactProduct);
+                  setSearchQuery('');
+                  e.preventDefault();
+                }
+              }
+            }}
           />
 
           <div className="flex flex-wrap items-center gap-2">
