@@ -7,6 +7,8 @@ use App\Mail\GeneralMail;
 use App\Models\AuditLog;
 use App\Models\Business;
 use App\Models\BusinessSetting;
+use App\Models\Currency;
+use App\Models\Tax;
 use App\Utilities\Overrider;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -75,6 +77,8 @@ class BusinessSettingsController extends Controller
         ];
 
         $invoiceColumns = json_decode(get_setting($business->systemSettings, 'invoice_column', null, $id));
+        $taxes = Tax::all();
+        $currencies = Currency::all();
 
         $data = [
             'business' => $business,
@@ -84,7 +88,9 @@ class BusinessSettingsController extends Controller
             'languages' => $languages,
             'financial_years' => $financial_years,
             'activeTab' => $tab,
-            'invoiceColumns' => $invoiceColumns
+            'invoiceColumns' => $invoiceColumns,
+            'currencies' => $currencies,
+            'taxes' => $taxes
         ];
 
         // Render the appropriate component based on the active tab
@@ -103,6 +109,8 @@ class BusinessSettingsController extends Controller
                 return Inertia::render('Backend/User/Business/Settings/SalesReturn', $data);
             case 'purchase_return':
                 return Inertia::render('Backend/User/Business/Settings/PurchaseReturn', $data);
+            case 'pos_settings':
+                return Inertia::render('Backend/User/Business/Settings/PosSettings', $data);
             default:
                 return Inertia::render('Backend/User/Business/Settings/General', $data);
         }

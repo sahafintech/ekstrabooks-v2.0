@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import InputError from "@/Components/InputError";
 import { Textarea } from "@/Components/ui/textarea";
 
-export default function General({ business, id, activeTab }) {
+export default function SalesReturn({ business, id, activeTab }) {
     const { data, setData, post, processing, errors } = useForm({
         // Sales Return Settings
         sales_return_title: business?.system_settings?.find((setting) => setting.name === "sales_return_title")?.value || "Sales Return",
@@ -40,6 +40,7 @@ export default function General({ business, id, activeTab }) {
         { id: "bill_invoice", label: "Bill", icon: "📑", url: route("business.settings", [business.id, "bill_invoice"]) },
         { id: "sales_return", label: "Sales Return", icon: "🔄", url: route("business.settings", [business.id, "sales_return"]) },
         { id: "purchase_return", label: "Purchase Return", icon: "⬅️", url: route("business.settings", [business.id, "purchase_return"]) },
+        { id: "pos_settings", label: "POS Settings", icon: "⬅️", url: route("business.settings", [business.id, "pos_settings"]) },
     ];
 
     return (

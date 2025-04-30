@@ -845,6 +845,10 @@ class ReceiptController extends Controller
         $holdList = HoldPosInvoice::with('items')->get();
         $todayList = Receipt::where('receipt_date', date('Y-m-d'))->get();
         $prescriptionProducts = PrescriptionProduct::with('items', 'prescription')->where('status', 0)->get();
+        $pos_default_taxes = json_decode(get_business_option('pos_default_taxes', []), true);
+        $pos_product_image = get_business_option('pos_product_image', 0);
+        $pos_default_currency_change = get_business_option('pos_default_currency_change', "");
+        $taxes = Tax::all();
 
         return Inertia::render('Backend/User/Pos/Pos', [
             'products' => $products,
@@ -856,7 +860,11 @@ class ReceiptController extends Controller
             'baseCurrency' => $baseCurrency,
             'holdList' => $holdList,
             'todayList' => $todayList,
-            'prescriptionProducts' => $prescriptionProducts
+            'prescriptionProducts' => $prescriptionProducts,
+            'pos_default_taxes' => $pos_default_taxes,
+            'pos_product_image' => $pos_product_image,
+            'pos_default_currency_change' => $pos_default_currency_change,
+            'taxes' => $taxes,
         ]);
     }
 

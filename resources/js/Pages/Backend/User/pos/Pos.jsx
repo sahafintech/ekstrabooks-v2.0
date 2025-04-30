@@ -23,7 +23,7 @@ import {
 import { toast } from "sonner";
 import InputError from "@/Components/InputError";
 
-export default function POS({ products, categories, currencies, accounts, customers, methods, baseCurrency, holdList, todayList, prescriptionProducts }) {
+export default function POS({ products, categories, currencies, accounts, customers, methods, baseCurrency, holdList, todayList, prescriptionProducts, pos_default_currency_change, pos_default_taxes, pos_product_image, taxes }) {
   // State to track which category is currently active
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -50,6 +50,7 @@ export default function POS({ products, categories, currencies, accounts, custom
     hold_pos_id: "",
     prescription_products_id: "",
     appointment: 0,
+    taxes: [],
   });
 
   const handleSubmit = () => {
@@ -253,8 +254,26 @@ export default function POS({ products, categories, currencies, accounts, custom
     return cartItems.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
   };
 
+  // build this once, outside of calculateTaxes
+  const taxRateMap = new Map(taxes.map(t => [t.id, Number(t.rate)]));
+
   const calculateTaxes = () => {
-    return 0
+    console.log(data.taxes)
+    return cartItems.reduce((sum, item) => {
+      const base = Number(item.quantity) * Number(item.unit_cost);
+
+      const itemTax = data.taxes.reduce((taxSum, taxIdStr) => {
+        // convert the incoming tax‐ID string to a Number
+        const taxId = Number(taxIdStr);
+
+        // look up the rate; if missing, default to 0
+        const rate = taxRateMap.get(taxId) || 0;
+
+        return taxSum + (base * rate) / 100;
+      }, 0);
+
+      return sum + itemTax;
+    }, 0);
   };
 
   const calculateDiscount = () => {
@@ -274,6 +293,20 @@ export default function POS({ products, categories, currencies, accounts, custom
     const discount = calculateDiscount();
     return (subtotal + taxes) - discount;
   };
+
+  const changeCurrency = () => {
+    if (pos_default_currency_change) {
+      setData('currency', pos_default_currency_change)
+
+      handleCurrencyChange(pos_default_currency_change)
+    }
+  }
+
+  const addTax = () => {
+    if(pos_default_taxes) {
+      setData("taxes", pos_default_taxes)
+    }
+  }
 
   useEffect(() => {
     let baseC = currencies.find(c => c.base_currency === 1);
@@ -305,7 +338,6 @@ export default function POS({ products, categories, currencies, accounts, custom
           }
         })
         .catch(error => {
-          console.error("Error fetching currency rate:", error);
           // Already set the fallback exchange rate above
         });
     }
@@ -447,20 +479,20 @@ export default function POS({ products, categories, currencies, accounts, custom
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
-              
+
               // Record time of input for barcode detection
               const currentTime = new Date().getTime();
               const timeSinceLastInput = currentTime - lastInputTime;
               setLastInputTime(currentTime);
-              
+
               // If typing is very fast (like from a barcode scanner)
               // and the input has sufficient length to be a barcode
               if (timeSinceLastInput < 50 && e.target.value.length > 5) {
                 // Try to find exact product match for the barcode
-                const exactProduct = products.find(product => 
+                const exactProduct = products.find(product =>
                   product.code === e.target.value.trim()
                 );
-                
+
                 if (exactProduct) {
                   // Found exact match, add to cart immediately
                   addToCart(exactProduct);
@@ -472,10 +504,10 @@ export default function POS({ products, categories, currencies, accounts, custom
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 // When Enter is pressed, check for exact barcode match
-                const exactProduct = products.find(product => 
+                const exactProduct = products.find(product =>
                   product.code === searchQuery.trim()
                 );
-                
+
                 if (exactProduct) {
                   addToCart(exactProduct);
                   setSearchQuery('');
@@ -732,6 +764,11 @@ export default function POS({ products, categories, currencies, accounts, custom
                     <div className="flex justify-between items-center">
                       <Label>Sub Total</Label>
                       <span className="font-medium">{formatCurrency({ amount: calculateSubtotal(), currency: data.currency })}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <Label>Tax Amount</Label>
+                      <span className="font-medium">{formatCurrency({ amount: calculateTaxes(), currency: data.currency })}</span>
                     </div>
 
                     <div className="flex justify-between items-center">
@@ -1076,7 +1113,7 @@ export default function POS({ products, categories, currencies, accounts, custom
                       min="1"
                       onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value) || 1)}
                     />
-                    <span>{formatCurrency({ amount: item.unit_cost * item.quantity })}</span>
+                    <span>{formatCurrency({ amount: item.unit_cost * item.quantity, currency: data.currency })}</span>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -1095,6 +1132,7 @@ export default function POS({ products, categories, currencies, accounts, custom
               {/* Totals section */}
               <div className="text-right space-y-1 mb-3">
                 <div>Sub Total: {formatCurrency({ amount: calculateSubtotal(), currency: data.currency })}</div>
+                <div>Tax: {formatCurrency({ amount: calculateTaxes(), currency: data.currency })}</div>
                 <div>Discount: -{formatCurrency({ amount: calculateDiscount(), currency: data.currency })}</div>
                 <div className="font-bold">Total: {renderTotal()}</div>
               </div>
@@ -1102,8 +1140,8 @@ export default function POS({ products, categories, currencies, accounts, custom
               {/* Action buttons */}
               <div className="flex flex-wrap justify-end gap-2">
                 <Button variant="default" onClick={() => handleShowPaymentModal()}>Pay</Button>
-                <Button variant="default">Tax</Button>
-                <Button variant="default" onClick={() => setShowCurrencyModal(true)}>Currency</Button>
+                <Button variant="default" onClick={() => addTax()}>Tax</Button>
+                <Button variant="default" onClick={() => changeCurrency()}>Change</Button>
                 <Button variant="default" onClick={() => setShowDiscountModal(true)}>Discount</Button>
                 <Button variant="default" onClick={handleCancel}>Cancel</Button>
                 <Button variant="default" onClick={handleHold}>Hold</Button>
@@ -1514,9 +1552,11 @@ export default function POS({ products, categories, currencies, accounts, custom
                         className="border rounded-md flex flex-col items-center justify-center text-center p-2 hover:bg-gray-50 cursor-pointer transition-colors"
                         onClick={() => addToCart(product)}
                       >
-                        <div className="w-14">
-                          <img src={`/uploads/media/${product.image}`} alt={product.name} />
-                        </div>
+                        {pos_product_image == 1 && (
+                          <div className="w-14">
+                            <img src={`/uploads/media/${product.image}`} alt={product.name} />
+                          </div>
+                        )}
                         <div className="font-medium w-full">{product.name}</div>
                         {product.code && (
                           <div className="text-xs text-gray-500">{product.code}</div>

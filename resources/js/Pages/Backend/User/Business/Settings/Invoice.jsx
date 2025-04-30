@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import InputError from "@/Components/InputError";
 import { Textarea } from "@/Components/ui/textarea";
 
-export default function General({ business, id, activeTab, invoiceColumns }) {
+export default function Invoice({ business, id, activeTab, invoiceColumns }) {
     const { data, setData, post, processing, errors } = useForm({
         // Credit Invoice Settings
         invoice_title: business?.system_settings?.find((setting) => setting.name === "invoice_title")?.value || "Credit Invoice",
@@ -42,6 +42,7 @@ export default function General({ business, id, activeTab, invoiceColumns }) {
         { id: "bill_invoice", label: "Bill", icon: "📑", url: route("business.settings", [business.id, "bill_invoice"]) },
         { id: "sales_return", label: "Sales Return", icon: "🔄", url: route("business.settings", [business.id, "sales_return"]) },
         { id: "purchase_return", label: "Purchase Return", icon: "⬅️", url: route("business.settings", [business.id, "purchase_return"]) },
+        { id: "pos_settings", label: "POS Settings", icon: "⬅️", url: route("business.settings", [business.id, "pos_settings"]) },
     ];
 
     return (

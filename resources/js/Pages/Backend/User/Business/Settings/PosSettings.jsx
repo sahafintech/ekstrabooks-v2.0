@@ -4,29 +4,29 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import PageHeader from "@/Components/PageHeader";
 import { cn } from "@/lib/utils";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { Button } from "@/Components/ui/button";
-import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
 import { toast } from "sonner";
 import InputError from "@/Components/InputError";
 import { Link } from "@inertiajs/react";
+import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
+import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import { Switch } from "@/Components/ui/switch";
 
-export default function Currency({ business, id, activeTab }) {
+export default function PosSettings({ business, id, activeTab, taxes, currencies }) {
     const { data, setData, post, processing, errors } = useForm({
         // Currency Settings
-        thousand_separator: business?.system_settings?.find((setting) => setting.name === "thousand_separator")?.value || ",",
-        decimal_separator: business?.system_settings?.find((setting) => setting.name === "decimal_separator")?.value || ".",
-        decimal_places: business?.system_settings?.find((setting) => setting.name === "decimal_places")?.value || "2",
-        currency_position: business?.system_settings?.find((setting) => setting.name === "currency_position")?.value || "left",
+        pos_default_taxes: business?.system_settings?.find((setting) => setting.name === "pos_default_taxes")?.value || "",
+        pos_default_currency_change: business?.system_settings?.find((setting) => setting.name === "pos_default_currency_change")?.value || [],
+        pos_product_image: business?.system_settings?.find((setting) => setting.name === "pos_product_image")?.value || 0,
     });
 
     const submitCurrencySettings = (e) => {
         e.preventDefault();
-        post(route("business.store_currency_settings", id), {
+        post(route("business.store_pos_settings", id), {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success("Currency settings updated successfully");
+                toast.success("POS settings updated successfully");
             },
         });
     };
@@ -77,71 +77,57 @@ export default function Currency({ business, id, activeTab }) {
                     <div>
                         <div className="max-w-3xl mx-auto">
                             <form onSubmit={submitCurrencySettings}>
-                                <h2 className="text-xl font-semibold mb-6">Currency Preferences</h2>
+                                <h2 className="text-xl font-semibold mb-6">POS Settings</h2>
 
                                 <div className="grid grid-cols-12 mb-4">
-                                    <Label htmlFor="currency_position" className="col-span-3 flex items-center">
-                                        Currency Position
+                                    <Label htmlFor="pos_default_taxes" className="col-span-3 flex items-center">
+                                        Default Taxes
                                     </Label>
-                                    <div className="col-span-9">
-                                        <Select
-                                            value={data.currency_position}
-                                            onValueChange={(value) => setData("currency_position", value)}
-                                        >
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder="Select currency position" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="left">Left</SelectItem>
-                                                <SelectItem value="right">Right</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <InputError message={errors.currency_position} className="mt-1" />
+                                    <div className="col-span-9 ml-4">
+                                        <SearchableMultiSelectCombobox
+                                            options={taxes?.map(tax => ({
+                                                id: tax.id,
+                                                name: `${tax.name} (${tax.rate}%)`
+                                            }))}
+                                            value={data.pos_default_taxes}
+                                            onChange={(values) => setData("pos_default_taxes", values)}
+                                            placeholder="Select taxes"
+                                        />
+                                        <InputError message={errors.pos_default_taxes} className="mt-1" />
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-12 mb-4">
-                                    <Label htmlFor="thousand_separator" className="col-span-3 flex items-center">
-                                        Thousand Separator
+                                    <Label htmlFor="pos_default_currency_change" className="col-span-3 flex items-center">
+                                        Default Currency Change
                                     </Label>
-                                    <div className="col-span-9">
-                                        <Input
-                                            type="text"
-                                            value={data.thousand_separator}
-                                            onChange={(e) => setData("thousand_separator", e.target.value)}
-                                            className="w-full"
+                                    <div className="col-span-9 ml-4">
+                                        <SearchableCombobox
+                                            options={currencies?.map(currency => ({
+                                                id: currency.name,
+                                                value: currency.name,
+                                                label: currency.name,
+                                                name: `${currency.name} - ${currency.description} (${currency.exchange_rate})`
+                                            }))}
+                                            value={data.pos_default_currency_change}
+                                            onChange={(values) => setData("pos_default_currency_change", values)}
+                                            placeholder="Select currency"
                                         />
-                                        <InputError message={errors.thousand_separator} className="mt-1" />
+                                        <InputError message={errors.pos_default_currency_change} className="mt-1" />
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-12 mb-4">
-                                    <Label htmlFor="decimal_separator" className="col-span-3 flex items-center">
-                                        Decimal Separator
+                                <div className="grid grid-cols-12">
+                                    <Label htmlFor="pos_product_image" className="col-span-3 flex items-center">
+                                        POS Product Image
                                     </Label>
-                                    <div className="col-span-9">
-                                        <Input
-                                            type="text"
-                                            value={data.decimal_separator}
-                                            onChange={(e) => setData("decimal_separator", e.target.value)}
-                                            className="w-full"
+                                    <div className="col-span-9 ml-4">
+                                        <Switch
+                                            checked={data.pos_product_image == 1}
+                                            onCheckedChange={(checked) => setData("pos_product_image", checked ? 1 : 0)}
                                         />
-                                        <InputError message={errors.decimal_separator} className="mt-1" />
-                                    </div>
-                                </div>
 
-                                <div className="grid grid-cols-12 mb-4">
-                                    <Label htmlFor="decimal_places" className="col-span-3 flex items-center">
-                                        Decimal Places
-                                    </Label>
-                                    <div className="col-span-9">
-                                        <Input
-                                            type="text"
-                                            value={data.decimal_places}
-                                            onChange={(e) => setData("decimal_places", e.target.value)}
-                                            className="w-full"
-                                        />
-                                        <InputError message={errors.decimal_places} className="mt-1" />
+                                        <InputError message={errors.pos_product_image} className="mt-1" />
                                     </div>
                                 </div>
 

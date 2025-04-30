@@ -140,6 +140,22 @@ class BusinessSettingSeeder extends Seeder
                 'value' => '{"name":{"label":"Name","status":"1"},"description":{"status":"1"},"quantity":{"label":"Quantity","status":"1"},"price":{"label":"Price","status":"1"},"amount":{"label":"Amount","status":"1"}}',
                 'business_id' => $this->businessId
             ],
+            // Pos
+            [
+                'name' => 'pos_default_taxes',
+                'value' => "",
+                'business_id' => $this->businessId
+            ],
+            [
+                'name' => 'pos_default_currency_change',
+                'value' => '',
+                'business_id' => $this->businessId
+            ],
+            [
+                'name' => 'pos_product_image',
+                'value' => 0,
+                'business_id' => $this->businessId
+            ],
             // general
             [
                 'name' => 'fiscal_year',
