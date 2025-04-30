@@ -5,23 +5,15 @@ import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import {
-    Table,
+    ReportTable,
     TableBody,
     TableCell,
     TableHead,
     TableHeader,
     TableRow,
-} from "@/Components/ui/table";
+} from "@/Components/shared/ReportTable";
 import PageHeader from "@/Components/PageHeader";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
-import { cn, formatCurrency, parseDateObject } from "@/lib/utils";
+import { formatCurrency, parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function InventorySummary({ categories, date1, date2, business_name, currency }) {
@@ -315,7 +307,7 @@ export default function InventorySummary({ categories, date1, date2, business_na
                         </div>
 
                         <div className="rounded-md border printable-table mt-4">
-                            <Table>
+                            <ReportTable>
                                 <TableHeader>
                                     <TableRow>
                                         <TableCell colSpan={9}><strong>Inventory Summary Report by Category</strong></TableCell>
@@ -328,7 +320,7 @@ export default function InventorySummary({ categories, date1, date2, business_na
                                         <TableHead>Stock Adjustment Added</TableHead>
                                         <TableHead>Stock Adjustment Deducted</TableHead>
                                         <TableHead>Stock Balance</TableHead>
-                                        <TableHead className="text-right">Total Stock Cost</TableHead>
+                                        <TableHead>Total Stock Cost</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -358,7 +350,7 @@ export default function InventorySummary({ categories, date1, date2, business_na
                                                     <TableCell>
                                                         {getTotalStockBalance(cat)}
                                                     </TableCell>
-                                                    <TableCell>
+                                                    <TableCell className="text-right">
                                                         {formatCurrency({ amount: getTotalStockCost(cat) })}
                                                     </TableCell>
                                                 </TableRow>
@@ -372,9 +364,9 @@ export default function InventorySummary({ categories, date1, date2, business_na
                                         </TableRow>
                                     )}
                                 </TableBody>
-                            </Table>
+                            </ReportTable>
 
-                            <Table className="mt-6">
+                            <ReportTable className="mt-6">
                                 <TableHeader>
                                     <TableRow>
                                         <TableCell colSpan={9}><strong>Inventory Summary Report by Brand</strong></TableCell>
@@ -388,7 +380,7 @@ export default function InventorySummary({ categories, date1, date2, business_na
                                         <TableHead>Stock Adjustment Added</TableHead>
                                         <TableHead>Stock Adjustment Deducted</TableHead>
                                         <TableHead>Stock Balance</TableHead>
-                                        <TableHead className="text-right">Total Stock Cost</TableHead>
+                                        <TableHead>Total Stock Cost</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -423,7 +415,7 @@ export default function InventorySummary({ categories, date1, date2, business_na
                                                             <TableCell>
                                                                 {getTotalStockBalance(brand)}
                                                             </TableCell>
-                                                            <TableCell>
+                                                            <TableCell className="text-right">
                                                                 {formatCurrency({ amount: getTotalStockCost(brand) })}
                                                             </TableCell>
                                                         </TableRow>
@@ -439,7 +431,7 @@ export default function InventorySummary({ categories, date1, date2, business_na
                                         </TableRow>
                                     )}
                                 </TableBody>
-                            </Table>
+                            </ReportTable>
                         </div>
                     </div>
                 </div>

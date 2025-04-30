@@ -5,18 +5,18 @@ import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import {
-    Table,
+    ReportTable,
     TableBody,
     TableCell,
     TableHead,
     TableHeader,
     TableRow,
     TableFooter,
-} from "@/Components/ui/table";
+} from "@/Components/shared/ReportTable";
 import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
-import { cn, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 
 export default function PayrollCost({ report_data, month, year, currency }) {
     const { data, setData, post, processing } = useForm({
@@ -233,7 +233,7 @@ export default function PayrollCost({ report_data, month, year, currency }) {
                         <div className="printable-table mt-4">
                             <h2 className="text-xl font-bold mb-4">Payroll Cost - {getMonthName(data.month)} {data.year}</h2>
 
-                            <Table>
+                            <ReportTable>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead className="w-12">NO</TableHead>
@@ -278,7 +278,7 @@ export default function PayrollCost({ report_data, month, year, currency }) {
                                         <TableCell></TableCell>
                                     </TableRow>
                                 </TableFooter>
-                            </Table>
+                            </ReportTable>
                         </div>
                     </div>
                 </div>

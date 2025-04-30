@@ -5,13 +5,13 @@ import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import {
-    Table,
+    ReportTable,
     TableBody,
     TableCell,
     TableHead,
     TableHeader,
     TableRow,
-} from "@/Components/ui/table";
+} from "@/Components/shared/ReportTable";
 import {
     Select,
     SelectContent,
@@ -314,7 +314,7 @@ export default function Payables({ report_data, date1, date2, meta = {}, filters
                         </div>
 
                         <div className="rounded-md border printable-table">
-                            <Table>
+                            <ReportTable>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Purchase Date</TableHead>
@@ -361,7 +361,7 @@ export default function Payables({ report_data, date1, date2, meta = {}, filters
                                         </TableRow>
                                     )}
                                 </TableBody>
-                            </Table>
+                            </ReportTable>
                         </div>
 
                         {report_data.length > 0 && meta.total > 0 && (

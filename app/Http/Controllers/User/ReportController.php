@@ -806,19 +806,6 @@ class ReportController extends Controller
 
 		// Get currency information
 		$currency = request()->activeBusiness->currency;
-		$currency_symbol = currency_symbol($currency);
-
-		// Format currency amounts
-		foreach ($data_array as &$account) {
-			$account['debit_amount_formatted'] = formatAmount($account['debit_amount'], $currency_symbol);
-			$account['credit_amount_formatted'] = formatAmount($account['credit_amount'], $currency_symbol);
-			$account['balance_formatted'] = formatAmount($account['balance'], $currency_symbol);
-
-			foreach ($account['transactions'] as &$transaction) {
-				$transaction['transaction_amount_formatted'] = formatAmount($transaction['transaction_amount'], $currency_symbol);
-				$transaction['base_currency_amount_formatted'] = formatAmount($transaction['base_currency_amount'], $currency_symbol);
-			}
-		}
 
 		// Create paginator from filtered array
 		$page = request('page', 1);
@@ -831,11 +818,6 @@ class ReportController extends Controller
 			['path' => request()->url(), 'query' => request()->query()]
 		);
 
-		// Format grand total amounts
-		$grand_total_debit_formatted = formatAmount($grand_total_debit, $currency_symbol);
-		$grand_total_credit_formatted = formatAmount($grand_total_credit, $currency_symbol);
-		$grand_total_balance_formatted = formatAmount($grand_total_debit - $grand_total_credit, $currency_symbol);
-
 		// Get business information
 		$business_name = request()->activeBusiness->name;
 
@@ -843,9 +825,9 @@ class ReportController extends Controller
 		return Inertia::render('Backend/User/Reports/Ledger', [
 			'report_data' => $paginator->items(),
 			'currency' => $currency,
-			'grand_total_debit' => $grand_total_debit_formatted,
-			'grand_total_credit' => $grand_total_credit_formatted,
-			'grand_total_balance' => $grand_total_balance_formatted,
+			'grand_total_debit' => $grand_total_debit,
+			'grand_total_credit' => $grand_total_credit,
+			'grand_total_balance' => $grand_total_debit - $grand_total_credit,
 			'business_name' => $business_name,
 			'date1' => $date1,
 			'date2' => $date2,

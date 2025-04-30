@@ -36,7 +36,7 @@ import { formatCurrency } from "@/lib/utils";
 
 const DeleteBillModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this bill?
       </h2>
@@ -126,7 +126,7 @@ const ImportBillsModal = ({ show, onClose, onSubmit, processing }) => (
 
 const DeleteAllBillsModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected bill{count !== 1 ? 's' : ''}?
       </h2>
@@ -153,31 +153,27 @@ const DeleteAllBillsModal = ({ show, onClose, onConfirm, processing, count }) =>
 
 const BillApprovalStatusBadge = ({ status }) => {
   const statusMap = {
-    0: { label: "Pending", className: "text-gray-400" },
-    1: { label: "Approved", className: "text-green-400" },
+    0: { label: "Pending", className: "text-gray-600 bg-gray-200 px-3 py-1 rounded text-xs" },
+    1: { label: "Approved", className: "text-green-400 bg-green-200 px-3 py-1 rounded text-xs" },
   };
 
-  const { label, className } = statusMap[status] || statusMap[0];
-
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${className}`}>
-      {label}
+    <span className={statusMap[status].className}>
+      {statusMap[status].label}
     </span>
   );
 };
 
 const BillStatusBadge = ({ status }) => {
   const statusMap = {
-    0: { label: "Active", className: "text-blue-600" },
-    1: { label: "Partial Paid", className: "text-yellow-600" },
-    2: { label: "Paid", className: "text-green-600" },
+    0: { label: "Active", className: "text-blue-600 bg-blue-200 px-3 py-1 rounded text-xs" },
+    1: { label: "Partial Paid", className: "text-yellow-600 bg-yellow-200 px-3 py-1 rounded text-xs" },
+    2: { label: "Paid", className: "text-green-600 bg-green-200 px-3 py-1 rounded text-xs" },
   };
 
-  const { label, className } = statusMap[status] || statusMap[0];
-
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${className}`}>
-      {label}
+    <span className={statusMap[status].className}>
+      {statusMap[status].label}
     </span>
   );
 };
@@ -191,7 +187,7 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
   const [perPage, setPerPage] = useState(filters.per_page || 10);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
-  
+
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -292,9 +288,9 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
   const handleImport = (e) => {
     e.preventDefault();
     setProcessing(true);
-    
+
     const formData = new FormData(e.target);
-    
+
     router.post(route("bill_invoices.import"), formData, {
       onSuccess: () => {
         setShowImportModal(false);

@@ -100,7 +100,7 @@ export default function Create({ customers = [], products = [] }) {
                 product_name: selectedProduct.name,
                 description: selectedProduct.description || "",
                 quantity: 1,
-                unit_cost: selectedProduct.price || 0,
+                unit_cost: selectedProduct.selling_price || 0,
             });
         }
     };

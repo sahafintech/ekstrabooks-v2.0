@@ -5,13 +5,13 @@ import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import {
-    Table,
+    ReportTable,
     TableBody,
     TableCell,
     TableHead,
     TableHeader,
     TableRow,
-} from "@/Components/ui/table";
+} from "@/Components/shared/ReportTable";
 import {
     Select,
     SelectContent,
@@ -22,7 +22,7 @@ import {
 import { Input } from "@/Components/ui/input";
 import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
-import { parseDateObject } from "@/lib/utils";
+import { formatAmount, parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function GeneralJournal({ transactions, date1, date2, meta = {}, filters = {}, base_currency, business_name }) {
@@ -291,7 +291,7 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
                         </div>
 
                         <div className="rounded-md border printable-table">
-                            <Table>
+                            <ReportTable>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Date</TableHead>
@@ -318,14 +318,14 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
                                                 <TableCell>{transaction.description || 'N/A'}</TableCell>
                                                 <TableCell>{transaction.ref_type === 'receipt' ? 'cash invoice' : transaction.ref_type || 'N/A'}</TableCell>
                                                 <TableCell>{transaction.payee_name || 'N/A'}</TableCell>
+                                                <TableCell className="text-right">{formatAmount(transaction.transaction_amount) || 'N/A'}</TableCell>
+                                                <TableCell className="text-right">{transaction.dr_cr === 'dr' ? formatAmount(transaction.transaction_amount) : 0}</TableCell>
+                                                <TableCell className="text-right">{transaction.dr_cr === 'cr' ? formatAmount(transaction.transaction_amount) : 0}</TableCell>
                                                 <TableCell>{transaction.transaction_currency || 'N/A'}</TableCell>
-                                                <TableCell>{transaction.dr_cr === 'dr' ? transaction.transaction_amount : 0}</TableCell>
-                                                <TableCell>{transaction.dr_cr === 'cr' ? transaction.transaction_amount : 0}</TableCell>
-                                                <TableCell>{transaction.transaction_currency || 'N/A'}</TableCell>
-                                                <TableCell>{transaction.currency_rate || 'N/A'}</TableCell>
+                                                <TableCell className="text-right">{formatAmount(transaction.currency_rate) || 'N/A'}</TableCell>
                                                 <TableCell>{base_currency}</TableCell>
-                                                <TableCell>{transaction.dr_cr === 'dr' ? transaction.base_currency_amount : 0}</TableCell>
-                                                <TableCell>{transaction.dr_cr === 'cr' ? transaction.base_currency_amount : 0}</TableCell>
+                                                <TableCell className="text-right">{transaction.dr_cr === 'dr' ? formatAmount(transaction.base_currency_amount) : 0}</TableCell>
+                                                <TableCell className="text-right">{transaction.dr_cr === 'cr' ? formatAmount(transaction.base_currency_amount) : 0}</TableCell>
                                             </TableRow>
                                         ))
                                     ) : (
@@ -336,7 +336,7 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
                                         </TableRow>
                                     )}
                                 </TableBody>
-                            </Table>
+                            </ReportTable>
                         </div>
 
                         {transactions.length > 0 && meta.total > 0 && (

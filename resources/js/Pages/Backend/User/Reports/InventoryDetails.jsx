@@ -5,13 +5,13 @@ import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import {
-    Table,
+    ReportTable,
     TableBody,
     TableCell,
     TableHead,
     TableHeader,
     TableRow,
-} from "@/Components/ui/table";
+} from "@/Components/shared/ReportTable";
 import PageHeader from "@/Components/PageHeader";
 import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
@@ -358,7 +358,7 @@ export default function InventoryDetails({ categories, date1, date2, business_na
                         </div>
 
                         <div className="rounded-md border printable-table mt-4">
-                            <Table>
+                            <ReportTable>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Code</TableHead>
@@ -480,7 +480,7 @@ export default function InventoryDetails({ categories, date1, date2, business_na
                                         </TableRow>
                                     )}
                                 </TableBody>
-                            </Table>
+                            </ReportTable>
                         </div>
                     </div>
                 </div>

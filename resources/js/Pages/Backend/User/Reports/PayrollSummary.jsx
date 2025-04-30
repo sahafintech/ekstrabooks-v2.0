@@ -5,13 +5,13 @@ import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import {
-    Table,
+    ReportTable,
     TableBody,
     TableCell,
     TableHead,
     TableHeader,
     TableRow,
-} from "@/Components/ui/table";
+} from "@/Components/shared/ReportTable";
 import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
 import { formatCurrency } from "@/lib/utils";
@@ -195,7 +195,7 @@ export default function PayrollSummary({ report_data, month, year, currency }) {
                         <div className="printable-table mt-4">
                             <h2 className="text-xl font-bold mb-4">Payroll Summary - {getMonthName(data.month)} {data.year}</h2>
 
-                            <Table>
+                            <ReportTable>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead className="w-1/2">Pay Component</TableHead>
@@ -224,7 +224,7 @@ export default function PayrollSummary({ report_data, month, year, currency }) {
                                         <TableCell>{formatCurrency({ amount: report_data.total_tax || 0, currency })}</TableCell>
                                     </TableRow>
                                 </TableBody>
-                            </Table>
+                            </ReportTable>
 
                             <div className="mt-8">
                                 <h3 className="text-lg font-medium mb-2">Summary</h3>

@@ -5,13 +5,13 @@ import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import {
-    Table,
+    ReportTable,
     TableBody,
     TableCell,
     TableHead,
     TableHeader,
     TableRow,
-} from "@/Components/ui/table";
+} from "@/Components/shared/ReportTable";
 import {
     Select,
     SelectContent,
@@ -22,7 +22,7 @@ import {
 import { Input } from "@/Components/ui/input";
 import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
-import { parseDateObject } from "@/lib/utils";
+import { formatAmount, parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function Ledger({
@@ -182,9 +182,9 @@ export default function Ledger({
                 printContent += `
                     <tr>
                         <td>${account.account_number} - ${account.account_name}</td>
-                        <td class="text-right">${account.debit_amount_formatted}</td>
-                        <td class="text-right">${account.credit_amount_formatted}</td>
-                        <td class="text-right">${account.balance_formatted}</td>
+                        <td class="text-right">${account.debit_amount}</td>
+                        <td class="text-right">${account.credit_amount}</td>
+                        <td class="text-right">${account.balance}</td>
                     </tr>
                 `;
 
@@ -212,8 +212,8 @@ export default function Ledger({
                                     <td>${transaction.trans_date}</td>
                                     <td>${transaction.description}</td>
                                     <td>${transaction.reference || 'N/A'}</td>
-                                    <td class="text-right">${transaction.debit_amount_formatted}</td>
-                                    <td class="text-right">${transaction.credit_amount_formatted}</td>
+                                    <td class="text-right">${transaction.debit_amount}</td>
+                                    <td class="text-right">${transaction.credit_amount}</td>
                                 </tr>
                             `;
                     });
@@ -233,7 +233,7 @@ export default function Ledger({
                         <td>Total for ${accountType.type}</td>
                         <td class="text-right">${accountType.total_debit_formatted}</td>
                         <td class="text-right">${accountType.total_credit_formatted}</td>
-                        <td class="text-right">${accountType.balance_formatted}</td>
+                        <td class="text-right">${accountType.balance}</td>
                     </tr>
                 `;
 
@@ -354,34 +354,32 @@ export default function Ledger({
 
                         {report_data.length > 0 ? (
                             <div className="p-4">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Account</TableHead>
-                                            <TableHead className="text-right">Debit ({currency})</TableHead>
-                                            <TableHead className="text-right">Credit ({currency})</TableHead>
-                                            <TableHead className="text-right">Balance ({currency})</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
+                                <ReportTable>
                                     <TableBody>
                                         {report_data.map((account) => (
                                             <React.Fragment key={account.id}>
+                                                <TableRow className="bg-gray-200">
+                                                    <TableCell>Account</TableCell>
+                                                    <TableCell className="text-right">Debit ({currency})</TableCell>
+                                                    <TableCell className="text-right">Credit ({currency})</TableCell>
+                                                    <TableCell className="text-right">Balance ({currency})</TableCell>
+                                                </TableRow>
                                                 <TableRow>
-                                                    <TableCell>
+                                                    <TableCell className="bg-gray-100">
                                                         <div className="font-medium">
                                                             {account.account_number} - {account.account_name}
                                                         </div>
                                                     </TableCell>
-                                                    <TableCell className="text-right">{account.debit_amount_formatted}</TableCell>
-                                                    <TableCell className="text-right">{account.credit_amount_formatted}</TableCell>
-                                                    <TableCell className="text-right">{account.balance_formatted}</TableCell>
+                                                    <TableCell className="text-right bg-gray-100">{formatAmount(account.debit_amount)}</TableCell>
+                                                    <TableCell className="text-right bg-gray-100">{formatAmount(account.credit_amount)}</TableCell>
+                                                    <TableCell className="text-right bg-gray-100">{formatAmount(account.balance)}</TableCell>
                                                 </TableRow>
 
                                                 {account.transactions.length > 0 && (
                                                     <TableRow>
                                                         <TableCell colSpan={4} className="p-0">
                                                             <div className="pl-8 pb-4">
-                                                                <Table>
+                                                                <ReportTable>
                                                                     <TableHeader>
                                                                         <TableRow>
                                                                             <TableHead>Date</TableHead>
@@ -389,13 +387,13 @@ export default function Ledger({
                                                                             <TableHead>Type</TableHead>
                                                                             <TableHead>Name</TableHead>
                                                                             <TableHead>Transaction Currency</TableHead>
-                                                                            <TableHead className="text-right">Transaction Currency[Debit]</TableHead>
-                                                                            <TableHead className="text-right">Transaction Currency[Credit]</TableHead>
+                                                                            <TableHead>Transaction Currency[Debit]</TableHead>
+                                                                            <TableHead>Transaction Currency[Credit]</TableHead>
                                                                             <TableHead>Currency Rate</TableHead>
                                                                             <TableHead>Rate</TableHead>
                                                                             <TableHead>Base Currency</TableHead>
-                                                                            <TableHead className="text-right">Base Currency[Debit]</TableHead>
-                                                                            <TableHead className="text-right">Base Currency[Credit]</TableHead>
+                                                                            <TableHead>Base Currency[Debit]</TableHead>
+                                                                            <TableHead>Base Currency[Credit]</TableHead>
                                                                         </TableRow>
                                                                     </TableHeader>
                                                                     <TableBody>
@@ -404,19 +402,19 @@ export default function Ledger({
                                                                                 <TableCell>{transaction.trans_date}</TableCell>
                                                                                 <TableCell>{transaction.description}</TableCell>
                                                                                 <TableCell>{transaction.ref_type === 'receipt' ? 'Cash Invoice' : transaction.ref_type}</TableCell>
-                                                                                <TableCell className="text-right">{transaction.payee_name || 'N/A'}</TableCell>
+                                                                                <TableCell>{transaction.payee_name || 'N/A'}</TableCell>
                                                                                 <TableCell>{transaction.transaction_currency}</TableCell>
-                                                                                <TableCell className="text-right">{transaction.dr_cr === 'dr' ? transaction.transaction_amount_formatted : 0}</TableCell>
-                                                                                <TableCell className="text-right">{transaction.dr_cr === 'cr' ? transaction.transaction_amount_formatted : 0}</TableCell>
-                                                                                <TableCell className="text-right">{transaction.currency}</TableCell>
-                                                                                <TableCell className="text-right">{transaction.currency_rate}</TableCell>
+                                                                                <TableCell className="text-right">{transaction.dr_cr === 'dr' ? formatAmount(transaction.transaction_amount) : 0}</TableCell>
+                                                                                <TableCell className="text-right">{transaction.dr_cr === 'cr' ? formatAmount(transaction.transaction_amount) : 0}</TableCell>
+                                                                                <TableCell className="text-right">{transaction.transaction_currency}</TableCell>
+                                                                                <TableCell className="text-right">{formatAmount(transaction.currency_rate)}</TableCell>
                                                                                 <TableCell>{currency}</TableCell>
-                                                                                <TableCell className="text-right">{transaction.dr_cr === 'dr' ? transaction.base_currency_amount_formatted : 0}</TableCell>
-                                                                                <TableCell className="text-right">{transaction.dr_cr === 'cr' ? transaction.base_currency_amount_formatted : 0}</TableCell>
+                                                                                <TableCell className="text-right">{transaction.dr_cr === 'dr' ? formatAmount(transaction.base_currency_amount) : 0}</TableCell>
+                                                                                <TableCell className="text-right">{transaction.dr_cr === 'cr' ? formatAmount(transaction.base_currency_amount) : 0}</TableCell>
                                                                             </TableRow>
                                                                         ))}
                                                                     </TableBody>
-                                                                </Table>
+                                                                </ReportTable>
                                                             </div>
                                                         </TableCell>
                                                     </TableRow>
@@ -431,7 +429,7 @@ export default function Ledger({
                                             <TableCell className="text-right">{grand_total_balance}</TableCell>
                                         </TableRow>
                                     </TableBody>
-                                </Table>
+                                </ReportTable>
                             </div>
                         ) : (
                             <div className="rounded-md border">

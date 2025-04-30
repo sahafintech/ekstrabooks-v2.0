@@ -69,6 +69,45 @@ export function formatCurrency(amount, currency, decimalPlaces,
   }
 }
 
+export function formatAmount(amount, decimalPlaces, 
+  thousandSeparator, decimalSeparator) {
+  const settings = getSettings();
+  
+  decimalPlaces = decimalPlaces !== undefined ? decimalPlaces : settings.decimalPlace;
+  thousandSeparator = thousandSeparator || settings.thousandSep;
+  decimalSeparator = decimalSeparator || settings.decimalSep;
+  
+  if (typeof amount === 'object' && amount !== null) {
+    const options = amount;
+    return formatCurrency(
+      options.amount,
+      options.decimalPlaces !== undefined ? options.decimalPlaces : decimalPlaces,
+      options.thousandSeparator || thousandSeparator,
+      options.decimalSeparator || decimalSeparator,
+    );
+  }
+
+  const fixed = amount == null
+    ? (0).toFixed(decimalPlaces)
+    : parseFloat(amount).toFixed(decimalPlaces);
+
+  // Split into integer and decimal parts
+  const [intPart, decPart] = fixed.split('.');
+
+  // Insert thousand separators
+  const formattedInt = intPart.replace(
+    /\B(?=(\d{3})+(?!\d))/g,
+    thousandSeparator
+  );
+
+  // Build the core number string
+  const numberStr = decPart != null
+    ? `${formattedInt}${decimalSeparator}${decPart}`
+    : formattedInt;
+
+  return `${numberStr}`;
+}
+
 export function convertCurrency(amount, exchangeRate) {
   if (!exchangeRate || exchangeRate === 0) return amount;
 

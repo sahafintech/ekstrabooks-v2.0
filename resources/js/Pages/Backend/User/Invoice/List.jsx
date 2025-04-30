@@ -153,11 +153,11 @@ const DeleteAllInvoicesModal = ({ show, onClose, onConfirm, processing, count })
 
 const InvoiceStatusBadge = ({ status }) => {
   const statusMap = {
-    0: { label: "Draft", className: "text-gray-600" },
-    1: { label: "Active", className: "text-blue-600" },
-    2: { label: "Paid", className: "text-green-600" },
-    3: { label: "Partially Paid", className: "text-yellow-600" },
-    4: { label: "Canceled", className: "text-red-600" }
+    0: { label: "Draft", className: "text-gray-600 bg-gray-200 px-3 py-1 rounded text-sm" },
+    1: { label: "Active", className: "text-blue-600 bg-blue-200 px-3 py-1 rounded text-sm" },
+    2: { label: "Paid", className: "text-green-600 bg-green-200 px-3 py-1 rounded text-sm" },
+    3: { label: "Partially Paid", className: "text-yellow-600 bg-yellow-200 px-3 py-1 rounded text-sm" },
+    4: { label: "Canceled", className: "text-red-600 bg-red-200 px-3 py-1 rounded text-sm" }
   };
 
   return (

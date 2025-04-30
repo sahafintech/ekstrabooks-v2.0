@@ -5,13 +5,13 @@ import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import {
-    Table,
+    ReportTable,
     TableBody,
     TableCell,
     TableHead,
     TableHeader,
     TableRow,
-} from "@/Components/ui/table";
+} from "@/Components/shared/ReportTable";
 import {
     Select,
     SelectContent,
@@ -22,13 +22,6 @@ import {
 import { Input } from "@/Components/ui/input";
 import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon } from "lucide-react";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { formatCurrency, parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
@@ -307,7 +300,7 @@ export default function IncomeByCustomer({ report_data, date1, date2, meta = {},
                         </div>
 
                         <div className="rounded-md border printable-table">
-                            <Table>
+                            <ReportTable>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Customer</TableHead>
@@ -342,7 +335,7 @@ export default function IncomeByCustomer({ report_data, date1, date2, meta = {},
                                         </TableRow>
                                     )}
                                 </TableBody>
-                            </Table>
+                            </ReportTable>
                         </div>
 
                         {report_data.length > 0 && meta.total > 0 && (
