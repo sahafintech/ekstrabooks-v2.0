@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Head, usePage, router } from "@inertiajs/react";
+import { router } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import {
@@ -29,12 +29,9 @@ import {
     Line,
     LineChart,
     ResponsiveContainer,
-    Area,
-    AreaChart,
     PieChart,
     Pie,
     Cell,
-    Label,
 } from "recharts";
 import {
     ChartContainer,
@@ -43,6 +40,7 @@ import {
 } from "@/components/ui/chart";
 import TableWrapper from "@/Components/shared/TableWrapper";
 import PageHeader from "@/Components/PageHeader";
+import { formatAmount, formatCurrency } from "@/lib/utils";
 
 export default function DashboardInventory({
     dashboard_type = 'inventory',
@@ -104,28 +102,28 @@ export default function DashboardInventory({
     const statsCards = [
         {
             title: "Total Stock Value",
-            value: `${inventory_value}`,
+            value: `${formatCurrency(inventory_value)}`,
             description: "Current inventory value",
             icon: BoxIcon,
             iconColor: "text-blue-500"
         },
         {
             title: "Low Stock Items",
-            value: low_stock_products,
+            value: formatAmount(low_stock_products),
             description: "Items below threshold",
             icon: AlertTriangle,
             iconColor: "text-yellow-500"
         },
         {
             title: "Items Sold",
-            value: stock_movements.sales,
+            value: formatAmount(stock_movements.sales),
             description: "Total units sold (days)",
             icon: ShoppingCart,
             iconColor: "text-green-500"
         },
         {
             title: "Total Products",
-            value: total_products,
+            value: formatAmount(total_products),
             description: "Active products",
             icon: Package,
             iconColor: "text-purple-500"
@@ -136,28 +134,28 @@ export default function DashboardInventory({
     const stockMetrics = [
         {
             title: "Current Stock",
-            value: closing_stock,
+            value: formatAmount(closing_stock),
             description: "Total units in stock",
             icon: BoxIcon,
             iconColor: "text-gray-500"
         },
         {
             title: "Stock In",
-            value: stock_in,
+            value: formatAmount(stock_in),
             description: "Total units received",
             icon: ArrowUp,
             iconColor: "text-green-500"
         },
         {
             title: "Stock Out",
-            value: stock_out,
+            value: formatAmount(stock_out),
             description: "Total units out",
             icon: ArrowDown,
             iconColor: "text-red-500"
         },
         {
             title: "Stock Turnover",
-            value: `${stock_turnover_rate}%`,
+            value: `${formatAmount(stock_turnover_rate)}%`,
             description: "Turnover rate",
             icon: RefreshCw,
             iconColor: "text-blue-500"
@@ -283,37 +281,55 @@ export default function DashboardInventory({
                             ))}
                         </div>
 
-                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-                            {/* Stock Movement Trends */}
-                            <div className="col-span-4 flex flex-col rounded-lg bg-background p-6 shadow-sm mt-3">
+                        <div className="grid auto-rows-min gap-2 md:grid-cols-2">
+                            <div className="flex flex-col gap-2 rounded-lg bg-background p-4 shadow-sm">
                                 <div>
                                     <div className="text-lg font-semibold">Stock Movement Trends</div>
                                     <div className="text-sm text-muted-foreground">Monthly Overview</div>
                                 </div>
                                 <div className="flex-1">
-                                    <ResponsiveContainer width="100%" height={300}>
-                                        <BarChart data={stockMovementData}>
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis dataKey="date" />
-                                            <YAxis />
-                                            <Tooltip />
+                                    <ChartContainer config={chartConfig}>
+                                        <BarChart accessibilityLayer data={stockMovementData}>
+                                            <CartesianGrid vertical={false} />
+                                            <XAxis
+                                                dataKey="date"
+                                                tickLine={false}
+                                                tickMargin={10}
+                                                axisLine={false}
+                                            />
+                                            <YAxis
+                                                tickLine={false}
+                                                axisLine={false}
+                                            />
+                                            <ChartTooltip
+                                                cursor={false}
+                                                content={<ChartTooltipContent indicator="dashed" />}
+                                            />
                                             <Legend />
-                                            <Bar dataKey="Stock In" fill={chartConfig.stockIn.color} />
-                                            <Bar dataKey="Stock Out" fill={chartConfig.stockOut.color} />
+                                            <Bar
+                                                dataKey="Stock In"
+                                                fill={chartConfig.stockIn.color}
+                                                radius={4}
+                                            />
+                                            <Bar
+                                                dataKey="Stock Out"
+                                                fill={chartConfig.stockOut.color}
+                                                radius={4}
+                                            />
                                         </BarChart>
-                                    </ResponsiveContainer>
+                                    </ChartContainer>
                                 </div>
                             </div>
 
                             {/* Stock Distribution */}
-                            <div className="col-span-3 flex flex-col rounded-lg bg-background p-6 shadow-sm mt-3">
+                            <div className="flex flex-col gap-2 rounded-lg bg-background p-4 shadow-sm">
                                 <div>
                                     <div className="text-lg font-semibold">Stock Distribution</div>
                                     <div className="text-sm text-muted-foreground">Current Status</div>
                                 </div>
                                 <div className="flex-1">
-                                    <ResponsiveContainer width="100%" height={300}>
-                                        <PieChart>
+                                    <ChartContainer config={chartConfig}>
+                                        <PieChart accessibilityLayer>
                                             <Pie
                                                 data={stockDistribution}
                                                 dataKey="value"
@@ -321,58 +337,102 @@ export default function DashboardInventory({
                                                 cx="50%"
                                                 cy="50%"
                                                 outerRadius={100}
-                                                label
+                                                labelLine={false}
+                                                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(1)}%`}
                                             >
                                                 <Cell fill={chartConfig.healthy.color} />
                                                 <Cell fill={chartConfig.low.color} />
                                                 <Cell fill={chartConfig.outOfStock.color} />
                                             </Pie>
-                                            <Tooltip />
+                                            <ChartTooltip
+                                                cursor={false}
+                                                content={<ChartTooltipContent indicator="dashed" />}
+                                            />
                                             <Legend />
                                         </PieChart>
-                                    </ResponsiveContainer>
+                                    </ChartContainer>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-                            {/* Daily Stock Movement */}
-                            <div className="col-span-4 flex flex-col rounded-lg bg-background p-6 shadow-sm mt-3">
+                        <div className="grid auto-rows-min gap-2 md:grid-cols-2">
+                            <div className="flex flex-col gap-2 rounded-lg bg-background p-4 shadow-sm">
                                 <div>
                                     <div className="text-lg font-semibold">Daily Stock Movement</div>
                                     <div className="text-sm text-muted-foreground">Daily Trends</div>
                                 </div>
                                 <div className="flex-1">
-                                    <ResponsiveContainer width="100%" height={300}>
-                                        <LineChart data={stockMovementData}>
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis dataKey="date" />
-                                            <YAxis />
-                                            <Tooltip />
+                                    <ChartContainer config={chartConfig}>
+                                        <LineChart accessibilityLayer data={stockMovementData}>
+                                            <CartesianGrid vertical={false} />
+                                            <XAxis
+                                                dataKey="date"
+                                                tickLine={false}
+                                                tickMargin={10}
+                                                axisLine={false}
+                                            />
+                                            <YAxis
+                                                tickLine={false}
+                                                axisLine={false}
+                                            />
+                                            <ChartTooltip
+                                                cursor={false}
+                                                content={<ChartTooltipContent indicator="dashed" />}
+                                            />
                                             <Legend />
-                                            <Line type="monotone" dataKey="Stock In" stroke={chartConfig.stockIn.color} />
-                                            <Line type="monotone" dataKey="Stock Out" stroke={chartConfig.stockOut.color} />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="Stock In"
+                                                stroke={chartConfig.stockIn.color}
+                                                strokeWidth={2}
+                                                dot={false}
+                                            />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="Stock Out"
+                                                stroke={chartConfig.stockOut.color}
+                                                strokeWidth={2}
+                                                dot={false}
+                                            />
                                         </LineChart>
-                                    </ResponsiveContainer>
+                                    </ChartContainer>
                                 </div>
                             </div>
 
                             {/* Category-wise Stock Out */}
-                            <div className="col-span-3 flex flex-col rounded-lg bg-background p-6 shadow-sm mt-3">
+                            <div className="flex flex-col gap-2 rounded-lg bg-background p-4 shadow-sm">
                                 <div>
                                     <div className="text-lg font-semibold">Category-wise Stock Out</div>
                                     <div className="text-sm text-muted-foreground">By Category</div>
                                 </div>
                                 <div className="flex-1">
-                                    <ResponsiveContainer width="100%" height={300}>
-                                        <BarChart data={category_stock} layout="vertical">
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis type="number" />
-                                            <YAxis dataKey="name" type="category" width={100} />
-                                            <Tooltip />
-                                            <Bar dataKey="value" fill="#60a5fa" />
+                                    <ChartContainer config={chartConfig}>
+                                        <BarChart accessibilityLayer data={category_stock} layout="vertical">
+                                            <CartesianGrid horizontal={false} />
+                                            <XAxis
+                                                type="number"
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tickMargin={10}
+                                            />
+                                            <YAxis
+                                                dataKey="name"
+                                                type="category"
+                                                tickLine={false}
+                                                axisLine={false}
+                                                width={100}
+                                            />
+                                            <ChartTooltip
+                                                cursor={false}
+                                                content={<ChartTooltipContent indicator="dashed" />}
+                                            />
+                                            <Bar
+                                                dataKey="value"
+                                                fill="#60a5fa"
+                                                radius={4}
+                                            />
                                         </BarChart>
-                                    </ResponsiveContainer>
+                                    </ChartContainer>
                                 </div>
                             </div>
                         </div>
@@ -384,38 +444,35 @@ export default function DashboardInventory({
                                     <div className="text-lg font-semibold">Low Stock Alert</div>
                                     <div className="text-sm text-muted-foreground">Products below threshold</div>
                                 </div>
-                                <TableWrapper>
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>PRODUCT</TableHead>
-                                                <TableHead>CURRENT STOCK</TableHead>
-                                                <TableHead>MINIMUM LEVEL</TableHead>
-                                                <TableHead>STATUS</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {(Array.isArray(top_selling_products) ? top_selling_products : []).map((product) => (
-                                                <TableRow key={product.id}>
-                                                    <TableCell>{product.name}</TableCell>
-                                                    <TableCell>{product.stock}</TableCell>
-                                                    <TableCell>{product.minimum_stock}</TableCell>
-                                                    <TableCell>
-                                                        <span className={`px-2 py-1 rounded-full text-xs ${
-                                                            product.status === 'Out of Stock'
-                                                                ? 'bg-red-100 text-red-800'
-                                                                : product.status === 'Low Stock'
-                                                                ? 'bg-yellow-100 text-yellow-800'
-                                                                : 'bg-green-100 text-green-800'
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>PRODUCT</TableHead>
+                                            <TableHead>CURRENT STOCK</TableHead>
+                                            <TableHead>MINIMUM LEVEL</TableHead>
+                                            <TableHead>STATUS</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {(Array.isArray(top_selling_products) ? top_selling_products : []).map((product) => (
+                                            <TableRow key={product.id}>
+                                                <TableCell>{product.name}</TableCell>
+                                                <TableCell>{product.stock}</TableCell>
+                                                <TableCell>{product.minimum_stock}</TableCell>
+                                                <TableCell>
+                                                    <span className={`px-2 py-1 rounded-full text-xs ${product.status === 'Out of Stock'
+                                                        ? 'bg-red-100 text-red-800'
+                                                        : product.status === 'Low Stock'
+                                                            ? 'bg-yellow-100 text-yellow-800'
+                                                            : 'bg-green-100 text-green-800'
                                                         }`}>
-                                                            {product.status}
-                                                        </span>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </TableWrapper>
+                                                        {product.status}
+                                                    </span>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
                             </div>
 
                             {/* Top Selling Products */}
@@ -425,15 +482,33 @@ export default function DashboardInventory({
                                     <div className="text-sm text-muted-foreground">Most sold items</div>
                                 </div>
                                 <div className="flex-1 h-[300px]">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={top_selling_products} layout="vertical">
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis type="number" />
-                                            <YAxis dataKey="name" type="category" width={120} />
-                                            <Tooltip />
-                                            <Bar dataKey="invoice_items_sum_quantity" fill="#60a5fa" />
+                                    <ChartContainer config={chartConfig}>
+                                        <BarChart accessibilityLayer data={top_selling_products} layout="vertical">
+                                            <CartesianGrid horizontal={false} />
+                                            <XAxis
+                                                type="number"
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tickMargin={10}
+                                            />
+                                            <YAxis
+                                                dataKey="name"
+                                                type="category"
+                                                tickLine={false}
+                                                axisLine={false}
+                                                width={120}
+                                            />
+                                            <ChartTooltip
+                                                cursor={false}
+                                                content={<ChartTooltipContent indicator="dashed" />}
+                                            />
+                                            <Bar
+                                                dataKey="invoice_items_sum_quantity"
+                                                fill="#60a5fa"
+                                                radius={4}
+                                            />
                                         </BarChart>
-                                    </ResponsiveContainer>
+                                    </ChartContainer>
                                 </div>
                             </div>
                         </div>

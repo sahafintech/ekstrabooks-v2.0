@@ -1,11 +1,9 @@
-// components/DateTimePicker.jsx
 import React from "react"
 import Flatpickr from "react-flatpickr"
 import "flatpickr/dist/flatpickr.min.css"
-import { cn } from "@/lib/utils"  // shadcn’s classnames helper
+import { cn } from "@/lib/utils"
 import { usePage } from "@inertiajs/react"
 
-// match shadcn <Input> styles
 const inputClasses = `
   flex h-9 w-full 
   rounded-md border border-input px-3 py-1 text-base 
@@ -21,9 +19,11 @@ export default function DateTimePicker({
   enableTime = false,
   options = {},
   className,
+  isRange = false,
   ...rest
 }) {
   const { date_format } = usePage().props
+
   return (
     <Flatpickr
       {...rest}
@@ -31,19 +31,28 @@ export default function DateTimePicker({
       value={value}
       options={{
         enableTime,
+        mode: isRange ? "range" : "single",
         dateFormat: date_format,
         ...options,
       }}
-      // plain JSX-friendly handler:
-      onChange={([d]) => {
-        if (!d || isNaN(d)) return onChange(null)
-      
-        // shift the underlying timestamp by the offset:
-        //    getTimezoneOffset() is negative for UTC+3, so subtracting it adds 3 hours.
-        const zoneless = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-        onChange(zoneless)
+      onChange={(selectedDates) => {
+        if (isRange) {
+          if (selectedDates.length !== 2) return // wait until both dates are selected
+          if (selectedDates.some((d) => !d || isNaN(d))) {
+            return onChange(null)
+          }
+          const zonelessDates = selectedDates.map(
+            (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+          )
+          onChange(zonelessDates)
+        } else {
+          const [d] = selectedDates
+          if (!d || isNaN(d)) return onChange(null)
+          const zoneless = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+          onChange(zoneless)
+        }
       }}
-      placeholder="pick a date"
+      placeholder={isRange ? "pick a date range" : "pick a date"}
     />
   )
 }

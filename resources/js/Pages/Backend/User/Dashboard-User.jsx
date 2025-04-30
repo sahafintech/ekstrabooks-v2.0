@@ -1,11 +1,5 @@
 import { useState } from "react";
-import { Head, Link, usePage, router } from "@inertiajs/react";
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
+import { router, useForm } from "@inertiajs/react";
 import {
     Select,
     SelectContent,
@@ -13,6 +7,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import {
     Table,
     TableBody,
@@ -27,18 +22,8 @@ import {
     BarChart,
     CartesianGrid,
     XAxis,
-    YAxis,
-    Tooltip,
-    Legend,
-    Line,
-    LineChart,
-    ResponsiveContainer,
     Area,
     AreaChart,
-    PieChart,
-    Pie,
-    Cell,
-    Label,
 } from "recharts";
 import {
     ChartContainer,
@@ -49,6 +34,8 @@ import TableWrapper from "@/Components/shared/TableWrapper";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import PageHeader from "@/Components/PageHeader";
+import { formatCurrency } from "@/lib/utils";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function DashboardUser({
     dashboard_type = 'accounting',
@@ -63,10 +50,10 @@ export default function DashboardUser({
     topCustomers,
     receivables_payables,
     cashflow,
-    transactions,
 }) {
-    const [selectedRange, setSelectedRange] = useState(range || 'all');
-    const [customRange, setCustomRange] = useState(custom || '');
+    const [selectedRange, setSelectedRange] = useState(range);
+    const [customRange, setCustomRange] = useState(custom);
+    const [isCustom, setIsCustom] = useState(false);
     const [dashboardType, setDashboardType] = useState(dashboard_type);
 
     // Transform data for charts
@@ -97,11 +84,27 @@ export default function DashboardUser({
     const handleRangeChange = (value) => {
         setSelectedRange(value);
         if (value === 'custom') {
-            // Initialize date picker
-            initializeDatePicker();
+            setIsCustom(true);
         } else {
-            document.getElementById('filter_form').submit();
+            router.visit(route('dashboard.index'), {
+                preserveState: true,
+                preserveScroll: true,
+                data: {
+                    range: value,
+                }
+            });
         }
+    };
+
+    const handleDateRangeChange = (dateRange) => {
+        setCustomRange(dateRange);
+        router.visit(route('dashboard.index'), {
+            preserveState: true,
+            preserveScroll: true,
+            data: {
+                custom: dateRange
+            }
+        });
     };
 
     const handleDashboardTypeChange = (value) => {
@@ -135,7 +138,7 @@ export default function DashboardUser({
                     subpage="Dashboard"
                     url="dashboard.index"
                 />
-                <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+                <div className="flex flex-1 flex-col gap-2 p-4 pt-0">
 
                     <div className="main-content space-y-8">
                         <div className="block justify-between page-header md:flex">
@@ -145,7 +148,7 @@ export default function DashboardUser({
                                 </h3>
                             </div>
 
-                            <div className="flex items-center justify-end space-x-4">
+                            <div className="flex items-center justify-end space-x-2">
                                 <Select value={dashboardType} onValueChange={handleDashboardTypeChange}>
                                     <SelectTrigger className="w-[200px]">
                                         <SelectValue placeholder="Select dashboard type" />
@@ -156,27 +159,52 @@ export default function DashboardUser({
                                     </SelectContent>
                                 </Select>
 
-                                <Select value={selectedRange} onValueChange={handleRangeChange}>
-                                    <SelectTrigger className="w-[200px]">
-                                        <SelectValue placeholder="Select range" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Time</SelectItem>
-                                        <SelectItem value="7">Last 7 Days</SelectItem>
-                                        <SelectItem value="30">Last 30 Days</SelectItem>
-                                        <SelectItem value="60">Last 60 Days</SelectItem>
-                                        <SelectItem value="360">Last Year</SelectItem>
-                                        <SelectItem value="custom">Custom Range</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <div className="flex space-x-2">
+                                    {!isCustom && (
+                                        <Select value={selectedRange} onValueChange={handleRangeChange}>
+                                            <SelectTrigger className="w-[200px]">
+                                                <SelectValue placeholder="Select range" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">All Time</SelectItem>
+                                                <SelectItem value="7">Last 7 Days</SelectItem>
+                                                <SelectItem value="30">Last 30 Days</SelectItem>
+                                                <SelectItem value="60">Last 60 Days</SelectItem>
+                                                <SelectItem value="360">Last Year</SelectItem>
+                                                <SelectItem value="custom">Custom Range</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+
+                                    {isCustom && (
+                                        <div className="flex items-center space-x-2">
+                                            <DateTimePicker
+                                                value={customRange}
+                                                onChange={handleDateRangeChange}
+                                                className="w-[250px]"
+                                                isRange={true}
+                                            />
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    setIsCustom(false);
+                                                    setSelectedRange('all');
+                                                }}
+                                            >
+                                                Clear
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
                         {/* Dashboard Stats */}
-                        <div className="grid auto-rows-min gap-6 md:grid-cols-2 lg:grid-cols-4">
+                        <div className="grid auto-rows-min gap-2 md:grid-cols-2 lg:grid-cols-4">
                             <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm">
                                 <div className="text-sm text-muted-foreground">Total Income</div>
-                                <div className="text-xl font-semibold">{current_month_income}</div>
+                                <div className="text-xl font-semibold">{formatCurrency(current_month_income)}</div>
                                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                     <DollarSign className="h-4 w-4" />
                                     <span>Income</span>
@@ -185,7 +213,7 @@ export default function DashboardUser({
 
                             <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm">
                                 <div className="text-sm text-muted-foreground">Total Expense</div>
-                                <div className="text-xl font-semibold">{current_month_expense}</div>
+                                <div className="text-xl font-semibold">{formatCurrency(current_month_expense)}</div>
                                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                     <Wallet className="h-4 w-4" />
                                     <span>Expense</span>
@@ -194,7 +222,7 @@ export default function DashboardUser({
 
                             <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm">
                                 <div className="text-sm text-muted-foreground">Receivable</div>
-                                <div className="text-xl font-semibold">{AccountsReceivable}</div>
+                                <div className="text-xl font-semibold">{formatCurrency(AccountsReceivable)}</div>
                                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                     <CreditCard className="h-4 w-4" />
                                     <span>Receivable</span>
@@ -203,7 +231,7 @@ export default function DashboardUser({
 
                             <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm">
                                 <div className="text-sm text-muted-foreground">Payable</div>
-                                <div className="text-xl font-semibold">{AccountsPayable}</div>
+                                <div className="text-xl font-semibold">{formatCurrency(AccountsPayable)}</div>
                                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                     <CreditCard className="h-4 w-4" />
                                     <span>Payable</span>
@@ -212,8 +240,8 @@ export default function DashboardUser({
                         </div>
 
                         {/* Charts Section */}
-                        <div className="flex flex-1 flex-col gap-6 p-4 pt-0">
-                            <div className="grid auto-rows-min gap-6 md:grid-cols-2">
+                        <div className="flex flex-1 flex-col gap-2 pt-0">
+                            <div className="grid auto-rows-min gap-2 md:grid-cols-2">
                                 <div className="flex flex-col gap-2 rounded-lg bg-background p-4 shadow-sm">
                                     <div>
                                         <div className="text-lg font-semibold">Income vs Expense</div>
@@ -354,7 +382,7 @@ const RecentTransactionsTable = ({ transactions }) => (
                     <TableCell>{transaction.account.account_name}</TableCell>
                     <TableCell>{transaction.description}</TableCell>
                     <TableCell className="text-right">
-                        {transaction.base_currency_amount}
+                        {formatCurrency(transaction.base_currency_amount)}
                     </TableCell>
                 </TableRow>
             ))}

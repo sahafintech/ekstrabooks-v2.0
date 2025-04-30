@@ -10,15 +10,7 @@ import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
 import { Switch } from "@/Components/ui/switch";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function Create({ productUnits = [], categories = [], brands = [], accounts = [] }) {
   const { data, setData, post, processing, errors, reset } = useForm({
@@ -211,34 +203,12 @@ export default function Create({ productUnits = [], categories = [], brands = []
                 Expiry Date
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "md:w-1/2 w-full justify-start text-left font-normal",
-                        !data.expiry_date && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {data.expiry_date ? (
-                        format(new Date(data.expiry_date), "PPP")
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={data.expiry_date ? new Date(data.expiry_date) : undefined}
-                      onSelect={(date) =>
-                        setData("expiry_date", date ? format(date, "yyyy-MM-dd") : "")
-                      }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DateTimePicker
+                  value={data.expiry_date}
+                  onChange={(date) => setData("axpiray_date", date)}
+                  className="md:w-1/2 w-full"
+                  required
+                />
                 <InputError message={errors.expiry_date} className="text-sm" />
               </div>
             </div>

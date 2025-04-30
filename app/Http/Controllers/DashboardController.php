@@ -134,11 +134,12 @@ class DashboardController extends Controller
 
 			// income and expense widgets
 
-			$data['range'] = $request->range;
+			$data['range'] = !intval($request->range) ? 'all' : $request->range;
 			$data['custom'] = $request->custom;
 
-			$start_date = Carbon::parse(explode('to', $request->custom)[0] ?? '')->format('Y-m-d');
-			$end_date = Carbon::parse(explode('to', $request->custom)[1] ?? '')->format('Y-m-d');
+			$start_date = $request->custom[0] ?? "";
+			$end_date = $request->custom[1] ?? "";
+
 
 			$income_dr_amount = Transaction::whereHas('account', function ($query) {
 				$query->where('account_type', 'Sales')
@@ -149,7 +150,7 @@ class DashboardController extends Controller
 				->when($request->range, function ($query) use ($request) {
 					$query->where('trans_date', '>=', now()->subDays($request->range));
 				})
-				->when($request->custom, function ($query) use ($request, $start_date, $end_date) {
+				->when($request->custom, function ($query) use ($start_date, $end_date) {
 					$query->whereDate('trans_date', '>=', $start_date)
 						->whereDate('trans_date', '<=', $end_date);
 				})
@@ -164,13 +165,13 @@ class DashboardController extends Controller
 				->when($request->range, function ($query) use ($request) {
 					$query->where('trans_date', '>=', now()->subDays($request->range));
 				})
-				->when($request->custom, function ($query) use ($request, $start_date, $end_date) {
+				->when($request->custom, function ($query) use ($start_date, $end_date) {
 					$query->whereDate('trans_date', '>=', $start_date)
 						->whereDate('trans_date', '<=', $end_date);
 				})
 				->first();
 
-			$data['current_month_income'] = formatAmount(floatval($income_cr_amount->total) - floatval($income_dr_amount->total), currency_symbol(request()->activeBusiness->currency_symbol));
+			$data['current_month_income'] = floatval($income_cr_amount->total) - floatval($income_dr_amount->total);
 
 
 			$expense_dr_amount = Transaction::whereHas('account', function ($query) {
@@ -213,7 +214,7 @@ class DashboardController extends Controller
 				})
 				->first();
 
-			$data['current_month_expense'] = formatAmount(floatval($expense_dr_amount->total) - floatval($expense_cr_amount->total), currency_symbol(request()->activeBusiness->currency_symbol));
+			$data['current_month_expense'] = floatval($expense_dr_amount->total) - floatval($expense_cr_amount->total);
 
 			// income vs expense graph data
 
@@ -302,76 +303,76 @@ class DashboardController extends Controller
 				->get();
 
 			// Get products with their relationships and stock data
-            $products = Product::with(['category', 'invoice_items.invoice'])
-                ->where('business_id', $request->activeBusiness->id)
-                ->get();
+			$products = Product::with(['category', 'invoice_items.invoice'])
+				->where('business_id', $request->activeBusiness->id)
+				->get();
 
-            // Get top selling products
-            $top_selling_products = $products
-                ->map(function ($product) use ($start_date, $end_date) {
-                    $quantity_sold = $product->invoice_items
-                        ->filter(function ($item) use ($start_date, $end_date) {
-                            $invoice_date = $item->invoice->invoice_date;
-                            return $invoice_date >= $start_date && $invoice_date <= $end_date;
-                        })
-                        ->sum('quantity');
+			// Get top selling products
+			$top_selling_products = $products
+				->map(function ($product) use ($start_date, $end_date) {
+					$quantity_sold = $product->invoice_items
+						->filter(function ($item) use ($start_date, $end_date) {
+							$invoice_date = $item->invoice->invoice_date;
+							return $invoice_date >= $start_date && $invoice_date <= $end_date;
+						})
+						->sum('quantity');
 
-                    return [
-                        'id' => $product->id,
-                        'name' => $product->name,
-                        'invoice_items_sum_quantity' => $quantity_sold,
-                        'stock' => $product->stock,
-                        'minimum_stock' => $product->minimum_stock ?? 10,
-                        'status' => $product->stock <= 0 ? 'Out of Stock' : ($product->stock <= ($product->minimum_stock ?? 10) ? 'Low Stock' : 'In Stock')
-                    ];
-                })
-                ->sortByDesc('invoice_items_sum_quantity')
-                ->take(5)
-                ->values()
-                ->toArray();
+					return [
+						'id' => $product->id,
+						'name' => $product->name,
+						'invoice_items_sum_quantity' => $quantity_sold,
+						'stock' => $product->stock,
+						'minimum_stock' => $product->minimum_stock ?? 10,
+						'status' => $product->stock <= 0 ? 'Out of Stock' : ($product->stock <= ($product->minimum_stock ?? 10) ? 'Low Stock' : 'In Stock')
+					];
+				})
+				->sortByDesc('invoice_items_sum_quantity')
+				->take(5)
+				->values()
+				->toArray();
 
-            // Get low stock products
-            $low_stock_products = $products
-                ->filter(function ($product) {
-                    return $product->stock <= ($product->minimum_stock ?? 10);
-                })
-                ->map(function ($product) {
-                    return [
-                        'id' => $product->id,
-                        'name' => $product->name,
-                        'stock' => $product->stock,
-                        'minimum_stock' => $product->minimum_stock ?? 10,
-                        'status' => $product->stock <= 0 ? 'Out of Stock' : 'Low Stock'
-                    ];
-                })
-                ->take(5)
-                ->values()
-                ->toArray();
+			// Get low stock products
+			$low_stock_products = $products
+				->filter(function ($product) {
+					return $product->stock <= ($product->minimum_stock ?? 10);
+				})
+				->map(function ($product) {
+					return [
+						'id' => $product->id,
+						'name' => $product->name,
+						'stock' => $product->stock,
+						'minimum_stock' => $product->minimum_stock ?? 10,
+						'status' => $product->stock <= 0 ? 'Out of Stock' : 'Low Stock'
+					];
+				})
+				->take(5)
+				->values()
+				->toArray();
 
-            // Get category-wise stock data
-            $category_stock = $products
-                ->groupBy(function ($product) {
-                    return $product->category ? $product->category->name : 'Uncategorized';
-                })
-                ->map(function ($products, $category_name) use ($start_date, $end_date) {
-                    $total_sold = $products->sum(function ($product) use ($start_date, $end_date) {
-                        return $product->invoice_items
-                            ->filter(function ($item) use ($start_date, $end_date) {
-                                $invoice_date = $item->invoice->invoice_date;
-                                return $invoice_date >= $start_date && $invoice_date <= $end_date;
-                            })
-                            ->sum('quantity');
-                    });
+			// Get category-wise stock data
+			$category_stock = $products
+				->groupBy(function ($product) {
+					return $product->category ? $product->category->name : 'Uncategorized';
+				})
+				->map(function ($products, $category_name) use ($start_date, $end_date) {
+					$total_sold = $products->sum(function ($product) use ($start_date, $end_date) {
+						return $product->invoice_items
+							->filter(function ($item) use ($start_date, $end_date) {
+								$invoice_date = $item->invoice->invoice_date;
+								return $invoice_date >= $start_date && $invoice_date <= $end_date;
+							})
+							->sum('quantity');
+					});
 
-                    return [
-                        'name' => $category_name,
-                        'value' => $total_sold
-                    ];
-                })
-                ->sortByDesc('value')
-                ->take(10)
-                ->values()
-                ->toArray();
+					return [
+						'name' => $category_name,
+						'value' => $total_sold
+					];
+				})
+				->sortByDesc('value')
+				->take(10)
+				->values()
+				->toArray();
 
 			$data['top_selling_products'] = $top_selling_products;
 			$data['low_stock_products'] = $low_stock_products;
@@ -605,8 +606,8 @@ class DashboardController extends Controller
 
 			$data['accounts'] = get_account_details();
 
-			$data['AccountsReceivable'] = formatAmount(floatval($AccountsReceivable?->dr_amount) - floatval($AccountsReceivable?->cr_amount), currency_symbol(request()->activeBusiness->currency_symbol));
-			$data['AccountsPayable'] = formatAmount(floatval($AccountsPayable?->dr_amount) - floatval($AccountsPayable?->cr_amount), currency_symbol(request()->activeBusiness->currency_symbol));
+			$data['AccountsReceivable'] = floatval($AccountsReceivable?->dr_amount) - floatval($AccountsReceivable?->cr_amount);
+			$data['AccountsPayable'] = floatval($AccountsPayable?->dr_amount) - floatval($AccountsPayable?->cr_amount);
 
 			$data['recentTransactions'] = Transaction::whereHas('account', function ($query) {
 				$query->where(function ($query) {
@@ -883,29 +884,29 @@ class DashboardController extends Controller
 			->get();
 
 		// Initialize variables with default values
-        $date_aggregation = [
-            'type' => 'daily',
-            'format' => 'd M Y'
-        ];
-        $total_products = 0;
-        $low_stock_products = 0;
-        $out_of_stock_products = 0;
-        $inventory_value = 0;
-        $stock_in = 0;
-        $stock_out = 0;
-        $closing_stock = 0;
-        $stock_turnover_rate = 0;
-        $daily_stock_movements = [];
-        $category_stock = collect();
-        $top_selling_products = collect();
-        $most_purchased_products = collect();
+		$date_aggregation = [
+			'type' => 'daily',
+			'format' => 'd M Y'
+		];
+		$total_products = 0;
+		$low_stock_products = 0;
+		$out_of_stock_products = 0;
+		$inventory_value = 0;
+		$stock_in = 0;
+		$stock_out = 0;
+		$closing_stock = 0;
+		$stock_turnover_rate = 0;
+		$daily_stock_movements = [];
+		$category_stock = collect();
+		$top_selling_products = collect();
+		$most_purchased_products = collect();
 
 		if ($products->isNotEmpty()) {
 			// Calculate inventory statistics
 			$total_products = $products->count();
 			$low_stock_products = $products->where('stock', '<=', 10)->count();
 			$out_of_stock_products = $products->where('stock', '<=', 0)->count();
-			
+
 			// Calculate total inventory value
 			$inventory_value = $products->sum(function ($product) {
 				return $product->stock * $product->purchase_cost;
@@ -955,7 +956,7 @@ class DashboardController extends Controller
 				})
 				->values()
 				->toArray();
-			
+
 			// Get most purchased products
 			$most_purchased_products = $products->sortByDesc('purchase_items_sum_quantity')->take(5);
 
@@ -963,7 +964,7 @@ class DashboardController extends Controller
 			$days_diff = (strtotime($end_date) - strtotime($start_date)) / (60 * 60 * 24);
 			$group_by = 'DATE(date)';
 			$date_format = 'Y-m-d';
-			
+
 			if ($days_diff > 365) {
 				$group_by = "DATE_FORMAT(date, '%Y-%m')";
 				$date_format = 'Y-m';
@@ -974,7 +975,8 @@ class DashboardController extends Controller
 			}
 
 			// Optimize daily stock movements query using a single query with dynamic grouping
-			$movements = DB::select("
+			$movements = DB::select(
+				"
                 SELECT {$group_by} as date, movement_type, SUM(quantity) as total_quantity
                 FROM (
                     -- Purchases (in)
@@ -1020,54 +1022,53 @@ class DashboardController extends Controller
                     AND purchase_returns.return_date BETWEEN ? AND ?
                 ) as combined_movements
                 GROUP BY date, movement_type
-                ORDER BY date", 
-                [$start_date, $end_date, $start_date, $end_date, $start_date, $end_date, $start_date, $end_date]
-            );
+                ORDER BY date",
+				[$start_date, $end_date, $start_date, $end_date, $start_date, $end_date, $start_date, $end_date]
+			);
 
-            // Initialize and fill daily movements array
-            $daily_stock_movements = [];
-            
-            // Only create entries for dates that have movements
-            foreach ($movements as $movement) {
-                $date = $movement->date;
-                if (!isset($daily_stock_movements[$date])) {
-                    $daily_stock_movements[$date] = ['in' => 0, 'out' => 0];
-                }
-                if ($movement->movement_type === 'in') {
-                    $daily_stock_movements[$date]['in'] += $movement->total_quantity;
-                } else {
-                    $daily_stock_movements[$date]['out'] += $movement->total_quantity;
-                }
-            }
+			// Initialize and fill daily movements array
+			$daily_stock_movements = [];
 
-            // If weekly aggregation is needed (for 30-60 days range)
-            if (isset($aggregate_weekly) && $aggregate_weekly) {
-                $weekly_movements = [];
-                foreach ($daily_stock_movements as $date => $movements) {
-                    $week_start = date('Y-m-d', strtotime('monday this week', strtotime($date)));
-                    if (!isset($weekly_movements[$week_start])) {
-                        $weekly_movements[$week_start] = ['in' => 0, 'out' => 0];
-                    }
-                    $weekly_movements[$week_start]['in'] += $movements['in'];
-                    $weekly_movements[$week_start]['out'] += $movements['out'];
-                }
-                $daily_stock_movements = $weekly_movements;
-            }
+			// Only create entries for dates that have movements
+			foreach ($movements as $movement) {
+				$date = $movement->date;
+				if (!isset($daily_stock_movements[$date])) {
+					$daily_stock_movements[$date] = ['in' => 0, 'out' => 0];
+				}
+				if ($movement->movement_type === 'in') {
+					$daily_stock_movements[$date]['in'] += $movement->total_quantity;
+				} else {
+					$daily_stock_movements[$date]['out'] += $movement->total_quantity;
+				}
+			}
 
-            // Sort by date
-            ksort($daily_stock_movements);
+			// If weekly aggregation is needed (for 30-60 days range)
+			if (isset($aggregate_weekly) && $aggregate_weekly) {
+				$weekly_movements = [];
+				foreach ($daily_stock_movements as $date => $movements) {
+					$week_start = date('Y-m-d', strtotime('monday this week', strtotime($date)));
+					if (!isset($weekly_movements[$week_start])) {
+						$weekly_movements[$week_start] = ['in' => 0, 'out' => 0];
+					}
+					$weekly_movements[$week_start]['in'] += $movements['in'];
+					$weekly_movements[$week_start]['out'] += $movements['out'];
+				}
+				$daily_stock_movements = $weekly_movements;
+			}
 
-            // Add aggregation info to be used by the view
-            $date_aggregation = [
-                'type' => $days_diff > 365 ? 'monthly' : ($days_diff > 30 ? 'weekly' : 'daily'),
-                'format' => $date_format
-            ];
+			// Sort by date
+			ksort($daily_stock_movements);
 
+			// Add aggregation info to be used by the view
+			$date_aggregation = [
+				'type' => $days_diff > 365 ? 'monthly' : ($days_diff > 30 ? 'weekly' : 'daily'),
+				'format' => $date_format
+			];
 		}
 
 		return Inertia::render("Backend/User/Dashboard-Inventory", compact(
-			'range', 
-			'custom', 
+			'range',
+			'custom',
 			'dashboard_type',
 			'total_products',
 			'low_stock_products',
