@@ -88,6 +88,18 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
         );
     };
 
+    const getRefType = (ref_type) => {
+        if (ref_type == 'receipt') {
+            return 'cash invoice'
+        } else if (ref_type == 's return') {
+            return 'sales return'
+        } else if (ref_type == 's refund') {
+            return 'sales return refund'
+        } else {
+            return ref_type
+        }
+    }
+
     const renderPageNumbers = () => {
         const totalPages = meta.last_page;
         const pages = [];
@@ -314,7 +326,9 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
                                                 <TableCell className="!text-[10px]">{transaction.trans_date || 'N/A'}</TableCell>
                                                 <TableCell className="!text-[10px]">{transaction.account.account_name || 'N/A'}</TableCell>
                                                 <TableCell className="!text-[10px]">{transaction.description || 'N/A'}</TableCell>
-                                                <TableCell className="!text-[10px]">{transaction.ref_type === 'receipt' ? 'cash invoice' : transaction.ref_type || 'N/A'}</TableCell>
+                                                <TableCell className="!text-[10px]">
+                                                    {getRefType(transaction.ref_type) || 'N/A'}
+                                                </TableCell>
                                                 <TableCell className="!text-[10px]">{transaction.payee_name || 'N/A'}</TableCell>
                                                 <TableCell className="text-right !text-[10px]">{formatAmount(transaction.transaction_amount) || 'N/A'}</TableCell>
                                                 <TableCell className="text-right !text-[10px]">{transaction.dr_cr === 'dr' ? formatAmount(transaction.transaction_amount) : 0}</TableCell>

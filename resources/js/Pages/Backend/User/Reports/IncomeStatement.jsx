@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import PageHeader from "@/Components/PageHeader";
 import { formatCurrency, parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
+import { format } from "date-fns";
 
 const SectionHeading = ({ children }) => (
     <tr>
@@ -16,8 +17,8 @@ const SectionHeading = ({ children }) => (
 
 const SectionTotal = ({ label, value, underlined = false, bold = false }) => (
     <tr>
-        <td className={`text-right py-1 ${bold ? "font-bold" : ""} ${underlined ? "border-t border-black" : ""}`}>{label}</td>
-        <td className={`text-right py-1 ${bold ? "font-bold" : ""} ${underlined ? "border-t border-black" : ""}`}>{value}</td>
+        <td style={{ borderBottom: '3px double black' }} className={`text-right py-1 ${bold ? "font-bold" : ""} ${underlined ? "border-t border-black" : ""}`}>{label}</td>
+        <td style={{ borderBottom: '3px double black' }} className={`text-right py-1 ${bold ? "font-bold" : ""} ${underlined ? "border-t border-black" : ""}`}>{value}</td>
     </tr>
 );
 
@@ -189,7 +190,7 @@ export default function IncomeStatement({ report_data, date1, date2, business_na
                     <td colspan="2" class="section-heading">DIRECT EXPENSES</td>
                 </tr>
             `;
-            
+
             report_data.direct_expenses.forEach(account => {
                 const amount = account.dr_amount - account.cr_amount;
                 printContent += `
@@ -269,68 +270,79 @@ export default function IncomeStatement({ report_data, date1, date2, business_na
                                 <Button variant="outline" onClick={handleExport}>Export</Button>
                             </div>
 
-                            <div className="rounded-md border printable-table mt-4 p-4">
-                                <table className="w-full !text-[12px]">
-                                    <tbody>
-                                        {/* SALES AND INCOME SECTION */}
-                                        <SectionHeading>SALES AND INCOME</SectionHeading>
-                                        
-                                        {report_data.sales_and_income && report_data.sales_and_income.map(account => (
-                                            <tr key={account.id}>
-                                                <td className="py-1">{account.account_name}</td>
-                                                <td className="text-right py-1">{formatCurrency({ amount: account.cr_amount - account.dr_amount })}</td>
-                                            </tr>
-                                        ))}
-                                        
-                                        {/* COST OF SALE SECTION */}
-                                        <SectionHeading>COST OF SALE</SectionHeading>
-                                        
-                                        {report_data.cost_of_sale && report_data.cost_of_sale.map(account => (
-                                            <tr key={account.id}>
-                                                <td className="py-1">{account.account_name}</td>
-                                                <td className="text-right py-1">{formatCurrency({ amount: account.dr_amount - account.cr_amount })}</td>
-                                            </tr>
-                                        ))}
-                                        
-                                        <SectionTotal 
-                                            label="Gross Profit" 
-                                            value={formatCurrency({ amount: grossProfit })} 
-                                            underlined={true}
-                                            bold={true}
-                                        />
-                                        
-                                        {/* OTHER EXPENSES SECTION */}
-                                        <SectionHeading>OTHER EXPENSES</SectionHeading>
-                                        
-                                        {report_data.other_expenses && report_data.other_expenses.map(account => (
-                                            <tr key={account.id}>
-                                                <td className="py-1">{account.account_name}</td>
-                                                <td className="text-right py-1">{formatCurrency({ amount: account.dr_amount - account.cr_amount })}</td>
-                                            </tr>
-                                        ))}
-                                        
-                                        {/* DIRECT EXPENSES SECTION (if needed) */}
-                                        {report_data.direct_expenses && report_data.direct_expenses.length > 0 && (
-                                            <>
-                                                <SectionHeading>DIRECT EXPENSES</SectionHeading>
-                                                {report_data.direct_expenses.map(account => (
-                                                    <tr key={account.id}>
-                                                        <td className="py-1">{account.account_name}</td>
-                                                        <td className="text-right py-1">{formatCurrency({ amount: account.dr_amount - account.cr_amount })}</td>
-                                                    </tr>
-                                                ))}
-                                            </>
-                                        )}
-                                        
-                                        {/* NET INCOME */}
-                                        <SectionTotal 
-                                            label="Net Income" 
-                                            value={formatCurrency({ amount: netProfit })} 
-                                            underlined={true}
-                                            bold={true}
-                                        />
-                                    </tbody>
-                                </table>
+                            <div className="flex items-center justify-center">
+                                <div className="rounded-md border printable-table mt-4 p-4 w-full md:w-1/2">
+                                    <div className="text-center p-4">
+                                        <h1 className="text-lg">{business_name}</h1>
+                                        <h2 className="font-bold">Income Statement</h2>
+                                        <h2 className="flex items-center justify-center space-x-2">
+                                            <span>From {format(new Date(data.date1), "dd/MM/yyyy")}</span>
+                                            <span>To</span>
+                                            <span>{format(new Date(data.date2), "dd/MM/yyyy")}</span>
+                                        </h2>
+                                    </div>
+                                    <table className="w-full !text-[12px]">
+                                        <tbody>
+                                            {/* SALES AND INCOME SECTION */}
+                                            <SectionHeading>SALES AND INCOME</SectionHeading>
+
+                                            {report_data.sales_and_income && report_data.sales_and_income.map(account => (
+                                                <tr key={account.id}>
+                                                    <td className="py-1">{account.account_name}</td>
+                                                    <td className="text-right py-1">{formatCurrency({ amount: account.cr_amount - account.dr_amount })}</td>
+                                                </tr>
+                                            ))}
+
+                                            {/* COST OF SALE SECTION */}
+                                            <SectionHeading>COST OF SALE</SectionHeading>
+
+                                            {report_data.cost_of_sale && report_data.cost_of_sale.map(account => (
+                                                <tr key={account.id}>
+                                                    <td className="py-1">{account.account_name}</td>
+                                                    <td className="text-right py-1">{formatCurrency({ amount: account.dr_amount - account.cr_amount })}</td>
+                                                </tr>
+                                            ))}
+
+                                            <SectionTotal
+                                                label="Gross Profit"
+                                                value={formatCurrency({ amount: grossProfit })}
+                                                underlined={true}
+                                                bold={true}
+                                            />
+
+                                            {/* OTHER EXPENSES SECTION */}
+                                            <SectionHeading>OTHER EXPENSES</SectionHeading>
+
+                                            {report_data.other_expenses && report_data.other_expenses.map(account => (
+                                                <tr key={account.id}>
+                                                    <td className="py-1">{account.account_name}</td>
+                                                    <td className="text-right py-1">{formatCurrency({ amount: account.dr_amount - account.cr_amount })}</td>
+                                                </tr>
+                                            ))}
+
+                                            {/* DIRECT EXPENSES SECTION (if needed) */}
+                                            {report_data.direct_expenses && report_data.direct_expenses.length > 0 && (
+                                                <>
+                                                    <SectionHeading>DIRECT EXPENSES</SectionHeading>
+                                                    {report_data.direct_expenses.map(account => (
+                                                        <tr key={account.id}>
+                                                            <td className="py-1">{account.account_name}</td>
+                                                            <td className="text-right py-1">{formatCurrency({ amount: account.dr_amount - account.cr_amount })}</td>
+                                                        </tr>
+                                                    ))}
+                                                </>
+                                            )}
+
+                                            {/* NET INCOME */}
+                                            <SectionTotal
+                                                label="Net Income"
+                                                value={formatCurrency({ amount: netProfit })}
+                                                underlined={true}
+                                                bold={true}
+                                            />
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -875,7 +875,10 @@ class ReportController extends Controller
 			$business_name = $request->activeBusiness->name;
 
 			return Inertia::render('Backend/User/Reports/GeneralJournal', [
-				'transactions' => $transactions->items(),
+				'transactions' => $transactions->getCollection()->map(function ($transaction) {
+					$transaction->payee_name = $transaction->payee_name;
+					return $transaction;
+				}),
 				'date1' => $date1,
 				'date2' => $date2,
 				'base_currency' => $base_currency,

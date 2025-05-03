@@ -370,6 +370,14 @@ ${`
 
                         <div className="rounded-md border printable-table mt-4 p-4">
                             {/* Simple 2-column grid layout */}
+                            <div className="text-center p-4">
+                                <h1 className="text-lg">{business_name}</h1>
+                                <h2 className="font-bold">Balance Sheet</h2>
+                                <h2 className="flex items-center justify-center space-x-2">
+                                    <span>As of</span>
+                                    <span>{format(new Date(data.date2), "dd/MM/yyyy")}</span>
+                                </h2>
+                            </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 {/* Left Column - All Assets */}
                                 <div>
@@ -431,9 +439,13 @@ ${`
                                             <tbody>
                                                 <tr>
                                                     <td className="font-bold">TOTAL OF ASSETS</td>
-                                                    <td className="text-right font-bold border-t border-b border-black">
+                                                    <td
+                                                        className="text-right font-bold border-t border-black"
+                                                        style={{ borderBottom: '3px double black' }}
+                                                    >
                                                         {formatCurrency({ amount: totalAssets })}
                                                     </td>
+
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -500,7 +512,8 @@ ${`
                                             <tbody>
                                                 <tr>
                                                     <td className="font-bold">TOTAL OF LIABILITY & EQUITY</td>
-                                                    <td className="text-right font-bold border-t border-b border-black">
+                                                    <td className="text-right font-bold border-t border-black"
+                                                        style={{ borderBottom: '3px double black' }}>
                                                         {formatCurrency({ amount: liabilitiesPlusEquity })}
                                                     </td>
                                                 </tr>
