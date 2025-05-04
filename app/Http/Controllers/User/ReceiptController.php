@@ -118,7 +118,7 @@ class ReceiptController extends Controller
             'accounts' => $accounts,
             'receipt_title' => $receipt_title,
             'accounts' => $accounts,
-            'base_currency' => get_business_option('base_currency')
+            'base_currency' => get_business_option('currency'),
         ]);
     }
 
@@ -136,7 +136,7 @@ class ReceiptController extends Controller
         ]);
     }
 
-    public function edit(Request $request, $id)
+    public function edit($id)
     {
         $receipt = Receipt::with(['items.taxes', 'customer'])
             ->where('id', $id)
@@ -159,6 +159,10 @@ class ReceiptController extends Controller
             $query->where('account_type', 'Bank')
                 ->orWhere('account_type', 'Cash');
         })->get();
+        $taxIds = $receipt->taxes
+            ->pluck('tax_id')
+            ->map(fn($id) => (string) $id)
+            ->toArray();
 
         return Inertia::render('Backend/User/CashInvoice/Edit', [
             'receipt' => $receipt,
@@ -168,6 +172,7 @@ class ReceiptController extends Controller
             'currencies' => $currencies,
             'taxes' => $taxes,
             'accounts' => $accounts,
+            'taxIds' => $taxIds
         ]);
     }
 
@@ -185,9 +190,7 @@ class ReceiptController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'errors' => $validator->errors()
-            ]);
+            return redirect()->route('receipts.index')->with('success')->with('success', 'Saved Successfully');
         }
 
         // if quantity is less than 1 or null then return with error
@@ -348,8 +351,8 @@ class ReceiptController extends Controller
                 $transaction->save();
             }
 
-            if (isset($request->taxes[$receiptItem->product_id])) {
-                foreach ($request->taxes[$receiptItem->product_id] as $taxId) {
+            if (isset($request->taxes)) {
+                foreach ($request->taxes as $taxId) {
                     $tax = Tax::find($taxId);
 
                     $receiptItem->taxes()->save(new ReceiptItemTax([
@@ -458,9 +461,9 @@ class ReceiptController extends Controller
             $subTotal = ($subTotal + $line_total);
 
             //Calculate Taxes
-            if (isset($request->taxes[$request->product_id[$i]])) {
-                for ($j = 0; $j < count($request->taxes[$request->product_id[$i]]); $j++) {
-                    $taxId       = $request->taxes[$request->product_id[$i]][$j];
+            if (isset($request->taxes)) {
+                for ($j = 0; $j < count($request->taxes); $j++) {
+                    $taxId       = $request->taxes[$j];
                     $tax         = Tax::find($taxId);
                     $product_tax = ($line_total / 100) * $tax->rate;
                     $taxAmount += $product_tax;
@@ -681,7 +684,7 @@ class ReceiptController extends Controller
                 $transaction->save();
             }
 
-            if (isset($request->taxes[$receiptItem->product_id])) {
+            if (isset($request->taxes)) {
                 $transaction = Transaction::where('ref_id', $receipt->id)->where('ref_type', 'receipt tax')
                     ->get();
 
@@ -689,7 +692,7 @@ class ReceiptController extends Controller
                     $taxTransaction->delete();
                 }
 
-                foreach ($request->taxes[$receiptItem->product_id] as $taxId) {
+                foreach ($request->taxes as $taxId) {
                     $tax = Tax::find($taxId);
 
                     $receiptItem->taxes()->save(new ReceiptItemTax([

@@ -135,6 +135,15 @@ export default function View({ receipt, attachments, decimalPlace }) {
                             {/* Invoice Header */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                                 <div>
+                                    {receipt.business.logo && (
+                                        <div className="mb-3">
+                                            <img 
+                                                src={`/uploads/media/${receipt.business.logo}`} 
+                                                alt="Business Logo" 
+                                                className="max-h-16 object-contain"
+                                            />
+                                        </div>
+                                    )}
                                     <h2 className="text-2xl font-bold text-primary">
                                         {receipt.business.business_name}
                                     </h2>

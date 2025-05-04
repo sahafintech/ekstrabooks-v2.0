@@ -13,15 +13,15 @@ import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { Plus, Trash2 } from "lucide-react";
+import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 
-export default function Edit({ customers = [], products = [], currencies = [], taxes = [], invoice }) {
+export default function Edit({ customers = [], products = [], currencies = [], taxes = [], invoice, taxIds }) {
   const [invoiceItems, setInvoiceItems] = useState([{
     product_id: "",
     product_name: "",
     description: "",
     quantity: 1,
     unit_cost: 0,
-    taxes: []
   }]);
 
   const [exchangeRate, setExchangeRate] = useState(1);
@@ -48,7 +48,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     description: [],
     quantity: [],
     unit_cost: [],
-    taxes: []
+    taxes: taxIds
   });
 
   // Initialize invoice items from existing invoice
@@ -60,7 +60,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
         description: item.description,
         quantity: item.quantity,
         unit_cost: item.unit_cost,
-        taxes: item.taxes || []
       }));
       setInvoiceItems(formattedItems);
     }
@@ -78,7 +77,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
       description: invoice.items.map(item => item.description),
       quantity: invoice.items.map(item => item.quantity),
       unit_cost: invoice.items.map(item => item.unit_cost),
-      taxes: invoice.items.map(item => item.taxes)
     })
 
   }, [invoice]);
@@ -97,7 +95,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     setData("description", [...data.description, ""]);
     setData("quantity", [...data.quantity, 1]);
     setData("unit_cost", [...data.unit_cost, 0]);
-    setData("taxes", [...data.taxes, []]);
   };
 
   const removeInvoiceItem = (index) => {
@@ -108,7 +105,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     setData("description", updatedItems.map(item => item.description));
     setData("quantity", updatedItems.map(item => item.quantity));
     setData("unit_cost", updatedItems.map(item => item.unit_cost));
-    setData("taxes", updatedItems.map(item => item.taxes));
   };
 
   const updateInvoiceItem = (index, field, value) => {
@@ -134,18 +130,30 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     setData("description", updatedItems.map(item => item.description));
     setData("quantity", updatedItems.map(item => item.quantity));
     setData("unit_cost", updatedItems.map(item => item.unit_cost));
-    setData("taxes", updatedItems.map(item => item.taxes));
   };
 
   const calculateSubtotal = () => {
     return invoiceItems.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
   };
 
+  // build this once, outside of calculateTaxes
+  const taxRateMap = new Map(taxes.map(t => [t.id, Number(t.rate)]));
+
   const calculateTaxes = () => {
     return invoiceItems.reduce((sum, item) => {
-      return sum + item.taxes.reduce((taxSum, tax) => {
-        return taxSum + (item.quantity * item.unit_cost * tax.rate) / 100;
+      const base = Number(item.quantity) * Number(item.unit_cost);
+
+      const itemTax = data.taxes.reduce((taxSum, taxIdStr) => {
+        // convert the incoming tax‐ID string to a Number
+        const taxId = Number(taxIdStr);
+
+        // look up the rate; if missing, default to 0
+        const rate = taxRateMap.get(taxId) || 0;
+
+        return taxSum + (base * rate) / 100;
       }, 0);
+
+      return sum + itemTax;
     }, 0);
   };
 
@@ -214,52 +222,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     setData('converted_total', convertedTotal);
   }, [data.currency, invoiceItems, data.discount_type, data.discount_value, exchangeRate]);
 
-  // Parse date strings safely for the date picker
-  const parseDate = (dateString) => {
-    if (!dateString) return undefined;
-
-    try {
-      // Handle dd/mm/yyyy format
-      if (typeof dateString === 'string' && dateString.includes('/')) {
-        const [day, month, year] = dateString.split('/');
-        const parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-
-        if (!isNaN(parsedDate.getTime())) {
-          console.log("Successfully parsed date:", dateString, "to", parsedDate);
-          return parsedDate;
-        }
-      }
-
-      // Try to parse the date directly
-      const date = new Date(dateString);
-
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
-        console.warn("Invalid date:", dateString);
-        return undefined;
-      }
-
-      console.log("Parsed date:", dateString, "to", date);
-      return date;
-    } catch (error) {
-      console.error("Error parsing date:", error, "for input:", dateString);
-      return undefined;
-    }
-  };
-
-  // Format date to display format (dd/mm/yyyy)
-  const formatDateDisplay = (date) => {
-    if (!date) return "";
-    try {
-      const parsedDate = parseDate(date);
-      if (!parsedDate) return "";
-      return format(parsedDate, "dd/MM/yyyy");
-    } catch (error) {
-      console.error("Error formatting date for display:", error);
-      return "";
-    }
-  };
-
   const renderTotal = () => {
     const total = calculateTotal();
     const selectedCurrency = currencies.find(c => c.name === data.currency);
@@ -298,31 +260,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     );
   };
 
-  const TaxSelector = ({ index }) => {
-    return (
-      <div className="col-span-12 md:col-span-2">
-        <Label>Taxes</Label>
-        <SearchableCombobox
-          multiple
-          options={taxes?.map(tax => ({
-            id: tax.id,
-            name: `${tax.name} (${tax.rate}%)`
-          })) || []}
-          value={invoiceItems[index].taxes.map(t => t.id)}
-          onChange={(values) => {
-            const updatedItems = [...invoiceItems];
-            updatedItems[index].taxes = taxes
-              .filter(tax => values.includes(tax.id))
-              .map(tax => ({ id: tax.id, rate: tax.rate }));
-            setInvoiceItems(updatedItems);
-            setData("items", updatedItems);
-          }}
-          placeholder="Select taxes"
-        />
-      </div>
-    );
-  };
-
   const submit = (e) => {
     e.preventDefault();
 
@@ -344,12 +281,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
       description: invoiceItems.map(item => item.description),
       quantity: invoiceItems.map(item => item.quantity),
       unit_cost: invoiceItems.map(item => item.unit_cost),
-      taxes: Object.fromEntries(
-        invoiceItems.map(item => [
-          item.product_id,
-          item.taxes.map(tax => tax.id)
-        ])
-      )
     };
 
     // Log the data being sent to help debug
@@ -363,8 +294,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
         // Don't reset the form after updating
       },
       onError: (errors) => {
-        console.error("Error updating invoice:", errors);
-        toast.error("Failed to update invoice");
       }
     });
   };
@@ -546,10 +475,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                       />
                     </div>
 
-                    <div className="md:col-span-3">
-                      <TaxSelector index={index} />
-                    </div>
-
                     <div className="md:col-span-2">
                       <Label>Subtotal</Label>
                       <div className="p-2 bg-white rounded text-right">
@@ -576,6 +501,26 @@ export default function Edit({ customers = [], products = [], currencies = [], t
             </div>
 
             <SidebarSeparator className="my-4" />
+
+            <div className="grid grid-cols-12 mt-2">
+              <Label htmlFor="taxes" className="md:col-span-2 col-span-12">
+                Tax
+              </Label>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                <div className="md:w-1/2 w-full">
+                  <SearchableMultiSelectCombobox
+                    options={taxes?.map(tax => ({
+                      id: tax.id,
+                      name: `${tax.name} (${tax.rate}%)`
+                    }))}
+                    value={data.taxes}
+                    onChange={(values) => setData("taxes", values)}
+                    placeholder="Select taxes"
+                  />
+                </div>
+                <InputError message={errors.taxes} className="text-sm" />
+              </div>
+            </div>
 
             <div className="grid grid-cols-12 mt-2">
               <Label htmlFor="discount_type" className="md:col-span-2 col-span-12">

@@ -13,6 +13,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import DateTimePicker from "@/Components/DateTimePicker";
+import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 
 export default function Create({ customers = [], products = [], currencies = [], taxes = [], receipt_title, accounts, base_currency }) {
   const [receiptItems, setReceiptItems] = useState([{
@@ -21,7 +22,6 @@ export default function Create({ customers = [], products = [], currencies = [],
     description: "",
     quantity: 1,
     unit_cost: 0,
-    taxes: []
   }]);
 
   const [exchangeRate, setExchangeRate] = useState(1);
@@ -58,14 +58,12 @@ export default function Create({ customers = [], products = [], currencies = [],
       description: "",
       quantity: 1,
       unit_cost: 0,
-      taxes: []
     }]);
     setData("product_id", [...data.product_id, ""]);
     setData("product_name", [...data.product_name, ""]);
     setData("description", [...data.description, ""]);
     setData("quantity", [...data.quantity, 1]);
     setData("unit_cost", [...data.unit_cost, 0]);
-    setData("taxes", [...data.taxes, []]);
   };
 
   const removeReceiptItem = (index) => {
@@ -76,7 +74,6 @@ export default function Create({ customers = [], products = [], currencies = [],
     setData("description", updatedItems.map(item => item.description));
     setData("quantity", updatedItems.map(item => item.quantity));
     setData("unit_cost", updatedItems.map(item => item.unit_cost));
-    setData("taxes", updatedItems.map(item => item.taxes));
   };
 
   const updateReceiptItem = (index, field, value) => {
@@ -102,18 +99,30 @@ export default function Create({ customers = [], products = [], currencies = [],
     setData("description", updatedItems.map(item => item.description));
     setData("quantity", updatedItems.map(item => item.quantity));
     setData("unit_cost", updatedItems.map(item => item.unit_cost));
-    setData("taxes", updatedItems.map(item => item.taxes));
   };
 
   const calculateSubtotal = () => {
     return receiptItems.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
   };
 
+  // build this once, outside of calculateTaxes
+  const taxRateMap = new Map(taxes.map(t => [t.id, Number(t.rate)]));
+
   const calculateTaxes = () => {
     return receiptItems.reduce((sum, item) => {
-      return sum + item.taxes.reduce((taxSum, tax) => {
-        return taxSum + (item.quantity * item.unit_cost * tax.rate) / 100;
+      const base = Number(item.quantity) * Number(item.unit_cost);
+
+      const itemTax = data.taxes.reduce((taxSum, taxIdStr) => {
+        // convert the incoming tax‐ID string to a Number
+        const taxId = Number(taxIdStr);
+
+        // look up the rate; if missing, default to 0
+        const rate = taxRateMap.get(taxId) || 0;
+
+        return taxSum + (base * rate) / 100;
       }, 0);
+
+      return sum + itemTax;
     }, 0);
   };
 
@@ -212,31 +221,6 @@ export default function Create({ customers = [], products = [], currencies = [],
     );
   };
 
-  const TaxSelector = ({ index }) => {
-    return (
-      <div className="col-span-12 md:col-span-2">
-        <Label>Taxes</Label>
-        <SearchableCombobox
-          multiple
-          options={taxes?.map(tax => ({
-            id: tax.id,
-            name: `${tax.name} (${tax.rate}%)`
-          })) || []}
-          value={receiptItems[index].taxes.map(t => t.id)}
-          onChange={(values) => {
-            const updatedItems = [...receiptItems];
-            updatedItems[index].taxes = taxes
-              .filter(tax => values.includes(tax.id))
-              .map(tax => ({ id: tax.id, rate: tax.rate }));
-            setReceiptItems(updatedItems);
-            setData("items", updatedItems);
-          }}
-          placeholder="Select taxes"
-        />
-      </div>
-    );
-  };
-
   const submit = (e) => {
     e.preventDefault();
 
@@ -258,12 +242,6 @@ export default function Create({ customers = [], products = [], currencies = [],
       description: receiptItems.map(item => item.description),
       quantity: receiptItems.map(item => item.quantity),
       unit_cost: receiptItems.map(item => item.unit_cost),
-      taxes: Object.fromEntries(
-        receiptItems.map(item => [
-          item.product_id,
-          item.taxes.map(tax => tax.id)
-        ])
-      )
     };
 
     // Log the data being sent to help debug
@@ -281,7 +259,6 @@ export default function Create({ customers = [], products = [], currencies = [],
           description: "",
           quantity: 1,
           unit_cost: 0,
-          taxes: []
         }]);
       },
     });
@@ -424,7 +401,7 @@ export default function Create({ customers = [], products = [], currencies = [],
               {receiptItems.map((item, index) => (
                 <div key={index} className="border rounded-lg p-4 space-y-4 bg-gray-50">
                   {/* First Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <div>
                       <Label>Product *</Label>
                       <SearchableCombobox
@@ -460,7 +437,7 @@ export default function Create({ customers = [], products = [], currencies = [],
                   </div>
 
                   {/* Second Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
                     <div className="md:col-span-6">
                       <Label>Description</Label>
                       <Textarea
@@ -470,10 +447,6 @@ export default function Create({ customers = [], products = [], currencies = [],
                       />
                     </div>
 
-                    <div className="md:col-span-3">
-                      <TaxSelector index={index} />
-                    </div>
-
                     <div className="md:col-span-2">
                       <Label>Subtotal</Label>
                       <div className="p-2 bg-white rounded mt-2 text-right">
@@ -481,7 +454,7 @@ export default function Create({ customers = [], products = [], currencies = [],
                       </div>
                     </div>
 
-                    <div className="md:col-span-1 flex items-end justify-end">
+                    <div className="md:col-span-1 flex items-center justify-end">
                       {receiptItems.length > 1 && (
                         <Button
                           type="button"
@@ -500,6 +473,26 @@ export default function Create({ customers = [], products = [], currencies = [],
             </div>
 
             <SidebarSeparator className="my-4" />
+
+            <div className="grid grid-cols-12 mt-2">
+              <Label htmlFor="taxes" className="md:col-span-2 col-span-12">
+                Tax
+              </Label>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                <div className="md:w-1/2 w-full">
+                  <SearchableMultiSelectCombobox
+                    options={taxes?.map(tax => ({
+                      id: tax.id,
+                      name: `${tax.name} (${tax.rate}%)`
+                    }))}
+                    value={data.taxes}
+                    onChange={(values) => setData("taxes", values)}
+                    placeholder="Select taxes"
+                  />
+                </div>
+                <InputError message={errors.taxes} className="text-sm" />
+              </div>
+            </div>
 
             <div className="grid grid-cols-12 mt-2">
               <Label htmlFor="discount_type" className="md:col-span-2 col-span-12">
@@ -606,7 +599,6 @@ export default function Create({ customers = [], products = [], currencies = [],
                       description: "",
                       quantity: 1,
                       unit_cost: 0,
-                      taxes: []
                     }]);
                   }}
                 >

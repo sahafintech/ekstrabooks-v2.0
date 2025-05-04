@@ -68,13 +68,13 @@ export default function View({ bill, attachments, decimalPlace }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title={`Cash Purchase #${bill.bill_no}`} />
+            <Head title={`Bill Invoices #${bill.bill_no}`} />
 
             <SidebarInset>
                 <div className="space-y-4">
                     <PageHeader
-                        page="Cash Purchases"
-                        subpage={`Cash Purchase #${bill.bill_no}`}
+                        page="Bill Invoices"
+                        subpage={`Bill Invoices #${bill.bill_no}`}
                         url="bill_invoices.index"
                     />
 

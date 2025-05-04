@@ -810,12 +810,15 @@ class SalesReturnController extends Controller
             }
 
             if (isset($request->taxes)) {
-                $returnItem->taxes()->delete();
                 $transaction = Transaction::where('ref_id', $return->id)->where('ref_type', 's return tax')
                     ->get();
-                foreach ($transaction as $t) {
-                    $t->delete();
+
+                foreach ($transaction as $trans) {
+                    $trans->delete();
                 }
+
+                $returnItem->taxes()->delete();
+
                 foreach ($request->taxes as $taxId) {
                     $tax = Tax::find($taxId);
 
@@ -1002,9 +1005,9 @@ class SalesReturnController extends Controller
             $subTotal = ($subTotal + $line_total);
 
             //Calculate Taxes
-            if (isset($request->taxes[$request->product_id[$i]])) {
-                for ($j = 0; $j < count($request->taxes[$request->product_id[$i]]); $j++) {
-                    $taxId       = $request->taxes[$request->product_id[$i]][$j];
+            if (isset($request->taxes)) {
+                for ($j = 0; $j < count($request->taxes); $j++) {
+                    $taxId       = $request->taxes[$j];
                     $tax         = Tax::find($taxId);
                     $product_tax = ($line_total / 100) * $tax->rate;
                     $taxAmount += $product_tax;

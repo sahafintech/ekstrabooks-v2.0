@@ -266,8 +266,8 @@ class CashPurchaseController extends Controller
 			]));
 
 
-			if (isset($request->taxes[$purchaseItem->product_name])) {
-				foreach ($request->taxes[$purchaseItem->product_name] as $taxId) {
+			if (isset($request->taxes)) {
+				foreach ($request->taxes as $taxId) {
 					$tax = Tax::find($taxId);
 
 					$purchaseItem->taxes()->save(new PurchaseItemTax([
@@ -527,7 +527,7 @@ class CashPurchaseController extends Controller
 		$discountAmount = 0;
 		$grandTotal = 0;
 
-		for ($i = 0; $i < count($request->product_name); $i++) {
+		for ($i = 0; $i < count($request->account_id); $i++) {
 			//Calculate Sub Total
 			$line_qnt = $request->quantity[$i];
 			$line_unit_cost = $request->unit_cost[$i];
@@ -537,9 +537,9 @@ class CashPurchaseController extends Controller
 			$subTotal = ($subTotal + $line_total);
 
 			//Calculate Taxes
-			if (isset($request->taxes[$request->product_name[$i]])) {
-				for ($j = 0; $j < count($request->taxes[$request->product_name[$i]]); $j++) {
-					$taxId = $request->taxes[$request->product_name[$i]][$j];
+			if (isset($request->taxes)) {
+				for ($j = 0; $j < count($request->taxes); $j++) {
+					$taxId = $request->taxes[$j];
 					$tax = Tax::find($taxId);
 					$product_tax = ($line_total / 100) * $tax->rate;
 					$taxAmount += $product_tax;
@@ -582,7 +582,7 @@ class CashPurchaseController extends Controller
 	 * @param  int  $id
 	 * @return \Illuminate\Http\Response
 	 */
-	public function edit(Request $request, $id)
+	public function edit($id)
 	{
 		$bill = Purchase::with(['business', 'items', 'taxes', 'vendor'])->find($id);
 
@@ -603,6 +603,10 @@ class CashPurchaseController extends Controller
 		$products = Product::all();
 		$taxes = Tax::all();
 		$inventory = Account::where('account_name', 'Inventory')->first();
+		$taxIds = $bill->taxes
+            ->pluck('tax_id')
+            ->map(fn($id) => (string) $id)
+            ->toArray();
 
 		return Inertia::render('Backend/User/CashPurchase/Edit', [
 			'bill' => $bill,
@@ -614,6 +618,7 @@ class CashPurchaseController extends Controller
 			'products' => $products,
 			'taxes' => $taxes,
 			'inventory' => $inventory,
+			'taxIds' => $taxIds
 		]);
 	}
 
@@ -815,7 +820,7 @@ class CashPurchaseController extends Controller
 			]));
 
 			if (has_permission('cash_purchases.approve') || request()->isOwner && $purchase->approval_status == 1) {
-				if (isset($request->taxes[$purchaseItem->product_name])) {
+				if (isset($request->taxes)) {
 
 					$transaction = Transaction::where('ref_id', $purchase->id)->where('ref_type', 'cash purchase tax')
 						->get();
@@ -826,7 +831,7 @@ class CashPurchaseController extends Controller
 
 					$purchaseItem->taxes()->delete();
 
-					foreach ($request->taxes[$purchaseItem->product_name] as $taxId) {
+					foreach ($request->taxes as $taxId) {
 						$tax = Tax::find($taxId);
 
 						$purchaseItem->taxes()->save(new PurchaseItemTax([

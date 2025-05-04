@@ -142,7 +142,7 @@ class QuotationController extends Controller
             'products' => $products,
             'taxes' => $taxes,
             'quotation_title' => $quotation_title,
-            'base_currency' => get_business_option('base_currency')
+            'base_currency' => get_business_option('currency')
         ]);
     }
 
@@ -469,7 +469,7 @@ class QuotationController extends Controller
         $audit->event = 'Quotation Updated' . ' ' . $quotation->quotation_number;
         $audit->save();
 
-        return redirect()->route('quotations.index')->with('success', _lang('Updated Successfully'));
+        return redirect()->route('quotations.show', $quotation->id)->with('success', _lang('Updated Successfully'));
     }
 
     /** Duplicate Invoice */

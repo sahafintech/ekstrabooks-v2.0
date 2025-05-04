@@ -288,8 +288,8 @@ class PurchaseController extends Controller
 				'account_id' => $request->account_id[$i],
 			]));
 
-			if (isset($request->taxes[$purchaseItem->product_name])) {
-				foreach ($request->taxes[$purchaseItem->product_name] as $taxId) {
+			if (isset($request->taxes)) {
+				foreach ($request->taxes as $taxId) {
 					$tax = Tax::find($taxId);
 
 					$purchaseItem->taxes()->save(new PurchaseItemTax([
@@ -580,6 +580,10 @@ class PurchaseController extends Controller
 		$products = Product::all();
 		$taxes = Tax::all();
 		$inventory = Account::where('account_name', 'Inventory')->first();
+		$taxIds = $bill->taxes
+            ->pluck('tax_id')
+            ->map(fn($id) => (string) $id)
+            ->toArray();
 
 		return Inertia::render('Backend/User/Bill/Edit', [
 			'bill' => $bill,
@@ -590,6 +594,7 @@ class PurchaseController extends Controller
 			'products' => $products,
 			'taxes' => $taxes,
 			'inventory' => $inventory,
+			'taxIds' => $taxIds,
 		]);
 	}
 
@@ -799,7 +804,7 @@ class PurchaseController extends Controller
 			]));
 
 			if (has_permission('bill_invoices.approve') || request()->isOwner && $purchase->approval_status == 1) {
-				if (isset($request->taxes[$purchaseItem->product_name])) {
+				if (isset($request->taxes)) {
 
 					$transaction = Transaction::where('ref_id', $purchase->id)->where('ref_type', 'bill invoice tax')
 						->get();
@@ -810,7 +815,7 @@ class PurchaseController extends Controller
 
 					$purchaseItem->taxes()->delete();
 
-					foreach ($request->taxes[$purchaseItem->product_name] as $taxId) {
+					foreach ($request->taxes as $taxId) {
 						$tax = Tax::find($taxId);
 
 						$purchaseItem->taxes()->save(new PurchaseItemTax([
@@ -1354,7 +1359,7 @@ class PurchaseController extends Controller
 		$discountAmount = 0;
 		$grandTotal = 0;
 
-		for ($i = 0; $i < count($request->product_id); $i++) {
+		for ($i = 0; $i < count($request->account_id); $i++) {
 			//Calculate Sub Total
 			$line_qnt = $request->quantity[$i];
 			$line_unit_cost = $request->unit_cost[$i];
@@ -1364,9 +1369,9 @@ class PurchaseController extends Controller
 			$subTotal = ($subTotal + $line_total);
 
 			//Calculate Taxes
-			if (isset($request->taxes[$request->product_id[$i]])) {
-				for ($j = 0; $j < count($request->taxes[$request->product_id[$i]]); $j++) {
-					$taxId = $request->taxes[$request->product_id[$i]][$j];
+			if (isset($request->taxes)) {
+				for ($j = 0; $j < count($request->taxes); $j++) {
+					$taxId = $request->taxes[$j];
 					$tax = Tax::find($taxId);
 					$product_tax = ($line_total / 100) * $tax->rate;
 					$taxAmount += $product_tax;

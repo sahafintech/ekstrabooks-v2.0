@@ -9,10 +9,11 @@ import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
-import { convertCurrency, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { Plus, Trash2 } from "lucide-react";
+import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 
 export default function Create({ vendors = [], products = [], currencies = [], taxes = [], accounts = [], purchase_title, inventory, base_currency }) {
   const [billItems, setBillItems] = useState([{
@@ -21,7 +22,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     description: "",
     quantity: 1,
     unit_cost: 0,
-    taxes: []
+    account_id: inventory.id
   }]);
 
   const [billAccounts, setBillAccounts] = useState([]);
@@ -54,6 +55,27 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     benificiary: "",
   });
 
+  // ------------------------------------------------
+  // Keep Inertia form arrays in sync with our two local lists
+  const syncFormArrays = () => {
+    setData("product_id", billItems.map(i => i.product_id));
+    setData("product_name", billItems.map(i => i.product_name)
+      .concat(billAccounts.map(a => a.product_name || "")));
+    setData("account_id", billAccounts.map(a => a.account_id)
+      .concat(billItems.map(a => a.account_id || "")));
+    setData("description", billItems.map(i => i.description)
+      .concat(billAccounts.map(a => a.description || "")));
+    setData("quantity", billItems.map(i => i.quantity)
+      .concat(billAccounts.map(a => a.quantity || 1)));
+    setData("unit_cost", billItems.map(i => i.unit_cost)
+      .concat(billAccounts.map(a => a.unit_cost)));
+  };
+
+  useEffect(() => {
+    syncFormArrays();
+  }, [billItems, billAccounts]);
+  // ------------------------------------------------
+
   const addBillItem = () => {
     setBillItems([...billItems, {
       product_id: "",
@@ -61,15 +83,8 @@ export default function Create({ vendors = [], products = [], currencies = [], t
       description: "",
       quantity: 1,
       unit_cost: 0,
-      taxes: [],
-      account_id: ""
+      account_id: inventory.id
     }]);
-    setData("product_id", [...data.product_id, ""]);
-    setData("product_name", [...data.product_name, ""]);
-    setData("description", [...data.description, ""]);
-    setData("quantity", [...data.quantity, 1]);
-    setData("unit_cost", [...data.unit_cost, 0]);
-    setData("taxes", [...data.taxes, []]);
   };
 
   const addBillAccount = () => {
@@ -78,76 +93,18 @@ export default function Create({ vendors = [], products = [], currencies = [], t
       unit_cost: 0,
       quantity: 1,
       description: "",
-      taxes: [],
       product_name: "" // Initialize product_name for account entries
     }]);
-    setData("account_id", [...data.account_id || [], ""]);
-    setData("unit_cost", [...data.unit_cost || [], 0]);
-
-    // Update quantity and description arrays to include new account entries
-    const updatedQuantities = [
-      ...billItems.map(item => item.quantity),
-      ...billAccounts.map(account => account.quantity || 1),
-      1  // for the new account
-    ];
-
-    const updatedDescriptions = [
-      ...billItems.map(item => item.description),
-      ...billAccounts.map(account => account.description || ""),
-      ""  // for the new account
-    ];
-
-    // Update product_name array to include new account entry
-    const updatedProductNames = [
-      ...billItems.map(item => item.product_name),
-      ...billAccounts.map(account => account.product_name || ""),
-      ""  // for the new account
-    ];
-
-    setData("quantity", updatedQuantities);
-    setData("description", updatedDescriptions);
-    setData("product_name", updatedProductNames);
   };
 
   const removeBillAccount = (index) => {
     const updatedAccounts = billAccounts.filter((_, i) => i !== index);
     setBillAccounts(updatedAccounts);
-    setData("account_id", updatedAccounts.map(account => account.account_id));
-    setData("unit_cost", updatedAccounts.map(account => account.unit_cost));
-
-    // Update quantity and description arrays after removing an account
-    setData("quantity", [
-      ...billItems.map(item => item.quantity),
-      ...updatedAccounts.map(account => account.quantity || 1)
-    ]);
-
-    setData("description", [
-      ...billItems.map(item => item.description),
-      ...updatedAccounts.map(account => account.description || "")
-    ]);
-
-    // Update product_name array after removing an account
-    setData("product_name", [
-      ...billItems.map(item => item.product_name),
-      ...updatedAccounts.map(account => account.product_name || "")
-    ]);
   };
 
   const removeInvoiceItem = (index) => {
     const updatedItems = billItems.filter((_, i) => i !== index);
     setBillItems(updatedItems);
-    setData("product_id", updatedItems.map(item => item.product_id));
-    setData("product_name", updatedItems.map(item => item.product_name));
-    setData("description", [
-      ...updatedItems.map(item => item.description),
-      ...billAccounts.map(account => account.description || "")
-    ]);
-    setData("quantity", [
-      ...updatedItems.map(item => item.quantity),
-      ...billAccounts.map(account => account.quantity || 1)
-    ]);
-    setData("unit_cost", updatedItems.map(item => item.unit_cost));
-    setData("taxes", updatedItems.map(item => item.taxes));
   };
 
   const updateInvoiceItem = (index, field, value) => {
@@ -171,13 +128,6 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     }
 
     setBillItems(updatedItems);
-    setData("product_id", updatedItems.map(item => item.product_id));
-    setData("product_name", updatedItems.map(item => item.product_name));
-    setData("description", updatedItems.map(item => item.description));
-    setData("quantity", updatedItems.map(item => item.quantity));
-    setData("unit_cost", updatedItems.map(item => item.unit_cost));
-    setData("taxes", updatedItems.map(item => item.taxes));
-    setData("account_id", updatedItems.map(item => item.account_id));
   };
 
   const calculateSubtotal = () => {
@@ -186,11 +136,20 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     return productSubtotal + accountSubtotal;
   };
 
+  // build this once, outside of calculateTaxes
+  const taxRateMap = new Map(taxes.map(t => [t.id, Number(t.rate)]));
+
   const calculateTaxes = () => {
-    return billItems.reduce((sum, item) => {
-      return sum + item.taxes.reduce((taxSum, tax) => {
-        return taxSum + (item.quantity * item.unit_cost * tax.rate) / 100;
+    // merge both lists into one
+    const allLines = [...billItems, ...billAccounts];
+
+    return allLines.reduce((sum, line) => {
+      const base = Number(line.quantity) * Number(line.unit_cost);
+      const lineTax = data.taxes.reduce((taxSum, taxIdStr) => {
+        const rate = taxRateMap.get(Number(taxIdStr)) || 0;
+        return taxSum + (base * rate) / 100;
       }, 0);
+      return sum + lineTax;
     }, 0);
   };
 
@@ -246,7 +205,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
   // Update converted_total whenever relevant values change
   useEffect(() => {
     const total = calculateTotal();
-    const convertedTotal = convertCurrency(total, exchangeRate);
+    const convertedTotal = total;
     setData('converted_total', convertedTotal);
   }, [data.currency, billItems, data.discount_type, data.discount_value, exchangeRate]);
 
@@ -288,51 +247,6 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     );
   };
 
-  const TaxSelector = ({ index, isAccount = false }) => {
-    const item = isAccount ? billAccounts[index] : billItems[index];
-
-    // Handle undefined taxes array (safety check)
-    if (!item || !item.taxes) {
-      console.warn(`Item at index ${index} has no taxes array`);
-      return (
-        <div className="col-span-12 md:col-span-2">
-          <Label>Taxes</Label>
-          <div className="p-2 bg-white rounded mt-2">None</div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="col-span-12 md:col-span-2">
-        <Label>Taxes</Label>
-        <SearchableCombobox
-          multiple
-          options={taxes?.map(tax => ({
-            id: tax.id,
-            name: `${tax.name} (${tax.rate}%)`
-          })) || []}
-          value={item.taxes.map(t => t.id)}
-          onChange={(values) => {
-            if (isAccount) {
-              const updatedAccounts = [...billAccounts];
-              updatedAccounts[index].taxes = taxes
-                .filter(tax => values.includes(tax.id))
-                .map(tax => ({ id: tax.id, rate: tax.rate }));
-              setBillAccounts(updatedAccounts);
-            } else {
-              const updatedItems = [...billItems];
-              updatedItems[index].taxes = taxes
-                .filter(tax => values.includes(tax.id))
-                .map(tax => ({ id: tax.id, rate: tax.rate }));
-              setBillItems(updatedItems);
-            }
-          }}
-          placeholder="Select taxes"
-        />
-      </div>
-    );
-  };
-
   const submit = (e) => {
     e.preventDefault();
 
@@ -358,16 +272,6 @@ export default function Create({ vendors = [], products = [], currencies = [], t
         billAccounts.map(account => account.quantity || 1)
       ),
       unit_cost: billItems.map(item => item.unit_cost),
-      taxes: Object.fromEntries(
-        [...billItems.map(item => [
-          item.product_id,
-          item.taxes.map(tax => tax.id)
-        ]),
-        ...billAccounts.map(account => [
-          account.account_id,
-          account.taxes.map(tax => tax.id)
-        ])]
-      ),
       account_id: [
         ...billItems.map(item => item.account_id),
         ...billAccounts.map(account => account.account_id)
@@ -390,7 +294,6 @@ export default function Create({ vendors = [], products = [], currencies = [], t
           description: "",
           quantity: 1,
           unit_cost: 0,
-          taxes: [],
           account_id: ""
         }]);
         setBillAccounts([]);
@@ -607,10 +510,6 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                       />
                     </div>
 
-                    <div className="md:col-span-3">
-                      <TaxSelector index={index} />
-                    </div>
-
                     <div className="md:col-span-2">
                       <Label>Subtotal</Label>
                       <div className="p-2 bg-white rounded text-right">
@@ -710,7 +609,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                       />
                     </div>
 
-                    <div className="md:col-span-6">
+                    <div className="md:col-span-5">
                       <Label>Description</Label>
                       <Textarea
                         value={accountItem.description || ""}
@@ -727,8 +626,11 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                       />
                     </div>
 
-                    <div className="md:col-span-2">
-                      <TaxSelector index={index} isAccount={true} />
+                    <div className="md:col-span-3">
+                      <Label>Subtotal</Label>
+                      <div className="p-2 bg-white rounded mt-1 text-right">
+                        {(accountItem.quantity * accountItem.unit_cost).toFixed(2)}
+                      </div>
                     </div>
 
                     <div className="md:col-span-1 flex items-center justify-end">
@@ -743,20 +645,31 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                       </Button>
                     </div>
                   </div>
-
-                  <div className="flex justify-end">
-                    <div className="text-right">
-                      <Label>Subtotal</Label>
-                      <div className="p-2 bg-white rounded mt-1 text-right">
-                        {(accountItem.quantity * accountItem.unit_cost).toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
                 </div>
               ))}
             </div>
 
             <SidebarSeparator className="my-4" />
+
+            <div className="grid grid-cols-12 mt-2">
+              <Label htmlFor="taxes" className="md:col-span-2 col-span-12">
+                Tax
+              </Label>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                <div className="md:w-1/2 w-full">
+                  <SearchableMultiSelectCombobox
+                    options={taxes?.map(tax => ({
+                      id: tax.id,
+                      name: `${tax.name} (${tax.rate}%)`
+                    }))}
+                    value={data.taxes}
+                    onChange={(values) => setData("taxes", values)}
+                    placeholder="Select taxes"
+                  />
+                </div>
+                <InputError message={errors.taxes} className="text-sm" />
+              </div>
+            </div>
 
             <div className="grid grid-cols-12 mt-2">
               <Label htmlFor="discount_type" className="md:col-span-2 col-span-12">
@@ -863,7 +776,6 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                       description: "",
                       quantity: 1,
                       unit_cost: 0,
-                      taxes: [],
                       account_id: ""
                     }]);
                     setBillAccounts([]);
@@ -872,7 +784,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                   Reset
                 </Button>
                 <Button type="submit" disabled={processing}>
-                  Create Cash Purchase
+                  Create Bill
                 </Button>
               </div>
             </div>

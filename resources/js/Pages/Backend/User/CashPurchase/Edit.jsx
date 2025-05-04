@@ -13,8 +13,9 @@ import { Plus, Trash2 } from "lucide-react";
 import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import DateTimePicker from "@/Components/DateTimePicker";
+import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 
-export default function Edit({ vendors = [], products = [], bill, currencies = [], taxes = [], accounts = [], credit_account, inventory }) {
+export default function Edit({ vendors = [], products = [], bill, currencies = [], taxes = [], accounts = [], credit_account, inventory, taxIds }) {
   const [purchaseItems, setPurchaseItems] = useState([]);
   const [purchaseAccounts, setPurchaseAccounts] = useState([]);
   const [exchangeRate, setExchangeRate] = useState(1);
@@ -40,7 +41,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
     description: [],
     quantity: [],
     unit_cost: [],
-    taxes: [],
+    taxes: taxIds,
     account_id: [],
     benificiary: bill.benificiary,
     credit_account_id: credit_account,
@@ -49,51 +50,55 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
 
   // Initialize purchase items from existing bill
   useEffect(() => {
-    if (bill && bill.items && bill.items.length > 0) {
-      // Separate product items and account items
-      const productItems = [];
-      const accountItems = [];
+    if (!bill) return;
 
-      bill.items.forEach(item => {
-        const formattedItem = {
-          account_id: item.account_id,
-          product_id: item.product_id,
-          product_name: item.product_name,
-          description: item.description,
-          quantity: item.quantity,
-          unit_cost: item.unit_cost,
-          taxes: item.taxes || []
-        };
+    // split items
+    const productItems = [];
+    const accountItems = [];
+    bill.items.forEach(item => {
+      const row = {
+        product_id: item.product_id,
+        account_id: item.account_id,
+        product_name: item.product_name,
+        description: item.description,
+        quantity: item.quantity,
+        unit_cost: item.unit_cost,
+      };
+      (item.product_id ? productItems : accountItems).push(row);
+    });
 
-        if (!item.product_id) {
-          accountItems.push(formattedItem);
-        } else {
-          productItems.push(formattedItem);
-        }
-      });
+    // set local state only
+    setPurchaseItems(productItems);
+    setPurchaseAccounts(accountItems);
 
-      // Set the state directly instead of appending
-      setPurchaseItems(productItems);
-      setPurchaseAccounts(accountItems);
+    // set one‐offs
+    setData("currency", bill.currency);
+    setData("exchange_rate", bill.exchange_rate);
+    setExchangeRate(bill.exchange_rate);
+    // …and your dates, vendor, title, etc…
+  }, []);
 
-      // Also update the form data with the loaded items
-      setData({
-        ...data,
-        product_id: [...productItems.map(item => item.product_id), ...accountItems.map(item => item.product_id)],
-        product_name: [...productItems.map(item => item.product_name), ...accountItems.map(item => item.product_name)],
-        description: [...productItems.map(item => item.description), ...accountItems.map(account => account.description || "")],
-        quantity: [...productItems.map(item => item.quantity), ...accountItems.map(account => account.quantity || 1)],
-        unit_cost: [...productItems.map(item => item.unit_cost), ...accountItems.map(account => account.unit_cost || 0)],
-        account_id: [...productItems.map(item => item.account_id || "Inventory"), ...accountItems.map(account => account.account_id)]
-      });
-    }
 
-    // Set the initial currency and exchange rate
-    if (bill && bill.currency) {
-      setData('currency', bill.currency);
-      setExchangeRate(bill.exchange_rate);
-    }
-  }, []);  // Empty dependency array so it only runs once
+  // ------------------------------------------------
+  // Keep Inertia form arrays in sync with our two local lists
+  const syncFormArrays = () => {
+    setData("product_id", purchaseItems.map(i => i.product_id));
+    setData("product_name", purchaseItems.map(i => i.product_name)
+      .concat(purchaseAccounts.map(a => a.product_name || "")));
+    setData("account_id", purchaseAccounts.map(a => a.account_id)
+      .concat(purchaseItems.map(a => a.account_id || "")));
+    setData("description", purchaseItems.map(i => i.description)
+      .concat(purchaseAccounts.map(a => a.description || "")));
+    setData("quantity", purchaseItems.map(i => i.quantity)
+      .concat(purchaseAccounts.map(a => a.quantity || 1)));
+    setData("unit_cost", purchaseItems.map(i => i.unit_cost)
+      .concat(purchaseAccounts.map(a => a.unit_cost)));
+  };
+
+  useEffect(() => {
+    syncFormArrays();
+  }, [purchaseItems, purchaseAccounts]);
+  // ------------------------------------------------
 
   const addPurchaseItem = () => {
     setPurchaseItems([...purchaseItems, {
@@ -102,15 +107,8 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
       description: "",
       quantity: 1,
       unit_cost: 0,
-      taxes: [],
-      account_id: "Inventory" // Default account_id for product rows
+      account_id: inventory.id
     }]);
-    setData("product_id", [...data.product_id, ""]);
-    setData("product_name", [...data.product_name, ""]);
-    setData("description", [...data.description, ""]);
-    setData("quantity", [...data.quantity, 1]);
-    setData("unit_cost", [...data.unit_cost, 0]);
-    setData("taxes", [...data.taxes, []]);
   };
 
   const addPurchaseAccount = () => {
@@ -119,76 +117,18 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
       unit_cost: 0,
       quantity: 1,
       description: "",
-      taxes: [],
       product_name: "" // Initialize product_name for account entries
     }]);
-    setData("account_id", [...data.account_id || [], ""]);
-    setData("unit_cost", [...data.unit_cost || [], 0]);
-
-    // Update quantity and description arrays to include new account entries
-    const updatedQuantities = [
-      ...purchaseItems.map(item => item.quantity),
-      ...purchaseAccounts.map(account => account.quantity || 1),
-      1  // for the new account
-    ];
-
-    const updatedDescriptions = [
-      ...purchaseItems.map(item => item.description),
-      ...purchaseAccounts.map(account => account.description || ""),
-      ""  // for the new account
-    ];
-
-    // Update product_name array to include new account entry
-    const updatedProductNames = [
-      ...purchaseItems.map(item => item.product_name),
-      ...purchaseAccounts.map(account => account.product_name || ""),
-      ""  // for the new account
-    ];
-
-    setData("quantity", updatedQuantities);
-    setData("description", updatedDescriptions);
-    setData("product_name", updatedProductNames);
   };
 
   const removePurchaseAccount = (index) => {
     const updatedAccounts = purchaseAccounts.filter((_, i) => i !== index);
     setPurchaseAccounts(updatedAccounts);
-    setData("account_id", updatedAccounts.map(account => account.account_id));
-    setData("unit_cost", updatedAccounts.map(account => account.unit_cost));
-
-    // Update quantity and description arrays after removing an account
-    setData("quantity", [
-      ...purchaseItems.map(item => item.quantity),
-      ...updatedAccounts.map(account => account.quantity || 1)
-    ]);
-
-    setData("description", [
-      ...purchaseItems.map(item => item.description),
-      ...updatedAccounts.map(account => account.description || "")
-    ]);
-
-    // Update product_name array after removing an account
-    setData("product_name", [
-      ...purchaseItems.map(item => item.product_name),
-      ...updatedAccounts.map(account => account.product_name || "")
-    ]);
   };
 
   const removeInvoiceItem = (index) => {
     const updatedItems = purchaseItems.filter((_, i) => i !== index);
     setPurchaseItems(updatedItems);
-    setData("product_id", updatedItems.map(item => item.product_id));
-    setData("product_name", updatedItems.map(item => item.product_name));
-    setData("description", [
-      ...updatedItems.map(item => item.description),
-      ...purchaseAccounts.map(account => account.description || "")
-    ]);
-    setData("quantity", [
-      ...updatedItems.map(item => item.quantity),
-      ...purchaseAccounts.map(account => account.quantity || 1)
-    ]);
-    setData("unit_cost", updatedItems.map(item => item.unit_cost));
-    setData("taxes", updatedItems.map(item => item.taxes));
   };
 
   const updateInvoiceItem = (index, field, value) => {
@@ -208,18 +148,10 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
           updatedItems[index].description = product.description || "";
         }
       } else {
-        console.warn("Product not found for ID:", value);
       }
     }
 
     setPurchaseItems(updatedItems);
-    setData("product_id", updatedItems.map(item => item.product_id));
-    setData("product_name", updatedItems.map(item => item.product_name));
-    setData("description", updatedItems.map(item => item.description));
-    setData("quantity", updatedItems.map(item => item.quantity));
-    setData("unit_cost", updatedItems.map(item => item.unit_cost));
-    setData("taxes", updatedItems.map(item => item.taxes));
-    setData("account_id", updatedItems.map(item => item.account_id));
   };
 
   const calculateSubtotal = () => {
@@ -228,11 +160,20 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
     return productSubtotal + accountSubtotal;
   };
 
+  // build this once, outside of calculateTaxes
+  const taxRateMap = new Map(taxes.map(t => [t.id, Number(t.rate)]));
+
   const calculateTaxes = () => {
-    return purchaseItems.reduce((sum, item) => {
-      return sum + item.taxes.reduce((taxSum, tax) => {
-        return taxSum + (item.quantity * item.unit_cost * tax.rate) / 100;
+    // merge both lists into one
+    const allLines = [...purchaseItems, ...purchaseAccounts];
+
+    return allLines.reduce((sum, line) => {
+      const base = Number(line.quantity) * Number(line.unit_cost);
+      const lineTax = data.taxes.reduce((taxSum, taxIdStr) => {
+        const rate = taxRateMap.get(Number(taxIdStr)) || 0;
+        return taxSum + (base * rate) / 100;
       }, 0);
+      return sum + lineTax;
     }, 0);
   };
 
@@ -338,51 +279,6 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
     );
   };
 
-  const TaxSelector = ({ index, isAccount = false }) => {
-    const item = isAccount ? purchaseAccounts[index] : purchaseItems[index];
-
-    // Handle undefined taxes array (safety check)
-    if (!item || !item.taxes) {
-      console.warn(`Item at index ${index} has no taxes array`);
-      return (
-        <div className="col-span-12 md:col-span-2">
-          <Label>Taxes</Label>
-          <div className="p-2 bg-white rounded mt-2">None</div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="col-span-12 md:col-span-2">
-        <Label>Taxes</Label>
-        <SearchableCombobox
-          multiple
-          options={taxes?.map(tax => ({
-            id: tax.id,
-            name: `${tax.name} (${tax.rate}%)`
-          })) || []}
-          value={item.taxes.map(t => t.id)}
-          onChange={(values) => {
-            if (isAccount) {
-              const updatedAccounts = [...purchaseAccounts];
-              updatedAccounts[index].taxes = taxes
-                .filter(tax => values.includes(tax.id))
-                .map(tax => ({ id: tax.id, rate: tax.rate }));
-              setPurchaseAccounts(updatedAccounts);
-            } else {
-              const updatedItems = [...purchaseItems];
-              updatedItems[index].taxes = taxes
-                .filter(tax => values.includes(tax.id))
-                .map(tax => ({ id: tax.id, rate: tax.rate }));
-              setPurchaseItems(updatedItems);
-            }
-          }}
-          placeholder="Select taxes"
-        />
-      </div>
-    );
-  };
-
   const submit = (e) => {
     e.preventDefault();
 
@@ -413,18 +309,6 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
         ...purchaseItems.map(item => item.unit_cost * item.quantity),
         ...purchaseAccounts.map(account => account.unit_cost)
       ],
-      taxes: Object.fromEntries(
-        [
-          ...purchaseItems.map(item => [
-            item.product_id,
-            item.taxes.map(tax => tax.id)
-          ]),
-          ...purchaseAccounts.map(account => [
-            account.account_id,
-            account.taxes?.map(tax => tax.id) || []
-          ])
-        ].filter(entry => entry[0]) // Filter out any undefined keys
-      ),
       account_id: [
         ...purchaseItems.map(item => item.account_id || "Inventory"),
         ...purchaseAccounts.map(account => account.account_id)
@@ -659,10 +543,6 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                       />
                     </div>
 
-                    <div className="md:col-span-3">
-                      <TaxSelector index={index} />
-                    </div>
-
                     <div className="md:col-span-2">
                       <Label>Subtotal</Label>
                       <div className="p-2 bg-white rounded mt-2 text-right">
@@ -670,7 +550,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                       </div>
                     </div>
 
-                    <div className="md:col-span-1 flex items-end justify-end">
+                    <div className="md:col-span-1 flex items-center justify-end">
                       <Button
                         type="button"
                         variant="ghost"
@@ -762,7 +642,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                       />
                     </div>
 
-                    <div className="md:col-span-6">
+                    <div className="md:col-span-5">
                       <Label>Description</Label>
                       <Textarea
                         value={accountItem.description || ""}
@@ -779,8 +659,11 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                       />
                     </div>
 
-                    <div className="md:col-span-2">
-                      <TaxSelector index={index} isAccount={true} />
+                    <div className="md:col-span-3">
+                      <Label>Subtotal</Label>
+                      <div className="p-2 bg-white rounded mt-1 text-right">
+                        {(accountItem.quantity * accountItem.unit_cost).toFixed(2)}
+                      </div>
                     </div>
 
                     <div className="md:col-span-1 flex items-center justify-end">
@@ -795,20 +678,31 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                       </Button>
                     </div>
                   </div>
-
-                  <div className="flex justify-end">
-                    <div className="text-right">
-                      <Label>Subtotal</Label>
-                      <div className="p-2 bg-white rounded mt-1 text-right">
-                        {(accountItem.quantity * accountItem.unit_cost).toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
                 </div>
               ))}
             </div>
 
             <SidebarSeparator className="my-4" />
+
+            <div className="grid grid-cols-12 mt-2">
+              <Label htmlFor="discount_type" className="md:col-span-2 col-span-12">
+                Tax
+              </Label>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                <div className="md:w-1/2 w-full">
+                  <SearchableMultiSelectCombobox
+                    options={taxes?.map(tax => ({
+                      id: tax.id,
+                      name: `${tax.name} (${tax.rate}%)`
+                    }))}
+                    value={data.taxes}
+                    onChange={(values) => setData("taxes", values)}
+                    placeholder="Select taxes"
+                  />
+                </div>
+                <InputError message={errors.taxes} className="text-sm" />
+              </div>
+            </div>
 
             <div className="grid grid-cols-12 mt-2">
               <Label htmlFor="discount_type" className="md:col-span-2 col-span-12">

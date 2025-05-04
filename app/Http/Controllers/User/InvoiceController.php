@@ -328,8 +328,8 @@ class InvoiceController extends Controller
                 $transaction->save();
             }
 
-            if (isset($request->taxes[$invoiceItem->product_id])) {
-                foreach ($request->taxes[$invoiceItem->product_id] as $taxId) {
+            if (isset($request->taxes)) {
+                foreach ($request->taxes as $taxId) {
                     $tax = Tax::find($taxId);
 
                     $invoiceItem->taxes()->save(new InvoiceItemTax([
@@ -564,6 +564,10 @@ class InvoiceController extends Controller
         $currencies = Currency::all();
         $products = Product::all();
         $taxes = Tax::all();
+        $taxIds = $invoice->taxes
+            ->pluck('tax_id')
+            ->map(fn($id) => (string) $id)
+            ->toArray();
 
         return Inertia::render('Backend/User/Invoice/Edit', [
             'invoice' => $invoice,
@@ -571,6 +575,7 @@ class InvoiceController extends Controller
             'currencies' => $currencies,
             'products' => $products,
             'taxes' => $taxes,
+            'taxIds' => $taxIds
         ]);
     }
 
@@ -820,7 +825,7 @@ class InvoiceController extends Controller
                 $transaction->save();
             }
 
-            if (isset($request->taxes[$invoiceItem->product_id])) {
+            if (isset($request->taxes)) {
                 $invoiceItem->taxes()->delete();
                 $transaction = Transaction::where('ref_id', $invoice->id)->where('ref_type', 'invoice tax')
                     ->get();
@@ -828,7 +833,7 @@ class InvoiceController extends Controller
                     $t->delete();
                 }
 
-                foreach ($request->taxes[$invoiceItem->product_id] as $taxId) {
+                foreach ($request->taxes as $taxId) {
                     $tax = Tax::find($taxId);
 
                     $invoiceItem->taxes()->save(new InvoiceItemTax([
@@ -1057,9 +1062,9 @@ class InvoiceController extends Controller
             $subTotal = ($subTotal + $line_total);
 
             //Calculate Taxes
-            if (isset($request->taxes[$request->product_id[$i]])) {
-                for ($j = 0; $j < count($request->taxes[$request->product_id[$i]]); $j++) {
-                    $taxId       = $request->taxes[$request->product_id[$i]][$j];
+            if (isset($request->taxes)) {
+                for ($j = 0; $j < count($request->taxes); $j++) {
+                    $taxId       = $request->taxes[$j];
                     $tax         = Tax::find($taxId);
                     $product_tax = ($line_total / 100) * $tax->rate;
                     $taxAmount += $product_tax;
