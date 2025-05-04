@@ -879,18 +879,18 @@ class ReceiptController extends Controller
 
         try {
             Excel::import(new CashInvoiceImport, $request->file('receipts_file'));
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->id();
+            $audit->event = 'Cash Invoices Imported';
+            $audit->save();
+
+            return redirect()->route('receipts.index')->with('success', _lang('Invoices Imported'));
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }
-
-        // audit log
-        $audit = new AuditLog();
-        $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->id();
-        $audit->event = 'Cash Invoices Imported';
-        $audit->save();
-
-        return redirect()->route('receipts.index')->with('success', _lang('Invoices Imported'));
     }
 
     public function receipts_filter(Request $request)

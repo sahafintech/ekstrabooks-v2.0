@@ -1,25 +1,43 @@
-import { Button } from "@/Components/ui/button";
+import React, { useState, useEffect } from "react";
+import { Head, Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { Link, usePage, router } from "@inertiajs/react";
-import PageHeader from "@/Components/PageHeader";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit } from "lucide-react";
-import Modal from "@/Components/Modal";
-import { useState, useMemo } from "react";
 import { SidebarInset } from "@/Components/ui/sidebar";
+import { Button } from "@/Components/ui/button";
 import { Checkbox } from "@/Components/ui/checkbox";
-import { DataTable } from "@/Components/ui/data-table/data-table";
-import TableActions from "@/Components/shared/TableActions";
-
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/Components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/Components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
+import { Input } from "@/Components/ui/input";
+import { Edit, EyeIcon, FileDown, FileUp, MoreVertical, Plus, Trash } from "lucide-react";
+import { Toaster } from "@/Components/ui/toaster";
+import { useToast } from "@/hooks/use-toast";
+import TableActions from "@/Components/shared/TableActions";
+import PageHeader from "@/Components/PageHeader";
+import Modal from "@/Components/Modal";
+import { formatCurrency } from "@/lib/utils";
 
+// Delete Confirmation Modal Component
 const DeleteProductModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this product?
       </h2>
@@ -37,16 +55,45 @@ const DeleteProductModal = ({ show, onClose, onConfirm, processing }) => (
           variant="destructive"
           disabled={processing}
         >
-          Delete Product
+          Delete
         </Button>
       </div>
     </form>
   </Modal>
 );
 
-const ImportProductsModal = ({ show, onClose, onSubmit, processing }) => (
+// Bulk Delete Confirmation Modal Component
+const DeleteAllProductsModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-    <form onSubmit={onSubmit} className="p-6">
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to delete {count} selected product{count !== 1 ? 's' : ''}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="destructive"
+          disabled={processing}
+        >
+          Delete Selected
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+// Import Products Modal Component
+const ImportProductsModal = ({ show, onClose, onSubmit, processing }) => (
+  <Modal show={show} onClose={onClose} maxWidth="3xl">
+    <form onSubmit={onSubmit}>
       <div className="ti-modal-header">
         <h3 className="text-lg font-bold">Import Products</h3>
       </div>
@@ -56,11 +103,11 @@ const ImportProductsModal = ({ show, onClose, onSubmit, processing }) => (
             <label className="block font-medium text-sm text-gray-700">
               Products File
             </label>
-            <Link href="/uploads/media/default/sample_items.xlsx">
-              <Button variant="secondary" size="sm">
+            <a href="/uploads/media/default/sample_items.xlsx" download>
+              <Button variant="secondary" size="sm" type="button">
                 Use This Sample File
               </Button>
-            </Link>
+            </a>
           </div>
           <input type="file" className="w-full dropify" name="products_file" required />
         </div>
@@ -100,68 +147,121 @@ const ImportProductsModal = ({ show, onClose, onSubmit, processing }) => (
           type="submit"
           disabled={processing}
         >
-          Import Items
+          Import
         </Button>
       </div>
     </form>
   </Modal>
-);
-
-const DeleteAllProductsModal = ({ show, onClose, onConfirm, processing }) => (
-  <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
-      <h2 className="text-lg font-medium">
-        Are you sure you want to delete all selected products?
-      </h2>
-      <div className="mt-6 flex justify-end">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={onClose}
-          className="mr-3"
-        >
-          Close
-        </Button>
-        <Button
-          type="submit"
-          variant="destructive"
-          disabled={processing}
-        >
-          Delete All
-        </Button>
-      </div>
-    </form>
-  </Modal>
-);
-
-const ProductStatusBadge = ({ status }) => (
-  <span className={status === 1 ? "text-success" : "text-danger"}>
-    {status === 1 ? "Active" : "Disabled"}
-  </span>
 );
 
 export default function List({ products = [], meta = {}, filters = {} }) {
-  const { auth } = usePage().props;
+  const { flash = {} } = usePage().props;
+  const { toast } = useToast();
   const [selectedProducts, setSelectedProducts] = useState([]);
+  const [isAllSelected, setIsAllSelected] = useState(false);
+  const [search, setSearch] = useState(filters.search || "");
+  const [perPage, setPerPage] = useState(meta.per_page || 50);
+  const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
+  const [bulkAction, setBulkAction] = useState("");
+
+  // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
-  const [tableRef, setTableRef] = useState(null);
   const [processing, setProcessing] = useState(false);
 
-  // Format currency with proper ISO 4217 code
-  const formatCurrency = (amount, currencyCode = 'USD') => {
-    return new Intl.NumberFormat('en-US', { 
-      style: 'currency', 
-      currency: currencyCode 
-    }).format(amount);
+  useEffect(() => {
+    if (flash && flash.success) {
+      toast({
+        title: "Success",
+        description: flash.success,
+      });
+    }
+
+    if (flash && flash.error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: flash.error,
+      });
+    }
+  }, [flash, toast]);
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedProducts([]);
+    } else {
+      setSelectedProducts(products.map((product) => product.id));
+    }
+    setIsAllSelected(!isAllSelected);
+  };
+
+  const toggleSelectProduct = (id) => {
+    if (selectedProducts.includes(id)) {
+      setSelectedProducts(selectedProducts.filter((productId) => productId !== id));
+      setIsAllSelected(false);
+    } else {
+      setSelectedProducts([...selectedProducts, id]);
+      if (selectedProducts.length + 1 === products.length) {
+        setIsAllSelected(true);
+      }
+    }
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    router.get(
+      route("products.index"),
+      { search, page: 1, per_page: perPage },
+      { preserveState: true }
+    );
+  };
+
+  const handlePerPageChange = (value) => {
+    setPerPage(value);
+    router.get(
+      route("products.index"),
+      { search, page: 1, per_page: value },
+      { preserveState: true }
+    );
+  };
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    router.get(
+      route("products.index"),
+      { search, page, per_page: perPage },
+      { preserveState: true }
+    );
+  };
+
+  const handleBulkAction = () => {
+    if (bulkAction === "") return;
+
+    if (selectedProducts.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select at least one product",
+      });
+      return;
+    }
+
+    if (bulkAction === "delete") {
+      setShowDeleteAllModal(true);
+    }
+  };
+
+  const handleDeleteConfirm = (id) => {
+    setProductToDelete(id);
+    setShowDeleteModal(true);
   };
 
   const handleDelete = (e) => {
     e.preventDefault();
     setProcessing(true);
-    
+
     router.delete(route('products.destroy', productToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
@@ -176,18 +276,15 @@ export default function List({ products = [], meta = {}, filters = {} }) {
 
   const handleDeleteAll = (e) => {
     e.preventDefault();
-    if (!tableRef) return;
-    
-    const selectedIds = tableRef.getSelectedRowModel().rows.map(row => row.original.id);
-    if (selectedIds.length === 0) return;
-
     setProcessing(true);
-    router.post(route('products.destroy-multiple'), {
-      products: selectedIds
+
+    router.post(route('products.bulk_action'), {
+      delete_products: selectedProducts.join(',')
     }, {
       onSuccess: () => {
         setShowDeleteAllModal(false);
-        tableRef.toggleAllRowsSelected(false);
+        setSelectedProducts([]);
+        setIsAllSelected(false);
         setProcessing(false);
       },
       onError: () => {
@@ -200,7 +297,7 @@ export default function List({ products = [], meta = {}, filters = {} }) {
     e.preventDefault();
     const formData = new FormData(e.target);
     setProcessing(true);
-    
+
     router.post(route('products.import'), formData, {
       onSuccess: () => {
         setShowImportModal(false);
@@ -212,298 +309,274 @@ export default function List({ products = [], meta = {}, filters = {} }) {
     });
   };
 
-  const handlePagination = (pagination) => {
-    // Ensure we have valid numeric values for page and page size
-    const pageIndex = isNaN(pagination.pageIndex) ? 0 : pagination.pageIndex;
-    const pageSize = isNaN(pagination.pageSize) ? 10 : pagination.pageSize;
-    
-    // Create query parameters object (only include non-empty values)
-    const params = {
-      page: pageIndex + 1, // Convert 0-indexed to 1-indexed
-      per_page: pageSize,
-    };
-    
-    // Only add search if it's non-empty
-    if (pagination.globalFilter || filters.search) {
-      params.search = pagination.globalFilter || filters.search || '';
-    }
-    
-    // Only add column filters if they exist
-    const columnFiltersArray = pagination.columnFilters || filters.columnFilters || [];
-    if (columnFiltersArray.length > 0) {
-      params.columnFilters = JSON.stringify(columnFiltersArray);
-    }
-    
-    // Only add sorting if it exists
-    const sortingArray = pagination.sorting || filters.sorting || [];
-    if (sortingArray.length > 0) {
-      params.sorting = JSON.stringify(sortingArray);
+  const renderPageNumbers = () => {
+    const totalPages = meta.last_page;
+    const pages = [];
+    const maxPagesToShow = 5;
+
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = startPage + maxPagesToShow - 1;
+
+    if (endPage > totalPages) {
+      endPage = totalPages;
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
     }
 
-    // Debug the parameters being sent to the server
-    console.log('Sending to server:', params);
-    
-    // Update URL and fetch data
-    router.get(route('products.index'), params, {
-      preserveState: true,
-      preserveScroll: true,
-      only: ['products', 'meta', 'filters'],
-      replace: false, // Use false to update browser history
-    });
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(
+        <Button
+          key={i}
+          variant={i === currentPage ? "default" : "outline"}
+          size="sm"
+          onClick={() => handlePageChange(i)}
+          className="mx-1"
+        >
+          {i}
+        </Button>
+      );
+    }
+
+    return pages;
   };
 
-  const handleDataTableChange = (updatedState) => {
-    // Ensure we have valid numeric values for page and page size
-    const pageIndex = isNaN(updatedState.pagination.pageIndex) ? 0 : updatedState.pagination.pageIndex;
-    const pageSize = isNaN(updatedState.pagination.pageSize) ? 10 : updatedState.pagination.pageSize;
-    
-    // Create query parameters object (only include non-empty values)
-    const params = {
-      page: pageIndex + 1, // Convert 0-indexed to 1-indexed
-      per_page: pageSize,
-    };
-    
-    // Only add search if it's non-empty
-    if (updatedState.globalFilter) {
-      params.search = updatedState.globalFilter;
-    }
-    
-    // Only add column filters if they exist
-    const columnFiltersArray = updatedState.columnFilters || [];
-    if (columnFiltersArray.length > 0) {
-      params.columnFilters = JSON.stringify(columnFiltersArray);
-    }
-    
-    // Only add sorting if it exists
-    const sortingArray = updatedState.sorting || [];
-    if (sortingArray.length > 0) {
-      params.sorting = JSON.stringify(sortingArray);
-    }
-
-    // Debug the parameters being sent to the server
-    console.log('Table state change:', params);
-    
-    // Update URL and fetch data
-    router.get(route('products.index'), params, {
-      preserveState: true,
-      preserveScroll: true,
-      only: ['products', 'meta', 'filters'],
-      replace: false, // Use false to update browser history
-    });
+  const exportProducts = () => {
+    window.location.href = route("products.export");
   };
 
-  const columns = useMemo(
-    () => [
-      {
-        id: "select",
-        header: ({ table }) => (
-          <Checkbox
-            checked={table.getIsAllPageRowsSelected()}
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-            aria-label="Select all"
-          />
-        ),
-        cell: ({ row }) => (
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label="Select row"
-          />
-        ),
-        enableSorting: false,
-        enableHiding: false,
-      },
-      {
-        accessorKey: "image",
-        header: "Image",
-        cell: ({ row }) => (
-          <img 
-            src={`/uploads/media/${row.original.image}`} 
-            className="w-14" 
-            alt={row.original.name} 
-          />
-        ),
-        enableSorting: false,
-      },
-      {
-        accessorKey: "name",
-        header: "Name",
-      },
-      {
-        accessorKey: "type",
-        header: "Type",
-      },
-      {
-        accessorKey: "purchase_cost",
-        header: "Purchase Cost",
-        cell: ({ row }) => (
-          <div className="text-right">
-            {formatCurrency(row.original.purchase_cost, row.original.currency || 'USD')}
-          </div>
-        ),
-      },
-      {
-        accessorKey: "selling_price",
-        header: "Selling Price",
-        cell: ({ row }) => (
-          <div className="text-right">
-            {formatCurrency(row.original.selling_price, row.original.currency || 'USD')}
-          </div>
-        ),
-      },
-      {
-        accessorKey: "stock",
-        header: "Stock",
-        cell: ({ row }) => (
-          <div className="text-center">{row.original.stock}</div>
-        ),
-      },
-      {
-        accessorKey: "status",
-        header: "Status",
-        cell: ({ row }) => (
-          <div className="text-center">
-            <ProductStatusBadge status={row.original.status} />
-          </div>
-        ),
-        filterFn: (row, id, value) => {
-          return value.includes(row.getValue(id))
-        },
-      },
-      {
-        id: "actions",
-        header: "Actions",
-        cell: ({ row }) => (
-          <TableActions
-            actions={[
-              {
-                label: "Edit",
-                icon: Edit,
-                onClick: () => router.visit(route('products.edit', row.original.id))
-              },
-              {
-                label: "View",
-                icon: Eye,
-                onClick: () => router.visit(route('products.show', row.original.id))
-              },
-              {
-                label: "Delete",
-                icon: Trash2,
-                onClick: () => {
-                  setProductToDelete(row.original.id);
-                  setShowDeleteModal(true);
-                },
-                className: "text-red-600"
-              }
-            ]}
-          />
-        ),
-      },
-    ],
-    []
-  );
+  const ProductStatusBadge = ({ status }) => {
+    const statusMap = {
+      1: { label: "Active", className: "text-green-600 bg-green-200 px-3 py-1 rounded text-sm" },
+      0: { label: "Disabled", className: "text-red-600 bg-red-200 px-3 py-1 rounded text-sm" },
+    };
 
-  const filterableColumns = [
-    {
-      id: "status",
-      title: "Status",
-      options: [
-        { label: "Active", value: "1" },
-        { label: "Disabled", value: "0" },
-      ],
-    },
-    {
-      id: "type",
-      title: "Type",
-      options: Array.from(new Set(products.map(p => p.type)))
-        .filter(Boolean)
-        .map(type => ({ label: type, value: type })),
-    },
-  ];
-
-  const searchableColumns = [
-    {
-      id: "name",
-      title: "Name",
-    },
-  ];
+    return (
+      <span className={statusMap[status].className}>
+        {statusMap[status].label}
+      </span>
+    );
+  };
 
   return (
     <AuthenticatedLayout>
+      <Head title="Products" />
+      <Toaster />
       <SidebarInset>
         <div className="main-content">
-          <PageHeader page="Products" subpage="list" url="products.index" />
-
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-            <div className="flex items-center space-x-2">
-              <Link href={route("products.create")}>
-                <Button>Add New Product</Button>
-              </Link>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="secondary">
-                    <MoreVertical className="h-4 w-4" />
+          <PageHeader
+            page="Products"
+            subpage="List"
+            url="products.index"
+          />
+          <div className="p-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                <Link href={route("products.create")}>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Product
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setShowImportModal(true)}>
-                    <FileUp className="mr-2 h-4 w-4" /> Import
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href={route('products.export')}>
+                </Link>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="secondary">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setShowImportModal(true)}>
+                      <FileUp className="mr-2 h-4 w-4" /> Import
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportProducts}>
                       <FileDown className="mr-2 h-4 w-4" /> Export
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              <div className="flex flex-col md:flex-row gap-4 md:items-center">
+                <form onSubmit={handleSearch} className="flex gap-2">
+                  <Input
+                    placeholder="Search products..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full md:w-80"
+                  />
+                  <Button type="submit">Search</Button>
+                </form>
+              </div>
             </div>
 
-              <DataTable
-                columns={columns}
-                data={products}
-                filterableColumns={filterableColumns}
-                searchableColumns={searchableColumns}
-                totalRows={meta.total || 0}
-                pageCount={meta.last_page || 1}
-                onPaginationChange={handlePagination}
-                onTableStateChange={handleDataTableChange}
-                serverSide={true}
-                initialState={{
-                  pagination: {
-                    pageIndex: (meta.current_page || 1) - 1,
-                    pageSize: meta.per_page || 10,
-                  },
-                  globalFilter: filters.search || '',
-                  columnFilters: filters.columnFilters || [],
-                  sorting: filters.sorting || [],
-                }}
-                tableRef={setTableRef}
-                meta={meta}
-              />
+            <div className="mb-4 flex flex-col md:flex-row gap-4 justify-between">
+              <div className="flex items-center gap-2">
+                <Select value={bulkAction} onValueChange={setBulkAction}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Bulk actions" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="delete">Delete Selected</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleBulkAction} variant="outline">
+                  Apply
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Show</span>
+                <Select value={perPage.toString()} onValueChange={handlePerPageChange}>
+                  <SelectTrigger className="w-[80px]">
+                    <SelectValue placeholder="10" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-gray-500">entries</span>
+              </div>
+            </div>
+
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px]">
+                      <Checkbox
+                        checked={isAllSelected}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                    </TableHead>
+                    <TableHead className="w-[80px]">ID</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Purchase Cost</TableHead>
+                    <TableHead>Selling Price</TableHead>
+                    <TableHead>Stock</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {products.length > 0 ? (
+                    products.map((product) => (
+                      <TableRow key={product.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedProducts.includes(product.id)}
+                            onCheckedChange={() => toggleSelectProduct(product.id)}
+                          />
+                        </TableCell>
+                        <TableCell>{product.id}</TableCell>
+                        <TableCell>{product.name}</TableCell>
+                        <TableCell>{product.type}</TableCell>
+                        <TableCell>{formatCurrency(product.purchase_cost) || "-"}</TableCell>
+                        <TableCell>{formatCurrency(product.selling_price) || "-"}</TableCell>
+                        <TableCell>{product.stock || "-"}</TableCell>
+                        <TableCell>
+                          {<ProductStatusBadge status={product.status} /> || "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <TableActions
+                            actions={[
+                              {
+                                label: "View",
+                                icon: <EyeIcon className="h-4 w-4" />,
+                                href: route("products.show", product.id),
+                              },
+                              {
+                                label: "Edit",
+                                icon: <Edit className="h-4 w-4" />,
+                                href: route("products.edit", product.id),
+                              },
+                              {
+                                label: "Delete",
+                                icon: <Trash className="h-4 w-4" />,
+                                onClick: () => handleDeleteConfirm(product.id),
+                                destructive: true,
+                              },
+                            ]}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={8} className="h-24 text-center">
+                        No products found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {products.length > 0 && meta.total > 0 && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-gray-500">
+                  Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, meta.total)} of {meta.total} entries
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                  >
+                    First
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  {renderPageNumbers()}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === meta.last_page}
+                  >
+                    Next
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(meta.last_page)}
+                    disabled={currentPage === meta.last_page}
+                  >
+                    Last
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
-
-          <DeleteProductModal
-            show={showDeleteModal}
-            onClose={() => setShowDeleteModal(false)}
-            onConfirm={handleDelete}
-            processing={processing}
-          />
-
-          <DeleteAllProductsModal
-            show={showDeleteAllModal}
-            onClose={() => setShowDeleteAllModal(false)}
-            onConfirm={handleDeleteAll}
-            processing={processing}
-          />
-
-          <ImportProductsModal
-            show={showImportModal}
-            onClose={() => setShowImportModal(false)}
-            onSubmit={handleImport}
-            processing={processing}
-          />
         </div>
       </SidebarInset>
+
+      <DeleteProductModal
+        show={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDelete}
+        processing={processing}
+      />
+
+      <DeleteAllProductsModal
+        show={showDeleteAllModal}
+        onClose={() => setShowDeleteAllModal(false)}
+        onConfirm={handleDeleteAll}
+        processing={processing}
+        count={selectedProducts.length}
+      />
+
+      <ImportProductsModal
+        show={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSubmit={handleImport}
+        processing={processing}
+      />
     </AuthenticatedLayout>
   );
 }

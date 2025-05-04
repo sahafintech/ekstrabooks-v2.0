@@ -11,13 +11,13 @@ export default function AuthenticatedLayout({ children }) {
     const { auth, isOwner, decimalPlace, decimalSep, thousandSep, baseCurrency, currencyPosition, date_format } = usePage().props;
 
     initSettings({
-        decimalPlace:    decimalPlace,
-        decimalSep:      decimalSep,
-        thousandSep:     thousandSep,
-        baseCurrency:    baseCurrency,
-        currencyPosition:currencyPosition,
-        date_format:     date_format,
-      });
+        decimalPlace: decimalPlace,
+        decimalSep: decimalSep,
+        thousandSep: thousandSep,
+        baseCurrency: baseCurrency,
+        currencyPosition: currencyPosition,
+        date_format: date_format,
+    });
 
     return (
         <SidebarProvider>

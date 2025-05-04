@@ -37,7 +37,7 @@ import Modal from "@/Components/Modal";
 // Delete Confirmation Modal Component
 const DeleteVendorModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this vendor?
       </h2>
@@ -65,7 +65,7 @@ const DeleteVendorModal = ({ show, onClose, onConfirm, processing }) => (
 // Bulk Delete Confirmation Modal Component
 const DeleteAllVendorsModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected vendor{count !== 1 ? 's' : ''}?
       </h2>
@@ -92,8 +92,8 @@ const DeleteAllVendorsModal = ({ show, onClose, onConfirm, processing, count }) 
 
 // Import Vendors Modal Component
 const ImportVendorsModal = ({ show, onClose, onSubmit, processing }) => (
-  <Modal show={show} onClose={onClose}>
-    <form onSubmit={onSubmit} className="p-6">
+  <Modal show={show} onClose={onClose} maxWidth="3xl">
+    <form onSubmit={onSubmit}>
       <div className="ti-modal-header">
         <h3 className="text-lg font-bold">Import Vendors</h3>
       </div>
@@ -103,11 +103,11 @@ const ImportVendorsModal = ({ show, onClose, onSubmit, processing }) => (
             <label className="block font-medium text-sm text-gray-700">
               Vendors File
             </label>
-            <Link href="/uploads/media/default/sample_suppliers.xlsx">
-              <Button variant="secondary" size="sm">
+            <a href="/uploads/media/default/sample_suppliers.xlsx" download>
+              <Button variant="secondary" size="sm" type="button">
                 Use This Sample File
               </Button>
-            </Link>
+            </a>
           </div>
           <input type="file" className="w-full dropify" name="vendors_file" required />
         </div>
@@ -160,10 +160,10 @@ export default function List({ vendors = [], meta = {}, filters = {} }) {
   const [selectedVendors, setSelectedVendors] = useState([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
-  const [perPage, setPerPage] = useState(meta.per_page || 10);
+  const [perPage, setPerPage] = useState(meta.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
-  
+
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
@@ -261,7 +261,7 @@ export default function List({ vendors = [], meta = {}, filters = {} }) {
   const handleDelete = (e) => {
     e.preventDefault();
     setProcessing(true);
-    
+
     router.delete(route('vendors.destroy', vendorToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
@@ -277,7 +277,7 @@ export default function List({ vendors = [], meta = {}, filters = {} }) {
   const handleDeleteAll = (e) => {
     e.preventDefault();
     setProcessing(true);
-    
+
     router.post(route('vendors.bulk_action'), {
       delete_vendors: selectedVendors.join(',')
     }, {
@@ -297,8 +297,8 @@ export default function List({ vendors = [], meta = {}, filters = {} }) {
     e.preventDefault();
     const formData = new FormData(e.target);
     setProcessing(true);
-    
-    router.post(route('vendors.import_vendors'), formData, {
+
+    router.post(route('vendors.import'), formData, {
       onSuccess: () => {
         setShowImportModal(false);
         setProcessing(false);
@@ -338,9 +338,9 @@ export default function List({ vendors = [], meta = {}, filters = {} }) {
 
     return pages;
   };
-  
+
   const exportVendors = () => {
-    router.get(route("vendors.export_vendors"));
+    window.location.href = route("vendors.export");
   };
 
   return (

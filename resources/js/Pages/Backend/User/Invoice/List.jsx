@@ -36,7 +36,7 @@ import { formatCurrency } from "@/lib/utils";
 
 const DeleteInvoiceModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this invoice?
       </h2>
@@ -62,8 +62,8 @@ const DeleteInvoiceModal = ({ show, onClose, onConfirm, processing }) => (
 );
 
 const ImportInvoicesModal = ({ show, onClose, onSubmit, processing }) => (
-  <Modal show={show} onClose={onClose}>
-    <form onSubmit={onSubmit} className="p-6">
+  <Modal show={show} onClose={onClose} maxWidth="3xl">
+    <form onSubmit={onSubmit}>
       <div className="ti-modal-header">
         <h3 className="text-lg font-bold">Import Invoices</h3>
       </div>
@@ -73,11 +73,11 @@ const ImportInvoicesModal = ({ show, onClose, onSubmit, processing }) => (
             <label className="block font-medium text-sm text-gray-700">
               Invoices File
             </label>
-            <Link href="/uploads/media/default/sample_invoices.xlsx">
-              <Button variant="secondary" size="sm">
+            <a href="/uploads/media/default/sample_invoices.xlsx" download>
+              <Button variant="secondary" size="sm" type="button">
                 Use This Sample File
               </Button>
-            </Link>
+            </a>
           </div>
           <input type="file" className="w-full dropify" name="invoices_file" required />
         </div>
@@ -126,7 +126,7 @@ const ImportInvoicesModal = ({ show, onClose, onSubmit, processing }) => (
 
 const DeleteAllInvoicesModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected invoice{count !== 1 ? 's' : ''}?
       </h2>
@@ -176,7 +176,7 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
   const [perPage, setPerPage] = useState(meta.per_page || 10);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
-  
+
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -274,7 +274,7 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
   const handleDelete = (e) => {
     e.preventDefault();
     setProcessing(true);
-    
+
     router.delete(route('invoices.destroy', invoiceToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
@@ -290,7 +290,7 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
   const handleDeleteAll = (e) => {
     e.preventDefault();
     setProcessing(true);
-    
+
     router.post(route('invoices.destroy-multiple'), {
       invoices: selectedInvoices
     }, {
@@ -353,7 +353,7 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
   };
 
   const exportInvoices = () => {
-    router.get(route("invoices.export"));
+    window.location.href = route("invoices.export");
   };
 
   return (

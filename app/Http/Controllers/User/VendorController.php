@@ -34,7 +34,7 @@ class VendorController extends Controller
      */
     public function index(Request $request)
     {
-        $per_page = $request->get('per_page', 10);
+        $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
         $query = Vendor::select('vendors.*')
@@ -325,11 +325,9 @@ class VendorController extends Controller
 
     public function import_vendors(Request $request)
     {
-        if ($request->hasFile('file')) {
-            $paths = $request->file('file')->store('vendor_import', 'uploads');
-
+        if ($request->hasFile('vendors_file')) {
             try {
-                Excel::import(new SupplierImport, storage_path('uploads/' . $paths));
+                Excel::import(new SupplierImport, $request->file('vendors_file'));
 
                 // audit log
                 $audit = new AuditLog();
@@ -340,17 +338,12 @@ class VendorController extends Controller
 
                 return back()->with('success', _lang('Imported Successfully'));
             } catch (\Exception $e) {
-                // audit log
-                $audit = new AuditLog();
-                $audit->date_changed = date('Y-m-d H:i:s');
-                $audit->changed_by = Auth::id();
-                $audit->event = 'Suppliers Import Failed';
-                $audit->save();
-
                 return back()->with('error', _lang('Error: ' . $e->getMessage()));
             } catch (\Exception $e) {
                 return back()->with('error', _lang('Error: ' . $e->getMessage()));
             }
+        }else {
+            return redirect()->route('vendors.index')->with('error', _lang('Please choose a file'));
         }
     }
 

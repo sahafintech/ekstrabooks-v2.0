@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
@@ -62,10 +62,10 @@ const DeleteReceiptModal = ({ show, onClose, onConfirm, processing }) => (
 );
 
 const ImportReceiptsModal = ({ show, onClose, onSubmit, processing }) => (
-  <Modal show={show} onClose={onClose}>
-    <form onSubmit={onSubmit} className="p-6">
+  <Modal show={show} onClose={onClose} maxWidth="3xl">
+    <form onSubmit={onSubmit}>
       <div className="ti-modal-header">
-        <h3 className="text-lg font-bold">Import Receipts</h3>
+        <h3 className="text-lg font-bold">Import Cash Invoices</h3>
       </div>
       <div className="ti-modal-body grid grid-cols-12">
         <div className="col-span-12">
@@ -73,11 +73,11 @@ const ImportReceiptsModal = ({ show, onClose, onSubmit, processing }) => (
             <label className="block font-medium text-sm text-gray-700">
               Cash Invoices File
             </label>
-            <Link href="/uploads/media/default/sample_cash_invoices.xlsx">
-              <Button variant="secondary" size="sm">
+            <a href="/uploads/media/default/sample_cash_invoices.xlsx" download>
+              <Button variant="secondary" size="sm" type="button">
                 Use This Sample File
               </Button>
-            </Link>
+            </a>
           </div>
           <input type="file" className="w-full dropify" name="receipts_file" required />
         </div>
@@ -115,10 +115,10 @@ const ImportReceiptsModal = ({ show, onClose, onSubmit, processing }) => (
         </Button>
         <Button
           type="submit"
-          variant="primary"
+          variant="default"
           disabled={processing}
         >
-          Import Receipts
+          Import Cash Invoices
         </Button>
       </div>
     </form>
@@ -154,6 +154,7 @@ const DeleteAllReceiptsModal = ({ show, onClose, onConfirm, processing, count })
 
 
 export default function List({ receipts = [], meta = {}, filters = {} }) {
+  const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
@@ -165,6 +166,23 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
   const [perPage, setPerPage] = useState(filters.per_page || 10);
   const [search, setSearch] = useState(filters.search || "");
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
+
+  useEffect(() => {
+    if (flash && flash.success) {
+      toast({
+        title: "Success",
+        description: flash.success,
+      });
+    }
+
+    if (flash && flash.error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: flash.error,
+      });
+    }
+  }, [flash, toast]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -247,19 +265,10 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
 
     router.post(route("receipts.import"), formData, {
       onSuccess: () => {
-        toast({
-          title: "Cash Invoices Imported",
-          description: "Cash Invoices have been imported successfully.",
-        });
         closeImportModal();
         setProcessing(false);
       },
       onError: (errors) => {
-        toast({
-          title: "Error",
-          description: "Failed to import cash invoices.",
-          variant: "destructive",
-        });
         setProcessing(false);
       },
     });

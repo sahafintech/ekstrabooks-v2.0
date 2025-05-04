@@ -62,8 +62,8 @@ const DeleteBillModal = ({ show, onClose, onConfirm, processing }) => (
 );
 
 const ImportBillsModal = ({ show, onClose, onSubmit, processing }) => (
-  <Modal show={show} onClose={onClose}>
-    <form onSubmit={onSubmit} className="p-6">
+  <Modal show={show} onClose={onClose} maxWidth="3xl">
+    <form onSubmit={onSubmit}>
       <div className="ti-modal-header">
         <h3 className="text-lg font-bold">Import Bills</h3>
       </div>
@@ -73,11 +73,11 @@ const ImportBillsModal = ({ show, onClose, onSubmit, processing }) => (
             <label className="block font-medium text-sm text-gray-700">
               Bills File
             </label>
-            <Link href="/uploads/media/default/sample_bills.xlsx">
-              <Button variant="secondary" size="sm">
+            <a href="/uploads/media/default/sample_bills.xlsx" download>
+              <Button variant="secondary" size="sm" type="button">
                 Use This Sample File
               </Button>
-            </Link>
+            </a>
           </div>
           <input type="file" className="w-full dropify" name="bills_file" required />
         </div>
@@ -344,6 +344,10 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
     }
   };
 
+  const handleExport = () => {
+    window.location.href = route("bill_invoices.export")
+  }
+
   const renderPageNumbers = () => {
     const totalPages = meta.last_page || 1;
     const pages = [];
@@ -404,7 +408,7 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
                     <DropdownMenuItem onClick={() => setShowImportModal(true)}>
                       <FileUp className="mr-2 h-4 w-4" /> Import
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => window.location.href = route("bill_invoices.export")}>
+                    <DropdownMenuItem onClick={handleExport}>
                       <FileDown className="mr-2 h-4 w-4" /> Export
                     </DropdownMenuItem>
                   </DropdownMenuContent>

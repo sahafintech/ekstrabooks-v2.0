@@ -16,7 +16,6 @@ use App\Models\ProductUnit;
 use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Validator;
@@ -38,81 +37,38 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Product::select('products.*')
-            ->with('product_unit');
+        $per_page = $request->get('per_page', 50);
+        $search = $request->get('search', '');
 
-        // Handle search
-        if ($request->has('search') && !empty($request->get('search'))) {
-            $search = $request->get('search');
+        $query = Product::orderBy("id", "desc");
+
+        // Apply search if provided
+        if (!empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('type', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%");
+                    ->orWhere('selling_price', 'like', "%{$search}%")
+                    ->orWhere('purchase_cost', 'like', "%{$search}%");
             });
         }
 
-        // Handle column filters
-        if ($request->has('columnFilters')) {
-            $columnFilters = $request->get('columnFilters');
-            
-            // Check if it's a JSON string and decode it
-            if (is_string($columnFilters)) {
-                $columnFilters = json_decode($columnFilters, true);
-            }
-            
-            // Process each column filter
-            if (is_array($columnFilters)) {
-                foreach ($columnFilters as $filter) {
-                    if (isset($filter['id']) && isset($filter['value'])) {
-                        $columnId = $filter['id'];
-                        $filterValue = $filter['value'];
-                        
-                        if (!empty($filterValue)) {
-                            if (is_array($filterValue)) {
-                                $query->whereIn($columnId, $filterValue);
-                            } else {
-                                $query->where($columnId, $filterValue);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        // Get vendors with pagination
+        $products = $query->paginate($per_page)->withQueryString();
 
-        // Handle sorting
-        $sortField = $request->get('sort_field', 'id');
-        $sortDirection = $request->get('sort_direction', 'desc');
-        
-        if ($request->has('sorting')) {
-            $sorting = $request->get('sorting');
-            
-            // Check if it's a JSON string and decode it
-            if (is_string($sorting)) {
-                $sorting = json_decode($sorting, true);
-            }
-            
-            if (is_array($sorting) && !empty($sorting)) {
-                $sortField = $sorting[0]['id'] ?? 'id';
-                $sortDirection = $sorting[0]['desc'] ? 'desc' : 'asc';
-            }
-        }
-        
-        $query->orderBy($sortField, $sortDirection);
-
-        // Handle pagination
-        $perPage = $request->get('per_page', 10);
-        $products = $query->paginate($perPage);
-
-        return inertia('Backend/User/Product/List', [
+        // Return Inertia view
+        return Inertia::render('Backend/User/Product/List', [
             'products' => $products->items(),
             'meta' => [
-                'total' => $products->total(),
-                'per_page' => $products->perPage(),
                 'current_page' => $products->currentPage(),
+                'from' => $products->firstItem(),
                 'last_page' => $products->lastPage(),
+                'links' => $products->linkCollection(),
+                'path' => $products->path(),
+                'per_page' => $products->perPage(),
+                'to' => $products->lastItem(),
+                'total' => $products->total(),
             ],
             'filters' => [
-                'search' => $request->get('search', ''),
+                'search' => $search,
                 'columnFilters' => $request->get('columnFilters', []),
                 'sorting' => $request->get('sorting', []),
             ],
@@ -128,7 +84,7 @@ class ProductController extends Controller
     {
         $productUnits = ProductUnit::select('id', 'unit')->get();
         $categories = Category::select('id', 'name')->get();
-        $brands = Brand::select('id', 'name')->get();
+        $brands = Brands::select('id', 'name')->get();
         $accounts = Account::select('id', 'account_name')->get();
 
         return Inertia::render('Backend/User/Product/Create', compact('productUnits', 'categories', 'brands', 'accounts'));
@@ -305,7 +261,7 @@ class ProductController extends Controller
 
         $productUnits = ProductUnit::select('id', 'unit')->get();
         $categories = Category::select('id', 'name')->get();
-        $brands = Brand::select('id', 'name')->get();
+        $brands = Brands::select('id', 'name')->get();
         $accounts = Account::select('id', 'account_name')->get();
 
         return inertia('Backend/User/Product/Edit', [
@@ -313,13 +269,7 @@ class ProductController extends Controller
             'productUnits' => $productUnits,
             'categories' => $categories,
             'brands' => $brands,
-            'accounts' => $accounts->map(function ($account) {
-                return [
-                    'id' => $account->id,
-                    'name' => $account->account_name,
-                    'type' => $account->account_type
-                ];
-            }),
+            'accounts' => $accounts,
         ]);
     }
 
@@ -509,16 +459,16 @@ class ProductController extends Controller
 
         try {
             Excel::import(new ProductImport, $request->file('products_file'));
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Products Imported - ' . $request->file('products_file')->getClientOriginalName();
+            $audit->save();
         } catch (\Exception $e) {
             return redirect()->route('products.index')->with('error', $e->getMessage());
         }
-
-        // audit log
-        $audit = new AuditLog();
-        $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Products Imported - ' . $request->file('products_file')->getClientOriginalName();
-        $audit->save();
 
         return redirect()->route('products.index')->with('success', _lang('Products Imported'));
     }

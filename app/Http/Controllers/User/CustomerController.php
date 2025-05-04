@@ -176,7 +176,7 @@ class CustomerController extends Controller
             ->where('is_recurring', 0)
             ->where('status', '!=', 0)
             ->first();
-        
+
         // Get recent transactions for the customer
         $data['recent_transactions'] = Transaction::where('customer_id', $id)
             ->whereHas('account', function ($query) {
@@ -322,18 +322,18 @@ class CustomerController extends Controller
 
         try {
             Excel::import(new CustomerImport, $request->file('customers_file'));
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Imported Customers';
+            $audit->save();
+
+            return redirect()->route('customers.index')->with('success', _lang('Customers Imported'));
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }
-
-        // audit log
-        $audit = new AuditLog();
-        $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Imported Customers';
-        $audit->save();
-
-        return redirect()->route('customers.index')->with('success', _lang('Customers Imported'));
     }
 
     public function export_customers()

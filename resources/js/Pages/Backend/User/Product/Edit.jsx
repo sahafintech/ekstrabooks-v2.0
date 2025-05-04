@@ -10,15 +10,8 @@ import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
 import { Switch } from "@/Components/ui/switch";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import DateTimePicker from "@/Components/DateTimePicker";
+import { parseDateObject } from "@/lib/utils";
 
 export default function Edit({ auth, product, productUnits = [], categories = [], brands = [], accounts = [] }) {
   const { data, setData, put, processing, errors } = useForm({
@@ -27,7 +20,7 @@ export default function Edit({ auth, product, productUnits = [], categories = []
     product_unit_id: product.product_unit_id?.toString(),
     code: product.code,
     descriptions: product.descriptions,
-    expiry_date: product.expiry_date,
+    expiry_date: parseDateObject(product.expiry_date),
     reorder_point: product.reorder_point,
     allow_for_selling: product.allow_for_selling,
     allow_for_purchasing: product.allow_for_purchasing,
@@ -37,8 +30,9 @@ export default function Edit({ auth, product, productUnits = [], categories = []
     expense_account_id: product.expense_account_id?.toString(),
     status: product.status,
     stock_management: product.stock_management,
-    category_id: product.category_id?.toString(),
+    sub_category_id: product.sub_category_id?.toString(),
     brand_id: product.brand_id?.toString(),
+    initial_stock: product.initial_stock,
     image: null,
     _method: "PUT",
   });
@@ -138,7 +132,7 @@ export default function Edit({ auth, product, productUnits = [], categories = []
             </div>
 
             <div className="grid grid-cols-12 mt-2">
-              <Label htmlFor="category_id" className="md:col-span-2 col-span-12">
+              <Label htmlFor="sub_category_id" className="md:col-span-2 col-span-12">
                 Category
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
@@ -148,12 +142,12 @@ export default function Edit({ auth, product, productUnits = [], categories = []
                       id: category.id,
                       name: category.name
                     }))}
-                    value={data.category_id}
-                    onChange={(value) => setData("category_id", value)}
+                    value={data.sub_category_id}
+                    onChange={(value) => setData("sub_category_id", value)}
                     placeholder="Select category"
                   />
                 </div>
-                <InputError message={errors.category_id} className="text-sm" />
+                <InputError message={errors.sub_category_id} className="text-sm" />
               </div>
             </div>
 
@@ -214,34 +208,12 @@ export default function Edit({ auth, product, productUnits = [], categories = []
                 Expiry Date
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "md:w-1/2 w-full justify-start text-left font-normal",
-                        !data.expiry_date && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {data.expiry_date ? (
-                        format(new Date(data.expiry_date), "PPP")
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={data.expiry_date ? new Date(data.expiry_date) : undefined}
-                      onSelect={(date) =>
-                        setData("expiry_date", date ? format(date, "yyyy-MM-dd") : "")
-                      }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DateTimePicker
+                  value={data.expiry_date}
+                  onChange={(date) => setData("axpiray_date", date)}
+                  className="md:w-1/2 w-full"
+                  required
+                />
                 <InputError message={errors.expiry_date} className="text-sm" />
               </div>
             </div>
@@ -286,8 +258,8 @@ export default function Edit({ auth, product, productUnits = [], categories = []
               <Label className="md:col-span-2 col-span-12">Allow for Selling</Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <Switch
-                  checked={data.allow_for_selling}
-                  onCheckedChange={(checked) => setData("allow_for_selling", checked)}
+                  checked={data.allow_for_selling == 1}
+                  onCheckedChange={(checked) => setData("allow_for_selling", checked ? 1 : 0)}
                 />
                 <InputError message={errors.allow_for_selling} className="text-sm" />
               </div>
@@ -339,8 +311,8 @@ export default function Edit({ auth, product, productUnits = [], categories = []
               <Label className="md:col-span-2 col-span-12">Allow for Purchasing</Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <Switch
-                  checked={data.allow_for_purchasing}
-                  onCheckedChange={(checked) => setData("allow_for_purchasing", checked)}
+                  checked={data.allow_for_purchasing == 1}
+                  onCheckedChange={(checked) => setData("allow_for_purchasing", checked ? 1 : 0)}
                 />
                 <InputError message={errors.allow_for_purchasing} className="text-sm" />
               </div>
@@ -398,8 +370,8 @@ export default function Edit({ auth, product, productUnits = [], categories = []
                 <div className="md:w-1/2 w-full">
                   <SearchableCombobox
                     options={[
-                      { id: "active", name: "Active" },
-                      { id: "inactive", name: "Inactive" }
+                      { id: "1", name: "Active" },
+                      { id: "0", name: "Disabled" }
                     ]}
                     value={data.status}
                     onChange={(value) => setData("status", value)}
@@ -414,8 +386,8 @@ export default function Edit({ auth, product, productUnits = [], categories = []
               <Label className="md:col-span-2 col-span-12">Stock Management</Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <Switch
-                  checked={data.stock_management}
-                  onCheckedChange={(checked) => setData("stock_management", checked)}
+                  checked={data.stock_management == 1}
+                  onCheckedChange={(checked) => setData("stock_management", checked ? 1 : 0)}
                 />
                 <InputError message={errors.stock_management} className="text-sm" />
               </div>

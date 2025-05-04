@@ -1098,18 +1098,18 @@ class InvoiceController extends Controller
 
         try {
             Excel::import(new CreditInvoiceImport, $request->file('invoices_file'));
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Imported Invoices';
+            $audit->save();
+
+            return redirect()->route('invoices.index')->with('success', _lang('Invoices Imported'));
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }
-
-        // audit log
-        $audit = new AuditLog();
-        $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Imported Invoices';
-        $audit->save();
-
-        return redirect()->route('invoices.index')->with('success', _lang('Invoices Imported'));
     }
 
     public function invoices_filter(Request $request)

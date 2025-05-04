@@ -36,7 +36,7 @@ import Modal from "@/Components/Modal";
 // Delete Confirmation Modal Component
 const DeleteCustomerModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this customer?
       </h2>
@@ -64,7 +64,7 @@ const DeleteCustomerModal = ({ show, onClose, onConfirm, processing }) => (
 // Bulk Delete Confirmation Modal Component
 const DeleteAllCustomersModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected customer{count !== 1 ? 's' : ''}?
       </h2>
@@ -91,8 +91,8 @@ const DeleteAllCustomersModal = ({ show, onClose, onConfirm, processing, count }
 
 // Import Customers Modal Component
 const ImportCustomersModal = ({ show, onClose, onSubmit, processing }) => (
-  <Modal show={show} onClose={onClose}>
-    <form onSubmit={onSubmit} className="p-6">
+  <Modal show={show} onClose={onClose} maxWidth="3xl">
+    <form onSubmit={onSubmit}>
       <div className="ti-modal-header">
         <h3 className="text-lg font-bold">Import Customers</h3>
       </div>
@@ -102,11 +102,11 @@ const ImportCustomersModal = ({ show, onClose, onSubmit, processing }) => (
             <label className="block font-medium text-sm text-gray-700">
               Customers File
             </label>
-            <Link href="/uploads/media/default/sample_suppliers.xlsx">
-              <Button variant="secondary" size="sm">
+            <a href="/uploads/media/default/sample_customers.xlsx" download>
+              <Button variant="secondary" size="sm" type="button">
                 Use This Sample File
               </Button>
-            </Link>
+            </a>
           </div>
           <input type="file" className="w-full dropify" name="customers_file" required />
         </div>
@@ -162,7 +162,7 @@ export default function List({ customers = [], meta = {}, filters = {} }) {
   const [perPage, setPerPage] = useState(meta.per_page || 10);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
-  
+
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
@@ -260,7 +260,7 @@ export default function List({ customers = [], meta = {}, filters = {} }) {
   const handleDelete = (e) => {
     e.preventDefault();
     setProcessing(true);
-    
+
     router.delete(route('customers.destroy', customerToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
@@ -276,7 +276,7 @@ export default function List({ customers = [], meta = {}, filters = {} }) {
   const handleDeleteAll = (e) => {
     e.preventDefault();
     setProcessing(true);
-    
+
     router.post(route('customers.bulk_action'), {
       delete_customers: selectedCustomers.join(',')
     }, {
@@ -296,8 +296,8 @@ export default function List({ customers = [], meta = {}, filters = {} }) {
     e.preventDefault();
     const formData = new FormData(e.target);
     setProcessing(true);
-    
-    router.post(route('customers.import_customers'), formData, {
+
+    router.post(route('customers.import'), formData, {
       onSuccess: () => {
         setShowImportModal(false);
         setProcessing(false);
@@ -339,7 +339,7 @@ export default function List({ customers = [], meta = {}, filters = {} }) {
   };
 
   const exportCustomers = () => {
-    router.get(route("customers.export_customers"));
+    window.location.href = route("customers.export")
   };
 
   return (

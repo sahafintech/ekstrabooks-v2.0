@@ -28,10 +28,10 @@ export default function Create({ productUnits = [], categories = [], brands = []
     selling_price: "0",
     income_account_id: "",
     expense_account_id: "",
-    status: "active",
+    status: "1",
     stock_management: true,
     image: null,
-    category_id: "",
+    sub_category_id: "",
     brand_id: "",
   });
 
@@ -127,7 +127,7 @@ export default function Create({ productUnits = [], categories = [], brands = []
             </div>
 
             <div className="grid grid-cols-12 mt-2">
-              <Label htmlFor="category_id" className="md:col-span-2 col-span-12">
+              <Label htmlFor="sub_category_id" className="md:col-span-2 col-span-12">
                 Category
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
@@ -137,12 +137,12 @@ export default function Create({ productUnits = [], categories = [], brands = []
                       id: category.id,
                       name: category.name
                     }))}
-                    value={data.category_id}
-                    onChange={(value) => setData("category_id", value)}
+                    value={data.sub_category_id}
+                    onChange={(value) => setData("sub_category_id", value)}
                     placeholder="Select category"
                   />
                 </div>
-                <InputError message={errors.category_id} className="text-sm" />
+                <InputError message={errors.sub_category_id} className="text-sm" />
               </div>
             </div>
 
@@ -253,8 +253,8 @@ export default function Create({ productUnits = [], categories = [], brands = []
               <Label className="md:col-span-2 col-span-12">Allow for Selling</Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <Switch
-                  checked={data.allow_for_selling}
-                  onCheckedChange={(checked) => setData("allow_for_selling", checked)}
+                  checked={data.allow_for_selling == 1}
+                  onCheckedChange={(checked) => setData("allow_for_selling", checked ? 1 : 0)}
                 />
                 <InputError message={errors.allow_for_selling} className="text-sm" />
               </div>
@@ -303,8 +303,8 @@ export default function Create({ productUnits = [], categories = [], brands = []
               <Label className="md:col-span-2 col-span-12">Allow for Purchasing</Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <Switch
-                  checked={data.allow_for_purchasing}
-                  onCheckedChange={(checked) => setData("allow_for_purchasing", checked)}
+                  checked={data.allow_for_purchasing == 1}
+                  onCheckedChange={(checked) => setData("allow_for_purchasing", checked ? 1 : 0)}
                 />
                 <InputError message={errors.allow_for_purchasing} className="text-sm" />
               </div>
@@ -359,8 +359,8 @@ export default function Create({ productUnits = [], categories = [], brands = []
                 <div className="md:w-1/2 w-full">
                   <SearchableCombobox
                     options={[
-                      { id: "active", name: "Active" },
-                      { id: "inactive", name: "Inactive" }
+                      { id: "1", name: "Active" },
+                      { id: "0", name: "Disabled" }
                     ]}
                     value={data.status}
                     onChange={(value) => setData("status", value)}
@@ -375,8 +375,8 @@ export default function Create({ productUnits = [], categories = [], brands = []
               <Label className="md:col-span-2 col-span-12">Stock Management</Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <Switch
-                  checked={data.stock_management}
-                  onCheckedChange={(checked) => setData("stock_management", checked)}
+                  checked={data.stock_management == 1}
+                  onCheckedChange={(checked) => setData("stock_management", checked ? 1 : 0)}
                 />
                 <InputError message={errors.stock_management} className="text-sm" />
               </div>

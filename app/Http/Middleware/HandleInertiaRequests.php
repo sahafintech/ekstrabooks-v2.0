@@ -66,6 +66,10 @@ class HandleInertiaRequests extends Middleware
             'isOwner' => $isOwner,
             'permissionList' => $permissionList,
             'date_format' => get_business_option('date_format', 'Y-m-d'),
+            'flash' => [
+                'success' => fn() => $request->session()->get('success'),
+                'error' => fn() => $request->session()->get('error'),
+            ],
         ];
     }
 }
