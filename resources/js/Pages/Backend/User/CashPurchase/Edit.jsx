@@ -468,7 +468,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
 
             <div className="grid grid-cols-12 mt-2">
               <Label htmlFor="benificiary" className="md:col-span-2 col-span-12">
-                Benificiary *
+                Benificiary
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <div className="md:w-1/2 w-full">
