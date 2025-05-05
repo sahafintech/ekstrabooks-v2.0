@@ -135,6 +135,15 @@ export default function View({ quotation, decimalPlace }) {
                             {/* Invoice Header */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                                 <div>
+                                    {quotation.business.logo && (
+                                        <div className="mb-3">
+                                            <img
+                                                src={`/uploads/media/${quotation.business.logo}`}
+                                                alt="Business Logo"
+                                                className="max-h-16 object-contain"
+                                            />
+                                        </div>
+                                    )}
                                     <h2 className="text-2xl font-bold text-primary">
                                         {quotation.business.business_name}
                                     </h2>
@@ -241,7 +250,7 @@ export default function View({ quotation, decimalPlace }) {
                                             </span>
                                         </div>
                                     )}
-                                    
+
                                     {/* Base currency equivalent total */}
                                     {quotation.currency !== quotation.business.currency && (
                                         <div className="flex justify-between py-2 text-sm text-gray-600">

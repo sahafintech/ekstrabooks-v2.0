@@ -135,6 +135,15 @@ export default function View({ sales_return, attachments, decimalPlace }) {
                             {/* Sales Return Header */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                                 <div>
+                                    {sales_return.business.logo && (
+                                        <div className="mb-3">
+                                            <img
+                                                src={`/uploads/media/${sales_return.business.logo}`}
+                                                alt="Business Logo"
+                                                className="max-h-16 object-contain"
+                                            />
+                                        </div>
+                                    )}
                                     <h2 className="text-2xl font-bold text-primary">
                                         {sales_return.business.business_name}
                                     </h2>
@@ -238,7 +247,7 @@ export default function View({ sales_return, attachments, decimalPlace }) {
                                             </span>
                                         </div>
                                     )}
-                                    
+
                                     {/* Base currency equivalent total */}
                                     {sales_return.currency !== sales_return.business.currency && (
                                         <div className="flex justify-between py-2 text-sm text-gray-600">

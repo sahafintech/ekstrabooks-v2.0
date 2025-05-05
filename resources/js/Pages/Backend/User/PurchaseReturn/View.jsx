@@ -135,6 +135,15 @@ export default function View({ purchase_return, attachments, decimalPlace }) {
                             {/* Purchase Return Header */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                                 <div>
+                                    {purchase_return.business.logo && (
+                                        <div className="mb-3">
+                                            <img
+                                                src={`/uploads/media/${purchase_return.business.logo}`}
+                                                alt="Business Logo"
+                                                className="max-h-16 object-contain"
+                                            />
+                                        </div>
+                                    )}
                                     <h2 className="text-2xl font-bold text-primary">
                                         {purchase_return.business.business_name}
                                     </h2>
@@ -212,7 +221,7 @@ export default function View({ purchase_return, attachments, decimalPlace }) {
                                             <span>{formatCurrency({ amount: tax.amount, currency: purchase_return.currency })}</span>
                                         </div>
                                     ))}
-                                    
+
                                     {/* Discount */}
                                     {purchase_return.discount > 0 && (
                                         <div className="flex justify-between py-2">
@@ -238,7 +247,7 @@ export default function View({ purchase_return, attachments, decimalPlace }) {
                                             </span>
                                         </div>
                                     )}
-                                    
+
                                     {/* Base currency equivalent total */}
                                     {purchase_return.currency !== purchase_return.business.currency && (
                                         <div className="flex justify-between py-2 text-sm text-gray-600">

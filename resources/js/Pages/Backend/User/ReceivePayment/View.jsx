@@ -135,8 +135,17 @@ export default function View({ payment, decimalPlace }) {
                             {/* Invoice Header */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                                 <div>
+                                    {payment.business.logo && (
+                                        <div className="mb-3">
+                                            <img
+                                                src={`/uploads/media/${payment.business.logo}`}
+                                                alt="Business Logo"
+                                                className="max-h-16 object-contain"
+                                            />
+                                        </div>
+                                    )}
                                     <h2 className="text-2xl font-bold text-primary">
-                                    {payment.business.business_name}
+                                        {payment.business.business_name}
                                     </h2>
                                     <div className="mt-2 text-sm">
                                         <p>{payment.business.address}</p>
