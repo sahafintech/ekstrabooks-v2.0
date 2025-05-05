@@ -1272,41 +1272,118 @@ class CashPurchaseController extends Controller
 		return redirect()->route('cash_purchases.index')->with('success', _lang('Deleted Successfully'));
 	}
 
-	public function approve($id)
+	public function bulk_destroy(Request $request)
 	{
-		$bill = Purchase::find($id);
-		$bill->approval_status = 1;
-		$bill->approved_by = auth()->user()->id;
-		$bill->save();
+		foreach ($request->ids as $id) {
+			$bill = Purchase::find($id);
 
-		// select from pending transactions and insert into transactions
-		$transactions = PendingTransaction::where('ref_id', $bill->id)->get();
+			// audit log
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = auth()->user()->id;
+			$audit->event = 'Deleted Cash Purchase ' . $bill->bill_no;
+			$audit->save();
 
-		foreach ($transactions as $transaction) {
-			// Create a new Transaction instance and replicate data from pending
-			$new_transaction = $transaction->replicate();
-			$new_transaction->setTable('transactions'); // Change the table to 'transactions'
-			$new_transaction->save();
+			// descrease stock
+			foreach ($bill->items as $purchaseItem) {
+				$product = $purchaseItem->product;
+				if ($product && $product->type == 'product' && $product->stock_management == 1) {
+					$product->stock = $product->stock - $purchaseItem->quantity;
+					$product->save();
+				}
+			}
 
-			// Delete the pending transaction
-			$transaction->delete();
+			// delete transactions
+			$transactions = Transaction::where('ref_id', $bill->id)
+				->where(function ($query) {
+					$query->where('ref_type', 'cash purchase')
+						->orWhere('ref_type', 'cash purchase tax');
+				})
+				->get();
+
+
+			if ($transactions->count() > 0) {
+				foreach ($transactions as $transaction) {
+					$transaction->delete();
+				}
+			}
+
+			// delete pending transactions
+			$transactions = PendingTransaction::where('ref_id', $bill->id)
+				->where(function ($query) {
+					$query->where('ref_type', 'cash purchase')
+						->orWhere('ref_type', 'cash purchase tax');
+				})
+				->get();
+
+			if ($transactions->count() > 0) {
+				foreach ($transactions as $transaction) {
+					$transaction->delete();
+				}
+			}
+
+
+			// bill invoice payment
+			$transaction = Transaction::where('ref_id', $bill->id)->where('ref_type', 'cash purchase payment')->get();
+			foreach ($transaction as $data) {
+				$data->delete();
+			}
+
+			// delete attachments
+			$attachments = Attachment::where('ref_id', $bill->id)->where('ref_type', 'cash purchase')->get();
+			foreach ($attachments as $attachment) {
+				$filePath = public_path($attachment->path);
+				if (file_exists($filePath)) {
+					unlink($filePath);
+				}
+				$attachment->delete();
+			}
+
+			$bill->delete();
+			return redirect()->route('cash_purchases.index')->with('success', _lang('Deleted Successfully'));
 		}
+	}
+
+	public function bulk_approve(Request $request)
+	{
+		foreach ($request->ids as $id) {
+			$bill = Purchase::find($id);
+			$bill->approval_status = 1;
+			$bill->approved_by = auth()->user()->id;
+			$bill->save();
+
+			// select from pending transactions and insert into transactions
+			$transactions = PendingTransaction::where('ref_id', $bill->id)->get();
+
+			foreach ($transactions as $transaction) {
+				// Create a new Transaction instance and replicate data from pending
+				$new_transaction = $transaction->replicate();
+				$new_transaction->setTable('transactions'); // Change the table to 'transactions'
+				$new_transaction->save();
+
+				// Delete the pending transaction
+				$transaction->delete();
+			}
 
 
-		// audit log
-		$audit = new AuditLog();
-		$audit->date_changed = date('Y-m-d H:i:s');
-		$audit->changed_by = auth()->user()->id;
-		$audit->event = 'Approved Cash Purchase ' . $bill->bill_no;
-		$audit->save();
+			// audit log
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = auth()->user()->id;
+			$audit->event = 'Approved Cash Purchase ' . $bill->bill_no;
+			$audit->save();
+		}
 
 		return redirect()->route('cash_purchases.index')->with('success', _lang('Approved Successfully'));
 	}
 
-	public function reject(Request $request, $id)
+	public function bulk_reject(Request $request)
 	{
-		$bill = Purchase::find(request()->id);
-		if ($bill->approval_status == 1) {
+		foreach ($request->ids as $id) {
+			$bill = Purchase::find($id);
+			if ($bill->approval_status == 0) {
+				continue;
+			}
 			$bill->approval_status = 0;
 			$bill->approved_by = null;
 			$bill->save();
@@ -1341,10 +1418,7 @@ class CashPurchaseController extends Controller
 			$audit->changed_by = auth()->user()->id;
 			$audit->event = 'Rejected Cash Purchase ' . $bill->bill_no;
 			$audit->save();
-
-			return redirect()->route('cash_purchases.index')->with('success', _lang('Rejected Successfully'));
-		} else {
-			return redirect()->route('cash_purchases.index')->with('error', _lang('Already Rejected'));
 		}
+		return redirect()->route('cash_purchases.index')->with('success', _lang('Rejected Successfully'));
 	}
 }

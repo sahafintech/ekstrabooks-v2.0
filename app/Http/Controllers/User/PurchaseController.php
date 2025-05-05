@@ -581,9 +581,9 @@ class PurchaseController extends Controller
 		$taxes = Tax::all();
 		$inventory = Account::where('account_name', 'Inventory')->first();
 		$taxIds = $bill->taxes
-            ->pluck('tax_id')
-            ->map(fn($id) => (string) $id)
-            ->toArray();
+			->pluck('tax_id')
+			->map(fn($id) => (string) $id)
+			->toArray();
 
 		return Inertia::render('Backend/User/Bill/Edit', [
 			'bill' => $bill,
@@ -1353,6 +1353,79 @@ class PurchaseController extends Controller
 		return redirect()->route('bill_invoices.index')->with('success', _lang('Deleted Successfully'));
 	}
 
+	public function bulk_destroy(Request $request)
+	{
+		foreach ($request->ids as $id) {
+			$purchase = Purchase::find($id);
+
+			// audit log
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = auth()->user()->id;
+			$audit->event = 'Bill Deleted' . ' ' . $purchase->bill_no;
+			$audit->save();
+
+			// descrease stock
+			foreach ($purchase->items as $purchaseItem) {
+				$product = $purchaseItem->product;
+				if ($product->type == 'product' && $product->stock_management == 1) {
+					$product->stock = $product->stock - $purchaseItem->quantity;
+					$product->save();
+				}
+			}
+			// delete transactions
+			$transactions = Transaction::where('ref_id', $purchase->id)
+				->where(function ($query) {
+					$query->where('ref_type', 'bill invoice')
+						->orWhere('ref_type', 'bill invoice tax');
+				})
+				->get();
+
+			foreach ($transactions as $transaction) {
+				$transaction->delete();
+			}
+
+			$purchase_payments = PurchasePayment::where('purchase_id', $purchase->id)->get();
+
+			foreach ($purchase_payments as $purchase_payment) {
+				$bill_payment = BillPayment::find($purchase_payment->payment_id);
+				if ($bill_payment) {
+					$bill_payment->amount = $bill_payment->amount - $purchase_payment->amount;
+					$bill_payment->save();
+
+					if ($bill_payment->amount == 0) {
+						$bill_payment->delete();
+					}
+
+					// delete transactions
+					$transactions = Transaction::where('ref_id', $purchase->id . ',' . $bill_payment->id)->where('ref_type', 'bill payment')->get();
+					foreach ($transactions as $transaction) {
+						$transaction->delete();
+					}
+				}
+				$purchase_payment->delete();
+
+				if ($bill_payment->purchases == null) {
+					$bill_payment->delete();
+				}
+			}
+
+			// delete attachments
+			$attachments = Attachment::where('ref_id', $purchase->id)->where('ref_type', 'bill invoice')->get();
+			foreach ($attachments as $attachment) {
+				$filePath = public_path($attachment->path);
+				if (file_exists($filePath)) {
+					unlink($filePath);
+				}
+				$attachment->delete();
+			}
+
+			$purchase->delete();
+		}
+
+		return redirect()->route('bill_invoices.index')->with('success', _lang('Deleted Successfully'));
+	}
+
 	private function calculateTotal(Request $request)
 	{
 		$subTotal = 0;
@@ -1534,41 +1607,46 @@ class PurchaseController extends Controller
 		return Excel::download(new BillInvoiceExport, 'purchases ' . now()->format('d m Y') . '.xlsx');
 	}
 
-	public function approve($id)
+	public function bulk_approve(Request $request)
 	{
-		$bill = Purchase::find($id);
-		$bill->approval_status = 1;
-		$bill->approved_by = auth()->user()->id;
-		$bill->save();
+		foreach ($request->ids as $id) {
+			$bill = Purchase::find($id);
+			$bill->approval_status = 1;
+			$bill->approved_by = auth()->user()->id;
+			$bill->save();
 
-		// select from pending transactions and insert into transactions
-		$transactions = PendingTransaction::where('ref_id', $bill->id)->get();
+			// select from pending transactions and insert into transactions
+			$transactions = PendingTransaction::where('ref_id', $bill->id)->get();
 
-		foreach ($transactions as $transaction) {
-			// Create a new Transaction instance and replicate data from pending
-			$new_transaction = $transaction->replicate();
-			$new_transaction->setTable('transactions'); // Change the table to 'transactions'
-			$new_transaction->save();
+			foreach ($transactions as $transaction) {
+				// Create a new Transaction instance and replicate data from pending
+				$new_transaction = $transaction->replicate();
+				$new_transaction->setTable('transactions'); // Change the table to 'transactions'
+				$new_transaction->save();
 
-			// Delete the pending transaction
-			$transaction->delete();
+				// Delete the pending transaction
+				$transaction->delete();
+			}
+
+
+			// audit log
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = auth()->user()->id;
+			$audit->event = 'Approved Bill Invoice ' . $bill->bill_no;
+			$audit->save();
 		}
-
-
-		// audit log
-		$audit = new AuditLog();
-		$audit->date_changed = date('Y-m-d H:i:s');
-		$audit->changed_by = auth()->user()->id;
-		$audit->event = 'Approved Bill Invoice ' . $bill->bill_no;
-		$audit->save();
 
 		return redirect()->route('bill_invoices.index')->with('success', _lang('Approved Successfully'));
 	}
 
-	public function reject($id)
+	public function bulk_reject(Request $request)
 	{
-		$bill = Purchase::find($id);
-		if ($bill->approval_status == 1) {
+		foreach ($request->ids as $id) {
+			$bill = Purchase::find($id);
+			if ($bill->approval_status == 0) {
+				continue;
+			}
 			$bill->approval_status = 0;
 			$bill->approved_by = null;
 			$bill->save();
@@ -1596,10 +1674,8 @@ class PurchaseController extends Controller
 			$audit->changed_by = auth()->user()->id;
 			$audit->event = 'Rejected Bill Invoice ' . $bill->bill_no;
 			$audit->save();
-
-			return redirect()->route('bill_invoices.index')->with('success', _lang('Rejected Successfully'));
-		} else {
-			return redirect()->route('bill_invoices.index')->with('error', _lang('Already Rejected'));
 		}
+
+		return redirect()->route('bill_invoices.index')->with('success', _lang('Rejected Successfully'));
 	}
 }

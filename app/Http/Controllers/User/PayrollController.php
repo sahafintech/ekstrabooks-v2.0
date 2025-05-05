@@ -15,7 +15,6 @@ use App\Models\EmployeeBenefit;
 use App\Models\Payroll;
 use App\Models\SalaryBenefit;
 use App\Models\Tax;
-use App\Models\TaxCalculationMethod;
 use App\Models\Transaction;
 use App\Models\TransactionMethod;
 use App\Utilities\Overrider;
@@ -418,69 +417,6 @@ class PayrollController extends Controller
         return redirect()->route('payslips.index')->with('success', _lang('Updated Successfully'));
     }
 
-    public function make_payment(Request $request)
-    {
-        if ($request->isMethod('get')) {
-            // Get all tax calculation methods
-            $taxCalculationMethods = TaxCalculationMethod::where('business_id', request()->activeBusiness->id)->get();
-            // Get all taxes for the legacy tax system
-            $taxes = Tax::where('business_id', request()->activeBusiness->id)->get();
-
-            return view('backend.user.payroll.make_payment', compact('taxCalculationMethods', 'taxes'));
-        } else {
-            $validator = Validator::make($request->all(), [
-                'month'                   => 'required',
-                'year'                    => 'required',
-                'account_id'              => 'required',
-                'expense_account_id'      => 'required',
-                'advance_account_id'      => 'required',
-                'tax_type'                => 'required|in:legacy,method',
-                'tax_calculation_method_id' => 'required_if:tax_type,method',
-                'taxes'                     => 'required_if:tax_type,legacy|array',
-            ], [
-                'account_id.required'         => 'You must select credit account',
-                'expense_account_id.required' => 'Expense account is required',
-                'advance_account_id.required' => 'Salary advance account is required',
-                'tax_calculation_method_id.required_if' => 'Please select a tax calculation method',
-                'taxes.required_if'                     => 'Please select at least one tax',
-            ]);
-
-            if ($validator->fails()) {
-                return back()->withErrors($validator)->withInput();
-            }
-
-            $payslips = Payroll::with('staff')
-                ->where('month', $request->month)
-                ->where('year', $request->year)
-                ->whereIn('status', [1, 2])
-                ->get();
-            $currency_symbol         = currency_symbol($request->activeBusiness->currency);
-            $account_id              = $request->account_id;
-            $expense_account_id      = $request->expense_account_id;
-            $advance_account_id      = $request->advance_account_id;
-            $method                  = $request->method;
-            $tax_type                = $request->tax_type;
-            $tax_calculation_method_id = $request->tax_calculation_method_id;
-            $taxes                   = $request->taxes;
-            $taxCalculationMethods   = TaxCalculationMethod::where('business_id', request()->activeBusiness->id)->get();
-            $taxesList               = Tax::where('business_id', request()->activeBusiness->id)->get();
-
-            return view('backend.user.payroll.make_payment', compact(
-                'payslips',
-                'currency_symbol',
-                'account_id',
-                'expense_account_id',
-                'advance_account_id',
-                'method',
-                'tax_type',
-                'tax_calculation_method_id',
-                'taxes',
-                'taxCalculationMethods',
-                'taxesList'
-            ));
-        }
-    }
-
     public function bulk_payment(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -489,11 +425,14 @@ class PayrollController extends Controller
             'credit_account_id'      => 'required',
             'debit_account_id' => 'required',
             'advance_account_id' => 'required',
+            'payment_date' => 'required'
         ]);
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator)->withInput();
         }
+
+        $currentTime = now();
 
         DB::beginTransaction();
         try {
@@ -509,7 +448,7 @@ class PayrollController extends Controller
                 $payslip->save();
 
                 $transaction                         = new Transaction();
-                $transaction->trans_date             = now();
+                $transaction->trans_date             = Carbon::parse($request->input('payment_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
                 $transaction->account_id             = $request->credit_account_id;
                 $transaction->dr_cr                  = 'dr';
                 $transaction->transaction_amount     = $payslip->net_salary;
@@ -525,7 +464,7 @@ class PayrollController extends Controller
                 $payslip->save();
 
                 $transaction                          = new Transaction();
-                $transaction->trans_date              = now();
+                $transaction->trans_date              = Carbon::parse($request->input('payment_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
                 $transaction->account_id              = $request->debit_account_id;
                 $transaction->dr_cr                   = 'dr';
                 $transaction->transaction_amount      = $payslip->current_salary + $payslip->total_allowance;
@@ -548,7 +487,7 @@ class PayrollController extends Controller
 
                 foreach ($deductions as $deduction) {
                     $transaction = new Transaction();
-                    $transaction->trans_date = now();
+                    $transaction->trans_date = Carbon::parse($request->input('payment_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
                     $transaction->account_id = $deduction->account_id;
                     $transaction->dr_cr = 'cr';
                     $transaction->transaction_amount = $deduction->amount;
@@ -563,7 +502,7 @@ class PayrollController extends Controller
 
                 if ($payslip->advance > 0) {
                     $transaction                          = new Transaction();
-                    $transaction->trans_date              = now();
+                    $transaction->trans_date              = Carbon::parse($request->input('payment_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
                     $transaction->account_id              = $request->advance_account_id;
                     $transaction->dr_cr                   = 'cr';
                     $transaction->transaction_amount      = $payslip->advance;

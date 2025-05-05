@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Head, Link, router, usePage } from "@inertiajs/react";
+import { Head, Link, router, useForm, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -36,7 +36,7 @@ import { formatCurrency } from "@/lib/utils";
 
 const DeleteCashPurchaseModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this cash purchase?
       </h2>
@@ -126,7 +126,7 @@ const ImportCashPurchasesModal = ({ show, onClose, onSubmit, processing }) => (
 
 const DeleteAllCashPurchasesModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected cash purchase{count !== 1 ? 's' : ''}?
       </h2>
@@ -145,6 +145,60 @@ const DeleteAllCashPurchasesModal = ({ show, onClose, onConfirm, processing, cou
           disabled={processing}
         >
           Delete Selected
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+const ApproveAllCashPurchasesModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to approve {count} selected cash purchase{count !== 1 ? 's' : ''}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Approve Selected
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+const RejectAllCashPurchasesModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to reject {count} selected cash purchase{count !== 1 ? 's' : ''}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="destructive"
+          disabled={processing}
+        >
+          Reject Selected
         </Button>
       </div>
     </form>
@@ -176,11 +230,13 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
   const [perPage, setPerPage] = useState(filters.per_page || 10);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
-  
+
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [showApproveAllModal, setShowApproveAllModal] = useState(false);
+  const [showRejectAllModal, setShowRejectAllModal] = useState(false);
   const [purchaseToDelete, setPurchaseToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
 
@@ -231,18 +287,9 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
         setPurchaseToDelete(null);
         setProcessing(false);
         setSelectedPurchases(prev => prev.filter(id => id !== purchaseToDelete));
-        toast({
-          title: "Cash Purchase Deleted",
-          description: "Cash purchase has been deleted successfully.",
-        });
       },
       onError: () => {
         setProcessing(false);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "There was an error deleting the cash purchase.",
-        });
       }
     });
   };
@@ -251,51 +298,80 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
     e.preventDefault();
     setProcessing(true);
 
-    router.delete(route("cash_purchases.delete_all"), {
-      data: { ids: selectedPurchases },
-      onSuccess: () => {
-        setShowDeleteAllModal(false);
-        setProcessing(false);
-        setSelectedPurchases([]);
-        setIsAllSelected(false);
-        toast({
-          title: "Cash Purchases Deleted",
-          description: "Selected cash purchases have been deleted successfully.",
-        });
+    router.post(
+      route("cash_purchases.bulk_destroy"),
+      {
+        ids: selectedPurchases,
       },
-      onError: () => {
-        setProcessing(false);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "There was an error deleting the selected cash purchases.",
-        });
-      }
-    });
+      {
+        onSuccess: () => {
+          setShowDeleteAllModal(false);
+          setProcessing(false);
+          setSelectedPurchases([]);
+          setIsAllSelected(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
+      });
+  };
+
+  const handleApproveAll = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+
+    router.post(route("cash_purchases.bulk_approve"),
+      {
+        ids: selectedPurchases,
+      },
+      {
+        onSuccess: () => {
+          setShowApproveAllModal(false);
+          setProcessing(false);
+          setSelectedPurchases([]);
+          setIsAllSelected(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
+      });
+  };
+
+  const handleRejectAll = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+
+    router.post(
+      route("cash_purchases.bulk_reject"),
+      {
+        ids: selectedPurchases,
+      },
+      {
+        onSuccess: () => {
+          setShowRejectAllModal(false);
+          setProcessing(false);
+          setSelectedPurchases([]);
+          setIsAllSelected(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
+      });
   };
 
   const handleImport = (e) => {
     e.preventDefault();
     setProcessing(true);
-    
+
     const formData = new FormData(e.target);
-    
+
     router.post(route("cash_purchases.import"), formData, {
       onSuccess: () => {
         setShowImportModal(false);
         setProcessing(false);
-        toast({
-          title: "Import Successful",
-          description: "Cash purchases have been imported successfully.",
-        });
       },
       onError: (errors) => {
         setProcessing(false);
-        toast({
-          variant: "destructive",
-          title: "Import Failed",
-          description: Object.values(errors).flat().join(", "),
-        });
       }
     });
   };
@@ -330,6 +406,12 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
   const handleBulkAction = () => {
     if (bulkAction === "delete" && selectedPurchases.length > 0) {
       setShowDeleteAllModal(true);
+    }
+    if (bulkAction === "approve" && selectedPurchases.length > 0) {
+      setShowApproveAllModal(true);
+    }
+    if (bulkAction === "reject" && selectedPurchases.length > 0) {
+      setShowRejectAllModal(true);
     }
   };
 
@@ -420,6 +502,8 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="delete">Delete Selected</SelectItem>
+                    <SelectItem value="approve">Approve Selected</SelectItem>
+                    <SelectItem value="reject">Reject Selected</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button onClick={handleBulkAction} variant="outline">
@@ -572,6 +656,22 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
         show={showDeleteAllModal}
         onClose={() => setShowDeleteAllModal(false)}
         onConfirm={handleDeleteAll}
+        processing={processing}
+        count={selectedPurchases.length}
+      />
+
+      <ApproveAllCashPurchasesModal
+        show={showApproveAllModal}
+        onClose={() => setShowApproveAllModal(false)}
+        onConfirm={handleApproveAll}
+        processing={processing}
+        count={selectedPurchases.length}
+      />
+
+      <RejectAllCashPurchasesModal
+        show={showRejectAllModal}
+        onClose={() => setShowRejectAllModal(false)}
+        onConfirm={handleRejectAll}
         processing={processing}
         count={selectedPurchases.length}
       />

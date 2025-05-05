@@ -399,8 +399,9 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('bill_payments', BillPaymentsController::class);
 		Route::post('all_bill_invoices', [PurchaseController::class, 'bill_invoices_all'])->name('bill_invoices.all');
 		Route::get('export_bill_invoices', [PurchaseController::class, 'export_bill_invoices'])->name('bill_invoices.export');
-		Route::post('approve_bill_invoices/{id}', [PurchaseController::class, 'approve'])->name('bill_invoices.approve');
-		Route::post('reject_bill_invoices/{id}', [PurchaseController::class, 'reject'])->name('bill_invoices.reject');
+		Route::post('approve_bill_invoices/bulk_approve', [PurchaseController::class, 'bulk_approve'])->name('bill_invoices.bulk_approve');
+		Route::post('reject_bill_invoices/bulk_reject', [PurchaseController::class, 'bulk_reject'])->name('bill_invoices.bulk_reject');
+		Route::post('reject_bill_invoices/bulk_destroy', [PurchaseController::class, 'bulk_destroy'])->name('bill_invoices.bulk_destroy');
 
 		//Cash Purchases
 		Route::resource('cash_purchases', CashPurchaseController::class);
@@ -409,8 +410,9 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('all_bills', [CashPurchaseController::class, 'bills_all'])->name('cash_purchases.all');
 		Route::get('export_bills', [CashPurchaseController::class, 'export_bills'])->name('cash_purchases.export');
 		Route::get('cash_purchases/voucher/{id}', [CashPurchaseController::class, 'voucher'])->name('cash_purchases.voucher');
-		Route::post('approve_cash_purchases/{id}', [CashPurchaseController::class, 'approve'])->name('cash_purchases.approve');
-		Route::post('reject_cash_purchase/{id}', [CashPurchaseController::class, 'reject'])->name('cash_purchases.reject');
+		Route::post('cash_purchases/bulk_approve', [CashPurchaseController::class, 'bulk_approve'])->name('cash_purchases.bulk_approve');
+		Route::post('cash_purchases/bulk_reject', [CashPurchaseController::class, 'bulk_reject'])->name('cash_purchases.bulk_reject');
+		Route::post('cash_purchases/bulk_destroy', [CashPurchaseController::class, 'bulk_destroy'])->name('cash_purchases.bulk_destroy');
 
 		// purchase orders
 		Route::get('purchase_orders/{id}/duplicate', [PurchaseOrderController::class, 'duplicate'])->name('purchase_orders.duplicate');

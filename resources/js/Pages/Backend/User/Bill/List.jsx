@@ -151,6 +151,60 @@ const DeleteAllBillsModal = ({ show, onClose, onConfirm, processing, count }) =>
   </Modal>
 );
 
+const ApproveAllBillsModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to approve {count} selected bill{count !== 1 ? 's' : ''}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Approve Selected
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+const RejectAllBillsModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to reject {count} selected bill{count !== 1 ? 's' : ''}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="destructive"
+          disabled={processing}
+        >
+          Reject Selected
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
 const BillApprovalStatusBadge = ({ status }) => {
   const statusMap = {
     0: { label: "Pending", className: "text-gray-600 bg-gray-200 px-3 py-1 rounded text-xs" },
@@ -192,6 +246,8 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [showApproveAllModal, setShowApproveAllModal] = useState(false);
+  const [showRejectAllModal, setShowRejectAllModal] = useState(false);
   const [billToDelete, setBillToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
 
@@ -262,27 +318,65 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
     e.preventDefault();
     setProcessing(true);
 
-    router.delete(route("bill_invoices.delete_all"), {
-      data: { ids: selectedBills },
-      onSuccess: () => {
-        setShowDeleteAllModal(false);
-        setProcessing(false);
-        setSelectedBills([]);
-        setIsAllSelected(false);
-        toast({
-          title: "Bills Deleted",
-          description: "Selected cash bills have been deleted successfully.",
-        });
+    router.post(
+      route("bill_invoices.bulk_destroy"),
+      {
+        ids: selectedBills,
       },
-      onError: () => {
-        setProcessing(false);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "There was an error deleting the selected cash bills.",
-        });
-      }
-    });
+      {
+        onSuccess: () => {
+          setShowDeleteAllModal(false);
+          setProcessing(false);
+          setSelectedBills([]);
+          setIsAllSelected(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
+      });
+  };
+
+  const handleApproveAll = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+
+    router.post(route("bill_invoices.bulk_approve"),
+      {
+        ids: selectedBills,
+      },
+      {
+        onSuccess: () => {
+          setShowApproveAllModal(false);
+          setProcessing(false);
+          setSelectedBills([]);
+          setIsAllSelected(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
+      });
+  };
+
+  const handleRejectAll = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+
+    router.post(
+      route("bill_invoices.bulk_reject"),
+      {
+        ids: selectedBills,
+      },
+      {
+        onSuccess: () => {
+          setShowRejectAllModal(false);
+          setProcessing(false);
+          setSelectedBills([]);
+          setIsAllSelected(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
+      });
   };
 
   const handleImport = (e) => {
@@ -341,6 +435,12 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
   const handleBulkAction = () => {
     if (bulkAction === "delete" && selectedBills.length > 0) {
       setShowDeleteAllModal(true);
+    }
+    if (bulkAction === "approve" && selectedBills.length > 0) {
+      setShowApproveAllModal(true);
+    }
+    if (bulkAction === "reject" && selectedBills.length > 0) {
+      setShowRejectAllModal(true);
     }
   };
 
@@ -417,7 +517,7 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <form onSubmit={handleSearch} className="flex gap-2">
                   <Input
-                    placeholder="Search cash bills..."
+                    placeholder="Search bills..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="w-full md:w-80"
@@ -435,6 +535,8 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="delete">Delete Selected</SelectItem>
+                    <SelectItem value="approve">Approve Selected</SelectItem>
+                    <SelectItem value="reject">Reject Selected</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button onClick={handleBulkAction} variant="outline">
@@ -536,7 +638,7 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={8} className="h-24 text-center">
-                        No cash bills found.
+                        No bills found.
                       </TableCell>
                     </TableRow>
                   )}
@@ -601,6 +703,22 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
         show={showDeleteAllModal}
         onClose={() => setShowDeleteAllModal(false)}
         onConfirm={handleDeleteAll}
+        processing={processing}
+        count={selectedBills.length}
+      />
+
+      <ApproveAllBillsModal
+        show={showApproveAllModal}
+        onClose={() => setShowApproveAllModal(false)}
+        onConfirm={handleApproveAll}
+        processing={processing}
+        count={selectedBills.length}
+      />
+
+      <RejectAllBillsModal
+        show={showRejectAllModal}
+        onClose={() => setShowRejectAllModal(false)}
+        onConfirm={handleRejectAll}
         processing={processing}
         count={selectedBills.length}
       />

@@ -35,6 +35,7 @@ import Modal from "@/Components/Modal";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { formatCurrency } from "@/lib/utils";
 import { Label } from "@/Components/ui/label";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
@@ -209,7 +210,7 @@ const BulkAccrueConfirmationModal = ({ show, onClose, onConfirm, processing, cou
     </Modal>
 );
 
-const BulkPaymentConfirmationModal = ({ show, onClose, onConfirm, processing, count, accounts, methods, debitAccountId, creditAccountId, setDebitAccountId, setCreditAccountId, advanceAccountId, setAdvanceAccountId, paymentMethod, setPaymentMethod }) => (
+const BulkPaymentConfirmationModal = ({ show, onClose, onConfirm, processing, count, accounts, methods, debitAccountId, creditAccountId, setDebitAccountId, setCreditAccountId, advanceAccountId, setAdvanceAccountId, paymentMethod, setPaymentMethod, paymentDate, setPaymentDate }) => (
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
@@ -218,7 +219,20 @@ const BulkPaymentConfirmationModal = ({ show, onClose, onConfirm, processing, co
             <div className="flex flex-1 flex-col gap-4 p-4 mt-4">
                 <div className="grid grid-cols-12 mt-2">
                     <Label htmlFor="credit_account_id" className="md:col-span-3 col-span-12">
-                        Credit Account
+                        Payment Date *
+                    </Label>
+                    <div className="md:col-span-9 col-span-12 md:mt-0 mt-2">
+                        <DateTimePicker
+                            value={paymentDate}
+                            onChange={(value) => setPaymentDate(value)}
+                            required
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-12 mt-2">
+                    <Label htmlFor="credit_account_id" className="md:col-span-3 col-span-12">
+                        Credit Account *
                     </Label>
                     <div className="md:col-span-9 col-span-12 md:mt-0 mt-2">
                         <SearchableCombobox
@@ -235,7 +249,7 @@ const BulkPaymentConfirmationModal = ({ show, onClose, onConfirm, processing, co
 
                 <div className="grid grid-cols-12 mt-2">
                     <Label htmlFor="debit_account_id" className="md:col-span-3 col-span-12">
-                        Debit Account
+                        Debit Account *
                     </Label>
                     <div className="md:col-span-9 col-span-12 md:mt-0 mt-2">
                         <SearchableCombobox
@@ -252,7 +266,7 @@ const BulkPaymentConfirmationModal = ({ show, onClose, onConfirm, processing, co
 
                 <div className="grid grid-cols-12 mt-2">
                     <Label htmlFor="advance_account_id" className="md:col-span-3 col-span-12">
-                        Advance Account
+                        Advance Account *
                     </Label>
                     <div className="md:col-span-9 col-span-12 md:mt-0 mt-2">
                         <SearchableCombobox
@@ -331,6 +345,7 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
     const [creditAccountId, setCreditAccountId] = useState(null);
     const [advanceAccountId, setAdvanceAccountId] = useState(null);
     const [paymentMethod, setPaymentMethod] = useState(null);
+    const [paymentDate, setPaymentDate] = useState(null);
 
     useEffect(() => {
         if (flash && flash.success) {
@@ -466,111 +481,131 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
         e.preventDefault();
         setIsProcessing(true);
 
-        router.post(route("payslips.bulk_delete"), {
-            ids: selectedPaylips
-        }, {
-            preserveState: true,
-            onSuccess: () => {
-                setSelectedPayslips([]);
-                setIsAllSelected(false);
-                setBulkAction("");
-                setShowBulkDeleteModal(false);
-                setIsProcessing(false);
+        router.post(
+            route("payslips.bulk_delete"),
+            {
+                ids: selectedPaylips
             },
-            onError: () => {
-                setIsProcessing(false);
+            {
+                preserveState: true,
+                onSuccess: () => {
+                    setSelectedPayslips([]);
+                    setIsAllSelected(false);
+                    setBulkAction("");
+                    setShowBulkDeleteModal(false);
+                    setIsProcessing(false);
+                },
+                onError: () => {
+                    setIsProcessing(false);
+                }
             }
-        });
+        );
     };
 
     const handleBulkApproveConfirm = (e) => {
         e.preventDefault();
         setIsProcessing(true);
 
-        router.post(route("payslips.bulk_approve"), {
-            ids: selectedPaylips,
-        }, {
-            preserveState: true,
-            onSuccess: () => {
-                setSelectedPayslips([]);
-                setIsAllSelected(false);
-                setBulkAction("");
-                setShowBulkApproveModal(false);
-                setIsProcessing(false);
+        router.post(
+            route("payslips.bulk_approve"),
+            {
+                ids: selectedPaylips,
             },
-            onError: () => {
-                setIsProcessing(false);
+            {
+                preserveState: true,
+                onSuccess: () => {
+                    setSelectedPayslips([]);
+                    setIsAllSelected(false);
+                    setBulkAction("");
+                    setShowBulkApproveModal(false);
+                    setIsProcessing(false);
+                },
+                onError: () => {
+                    setIsProcessing(false);
+                }
             }
-        });
+        );
     };
 
     const handleBulkRejectConfirm = (e) => {
         e.preventDefault();
         setIsProcessing(true);
 
-        router.post(route("payslips.bulk_reject"), {
-            ids: selectedPaylips
-        }, {
-            preserveState: true,
-            onSuccess: () => {
-                setSelectedPayslips([]);
-                setIsAllSelected(false);
-                setBulkAction("");
-                setShowBulkRejectModal(false);
-                setIsProcessing(false);
+        router.post(
+            route("payslips.bulk_reject"),
+            {
+                ids: selectedPaylips
             },
-            onError: () => {
-                setIsProcessing(false);
+            {
+                preserveState: true,
+                onSuccess: () => {
+                    setSelectedPayslips([]);
+                    setIsAllSelected(false);
+                    setBulkAction("");
+                    setShowBulkRejectModal(false);
+                    setIsProcessing(false);
+                },
+                onError: () => {
+                    setIsProcessing(false);
+                }
             }
-        });
+        );
     };
 
     const handleBulkAccrueConfirm = (e) => {
         e.preventDefault();
         setIsProcessing(true);
 
-        router.post(route("payslips.bulk_accrue"), {
-            ids: selectedPaylips,
-            liability_account_id: liabilityAccountId,
-            expense_account_id: expenseAccountId
-        }, {
-            preserveState: true,
-            onSuccess: () => {
-                setSelectedPayslips([]);
-                setIsAllSelected(false);
-                setBulkAction("");
-                setShowBulkAccrueModal(false);
-                setIsProcessing(false);
+        router.post(
+            route("payslips.bulk_accrue"),
+            {
+                ids: selectedPaylips,
+                liability_account_id: liabilityAccountId,
+                expense_account_id: expenseAccountId
             },
-            onError: () => {
-                setIsProcessing(false);
+            {
+                preserveState: true,
+                onSuccess: () => {
+                    setSelectedPayslips([]);
+                    setIsAllSelected(false);
+                    setBulkAction("");
+                    setShowBulkAccrueModal(false);
+                    setIsProcessing(false);
+                },
+                onError: () => {
+                    setIsProcessing(false);
+                }
             }
-        });
+        );
     };
 
     const handleBulkPaymentConfirm = (e) => {
         e.preventDefault();
         setIsProcessing(true);
 
-        router.post(route("payslips.bulk_payment"), {
-            ids: selectedPaylips,
-            credit_account_id: creditAccountId,
-            debit_account_id: debitAccountId,
-            advance_account_id: advanceAccountId,
-            method: paymentMethod,
-        }, {
-            preserveState: true,
-            onSuccess: () => {
-                setSelectedPayslips([]);
-                setIsAllSelected(false);
-                setBulkAction("");
-                setShowBulkPaymentModal(false);
-                setIsProcessing(false);
+        router.post(
+            route("payslips.bulk_payment"),
+            {
+                ids: selectedPaylips,
+                credit_account_id: creditAccountId,
+                debit_account_id: debitAccountId,
+                advance_account_id: advanceAccountId,
+                method: paymentMethod,
             },
-            onError: () => {
-                setIsProcessing(false);
+            {
+                preserveState: true,
+                onSuccess: () => {
+                    setSelectedPayslips([]);
+                    setIsAllSelected(false);
+                    setBulkAction("");
+                    setShowBulkPaymentModal(false);
+                    setIsProcessing(false);
+                },
+                onError: () => {
+                    setIsProcessing(false);
+                }
             }
-        });
+        );
     };
 
     const renderPageNumbers = () => {
@@ -881,6 +916,8 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                         setDebitAccountId={setDebitAccountId}
                         setAdvanceAccountId={setAdvanceAccountId}
                         setPaymentMethod={setPaymentMethod}
+                        setPaymentDate={setPaymentDate}
+                        paymentDate={paymentDate}
                     />
                 </div>
             </SidebarInset>
