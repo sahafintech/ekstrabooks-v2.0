@@ -122,6 +122,7 @@ class PurchaseOrderController extends Controller
 	 */
 	public function store(Request $request)
 	{
+		return $request;
 		$validator = Validator::make($request->all(), [
 			'vendor_id' => 'required',
 			'title' => 'required',
@@ -234,10 +235,10 @@ class PurchaseOrderController extends Controller
 
 
 		// if attachments then upload
-		if (isset($request->attachments['file'])) {
-			if ($request->attachments['file'] != null) {
-				for ($i = 0; $i < count($request->attachments['file']); $i++) {
-					$theFile = $request->file("attachments.file.$i");
+		if (isset($request->attachments)) {
+			if ($request->attachments != null) {
+				for ($i = 0; $i < count($request->attachments); $i++) {
+					$theFile = $request->file("attachments.$i.file");
 					if ($theFile == null) {
 						continue;
 					}
@@ -245,7 +246,7 @@ class PurchaseOrderController extends Controller
 					$theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
 
 					$attachment = new Attachment();
-					$attachment->file_name = $request->attachments['file_name'][$i];
+					$attachment->file_name = $request->attachments[$i]['file_name'];
 					$attachment->path = "/uploads/media/attachments/" . $theAttachment;
 					$attachment->ref_type = 'purchase order';
 					$attachment->ref_id = $purchase->id;
@@ -259,7 +260,7 @@ class PurchaseOrderController extends Controller
 				'purchase_order_id' => $purchase->id,
 				'product_id' => isset($request->product_id[$i]) ? $request->product_id[$i] : null,
 				'product_name' => $request->product_name[$i],
-				'description' => null,
+				'description' => isset($request->description[$i]) ? $request->description[$i] : null,
 				'quantity' => $request->quantity[$i],
 				'unit_cost' => $request->unit_cost[$i],
 				'sub_total' => ($request->unit_cost[$i] * $request->quantity[$i]),
@@ -318,13 +319,13 @@ class PurchaseOrderController extends Controller
 	 * @param  int  $id
 	 * @return \Illuminate\Http\Response
 	 */
-	public function edit(Request $request, $id)
+	public function edit($id)
 	{
 		$purchase_order = PurchaseOrder::with(['business', 'items', 'taxes', 'vendor'])
 			->where('id', $id)
 			->first();
 
-		$attachments = Attachment::where('ref_id', $id)->where('ref_type', 'purchase order')->get();
+		$theAttachments = Attachment::where('ref_id', $id)->where('ref_type', 'purchase order')->get();
 		$accounts = Account::all();
 		$currencies = Currency::all();
 		$vendors = Vendor::all();
@@ -338,7 +339,7 @@ class PurchaseOrderController extends Controller
 
 		return Inertia::render('Backend/User/PurchaseOrder/Edit', [
 			'purchase_order' => $purchase_order,
-			'attachments' => $attachments,
+			'theAttachments' => $theAttachments,
 			'accounts' => $accounts,
 			'currencies' => $currencies,
 			'vendors' => $vendors,
@@ -466,10 +467,11 @@ class PurchaseOrderController extends Controller
 		// delete old attachments
 		$attachments = Attachment::where('ref_id', $purchase->id)->where('ref_type', 'purchase order')->get(); // Get attachments from the database
 
-		foreach ($attachments as $attachment) {
-			// Only delete the file if it exist in the request attachments
-			if (isset($request->attachments['file'])) {
-				if (!$request->attachments['file'] == null && !in_array($attachment->path, $request->attachments['file'])) {
+		if (isset($request->attachments)) {
+			$incomingFiles = collect($request->attachments)->pluck('file')->toArray();
+
+			foreach ($attachments as $attachment) {
+				if (!in_array($attachment->path, $incomingFiles)) {
 					$filePath = public_path($attachment->path);
 					if (file_exists($filePath)) {
 						unlink($filePath); // Delete the file
@@ -480,10 +482,10 @@ class PurchaseOrderController extends Controller
 		}
 
 		// if attachments then upload
-		if (isset($request->attachments['file'])) {
-			if ($request->attachments['file'] != null) {
-				for ($i = 0; $i < count($request->attachments['file']); $i++) {
-					$theFile = $request->file("attachments.file.$i");
+		if (isset($request->attachments)) {
+			if ($request->attachments != null) {
+				for ($i = 0; $i < count($request->attachments); $i++) {
+					$theFile = $request->file("attachments.$i.file");
 					if ($theFile == null) {
 						continue;
 					}
@@ -491,7 +493,7 @@ class PurchaseOrderController extends Controller
 					$theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
 
 					$attachment = new Attachment();
-					$attachment->file_name = $request->attachments['file_name'][$i];
+					$attachment->file_name = $request->attachments[$i]['file_name'];
 					$attachment->path = "/uploads/media/attachments/" . $theAttachment;
 					$attachment->ref_type = 'purchase order';
 					$attachment->ref_id = $purchase->id;
@@ -508,9 +510,9 @@ class PurchaseOrderController extends Controller
 		for ($i = 0; $i < count($request->product_name); $i++) {
 			$purchaseItem = $purchase->items()->save(new PurchaseOrderItem([
 				'purchase_order_id' => $purchase->id,
-				'product_id' => null,
+				'product_id' => isset($request->product_id[$i]) ? $request->product_id[$i] : null,
 				'product_name' => $request->product_name[$i],
-				'description' => null,
+				'description' => isset($request->description[$i]) ? $request->description[$i] : null,
 				'quantity' => $request->quantity[$i],
 				'unit_cost' => $request->unit_cost[$i],
 				'sub_total' => ($request->unit_cost[$i] * $request->quantity[$i]),
@@ -589,7 +591,7 @@ class PurchaseOrderController extends Controller
 		$discountAmount = 0;
 		$grandTotal = 0;
 
-		for ($i = 0; $i < count($request->product_id); $i++) {
+		for ($i = 0; $i < count($request->account_id); $i++) {
 			//Calculate Sub Total
 			$line_qnt = $request->quantity[$i];
 			$line_unit_cost = $request->unit_cost[$i];
@@ -599,9 +601,9 @@ class PurchaseOrderController extends Controller
 			$subTotal = ($subTotal + $line_total);
 
 			//Calculate Taxes
-			if (isset($request->taxes[$request->product_id[$i]])) {
-				for ($j = 0; $j < count($request->taxes[$request->product_id[$i]]); $j++) {
-					$taxId = $request->taxes[$request->product_id[$i]][$j];
+			if (isset($request->taxes)) {
+				for ($j = 0; $j < count($request->taxes); $j++) {
+					$taxId = $request->taxes[$j];
 					$tax = Tax::find($taxId);
 					$product_tax = ($line_total / 100) * $tax->rate;
 					$taxAmount += $product_tax;

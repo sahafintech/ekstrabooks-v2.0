@@ -9,7 +9,7 @@ import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { convertCurrency, formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
@@ -22,10 +22,11 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     description: "",
     quantity: 1,
     unit_cost: 0,
-    account_id: "",
+    account_id: inventory.id,
   }]);
 
   const [purchaseOrderAccounts, setPurchaseOrderAccounts] = useState([]);
+  const [attachments, setAttachments] = useState([]);
   const [exchangeRate, setExchangeRate] = useState(1);
   const [baseCurrencyInfo, setBaseCurrencyInfo] = useState(null);
 
@@ -41,7 +42,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     template: "",
     note: "",
     footer: "",
-    attachment: null,
+    attachments: [],
     product_id: [],
     product_name: [],
     description: [],
@@ -51,6 +52,29 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     account_id: [],
   });
 
+  // ------------------------------------------------
+  // Keep Inertia form arrays in sync with our two local lists
+  const syncFormArrays = () => {
+    setData("product_id", purchaseOrderItems.map(i => i.product_id));
+    setData("product_name", purchaseOrderItems.map(i => i.product_name)
+      .concat(purchaseOrderAccounts.map(a => a.product_name || "")));
+    setData("account_id", purchaseOrderAccounts.map(a => a.account_id)
+      .concat(purchaseOrderItems.map(a => a.account_id || "")));
+    setData("description", purchaseOrderItems.map(i => i.description)
+      .concat(purchaseOrderAccounts.map(a => a.description || "")));
+    setData("quantity", purchaseOrderItems.map(i => i.quantity)
+      .concat(purchaseOrderAccounts.map(a => a.quantity || 1)));
+    setData("unit_cost", purchaseOrderItems.map(i => i.unit_cost)
+      .concat(purchaseOrderAccounts.map(a => a.unit_cost)));
+
+    setData("attachments", attachments);
+  };
+
+  useEffect(() => {
+    syncFormArrays();
+  }, [purchaseOrderItems, purchaseOrderAccounts, attachments]);
+  // ------------------------------------------------
+
   const addPurchaseOrderItem = () => {
     setPurchaseOrderItems([...purchaseOrderItems, {
       product_id: "",
@@ -58,14 +82,8 @@ export default function Create({ vendors = [], products = [], currencies = [], t
       description: "",
       quantity: 1,
       unit_cost: 0,
-      account_id: ""
+      account_id: inventory.id
     }]);
-    setData("product_id", [...data.product_id, ""]);
-    setData("product_name", [...data.product_name, ""]);
-    setData("description", [...data.description, ""]);
-    setData("quantity", [...data.quantity, 1]);
-    setData("unit_cost", [...data.unit_cost, 0]);
-    setData("account_id", [...data.account_id, ""]);
   };
 
   const addPurchaseOrderAccount = () => {
@@ -76,73 +94,16 @@ export default function Create({ vendors = [], products = [], currencies = [], t
       description: "",
       product_name: "" // Initialize product_name for account entries
     }]);
-    setData("account_id", [...data.account_id || [], ""]);
-    setData("unit_cost", [...data.unit_cost || [], 0]);
-
-    // Update quantity and description arrays to include new account entries
-    const updatedQuantities = [
-      ...purchaseOrderItems.map(item => item.quantity),
-      ...purchaseOrderAccounts.map(account => account.quantity),
-      1  // for the new account
-    ];
-
-    const updatedDescriptions = [
-      ...purchaseOrderItems.map(item => item.description),
-      ...purchaseOrderAccounts.map(account => account.description || ""),
-      ""  // for the new account
-    ];
-
-    // Update product_name array to include new account entry
-    const updatedProductNames = [
-      ...purchaseOrderItems.map(item => item.product_name),
-      ...purchaseOrderAccounts.map(account => account.product_name || ""),
-      ""  // for the new account
-    ];
-
-    setData("quantity", updatedQuantities);
-    setData("description", updatedDescriptions);
-    setData("product_name", updatedProductNames);
   };
 
   const removePurchaseOrderAccount = (index) => {
     const updatedAccounts = purchaseOrderAccounts.filter((_, i) => i !== index);
     setPurchaseOrderAccounts(updatedAccounts);
-    setData("account_id", updatedAccounts.map(account => account.account_id));
-    setData("unit_cost", updatedAccounts.map(account => account.unit_cost));
-
-    // Update quantity and description arrays after removing an account
-    setData("quantity", [
-      ...purchaseOrderItems.map(item => item.quantity),
-      ...updatedAccounts.map(account => account.quantity || 1)
-    ]);
-
-    setData("description", [
-      ...purchaseOrderItems.map(item => item.description),
-      ...updatedAccounts.map(account => account.description || "")
-    ]);
-
-    // Update product_name array after removing an account
-    setData("product_name", [
-      ...purchaseOrderItems.map(item => item.product_name),
-      ...updatedAccounts.map(account => account.product_name || "")
-    ]);
   };
 
   const removePurchaseOrderItem = (index) => {
     const updatedItems = purchaseOrderItems.filter((_, i) => i !== index);
     setPurchaseOrderItems(updatedItems);
-    setData("product_id", updatedItems.map(item => item.product_id));
-    setData("product_name", updatedItems.map(item => item.product_name));
-    setData("description", [
-      ...updatedItems.map(item => item.description),
-      ...purchaseOrderAccounts.map(account => account.description || "")
-    ]);
-    setData("quantity", [
-      ...updatedItems.map(item => item.quantity),
-      ...purchaseOrderAccounts.map(account => account.quantity || 1)
-    ]);
-    setData("unit_cost", updatedItems.map(item => item.unit_cost));
-    setData("account_id", updatedItems.map(item => item.account_id));
   };
 
   const updatePurchaseOrderItem = (index, field, value) => {
@@ -165,12 +126,6 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     }
 
     setPurchaseOrderItems(updatedItems);
-    setData("product_id", updatedItems.map(item => item.product_id));
-    setData("product_name", updatedItems.map(item => item.product_name));
-    setData("description", updatedItems.map(item => item.description));
-    setData("quantity", updatedItems.map(item => item.quantity));
-    setData("unit_cost", updatedItems.map(item => item.unit_cost));
-    setData("account_id", updatedItems.map(item => item.account_id));
   };
 
   const calculateSubtotal = () => {
@@ -183,20 +138,16 @@ export default function Create({ vendors = [], products = [], currencies = [], t
   const taxRateMap = new Map(taxes.map(t => [t.id, Number(t.rate)]));
 
   const calculateTaxes = () => {
-    return purchaseOrderItems.reduce((sum, item) => {
-      const base = Number(item.quantity) * Number(item.unit_cost);
+    // merge both lists into one
+    const allLines = [...purchaseOrderItems, ...purchaseOrderAccounts];
 
-      const itemTax = data.taxes.reduce((taxSum, taxIdStr) => {
-        // convert the incoming tax‐ID string to a Number
-        const taxId = Number(taxIdStr);
-
-        // look up the rate; if missing, default to 0
-        const rate = taxRateMap.get(taxId) || 0;
-
+    return allLines.reduce((sum, line) => {
+      const base = Number(line.quantity) * Number(line.unit_cost);
+      const lineTax = data.taxes.reduce((taxSum, taxIdStr) => {
+        const rate = taxRateMap.get(Number(taxIdStr)) || 0;
         return taxSum + (base * rate) / 100;
       }, 0);
-
-      return sum + itemTax;
+      return sum + lineTax;
     }, 0);
   };
 
@@ -344,6 +295,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
           account_id: ""
         }]);
         setPurchaseOrderAccounts([]);
+        setAttachments([]);
       },
     });
   };
@@ -741,17 +693,105 @@ export default function Create({ vendors = [], products = [], currencies = [], t
             </div>
 
             <div className="grid grid-cols-12 mt-2">
-              <Label htmlFor="attachment" className="md:col-span-2 col-span-12">
-                Attachment
+              <Label htmlFor="attachments" className="md:col-span-2 col-span-12">
+                Attachments
               </Label>
-              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Input
-                  id="attachment"
-                  type="file"
-                  onChange={(e) => setData("attachment", e.target.files[0])}
-                  className="md:w-1/2 w-full"
-                />
-                <InputError message={errors.attachment} className="text-sm" />
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2 space-y-2">
+                <div className="border rounded-md overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700 w-1/3">File Name</th>
+                        <th className="text-left py-2 px-4 font-medium text-gray-700">Attachment</th>
+                        <th className="text-center py-2 px-4 font-medium text-gray-700 w-24">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {attachments.map((item, index) => (
+                        <tr key={`attachment-${index}`} className="border-b last:border-b-0">
+                          <td className="py-3 px-4">
+                            <Input
+                              id={`filename-${index}`}
+                              type="text"
+                              placeholder="Enter file name"
+                              value={item.file_name}
+                              onChange={(e) => {
+                                const newAttachments = [...attachments];
+                                newAttachments[index] = {
+                                  ...newAttachments[index],
+                                  file_name: e.target.value
+                                };
+                                setAttachments(newAttachments);
+                              }}
+                              className="w-full"
+                            />
+                          </td>
+                          <td className="py-3 px-4">
+                            <Input
+                              id={`attachment-${index}`}
+                              type="file"
+                              onChange={(e) => {
+                                const newAttachments = [...attachments];
+                                newAttachments[index] = {
+                                  ...newAttachments[index],
+                                  file: e.target.files[0],
+                                };
+                                setAttachments(newAttachments);
+                              }}
+                              className="w-full"
+                            />
+                            {item.file && (
+                              <div className="text-xs text-gray-500 mt-1 flex items-center justify-between truncate">
+                                <span className="truncate">
+                                  {typeof item.file === 'string'
+                                    ? item.file.split('/').pop()
+                                    : item.file.name}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newAttachments = [...attachments];
+                                    newAttachments[index] = { ...newAttachments[index], file: null };
+                                    setAttachments(newAttachments);
+                                  }}
+                                  className="ml-2 text-red-500 hover:text-red-700"
+                                  title="Remove file"
+                                >
+                                  <X className="w-6 h-6" />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="text-red-500"
+                              onClick={() => {
+                                const newAttachments = attachments.filter((_, i) => i !== index);
+                                setAttachments(newAttachments);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAttachments([...attachments, { file: null, file_name: "" }])}
+                  className="mt-2"
+                >
+                  <Plus className="h-4 w-4 mr-2" /> Add Attachment
+                </Button>
+                <InputError message={errors.attachments} className="text-sm" />
               </div>
             </div>
 
@@ -778,6 +818,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                       account_id: ""
                     }]);
                     setPurchaseOrderAccounts([]);
+                    setAttachments([]);
                   }}
                 >
                   Reset

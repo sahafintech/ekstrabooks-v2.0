@@ -16,7 +16,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 
-export default function Home({ pageData = {}, pageMedia = {} }) {
+export default function Home({ pageData = {} }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         title: pageData.title || "",
         model_language: "",

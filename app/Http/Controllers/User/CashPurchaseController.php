@@ -26,38 +26,38 @@ class CashPurchaseController extends Controller
 {
 	public function index(Request $request)
 	{
-        $search = $request->get('search', '');
-        $perPage = $request->get('per_page', 10);
-        
-        $query = Purchase::with('vendor')
-            ->where('cash', 1)
-            ->orderBy('id', 'desc');
-            
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('bill_no', 'like', "%$search%")
-                  ->orWhere('title', 'like', "%$search%")
-                  ->orWhereHas('vendor', function ($q) use ($search) {
-                      $q->where('name', 'like', "%$search%");
-                  });
-            });
-        }
-        
-        $purchases = $query->paginate($perPage)->withQueryString();
+		$search = $request->get('search', '');
+		$perPage = $request->get('per_page', 10);
 
-        return Inertia::render('Backend/User/CashPurchase/List', [
-            'purchases' => $purchases->items(),
-            'meta' => [
-                'current_page' => $purchases->currentPage(),
-                'per_page' => $purchases->perPage(),
-                'last_page' => $purchases->lastPage(),
-                'total' => $purchases->total(),
-            ],
-            'filters' => [
-                'search' => $search,
-                'per_page' => $perPage,
-            ],
-        ]);
+		$query = Purchase::with('vendor')
+			->where('cash', 1)
+			->orderBy('id', 'desc');
+
+		if ($search) {
+			$query->where(function ($q) use ($search) {
+				$q->where('bill_no', 'like', "%$search%")
+					->orWhere('title', 'like', "%$search%")
+					->orWhereHas('vendor', function ($q) use ($search) {
+						$q->where('name', 'like', "%$search%");
+					});
+			});
+		}
+
+		$purchases = $query->paginate($perPage)->withQueryString();
+
+		return Inertia::render('Backend/User/CashPurchase/List', [
+			'purchases' => $purchases->items(),
+			'meta' => [
+				'current_page' => $purchases->currentPage(),
+				'per_page' => $purchases->perPage(),
+				'last_page' => $purchases->lastPage(),
+				'total' => $purchases->total(),
+			],
+			'filters' => [
+				'search' => $search,
+				'per_page' => $perPage,
+			],
+		]);
 	}
 
 	/**
@@ -67,36 +67,36 @@ class CashPurchaseController extends Controller
 	 */
 	public function create()
 	{
-        $vendors = Vendor::orderBy('id', 'desc')
-            ->get();
-            
-        $products = Product::orderBy('id', 'desc')
-            ->get();
-            
-        $currencies = Currency::orderBy('id', 'desc')
-            ->get();
-            
-        $taxes = Tax::orderBy('id', 'desc')
-            ->get();
-            
-        $accounts = Account::all();
+		$vendors = Vendor::orderBy('id', 'desc')
+			->get();
+
+		$products = Product::orderBy('id', 'desc')
+			->get();
+
+		$currencies = Currency::orderBy('id', 'desc')
+			->get();
+
+		$taxes = Tax::orderBy('id', 'desc')
+			->get();
+
+		$accounts = Account::all();
 
 		$inventory = Account::where('account_name', 'Inventory')->first();
 
 		$purchase_title = get_business_option('purchase_title', 'Cash Purchase');
 
 		$base_currency = get_business_option('currency');
-            
+
 		return Inertia::render('Backend/User/CashPurchase/Create', [
-            'vendors' => $vendors,
-            'products' => $products,
-            'currencies' => $currencies,
-            'inventory' => $inventory,
-            'taxes' => $taxes,
-            'accounts' => $accounts,
-            'purchase_title' => $purchase_title,
-            'base_currency' => $base_currency,
-	        ]);
+			'vendors' => $vendors,
+			'products' => $products,
+			'currencies' => $currencies,
+			'inventory' => $inventory,
+			'taxes' => $taxes,
+			'accounts' => $accounts,
+			'purchase_title' => $purchase_title,
+			'base_currency' => $base_currency,
+		]);
 	}
 
 	/**
@@ -231,10 +231,10 @@ class CashPurchaseController extends Controller
 		$purchase->save();
 
 		// if attachments then upload
-		if (isset($request->attachments['file'])) {
-			if ($request->attachments['file'] != null) {
-				for ($i = 0; $i < count($request->attachments['file']); $i++) {
-					$theFile = $request->file("attachments.file.$i");
+		if (isset($request->attachments)) {
+			if ($request->attachments != null) {
+				for ($i = 0; $i < count($request->attachments); $i++) {
+					$theFile = $request->file("attachments.$i.file");
 					if ($theFile == null) {
 						continue;
 					}
@@ -242,7 +242,7 @@ class CashPurchaseController extends Controller
 					$theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
 
 					$attachment = new Attachment();
-					$attachment->file_name = $request->attachments['file_name'][$i];
+					$attachment->file_name = $request->attachments[$i]['file_name'];
 					$attachment->path = "/uploads/media/attachments/" . $theAttachment;
 					$attachment->ref_type = 'cash purchase';
 					$attachment->ref_id = $purchase->id;
@@ -596,7 +596,7 @@ class CashPurchaseController extends Controller
 			$credit_account = PendingTransaction::where('ref_id', $id)->where('ref_type', 'cash purchase payment')->first();
 		}
 
-		$attachments = Attachment::where('ref_id', $id)->where('ref_type', 'cash purchase')->get();
+		$theAttachments = Attachment::where('ref_id', $id)->where('ref_type', 'cash purchase')->get();
 		$accounts = Account::all();
 		$currencies = Currency::all();
 		$vendors = Vendor::all();
@@ -604,13 +604,13 @@ class CashPurchaseController extends Controller
 		$taxes = Tax::all();
 		$inventory = Account::where('account_name', 'Inventory')->first();
 		$taxIds = $bill->taxes
-            ->pluck('tax_id')
-            ->map(fn($id) => (string) $id)
-            ->toArray();
+			->pluck('tax_id')
+			->map(fn($id) => (string) $id)
+			->toArray();
 
 		return Inertia::render('Backend/User/CashPurchase/Edit', [
 			'bill' => $bill,
-			'attachments' => $attachments,
+			'theAttachments' => $theAttachments,
 			'credit_account' => $credit_account->account_id,
 			'accounts' => $accounts,
 			'currencies' => $currencies,
@@ -742,10 +742,11 @@ class CashPurchaseController extends Controller
 		// delete old attachments
 		$attachments = Attachment::where('ref_id', $purchase->id)->where('ref_type', 'cash purchase')->get(); // Get attachments from the database
 
-		foreach ($attachments as $attachment) {
-			// Only delete the file if it exist in the request attachments
-			if (isset($request->attachments['file'])) {
-				if (!$request->attachments['file'] == null && !in_array($attachment->path, $request->attachments['file'])) {
+		if (isset($request->attachments)) {
+			$incomingFiles = collect($request->attachments)->pluck('file')->toArray();
+
+			foreach ($attachments as $attachment) {
+				if (!in_array($attachment->path, $incomingFiles)) {
 					$filePath = public_path($attachment->path);
 					if (file_exists($filePath)) {
 						unlink($filePath); // Delete the file
@@ -756,10 +757,10 @@ class CashPurchaseController extends Controller
 		}
 
 		// if attachments then upload
-		if (isset($request->attachments['file'])) {
-			if ($request->attachments['file'] == null) {
-				for ($i = 0; $i < count($request->attachments['file']); $i++) {
-					$theFile = $request->file("attachments.file.$i");
+		if (isset($request->attachments)) {
+			if ($request->attachments != null) {
+				for ($i = 0; $i < count($request->attachments); $i++) {
+					$theFile = $request->file("attachments.$i.file");
 					if ($theFile == null) {
 						continue;
 					}
@@ -767,7 +768,7 @@ class CashPurchaseController extends Controller
 					$theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
 
 					$attachment = new Attachment();
-					$attachment->file_name = $request->attachments['file_name'][$i];
+					$attachment->file_name = $request->attachments[$i]['file_name'];
 					$attachment->path = "/uploads/media/attachments/" . $theAttachment;
 					$attachment->ref_type = 'cash purchase';
 					$attachment->ref_id = $purchase->id;
@@ -1215,7 +1216,7 @@ class CashPurchaseController extends Controller
 		// descrease stock
 		foreach ($bill->items as $purchaseItem) {
 			$product = $purchaseItem->product;
-			if($product && $product->type == 'product' && $product->stock_management == 1) {
+			if ($product && $product->type == 'product' && $product->stock_management == 1) {
 				$product->stock = $product->stock - $purchaseItem->quantity;
 				$product->save();
 			}

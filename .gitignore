@@ -2,6 +2,9 @@
 /node_modules
 /public/build
 /public/hot
+/public/uploads/media/*
+!/public/uploads/media/default/
+/public/uploads/documents/*
 /public/storage
 /storage/*.key
 /storage/pail

@@ -1,42 +1,47 @@
 import { Card, CardContent } from "@/Components/ui/card";
+import { ReceiptIcon, CircleDollarSign, LucideReceiptText, Cloud, BarChart, AppWindow, DollarSign, ShieldCheck } from "lucide-react";
 
 export default function Features() {
     const features = [
         {
-            title: "Become efficiency leaders",
-            description: "Eliminate manual routine tasks and be among the most productive firms.",
-            icon: (
-                <svg className="h-8 w-8 text-primary" viewBox="0 0 24 24">
-                    <path fill="currentColor" d="M3.5 18.49l6-6.01l4 4L22 6.92L20.59 5.5l-8.09 8.09l-4-4L2 16.99z"/>
-                </svg>
-            ),
+            title: "Invoicing",
+            description: "involves generating bills for goods or services, detailing amounts due, payment terms, and customer information.",
+            icon: <ReceiptIcon />,
         },
         {
-            title: "Time for financial advice",
-            description: "Focus on more profitable, value-adding services for your clients.",
-            icon: (
-                <svg className="h-8 w-8 text-primary" viewBox="0 0 24 24">
-                    <path fill="currentColor" d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8s8 3.58 8 8s-3.58 8-8 8zm.5-13H11v6l5.25 3.15l.75-1.23l-4.5-2.67z"/>
-                </svg>
-            ),
+            title: "Online Payment",
+            description: "offer convenience and speed, enabling secure transactions for goods and services through digital platforms.",
+            icon: <CircleDollarSign />,
         },
         {
-            title: "Acquire modern clients",
-            description: "The best clients expect innovative and digital solutions.",
-            icon: (
-                <svg className="h-8 w-8 text-primary" viewBox="0 0 24 24">
-                    <path fill="currentColor" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5S5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05c1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-                </svg>
-            ),
+            title: "Tax Calculation",
+            description: "involves determining the amount of tax owed based on income, deductions, credits, and applicable tax rates.",
+            icon: <LucideReceiptText /> ,
         },
         {
-            title: "No installation necessary",
-            description: "Onboard in under 45min and export bookings to DATEV with just one click.",
-            icon: (
-                <svg className="h-8 w-8 text-primary" viewBox="0 0 24 24">
-                    <path fill="currentColor" d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5l-5-5l1.41-1.41L11 12.67V3h2z"/>
-                </svg>
-            ),
+            title: "Cloud Based-Access",
+            description: "enables users to securely access applications and data from anywhere, using any internet-connected device.",
+            icon: <Cloud />,
+        },
+        {
+            title: "Advanced Reporting",
+            description: "leverages sophisticated tools and analytics to provide in-depth, actionable insights for data-driven decision-making.",
+            icon: <BarChart />,
+        },
+        {
+            title: "Point Of Sale",
+            description: "(POS) system streamlines sales transactions, inventory management, and customer data processing efficiently.",
+            icon: <AppWindow />,
+        },
+        {
+            title: "Multi Currency",
+            description: "allow businesses to handle transactions in multiple currencies, facilitating global trade and financial operations.",
+            icon: <DollarSign />,
+        },
+        {
+            title: "System Access Controlls",
+            description: "ensures authorized users can access resources while preventing unauthorized access, enhancing security.",
+            icon: <ShieldCheck />,
         },
     ];
 
@@ -46,10 +51,10 @@ export default function Features() {
                 <div className="flex flex-col items-center justify-center space-y-4 text-center">
                     <div className="space-y-2">
                         <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
-                            Features that make a difference
+                            Explore Our Features
                         </h2>
                         <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                            Our AI-powered platform streamlines your accounting workflow
+                            There are many variations of features that we offer
                         </p>
                     </div>
                 </div>
