@@ -26,9 +26,77 @@ import {
 } from "@/components/ui/sidebar";
 
 export function UserSidebar({ ...props }) {
-    const { url } = usePage();
-
+    const { url } = usePage(); // e.g. "/user/products/123/edit"
     const { auth, activeBusiness } = usePage().props;
+
+    // ———————————————————————————————
+    // Define all your “startsWith” base-paths here:
+    // ———————————————————————————————
+    const dashboardBase = "/dashboard";
+
+    // Products
+    const productsBase = "/user/products";
+    const mainCategoryBase = "/user/main_categories";
+    const subCategoriesBase = "/user/sub_categories";
+    const brandsBase = "/user/brands";
+    const unitsBase = "/user/product_units";
+    const invAdjustBase = "/user/inventory_adjustments";
+
+    // Suppliers
+    const vendorsBase = "/user/vendors";
+    const purchaseOrdersBase = "/user/purchase_orders";
+    const cashPurchasesBase = "/user/cash_purchases";
+    const billInvoicesBase = "/user/bill_invoices";
+    const billPaymentsBase = "/user/bill_payments";
+    const purchaseReturnsBase = "/user/purchase_returns";
+
+    // Customers
+    const customersBase = "/user/customers";
+    const receiptsBase = "/user/receipts";
+    const creditInvoicesBase = "/user/invoices";
+    const medicalRecordsBase = "/user/medical_records";
+    const quotationsBase = "/user/quotations";
+    const deferredInvoicesBase = "/user/deffered_invoices";
+    const salesReturnsBase = "/user/sales_returns";
+    const prescriptionsBase = "/user/prescriptions";
+    const receivePaymentsBase = "/user/receive_payments";
+
+    // HR & Payroll
+    const staffsBase = "/user/staffs";
+    const attendanceBase = "/user/attendance";
+    const departmentsBase = "/user/departments";
+    const designationsBase = "/user/designations";
+    const payslipsBase = "/user/payslips";
+    const holidaysBase = "/user/holidays";
+    const leavesBase = "/user/leaves";
+    const awardsBase = "/user/awards";
+
+    // Accounting
+    const accountsBase = "/user/accounts";
+    const journalsBase = "/user/journals";
+    const transactionMethodsBase = "/user/transaction_methods";
+
+    // Business
+    const businessesBase = "/user/business";
+    const rolesBase = "/user/roles";
+    const taxesBase = "/user/taxes";
+    const currencyBase = "/user/currency";
+    const auditLogsBase = "/user/audit_logs";
+    const businessSettingsFragment = "/business/settings/"; // we’ll use `.includes`
+
+    // Reports
+    const reportsJournalBase = "/user/reports/journal";
+    const reportsLedgerBase = "/user/reports/ledger";
+    const reportsIncomeStatement = "/user/reports/income_statement";
+    const reportsTrialBalance = "/user/reports/trial_balance";
+    const reportsBalanceSheet = "/user/reports/balance_sheet";
+    const reportsReceivables = "/user/reports/receivables";
+    const reportsPayables = "/user/reports/payables";
+    const reportsPayrollSummary = "/user/reports/payroll_summary";
+    const reportsPayrollCost = "/user/reports/payroll_cost";
+    const reportsIncomeByCustomer = "/user/reports/income_by_customer";
+    const reportsInventoryDetails = "/user/reports/inventory_details";
+    const reportsInventorySummary = "/user/reports/inventory_summary";
 
     const data = {
         user: {
@@ -37,34 +105,17 @@ export function UserSidebar({ ...props }) {
             email: auth.user.email,
             avatar: '/uploads/media/' + auth.user.profile_picture,
         }
-    }
-
-    // Enhanced isRoute function that handles routes with wildcards for parameters
-    const isRoute = (name) => {
-        // Check if it's exactly the current route
-        if (route().current(name)) {
-            return true;
-        }
-
-        // Extract the base path from the current URL
-        const currentPath = window.location.pathname;
-
-        // Get the route base
-        const routeBase = route(name).split('?')[0]; // Remove any query parameters
-
-        // Create a pattern that matches the route base followed by any parameters
-        // This will match routes like /invoices/* or /customers/*
-        const pattern = new RegExp(`^${routeBase}(\\/|$)`);
-
-        return pattern.test(currentPath);
     };
 
+    // ——————————————————————————————————
+    // Build each section using url.startsWith
+    // ——————————————————————————————————
     const dashboardItems = [
         {
             title: "Dashboard",
             url: route("dashboard.index"),
             icon: PieChart,
-            isActive: isRoute("dashboard.index"),
+            isActive: url.startsWith(dashboardBase),
         },
     ];
 
@@ -73,136 +124,152 @@ export function UserSidebar({ ...props }) {
             title: "Products",
             url: "#",
             icon: Package,
-            isActive: isRoute("products.index") || isRoute("sub_categories.index") || isRoute("main_categories.index") || isRoute("brands.index") ||
-                isRoute("product_units.index") || isRoute("inventory_adjustments.index") ||
-                isRoute("products.create"),
+            isActive:
+                url.startsWith(productsBase) ||
+                url.startsWith(mainCategoryBase) ||
+                url.startsWith(subCategoriesBase) ||
+                url.startsWith(brandsBase) ||
+                url.startsWith(unitsBase) ||
+                url.startsWith(invAdjustBase),
             items: [
                 {
                     title: "All Products",
                     url: route("products.index"),
-                    isActive: isRoute("products.index") || isRoute("products.create"),
+                    isActive: url === productsBase,
                 },
                 {
                     title: "Main Categories",
                     url: route("main_categories.index"),
-                    isActive: isRoute("main_categories.index"),
+                    isActive: url === mainCategoryBase,
                 },
                 {
                     title: "Sub Categories",
                     url: route("sub_categories.index"),
-                    isActive: isRoute("sub_categories.index"),
+                    isActive: url.startsWith(subCategoriesBase),
                 },
                 {
                     title: "Brands",
                     url: route("brands.index"),
-                    isActive: isRoute("brands.index"),
+                    isActive: url.startsWith(brandsBase),
                 },
                 {
                     title: "Units",
                     url: route("product_units.index"),
-                    isActive: isRoute("product_units.index"),
+                    isActive: url.startsWith(unitsBase),
                 },
                 {
                     title: "Inventory Adjustment",
                     url: route("inventory_adjustments.index"),
-                    isActive: isRoute("inventory_adjustments.index"),
-                }
+                    isActive: url.startsWith(invAdjustBase),
+                },
             ],
         },
         {
             title: "Suppliers",
             url: "#",
             icon: Users,
-            isActive: isRoute("vendors.index") || isRoute("purchase_orders.index") || isRoute("cash_purchases.index") ||
-                isRoute("bill_invoices.index") || isRoute("bill_payments.index") || isRoute("purchase_returns.index"),
+            isActive:
+                url.startsWith(vendorsBase) ||
+                url.startsWith(purchaseOrdersBase) ||
+                url.startsWith(cashPurchasesBase) ||
+                url.startsWith(billInvoicesBase) ||
+                url.startsWith(billPaymentsBase) ||
+                url.startsWith(purchaseReturnsBase),
             items: [
                 {
                     title: "All Suppliers",
                     url: route("vendors.index"),
-                    isActive: isRoute("vendors.index"),
+                    isActive: url.startsWith(vendorsBase),
                 },
                 {
                     title: "Purchase Order",
                     url: route("purchase_orders.index"),
-                    isActive: isRoute("purchase_orders.index"),
+                    isActive: url.startsWith(purchaseOrdersBase),
                 },
                 {
                     title: "Cash Purchase",
                     url: route("cash_purchases.index"),
-                    isActive: isRoute("cash_purchases.index"),
+                    isActive: url.startsWith(cashPurchasesBase),
                 },
                 {
                     title: "Bill Invoice",
                     url: route("bill_invoices.index"),
-                    isActive: isRoute("bill_invoices.index"),
+                    isActive: url.startsWith(billInvoicesBase),
                 },
                 {
                     title: "Pay Bills",
                     url: route("bill_payments.index"),
-                    isActive: isRoute("bill_payments.index"),
+                    isActive: url.startsWith(billPaymentsBase),
                 },
                 {
                     title: "Purchase Return",
                     url: route("purchase_returns.index"),
-                    isActive: isRoute("purchase_returns.index"),
-                }
+                    isActive: url.startsWith(purchaseReturnsBase),
+                },
             ],
         },
         {
             title: "Customers",
             url: "#",
             icon: Users,
-            isActive: isRoute("customers.index") || isRoute("receipts.index") || isRoute("invoices.index") ||
-                isRoute("medical_records.index") || isRoute("quotations.index") || isRoute("deffered_invoices.index") ||
-                isRoute("sales_returns.index") || isRoute("prescriptions.index") || isRoute("receive_payments.index"),
+            isActive:
+                url.startsWith(customersBase) ||
+                url.startsWith(receiptsBase) ||
+                url.startsWith(creditInvoicesBase) ||
+                url.startsWith(medicalRecordsBase) ||
+                url.startsWith(quotationsBase) ||
+                url.startsWith(deferredInvoicesBase) ||
+                url.startsWith(salesReturnsBase) ||
+                url.startsWith(prescriptionsBase) ||
+                url.startsWith(receivePaymentsBase),
             items: [
                 {
                     title: "All Customers",
                     url: route("customers.index"),
-                    isActive: isRoute("customers.index"),
+                    isActive: url.startsWith(customersBase),
                 },
                 {
                     title: "Cash Invoice",
                     url: route("receipts.index"),
-                    isActive: isRoute("receipts.index"),
+                    isActive: url.startsWith(receiptsBase),
                 },
                 {
                     title: "Credit Invoice",
                     url: route("invoices.index"),
-                    isActive: isRoute("invoices.index"),
+                    isActive: url.startsWith(creditInvoicesBase),
                 },
                 {
                     title: "Medical Records",
                     url: route("medical_records.index"),
-                    isActive: isRoute("medical_records.index"),
+                    isActive: url.startsWith(medicalRecordsBase),
                 },
                 {
                     title: "Prescriptions",
                     url: route("prescriptions.index"),
-                    isActive: isRoute("prescriptions.index"),
+                    isActive: url.startsWith(prescriptionsBase),
                 },
                 {
-                    title: "Deffered Invoice",
+                    title: "Deferred Invoice",
                     url: route("deffered_invoices.index"),
-                    isActive: isRoute("deffered_invoices.index"),
+                    isActive: url.startsWith(deferredInvoicesBase),
                 },
                 {
                     title: "Received Payment",
                     url: route("receive_payments.index"),
-                    isActive: isRoute("receive_payments.index"),
+                    isActive: url.startsWith(receivePaymentsBase),
                 },
                 {
                     title: "Sales Return",
                     url: route("sales_returns.index"),
-                    isActive: isRoute("sales_returns.index"),
+                    isActive: url.startsWith(salesReturnsBase),
                 },
                 {
                     title: "Quotations",
                     url: route("quotations.index"),
-                    isActive: isRoute("quotations.index"),
-                }
-            ]
-        }
+                    isActive: url.startsWith(quotationsBase),
+                },
+            ],
+        },
     ];
 
     const navManagementItems = [
@@ -210,185 +277,207 @@ export function UserSidebar({ ...props }) {
             title: "HR & Payroll",
             url: "#",
             icon: GroupIcon,
-            isActive: isRoute("staffs.index") || isRoute("attendance.index") || isRoute("departments.index") ||
-                isRoute("designations.index") || isRoute("payslips.index") || isRoute("holidays.index") || isRoute("leaves.index") ||
-                isRoute("awards.index"),
+            isActive:
+                url.startsWith(staffsBase) ||
+                url.startsWith(attendanceBase) ||
+                url.startsWith(departmentsBase) ||
+                url.startsWith(designationsBase) ||
+                url.startsWith(payslipsBase) ||
+                url.startsWith(holidaysBase) ||
+                url.startsWith(leavesBase) ||
+                url.startsWith(awardsBase),
             items: [
                 {
                     title: "Staff Management",
                     url: route("staffs.index"),
-                    isActive: isRoute("staffs.index"),
+                    isActive: url.startsWith(staffsBase),
                 },
                 {
                     title: "Attendance",
                     url: route("attendance.index"),
-                    isActive: isRoute("attendance.index"),
+                    isActive: url.startsWith(attendanceBase),
                 },
                 {
                     title: "Departments",
                     url: route("departments.index"),
-                    isActive: isRoute("departments.index"),
+                    isActive: url.startsWith(departmentsBase),
                 },
                 {
                     title: "Designations",
                     url: route("designations.index"),
-                    isActive: isRoute("designations.index"),
+                    isActive: url.startsWith(designationsBase),
                 },
                 {
                     title: "Manage Payroll",
                     url: route("payslips.index"),
-                    isActive: isRoute("payslips.index"),
+                    isActive: url.startsWith(payslipsBase),
                 },
                 {
                     title: "Holidays",
                     url: route("holidays.index"),
-                    isActive: isRoute("holidays.index"),
+                    isActive: url.startsWith(holidaysBase),
                 },
                 {
                     title: "Leave Management",
                     url: route("leaves.index"),
-                    isActive: isRoute("leaves.index"),
+                    isActive: url.startsWith(leavesBase),
                 },
                 {
                     title: "Awards",
                     url: route("awards.index"),
-                    isActive: isRoute("awards.index"),
-                }
+                    isActive: url.startsWith(awardsBase),
+                },
             ],
         },
         {
             title: "Accounting",
             url: "#",
             icon: ChartPieIcon,
-            isActive: isRoute("accounts.index") || isRoute("journals.index") || isRoute("transaction_methods.index"),
+            isActive:
+                url.startsWith(accountsBase) ||
+                url.startsWith(journalsBase) ||
+                url.startsWith(transactionMethodsBase),
             items: [
                 {
                     title: "Chart of Accounts",
                     url: route("accounts.index"),
-                    isActive: isRoute("accounts.index"),
+                    isActive: url.startsWith(accountsBase),
                 },
                 {
                     title: "Journal Entry",
                     url: route("journals.index"),
-                    isActive: isRoute("journals.index"),
+                    isActive: url.startsWith(journalsBase),
                 },
                 {
                     title: "Transaction Methods",
                     url: route("transaction_methods.index"),
-                    isActive: isRoute("transaction_methods.index"),
-                }
-            ]
+                    isActive: url.startsWith(transactionMethodsBase),
+                },
+            ],
         },
         {
             title: "Business",
             url: "#",
             icon: Building2Icon,
-            isActive: isRoute("business.index") || isRoute("roles.index") ||
-                isRoute("taxes.index") || isRoute("currency.index") || isRoute("audit_logs.index") ||
-                url.includes('/business/settings/'),
+            isActive:
+                url.startsWith(businessesBase) ||
+                url.startsWith(rolesBase) ||
+                url.startsWith(taxesBase) ||
+                url.startsWith(currencyBase) ||
+                url.startsWith(auditLogsBase) ||
+                url.includes(businessSettingsFragment),
             items: [
                 {
                     title: "Manage Businesses",
                     url: route("business.index"),
-                    isActive: isRoute("business.index"),
+                    isActive: url.startsWith(businessesBase),
                 },
                 {
                     title: "Roles & Permissions",
                     url: route("roles.index"),
-                    isActive: isRoute("roles.index"),
+                    isActive: url.startsWith(rolesBase),
                 },
                 {
                     title: "Business Settings",
                     url: route("business.settings", activeBusiness.id),
-                    isActive: url.includes('/business/settings/'),
+                    isActive: url.includes(businessSettingsFragment),
                 },
                 {
                     title: "Tax Settings",
                     url: route("taxes.index"),
-                    isActive: isRoute("taxes.index"),
+                    isActive: url.startsWith(taxesBase),
                 },
                 {
                     title: "Currency Settings",
                     url: route("currency.index"),
-                    isActive: isRoute("currency.index"),
+                    isActive: url.startsWith(currencyBase),
                 },
                 {
                     title: "Audit Logs",
                     url: route("audit_logs.index"),
-                    isActive: isRoute("audit_logs.index"),
-                }
-            ]
+                    isActive: url.startsWith(auditLogsBase),
+                },
+            ],
         },
         {
             title: "Reports",
             url: "#",
             icon: Building2Icon,
-            isActive: isRoute("reports.journal") || isRoute("reports.ledger") || isRoute("reports.income_statement") ||
-                isRoute("reports.trial_balance") || isRoute("reports.balance_sheet") || isRoute("reports.receivables") ||
-                isRoute("reports.payables") || isRoute("reports.payroll_summary") || isRoute("reports.payroll_cost") || isRoute("reports.income_by_customer") ||
-                isRoute("reports.inventory_details") || isRoute("reports.inventory_summary"),
+            isActive:
+                url.startsWith(reportsJournalBase) ||
+                url.startsWith(reportsLedgerBase) ||
+                url.startsWith(reportsIncomeStatement) ||
+                url.startsWith(reportsTrialBalance) ||
+                url.startsWith(reportsBalanceSheet) ||
+                url.startsWith(reportsReceivables) ||
+                url.startsWith(reportsPayables) ||
+                url.startsWith(reportsPayrollSummary) ||
+                url.startsWith(reportsPayrollCost) ||
+                url.startsWith(reportsIncomeByCustomer) ||
+                url.startsWith(reportsInventoryDetails) ||
+                url.startsWith(reportsInventorySummary),
             items: [
                 {
                     title: "General Journal",
                     url: route("reports.journal"),
-                    isActive: isRoute("reports.journal"),
+                    isActive: url.startsWith(reportsJournalBase),
                 },
                 {
                     title: "General Ledger",
                     url: route("reports.ledger"),
-                    isActive: isRoute("reports.ledger"),
+                    isActive: url.startsWith(reportsLedgerBase),
                 },
                 {
                     title: "Income Statement",
                     url: route("reports.income_statement"),
-                    isActive: isRoute("reports.income_statement"),
+                    isActive: url.startsWith(reportsIncomeStatement),
                 },
                 {
                     title: "Trial Balance",
                     url: route("reports.trial_balance"),
-                    isActive: isRoute("reports.trial_balance"),
+                    isActive: url.startsWith(reportsTrialBalance),
                 },
                 {
                     title: "Balance Sheet",
                     url: route("reports.balance_sheet"),
-                    isActive: isRoute("reports.balance_sheet"),
+                    isActive: url.startsWith(reportsBalanceSheet),
                 },
                 {
                     title: "Income By Customer",
                     url: route("reports.income_by_customer"),
-                    isActive: isRoute("reports.income_by_customer"),
+                    isActive: url.startsWith(reportsIncomeByCustomer),
                 },
                 {
                     title: "Receivables",
                     url: route("reports.receivables"),
-                    isActive: isRoute("reports.receivables"),
+                    isActive: url.startsWith(reportsReceivables),
                 },
                 {
                     title: "Payables",
                     url: route("reports.payables"),
-                    isActive: isRoute("reports.payables"),
+                    isActive: url.startsWith(reportsPayables),
                 },
                 {
                     title: "Payroll Summary",
                     url: route("reports.payroll_summary"),
-                    isActive: isRoute("reports.payroll_summary"),
+                    isActive: url.startsWith(reportsPayrollSummary),
                 },
                 {
                     title: "Monthly Payroll Cost",
                     url: route("reports.payroll_cost"),
-                    isActive: isRoute("reports.payroll_cost"),
+                    isActive: url.startsWith(reportsPayrollCost),
                 },
                 {
                     title: "Inventory Details",
                     url: route("reports.inventory_details"),
-                    isActive: isRoute("reports.inventory_details"),
+                    isActive: url.startsWith(reportsInventoryDetails),
                 },
                 {
                     title: "Inventory Summary",
                     url: route("reports.inventory_summary"),
-                    isActive: isRoute("reports.inventory_summary"),
-                }
-            ]
+                    isActive: url.startsWith(reportsInventorySummary),
+                },
+            ],
         },
     ];
 
