@@ -485,13 +485,10 @@ class ProductController extends Controller
         return Excel::download(new ProductExport, 'products export ' . now()->format('d m Y') . '.xlsx');
     }
 
-    public function products_all(Request $request)
+    public function bulk_destroy(Request $request)
     {
-        if ($request->products == null) {
-            return redirect()->route('products.index')->with('error', _lang('Please Select Product'));
-        }
 
-        $products = Product::whereIn('id', $request->products)->get();
+        $products = Product::whereIn('id', $request->ids)->get();
 
         // audit log
         $audit = new AuditLog();

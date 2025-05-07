@@ -699,6 +699,23 @@ class QuotationController extends Controller
         return redirect()->route('quotations.index')->with('success', _lang('Deleted Successfully'));
     }
 
+    public function bulk_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $quotation = Quotation::find($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Quotation Deleted' . ' ' . $quotation->quotation_number;
+            $audit->save();
+
+            $quotation->delete();
+        }
+        return redirect()->route('quotations.index')->with('success', _lang('Deleted Successfully'));
+    }
+
     private function calculateTotal(Request $request)
     {
         $subTotal       = 0;

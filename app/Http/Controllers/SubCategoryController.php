@@ -12,69 +12,40 @@ class SubCategoryController extends Controller
 {
     public function index(Request $request)
     {
-        // Create a query builder for subcategories
-        $query = SubCategory::query()->with('mainCategory');
+        $per_page = $request->get('per_page', 50);
+        $search = $request->get('search', '');
 
-        // Apply search filter if provided
-        if ($request->has('search') && !empty($request->get('search'))) {
-            $search = $request->get('search');
-            $query->where('name', 'like', "%{$search}%");
+        $query = SubCategory::with('mainCategory')->orderBy("id", "desc");
+
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%");
+            });
         }
 
-        // Apply column filters if provided
-        if ($request->has('columnFilters') && !empty($request->get('columnFilters'))) {
-            $columnFilters = json_decode($request->get('columnFilters'), true);
-            foreach ($columnFilters as $filter) {
-                if (isset($filter['id']) && isset($filter['value'])) {
-                    if ($filter['id'] === 'mainCategory.name') {
-                        $query->whereHas('mainCategory', function($q) use ($filter) {
-                            $q->where('id', $filter['value']);
-                        });
-                    } else {
-                        $query->where($filter['id'], 'like', "%{$filter['value']}%");
-                    }
-                }
-            }
-        }
+        // Get vendors with pagination
+        $categories = $query->paginate($per_page)->withQueryString();
 
-        // Apply sorting if provided
-        if ($request->has('sorting') && !empty($request->get('sorting'))) {
-            $sorting = json_decode($request->get('sorting'), true);
-            foreach ($sorting as $sort) {
-                if ($sort['id'] === 'mainCategory.name') {
-                    $query->join('main_categories', 'sub_categories.main_category_id', '=', 'main_categories.id')
-                          ->orderBy('main_categories.name', $sort['desc'] ? 'desc' : 'asc')
-                          ->select('sub_categories.*');
-                } else {
-                    $query->orderBy($sort['id'], $sort['desc'] ? 'desc' : 'asc');
-                }
-            }
-        } else {
-            // Default sorting
-            $query->orderBy('id', 'desc');
-        }
-
-        // Paginate the results
-        $per_page = $request->get('per_page', 10);
-        $subcategories = $query->paginate($per_page);
-        
-        // Get all main categories for the dropdown
-        $mainCategories = MainCategory::all();
-
+        // Return Inertia view
         return Inertia::render('Backend/User/SubCategory/List', [
-            'subcategories' => $subcategories->items(),
-            'mainCategories' => $mainCategories,
+            'categories' => $categories->items(),
             'meta' => [
-                'current_page' => $subcategories->currentPage(),
-                'per_page' => $subcategories->perPage(),
-                'total' => $subcategories->total(),
-                'last_page' => $subcategories->lastPage()
+                'current_page' => $categories->currentPage(),
+                'from' => $categories->firstItem(),
+                'last_page' => $categories->lastPage(),
+                'links' => $categories->linkCollection(),
+                'path' => $categories->path(),
+                'per_page' => $categories->perPage(),
+                'to' => $categories->lastItem(),
+                'total' => $categories->total(),
             ],
             'filters' => [
-                'search' => $request->get('search', ''),
-                'columnFilters' => json_decode($request->get('columnFilters', '[]')),
-                'sorting' => json_decode($request->get('sorting', '[]'))
-            ]
+                'search' => $search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $request->get('sorting', []),
+            ],
+            'mainCategories' => MainCategory::all()
         ]);
     }
 
@@ -109,7 +80,7 @@ class SubCategoryController extends Controller
         return redirect()->route('sub_categories.index')->with('success', _lang('Category Created'));
     }
 
-    public function destroy(Request $request, $id)
+    public function destroy($id)
     {
         $category = SubCategory::find($id);
 
@@ -169,34 +140,25 @@ class SubCategoryController extends Controller
         return redirect()->route('sub_categories.index')->with('success', _lang('Category Updated'));
     }
 
-    public function destroy_multiple(Request $request)
+    public function bulk_destroy(Request $request)
     {
         $ids = $request->ids;
-        
-        if (!is_array($ids) && !is_null($ids)) {
-            // Try to decode JSON if it's a string
-            $ids = json_decode($ids, true);
-        }
-        
-        if (empty($ids) || !is_array($ids)) {
-            return response()->json(['error' => 'No valid IDs provided', 'received' => $request->all()], 400);
-        }
-        
+
         $deleted = [];
-        
+
         foreach ($ids as $id) {
             $category = SubCategory::find($id);
-            
+
             if ($category) {
                 // delete image if exists and not default
                 $image_path = public_path() . "/uploads/media/" . $category->image;
                 if (file_exists($image_path) && $category->image !== 'default.png') {
                     unlink($image_path);
                 }
-                
+
                 $category->delete();
                 $deleted[] = $id;
-                
+
                 // audit log
                 $audit = new AuditLog();
                 $audit->date_changed = date('Y-m-d H:i:s');
@@ -205,7 +167,7 @@ class SubCategoryController extends Controller
                 $audit->save();
             }
         }
-        
+
         return redirect()->route('sub_categories.index')->with('success', _lang('SubCategories Deleted'));
     }
 }

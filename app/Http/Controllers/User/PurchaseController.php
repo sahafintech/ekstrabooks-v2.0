@@ -45,7 +45,7 @@ class PurchaseController extends Controller
 	public function index(Request $request)
 	{
 		$search = $request->get('search', '');
-		$perPage = $request->get('per_page', 10);
+		$perPage = $request->get('per_page', 50);
 
 		$query = Purchase::with('vendor')
 			->where('cash', 0)
@@ -1532,67 +1532,6 @@ class PurchaseController extends Controller
 		$date_range = $request->date_range;
 
 		return view('backend.user.purchase.list', compact('purchases', 'status', 'vendor_id', 'date_range'));
-	}
-
-	public function bill_invoices_all(Request $request)
-	{
-		if ($request->purchases == null) {
-			return redirect()->route('bill_invoices.index')->with('error', _lang('Please Select a Purchase'));
-		}
-
-		$purchases = Purchase::whereIn('id', $request->purchases)->get();
-
-		// audit log
-		$audit = new AuditLog();
-		$audit->date_changed = date('Y-m-d H:i:s');
-		$audit->changed_by = auth()->user()->id;
-		$audit->event = 'Deleted ' . count($purchases) . ' Bills';
-		$audit->save();
-
-		foreach ($purchases as $purchase) {
-			// descrease stock
-			foreach ($purchase->items as $purchaseItem) {
-				$product = $purchaseItem->product;
-				if ($product->type == 'product' && $product->stock_management == 1) {
-					$product->stock = $product->stock - $purchaseItem->quantity;
-					$product->save();
-				}
-			}
-			// delete transactions
-			$transactions = Transaction::where('ref_id', $purchase->id)->where('ref_type', 'bill')->get();
-			foreach ($transactions as $transaction) {
-				$transaction->delete();
-			}
-
-			$purchase_payments = PurchasePayment::where('purchase_id', $purchase->id)->get();
-
-			foreach ($purchase_payments as $purchase_payment) {
-				$bill_payment = BillPayment::find($purchase_payment->payment_id);
-				if ($bill_payment) {
-					$bill_payment->amount = $bill_payment->amount - $purchase_payment->amount;
-					$bill_payment->save();
-
-					if ($bill_payment->amount == 0) {
-						$bill_payment->delete();
-					}
-
-					// delete transactions
-					$transactions = Transaction::where('ref_id', $purchase->id . ',' . $bill_payment->id)->where('ref_type', 'bill payment')->get();
-					foreach ($transactions as $transaction) {
-						$transaction->delete();
-					}
-				}
-				$purchase_payment->delete();
-
-				if ($bill_payment->purchases == null) {
-					$bill_payment->delete();
-				}
-			}
-
-			$purchase->delete();
-		}
-
-		return redirect()->route('bill_invoices.index')->with('success', _lang('Deleted Successfully'));
 	}
 
 	public function export_purchases()

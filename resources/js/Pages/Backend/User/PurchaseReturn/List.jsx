@@ -339,9 +339,12 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
 
     const handleSearch = (e) => {
         e.preventDefault();
+        const value = e.target.value;
+        setSearch(value);
+
         router.get(
             route("purchase_returns.index"),
-            { search, page: 1, per_page: perPage },
+            { search: value, page: 1, per_page: perPage },
             { preserveState: true }
         );
     };
@@ -434,19 +437,22 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
         e.preventDefault();
         setProcessing(true);
 
-        router.post(route('purchase_returns.destroy-multiple'), {
-            purchase_returns: selectedPurchaseReturns
-        }, {
-            onSuccess: () => {
-                setShowDeleteAllModal(false);
-                setSelectedPurchaseReturns([]);
-                setIsAllSelected(false);
-                setProcessing(false);
+        router.post(route('purchase_returns.bulk_destroy'),
+            {
+                ids: selectedPurchaseReturns
             },
-            onError: () => {
-                setProcessing(false);
+            {
+                onSuccess: () => {
+                    setShowDeleteAllModal(false);
+                    setSelectedPurchaseReturns([]);
+                    setIsAllSelected(false);
+                    setProcessing(false);
+                },
+                onError: () => {
+                    setProcessing(false);
+                }
             }
-        });
+        );
     };
 
     const handleImport = (e) => {
@@ -536,15 +542,12 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                                 </DropdownMenu>
                             </div>
                             <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                                <form onSubmit={handleSearch} className="flex gap-2">
-                                    <Input
-                                        placeholder="Search purchase returns..."
-                                        value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
-                                        className="w-full md:w-80"
-                                    />
-                                    <Button type="submit">Search</Button>
-                                </form>
+                                <Input
+                                    placeholder="Search purchase returns..."
+                                    value={search}
+                                    onChange={(e) => handleSearch(e)}
+                                    className="w-full md:w-80"
+                                />
                             </div>
                         </div>
 
@@ -590,7 +593,7 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                                             />
                                         </TableHead>
                                         <TableHead>Return Number</TableHead>
-                                        <TableHead>Customer</TableHead>
+                                        <TableHead>Supplier</TableHead>
                                         <TableHead>Date</TableHead>
                                         <TableHead className="text-right">Grand Total</TableHead>
                                         <TableHead className="text-right">Refunded</TableHead>

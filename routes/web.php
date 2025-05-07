@@ -207,11 +207,13 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		//Business Controller
 		Route::get('business/{id}/users', [BusinessController::class, 'users'])->name('business.users');
 		Route::resource('business', BusinessController::class)->except('show');
+		Route::post('business/bulk_destroy', [BusinessController::class, 'bulk_destroy'])->name('business.bulk_destroy');
 
 		//Permission Controller
 		Route::get('roles/{role_id?}/access_control', [PermissionController::class, 'show'])->name('permission.show');
 		Route::post('permission/store', [PermissionController::class, 'store'])->name('permission.store');
 		Route::resource('roles', RoleController::class)->except('show');
+		Route::post('roles/bulk_destroy', [RoleController::class, 'bulk_destroy'])->name('roles.bulk_destroy');
 
 		//User Controller
 		Route::match(['get', 'post'], 'system_users/{userId}/{businessId}/change_role', [SystemUserController::class, 'change_role'])->name('system_users.change_role');
@@ -241,6 +243,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 		//Currency List
 		Route::resource('currency', CurrencyController::class);
+		Route::post('currency/bulk_destroy', [CurrencyController::class, 'bulk_destroy'])->name('currency.bulk_destroy');
 
 		// audit logs
 		Route::get('audit_logs', [AuditLogController::class, 'index'])->name('audit_logs.index');
@@ -263,9 +266,9 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('dashboard/receivables_vs_payables_widget', 'DashboardController@receivables_vs_payables_widget')->name('dashboard.receivables_vs_payables_widget');
 
 		//Customers
-		Route::get('customers/get_table_data', [CustomerController::class, 'get_table_data']);
 		Route::resource('customers', CustomerController::class);
 		Route::post('import_customers', [CustomerController::class, 'import_customers'])->name('customers.import');
+		Route::post('customers/bulk_destroy', [CustomerController::class, 'bulk_destroy'])->name('customers.bulk_destroy');
 		Route::get('export_customers', [CustomerController::class, 'export_customers'])->name('customers.export');
 
 		//Vendors
@@ -273,26 +276,26 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('vendors', VendorController::class);
 		Route::post('import_suppliers', [VendorController::class, 'import_vendors'])->name('vendors.import');
 		Route::get('export_suppliers', [VendorController::class, 'export_vendors'])->name('vendors.export');
-		Route::post('all_vendors', [VendorController::class, 'vendors_all'])->name('vendors.all');
+		Route::post('vendors/bulk_destroy', [VendorController::class, 'bulk_destroy'])->name('vendors.bulk_destroy');
 
 		//Product Controller
 		Route::resource('product_units', ProductUnitController::class)->except('show');
-		Route::post('product_units/destroy/multiple', [ProductUnitController::class, 'destroy_multiple'])->name('product_units.destroy_multiple');
+		Route::post('product_units/bulk_destroy', [ProductUnitController::class, 'bulk_destroy'])->name('product_units.bulk_destroy');
 		Route::get('products/get_table_data', [ProductController::class, 'get_table_data']);
 		Route::get('products/export', [ProductController::class, 'product_export'])->name('products.export');
 		Route::resource('products', ProductController::class);
 		Route::post('import_products', [ProductController::class, 'import_products'])->name('products.import');
-		Route::post('all_products', [ProductController::class, 'products_all'])->name('products.all');
+		Route::post('products/bulk_destroy', [ProductController::class, 'bulk_destroy'])->name('products.bulk_destroy');
 
 		// categories
 		Route::resource('sub_categories', SubCategoryController::class);
-		Route::post('sub_categories/destroy/multiple', [SubCategoryController::class, 'destroy_multiple'])->name('sub_categories.destroy_multiple');
+		Route::post('sub_categories/bulk_destroy', [SubCategoryController::class, 'bulk_destroy'])->name('sub_categories.bulk_destroy');
 		Route::resource('main_categories', MainCategoryController::class);
-		Route::post('main_categories/destroy/multiple', [MainCategoryController::class, 'destroy_multiple'])->name('main_categories.destroy_multiple');
+		Route::post('main_categories/bulk_destroy', [MainCategoryController::class, 'bulk_destroy'])->name('main_categories.bulk_destroy');
 
 		// brands
 		Route::resource('brands', BrandsController::class);
-		Route::post('brands/destroy/multiple', [BrandsController::class, 'destroy_multiple'])->name('brands.destroy_multiple');
+		Route::post('brands/bulk_destroy', [BrandsController::class, 'bulk_destroy'])->name('brands.bulk_destroy');
 
 		// Inventory Adjustment Import (MUST BE BEFORE RESOURCE ROUTE)
 		Route::get('inventory_adjustments/import', [InventoryAdjustmentController::class, 'import'])->name('inventory_adjustments.import');
@@ -304,7 +307,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 		// inventory adjustments resource route
 		Route::resource('inventory_adjustments', InventoryAdjustmentController::class);
-		Route::post('inventory_adjustments/destroy/multiple', [InventoryAdjustmentController::class, 'destroy_multiple'])->name('inventory_adjustments.destroy_multiple');
+		Route::post('inventory_adjustments/bulk_destroy', [InventoryAdjustmentController::class, 'bulk_destroy'])->name('inventory_adjustments.bulk_destroy');
 
 		//Invoices
 		Route::match(['get', 'post'], 'invoices/{id}/send_email', [InvoiceController::class, 'send_email'])->name('invoices.send_email');
@@ -317,12 +320,13 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('receive_payments', ReceivePaymentsController::class);
 		Route::post('import_invoices', [InvoiceController::class, 'import_invoices'])->name('invoices.import');
 		Route::post('invoices/filter', [InvoiceController::class, 'invoices_filter'])->name('invoices.filter');
-		Route::post('all_invoices', [InvoiceController::class, 'invoices_all'])->name('invoices.all');
+		Route::post('invoices/bulk_destroy', [InvoiceController::class, 'bulk_destroy'])->name('invoices.bulk_destroy');
 		Route::get('export_invoices', [InvoiceController::class, 'export_invoices'])->name('invoices.export');
 
 		// Sales Return
 		Route::resource('sales_returns', SalesReturnController::class);
 		Route::post('sales_returns/refund/store/{id}', [SalesReturnController::class, 'refund_store'])->name('sales_returns.refund.store');
+		Route::post('sales_returns/bulk_destroy', [SalesReturnController::class, 'bulk_destroy'])->name('sales_returns.bulk_destroy');
 		Route::get('sales_returns/{id}/export_pdf', [SalesReturnController::class, 'export_pdf'])->name('sales_returns.export_pdf');
 		Route::match(['get', 'post'], 'sales_returns/{id}/send_email', [SalesReturnController::class, 'send_email'])->name('sales_returns.send_email');
 		Route::get('sales_return/{id}/export_pdf', [SalesReturnController::class, 'export_pdf'])->name('sales_returns.export_pdf');
@@ -331,6 +335,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('purchase_returns', PurchaseReturnController::class);
 		Route::get('purchase_returns/refund/{id}', [PurchaseReturnController::class, 'refund'])->name('purchase_returns.refund');
 		Route::post('purchase_returns/refund/store/{id}', [PurchaseReturnController::class, 'refund_store'])->name('purchase_returns.refund.store');
+		Route::post('purchase_returns/bulk_destroy', [PurchaseReturnController::class, 'bulk_destroy'])->name('purchase_returns.bulk_destroy');
 		Route::get('purchase_returns/{id}/export_pdf', [PurchaseReturnController::class, 'export_pdf'])->name('purchase_returns.export_pdf');
 		Route::match(['get', 'post'], 'purchase_returns/{id}/send_email', [PurchaseReturnController::class, 'send_email'])->name('purchase_returns.send_email');
 		Route::get('purchase_return/{id}/export_pdf', [PurchaseReturnController::class, 'export_pdf'])->name('purchase_returns.export_pdf');
@@ -339,9 +344,9 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('journals', JournalController::class);
 		Route::post('import_journal', [JournalController::class, 'import_journal'])->name('journals.import');
 		Route::get('journal/export/{id}', [JournalController::class, 'export_journal'])->name('journals.export');
-		Route::post('all_journals/{type}', [JournalController::class, 'journals_all'])->name('journals.all');
-		Route::post('approve_journal/{id}', [JournalController::class, 'approve_journal'])->name('journals.approve');
-		Route::post('reject_journal/{id}', [JournalController::class, 'reject_journal'])->name('journals.reject');
+		Route::post('journal/bulk_destroy', [JournalController::class, 'bulk_destroy'])->name('journals.bulk_destroy');
+		Route::post('journal/bulk_approve', [JournalController::class, 'bulk_approve'])->name('journals.bulk_approve');
+		Route::post('journal/bulk_reject', [JournalController::class, 'bulk_reject'])->name('journals.bulk_reject');
 
 		// Sales Receipts
 		Route::resource('receipts', ReceiptController::class);
@@ -352,7 +357,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('import_receipts', [ReceiptController::class, 'import_receipts'])->name('receipts.import');
 		Route::post('receipts/filter', [ReceiptController::class, 'receipts_filter'])->name('receipts.filter');
 		Route::post('pos/store', [ReceiptController::class, 'pos_store'])->name('receipts.pos_store');
-		Route::post('all_receipts', [ReceiptController::class, 'receipts_all'])->name('receipts.all');
+		Route::post('receipts/bulk_destroy', [ReceiptController::class, 'bulk_destroy'])->name('receipts.bulk_destroy');
 		Route::get('export_receipts', [ReceiptController::class, 'export_receipts'])->name('receipts.export');
 
 		// hold pos invoices
@@ -371,6 +376,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('deffered_invoices/payments/{id}', [DefferedInvoiceController::class, 'payments'])->name('deffered_invoices.payments');
 		Route::get('deffered_invoices/earnings/{id}', [DefferedInvoiceController::class, 'earnings'])->name('deffered_invoices.earnings');
 		Route::post('deffered_invoices/filter', [DefferedInvoiceController::class, 'deffered_invoices_filter'])->name('deffered_invoices.filter');
+		Route::post('deffered_invoices/bulk_destroy', [DefferedInvoiceController::class, 'bulk_destroy'])->name('deffered_invoices.bulk_destroy');
 
 		// deffered payments
 		Route::resource('deffered_receive_payments', DefferedPaymentController::class);
@@ -386,7 +392,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('quotations/{id}/convert_to_invoice', [QuotationController::class, 'convert_to_invoice'])->name('quotations.convert_to_invoice');
 		Route::get('quotations/{id}/duplicate', [QuotationController::class, 'duplicate'])->name('quotations.duplicate');
 		Route::get('quotations/{id}/export_pdf', [QuotationController::class, 'export_pdf'])->name('quotations.export_pdf');
-		Route::post('quotations/get_table_data', [QuotationController::class, 'get_table_data']);
+		Route::post('quotations/bulk_destroy', [QuotationController::class, 'bulk_destroy'])->name('quotations.bulk_destroy');
 		Route::resource('quotations', QuotationController::class);
 
 		//Bills
@@ -397,11 +403,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('import_bills', [PurchaseController::class, 'import_bills'])->name('bill_invoices.import');
 		Route::post('bill_invoices/filter', [PurchaseController::class, 'bill_invoices_filter'])->name('bill_invoices.filter');
 		Route::resource('bill_payments', BillPaymentsController::class);
-		Route::post('all_bill_invoices', [PurchaseController::class, 'bill_invoices_all'])->name('bill_invoices.all');
+		Route::post('bill_payments/bulk_destroy', [BillPaymentsController::class, 'bulk_destroy'])->name('bill_payments.bulk_destroy');
 		Route::get('export_bill_invoices', [PurchaseController::class, 'export_bill_invoices'])->name('bill_invoices.export');
-		Route::post('approve_bill_invoices/bulk_approve', [PurchaseController::class, 'bulk_approve'])->name('bill_invoices.bulk_approve');
-		Route::post('reject_bill_invoices/bulk_reject', [PurchaseController::class, 'bulk_reject'])->name('bill_invoices.bulk_reject');
-		Route::post('reject_bill_invoices/bulk_destroy', [PurchaseController::class, 'bulk_destroy'])->name('bill_invoices.bulk_destroy');
+		Route::post('bill_invoices/bulk_approve', [PurchaseController::class, 'bulk_approve'])->name('bill_invoices.bulk_approve');
+		Route::post('bill_invoices/bulk_reject', [PurchaseController::class, 'bulk_reject'])->name('bill_invoices.bulk_reject');
+		Route::post('bill_invoices/bulk_destroy', [PurchaseController::class, 'bulk_destroy'])->name('bill_invoices.bulk_destroy');
 
 		//Cash Purchases
 		Route::resource('cash_purchases', CashPurchaseController::class);
@@ -419,7 +425,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('purchase_orders', PurchaseOrderController::class);
 		Route::post('import_purchase_orders', [PurchaseOrderController::class, 'import_purchase_orders'])->name('purchase_orders.import');
 		Route::post('purchase_orders/filter', [PurchaseOrderController::class, 'purchase_orders_filter'])->name('purchase_orders.filter');
-		Route::post('all_purchase_orders', [PurchaseOrderController::class, 'purchase_orders_all'])->name('purchase_orders.all');
+		Route::post('purchase_oders/bulk_destroy', [PurchaseOrderController::class, 'bulk_destroy'])->name('purchase_orders.bulk_destroy');
 		Route::get('export_purchase_orders', [PurchaseOrderController::class, 'export_purchase_orders'])->name('purchase_orders.export');
 		Route::post('purchase_orders/{id}/convert_to_bill', [PurchaseOrderController::class, 'convert_to_bill'])->name('purchase_orders.convert_to_bill');
 		Route::post('purchase_orders/{id}/convert_to_cash', [PurchaseOrderController::class, 'convert_to_cash_purchase'])->name('purchase_orders.convert_to_cash_purchase');
@@ -438,6 +444,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('account/import_statement/{id}', [AccountController::class, 'importStatement'])->name('accounts.import_statement');
 		Route::post('import_accounts', [AccountController::class, 'import_accounts'])->name('accounts.import');
 		Route::get('export_accounts', [AccountController::class, 'export_accounts'])->name('accounts.export');
+		Route::post('accounts/bulk_destroy', [AccountController::class, 'bulk_destroy'])->name('accounts.bulk_destroy');
 		Route::match(['get', 'post'], 'account/account_statement/{id}', [AccountController::class, 'account_statement'])->name('accounts.account_statement');
 		Route::get('export_account_statement/{id}', [AccountController::class, 'export_account_statement'])->name('accounts.export_account_statement');
 
@@ -452,21 +459,21 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 		//Transaction Methods
 		Route::resource('transaction_methods', TransactionMethodController::class)->except('view');
-		Route::post('transaction_methods/bulk_delete', [TransactionMethodController::class, 'bulkDelete'])->name('transaction_methods.bulk_delete');
+		Route::post('transaction_methods/bulk_destroy', [TransactionMethodController::class, 'bulk_destroy'])->name('transaction_methods.bulk_destroy');
 
 		//HR Module
 		Route::resource('departments', DepartmentController::class);
-		Route::post('departments/bulk_delete', [DepartmentController::class, 'bulk_delete'])->name('departments.bulk_delete');
+		Route::post('departments/bulk_destroy', [DepartmentController::class, 'bulk_destroy'])->name('departments.bulk_destroy');
 		Route::get('designations/get_designations/{deaprtment_id}', [DesignationController::class, 'get_designations']);
 		Route::resource('designations', DesignationController::class)->except('show');
-		Route::post('designations/bulk_delete', [DesignationController::class, 'bulk_delete'])->name('designations.bulk_delete');
-		// Route::get('salary_scales/get_salary_scales/{designation_id}', [SalaryScaleController::class, 'get_salary_scales']);
+		Route::post('designations/bulk_destroy', [DesignationController::class, 'bulk_destroy'])->name('designations.bulk_destroy');
+		// Route::get('salary_scales/get_saylary_scales/{designation_id}', [SalaryScaleController::class, 'get_salary_scales']);
 		// Route::get('salary_scales/filter_by_department/{department_id}', [SalaryScaleController::class, 'index'])->name('salary_scales.filter_by_department');
 		// Route::resource('salary_scales', SalaryScaleController::class);
 		// Route::resource('benefits', BenefitController::class);
 
 		//Staff Controller
-		Route::get('staffs/get_table_data', [StaffController::class, 'get_table_data']);
+		Route::post('staffs/bulk_destroy', [StaffController::class, 'bulk_destroy'])->name('staffs.bulk_destroy');
 		Route::resource('staffs', StaffController::class);
 		Route::post('import_staffs', [StaffController::class, 'import_staffs'])->name('staffs.import');
 		Route::get('export_staffs', [StaffController::class, 'export_staffs'])->name('staffs.export');
@@ -495,7 +502,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 		//Leave Application
 		Route::resource('leave_types', LeaveTypeController::class)->except('show');
-		Route::get('leaves/get_table_data', [LeaveController::class, 'get_table_data']);
+		Route::post('leaves/bulk_destroy', [LeaveController::class, 'bulk_destroy'])->name('leaves.bulk_destroy');
 		Route::resource('leaves', LeaveController::class);
 
 		//Attendance Controller
@@ -507,7 +514,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('absent_fine', [AttendanceController::class, 'store_absent_fine'])->name('attendances.store_absent_fine');
 
 		//Award Controller
-		Route::get('awards/get_table_data', [AwardController::class, 'get_table_data']);
+		Route::post('awards/bulk_destroy', [AwardController::class, 'bulk_destroy'])->name('awards.bulk_destroy');
 		Route::resource('awards', AwardController::class);
 
 		//Payslip Controller
@@ -526,6 +533,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 		//Taxes
 		Route::resource('taxes', TaxController::class);
+		Route::post('taxes/bulk_destroy', [TaxController::class, 'bulk_destroy'])->name('taxes.bulk_destroy');
 
 		//Report Controller
 		Route::get('reports/account_balances', [ReportController::class, 'account_balances'])->name('reports.account_balances');

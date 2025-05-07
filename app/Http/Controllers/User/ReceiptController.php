@@ -76,7 +76,7 @@ class ReceiptController extends Controller
         }
 
         // Pagination
-        $perPage = request('per_page', 10);
+        $perPage = request('per_page', 50);
         $receipts = $query->paginate($perPage)->withQueryString();
 
         return Inertia::render('Backend/User/CashInvoice/List', [
@@ -1690,13 +1690,13 @@ class ReceiptController extends Controller
         return Tax::where('business_id', request()->activeBusiness->id)->get();
     }
 
-    public function receipts_all(Request $request)
+    public function bulk_destroy(Request $request)
     {
-        if ($request->receipts == null) {
+        if ($request->ids == null) {
             return redirect()->route('receipts.index')->with('error', _lang('Please Select invoice'));
         }
 
-        $receipts = Receipt::whereIn('id', $request->receipts)->get();
+        $receipts = Receipt::whereIn('id', $request->ids)->get();
 
         // audit log
         $audit = new AuditLog();

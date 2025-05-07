@@ -211,9 +211,12 @@ export default function List({ vendors = [], meta = {}, filters = {} }) {
 
   const handleSearch = (e) => {
     e.preventDefault();
+    const value = e.target.value;
+    setSearch(value);
+
     router.get(
       route("vendors.index"),
-      { search, page: 1, per_page: perPage },
+      { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
   };
@@ -278,19 +281,22 @@ export default function List({ vendors = [], meta = {}, filters = {} }) {
     e.preventDefault();
     setProcessing(true);
 
-    router.post(route('vendors.bulk_action'), {
-      delete_vendors: selectedVendors.join(',')
-    }, {
-      onSuccess: () => {
-        setShowDeleteAllModal(false);
-        setSelectedVendors([]);
-        setIsAllSelected(false);
-        setProcessing(false);
+    router.post(route('vendors.bulk_destroy'),
+      {
+        ids: selectedVendors
       },
-      onError: () => {
-        setProcessing(false);
+      {
+        onSuccess: () => {
+          setShowDeleteAllModal(false);
+          setSelectedVendors([]);
+          setIsAllSelected(false);
+          setProcessing(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
       }
-    });
+    );
   };
 
   const handleImport = (e) => {
@@ -380,15 +386,12 @@ export default function List({ vendors = [], meta = {}, filters = {} }) {
                 </DropdownMenu>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input
-                    placeholder="Search vendors..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full md:w-80"
-                  />
-                  <Button type="submit">Search</Button>
-                </form>
+                <Input
+                  placeholder="Search vendors..."
+                  value={search}
+                  onChange={(e) => handleSearch(e)}
+                  className="w-full md:w-80"
+                />
               </div>
             </div>
 

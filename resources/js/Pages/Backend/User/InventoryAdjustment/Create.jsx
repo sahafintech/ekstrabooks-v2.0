@@ -10,13 +10,14 @@ import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function Create({ accounts = [], products = [] }) {
   const [quantityOnHand, setQuantityOnHand] = useState(0);
   const [newQuantity, setNewQuantity] = useState(0);
-  
+
   const { data, setData, post, processing, errors } = useForm({
-    adjustment_date: format(new Date(), 'yyyy-MM-dd'),
+    adjustment_date: new Date(),
     account_id: "",
     product_id: "",
     quantity_on_hand: "0",
@@ -44,7 +45,7 @@ export default function Create({ accounts = [], products = [] }) {
       const adjusted = parseFloat(data.adjusted_quantity);
       const current = parseFloat(data.quantity_on_hand);
       const newQty = current + adjusted;
-      
+
       // Ensure new quantity is not negative
       const validNewQty = Math.max(0, newQty);
       setData("new_quantity", validNewQty.toString());
@@ -85,11 +86,9 @@ export default function Create({ accounts = [], products = [] }) {
                 Adjustment Date *
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Input
-                  id="adjustment_date"
-                  type="date"
+                <DateTimePicker
                   value={data.adjustment_date}
-                  onChange={(e) => setData("adjustment_date", e.target.value)}
+                  onChange={(date) => setData("adjustment_date", date)}
                   className="md:w-1/2 w-full"
                   required
                 />
@@ -99,7 +98,7 @@ export default function Create({ accounts = [], products = [] }) {
 
             <div className="grid grid-cols-12 mt-4">
               <Label htmlFor="account_id" className="md:col-span-2 col-span-12">
-                Account *
+                Material Cost Account *
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <div className="md:w-1/2 w-full">

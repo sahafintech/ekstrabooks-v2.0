@@ -140,9 +140,12 @@ export default function List({ payments = [], meta = {}, filters = {} }) {
 
     const handleSearch = (e) => {
         e.preventDefault();
+        const value = e.target.value;
+        setSearch(value);
+
         router.get(
             route("bill_payments.index"),
-            { search, page: 1, per_page: perPage },
+            { search: value, page: 1, per_page: perPage },
             { preserveState: true }
         );
     };
@@ -207,19 +210,22 @@ export default function List({ payments = [], meta = {}, filters = {} }) {
         e.preventDefault();
         setProcessing(true);
 
-        router.post(route('bill_payments.bulk_action'), {
-            delete_payments: selectedPayments.join(',')
-        }, {
-            onSuccess: () => {
-                setShowDeleteAllModal(false);
-                setSelectedPayments([]);
-                setIsAllSelected(false);
-                setProcessing(false);
+        router.post(route('bill_payments.bulk_destroy'),
+            {
+                ids: selectedPayments.join(',')
             },
-            onError: () => {
-                setProcessing(false);
+            {
+                onSuccess: () => {
+                    setShowDeleteAllModal(false);
+                    setSelectedPayments([]);
+                    setIsAllSelected(false);
+                    setProcessing(false);
+                },
+                onError: () => {
+                    setProcessing(false);
+                }
             }
-        });
+        );
     };
 
     const renderPageNumbers = () => {
@@ -272,15 +278,12 @@ export default function List({ payments = [], meta = {}, filters = {} }) {
                                 </Button>
                             </Link>
                             <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                                <form onSubmit={handleSearch} className="flex gap-2">
-                                    <Input
-                                        placeholder="Search payments..."
-                                        value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
-                                        className="w-full md:w-80"
-                                    />
-                                    <Button type="submit">Search</Button>
-                                </form>
+                                <Input
+                                    placeholder="Search payments..."
+                                    value={search}
+                                    onChange={(e) => handleSearch(e)}
+                                    className="w-full md:w-80"
+                                />
                             </div>
                         </div>
 

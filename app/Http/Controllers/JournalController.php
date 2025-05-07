@@ -25,22 +25,22 @@ class JournalController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search', '');
-        $perPage = $request->input('per_page', 10);
-        
+        $perPage = $request->input('per_page', 50);
+
         $query = Journal::query()
             ->where('business_id', request()->activeBusiness->id)
             ->with('created_user', 'approved_user')
             ->orderBy('id', 'desc');
-            
+
         if (!empty($search)) {
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('journal_number', 'like', "%$search%")
-                  ->orWhere('transaction_amount', 'like', "%$search%");
+                    ->orWhere('transaction_amount', 'like', "%$search%");
             });
         }
-        
+
         $journals = $query->paginate($perPage);
-        
+
         return Inertia::render('Backend/User/Journal/List', [
             'journals' => $journals->items(),
             'meta' => [
@@ -64,7 +64,7 @@ class JournalController extends Controller
         $customers = Customer::all();
         $vendors = Vendor::all();
         $journal_number = get_business_option('journal_number');
-        
+
         return Inertia::render('Backend/User/Journal/Create', [
             'accounts' => $accounts,
             'currencies' => $currencies,
@@ -111,7 +111,9 @@ class JournalController extends Controller
         $journal->journal_number = $request->journal_number;
         $journal->transaction_currency = $request->trans_currency;
         $journal->currency_rate = Currency::where('name', $request->trans_currency)->first()->exchange_rate;
-        $journal->transaction_amount      = array_sum(array_map(function ($entry) { return floatval($entry['debit']); }, $request->journal_entries));
+        $journal->transaction_amount      = array_sum(array_map(function ($entry) {
+            return floatval($entry['debit']);
+        }, $request->journal_entries));
         $journal->base_currency_amount    = convert_currency($request->trans_currency, $request->activeBusiness->currency, $journal->transaction_amount);
         $journal->user_id = auth()->user()->id;
         $journal->business_id = request()->activeBusiness->id;
@@ -267,7 +269,9 @@ class JournalController extends Controller
         $journal->date = Carbon::createFromFormat(get_date_format(), $journal->date)->format('Y-m-d');
         $journal->transaction_currency = $request->trans_currency;
         $journal->currency_rate = Currency::where('name', $request->trans_currency)->first()->exchange_rate;
-        $journal->transaction_amount      = array_sum(array_map(function ($entry) { return floatval($entry['debit']); }, $request->journal_entries));
+        $journal->transaction_amount      = array_sum(array_map(function ($entry) {
+            return floatval($entry['debit']);
+        }, $request->journal_entries));
         $journal->base_currency_amount    = convert_currency($request->trans_currency, $request->activeBusiness->currency, $journal->transaction_amount);
         $journal->save();
 
@@ -383,6 +387,30 @@ class JournalController extends Controller
         return redirect()->route('journals.index')->with('success', _lang('Journal Entry Deleted'));
     }
 
+    public function bulk_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $journal = Journal::find($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Journal Entry Deleted: ' . $journal->journal_number;
+            $audit->save();
+
+            $transaction = Transaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->get();
+
+            foreach ($transaction as $trans) {
+                $trans->delete();
+            }
+
+            $journal->delete();
+        }
+
+        return redirect()->route('journals.index')->with('success', _lang('Journal Entry Deleted'));
+    }
+
     public function import_journal(Request $request)
     {
         $request->validate([
@@ -419,11 +447,11 @@ class JournalController extends Controller
             ->where('business_id', request()->activeBusiness->id)
             ->with('created_user', 'approved_user')
             ->first();
-            
+
         if (!$journal) {
             return redirect()->route('journals.index')->with('error', _lang('Journal not found!'));
         }
-        
+
         $transactions = Transaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->with('account', 'customer', 'vendor')->get();
         $pending_transactions = PendingTransaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->get();
 
@@ -439,106 +467,72 @@ class JournalController extends Controller
         return Excel::download(new JournalExport($id), 'journal ' .  now()->format('d m Y')  .  '.xlsx');
     }
 
-    public function journals_all(Request $request)
+    public function bulk_approve(Request $request)
     {
-        if ($request->journals == null) {
-            return redirect()->route('journals.index')->with('error', _lang('Please Select Journal'));
-        }
+        foreach ($request->ids as $id) {
+            $journal = Journal::find($id);
+            $journal->status = 1;
+            $journal->approved_by = auth()->user()->id;
+            $journal->save();
 
-        $journals = Journal::whereIn('id', $request->journals)->get();
+            // transactions from pending to transaction
+            $pending_transactions = PendingTransaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->get();
 
-        if ($request->type == 'delete') {
-            foreach ($journals as $journal) {
+            if ($pending_transactions->count() > 0) {
+                foreach ($pending_transactions as $transaction) {
+                    // Create a new Transaction instance and replicate data from pending
+                    $new_transaction = $transaction->replicate();
+                    $new_transaction->setTable('transactions'); // Change the table to 'transactions'
+                    $new_transaction->save();
 
-                $transactions = Transaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->get();
-
-                foreach ($transactions as $trans) {
-                    $trans->delete();
+                    // Delete the pending transaction
+                    $transaction->delete();
                 }
+            }
 
-                $journal->delete();
-            }
-        } else if ($request->type == 'approve') {
-            foreach ($journals as $journal) {
-                $this->approve_journal($journal->id);
-            }
-        } else if ($request->type == 'reject') {
-            foreach ($journals as $journal) {
-                $this->reject_journal($journal->id);
-            }
-        } else {
-            return redirect()->route('journals.index')->with('error', _lang('Invalid Action'));
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Journal Entry Approved ' . $journal->journal_number;
+            $audit->save();
         }
-
-        return redirect()->route('journals.index')->with('success', _lang('Action Performed Successfully'));
-    }
-
-    public function approve_journal($id)
-    {
-        $journal = Journal::find($id);
-        $journal->status = 1;
-        $journal->approved_by = auth()->user()->id;
-        $journal->save();
-
-        // transactions from pending to transaction
-        $pending_transactions = PendingTransaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->get();
-
-        $currentTime = Carbon::now();
-
-        if ($pending_transactions->count() > 0) {
-            foreach ($pending_transactions as $transaction) {
-                // Create a new Transaction instance and replicate data from pending
-                $new_transaction = $transaction->replicate();
-                $new_transaction->setTable('transactions'); // Change the table to 'transactions'
-                $new_transaction->save();
-
-                // Delete the pending transaction
-                $transaction->delete();
-            }
-        }
-
-        // audit log
-        $audit = new AuditLog();
-        $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Journal Entry Approved ' . $journal->journal_number;
-        $audit->save();
 
         return redirect()->route('journals.index')->with('success', _lang('Journal Entry Approved'));
     }
 
-    public function reject_journal($id)
+    public function bulk_reject(Request $request)
     {
-        $journal = Journal::find($id);
+        foreach ($request->ids as $id) {
+            $journal = Journal::find($id);
 
-        if ($journal->status == 1) {
-            // transactions from transactions to pending
-            $transactions = Transaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->get();
+            if ($journal->status == 1) {
+                // transactions from transactions to pending
+                $transactions = Transaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->get();
 
-            $currentTime = Carbon::now();
+                if ($transactions->count() > 0) {
+                    foreach ($transactions as $transaction) {
+                        // Create a new PendingTransaction instance and replicate data from transaction
+                        $new_transaction = $transaction->replicate();
+                        $new_transaction->setTable('pending_transactions'); // Change the table to 'pending_transactions'
+                        $new_transaction->save();
 
-            if ($transactions->count() > 0) {
-                foreach ($transactions as $transaction) {
-                    // Create a new PendingTransaction instance and replicate data from transaction
-                    $new_transaction = $transaction->replicate();
-                    $new_transaction->setTable('pending_transactions'); // Change the table to 'pending_transactions'
-                    $new_transaction->save();
-
-                    // Delete the transaction
-                    $transaction->delete();
+                        // Delete the transaction
+                        $transaction->delete();
+                    }
                 }
             }
+
+            $journal->status = 2;
+            $journal->save();
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Journal Entry Rejected ' . $journal->journal_number;
+            $audit->save();
         }
-
-        $journal->status = 2;
-        $journal->save();
-
-        // audit log
-        $audit = new AuditLog();
-        $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Journal Entry Rejected ' . $journal->journal_number;
-        $audit->save();
 
         return redirect()->route('journals.index')->with('success', _lang('Journal Entry Rejected'));
     }

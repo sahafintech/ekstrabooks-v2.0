@@ -378,9 +378,12 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
 
   const handleSearch = (e) => {
     e.preventDefault();
+    const value = e.target.value;
+    setSearch(value);
+
     router.get(
       route("cash_purchases.index"),
-      { search, page: 1, per_page: perPage },
+      { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
   };
@@ -482,15 +485,12 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
                 </DropdownMenu>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input
-                    placeholder="Search cash purchases..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full md:w-80"
-                  />
-                  <Button type="submit">Search</Button>
-                </form>
+                <Input
+                  placeholder="Search cash purchases..."
+                  value={search}
+                  onChange={(e) => handleSearch(e)}
+                  className="w-full md:w-80"
+                />
               </div>
             </div>
 

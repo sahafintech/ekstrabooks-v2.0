@@ -530,6 +530,27 @@ class AccountController extends Controller
         return redirect()->route('accounts.index')->with('success', 'Account deleted successfully');
     }
 
+    public function bulk_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $account = Account::find($id);
+            if ($account->transactions->count() > 0) {
+                return redirect()->back()->withErrors(['delete' => 'This Account has transactions. Please delete them first!']);
+            }
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->id();
+            $audit->event = 'Deleted Account ' . $account->account_name;
+            $audit->save();
+
+            $account->delete();
+        }
+
+        return redirect()->route('accounts.index')->with('success', 'Account deleted successfully');
+    }
+
     public function destroyMultiple(Request $request)
     {
         $accountIds = $request->accounts;

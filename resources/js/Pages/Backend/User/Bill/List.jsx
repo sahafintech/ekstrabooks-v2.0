@@ -238,7 +238,7 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
   const [selectedBills, setSelectedBills] = useState([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
-  const [perPage, setPerPage] = useState(filters.per_page || 10);
+  const [perPage, setPerPage] = useState(filters.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
 
@@ -407,9 +407,12 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
 
   const handleSearch = (e) => {
     e.preventDefault();
+    const value = e.target.value;
+    setSearch(value);
+
     router.get(
       route("bill_invoices.index"),
-      { search, page: 1, per_page: perPage },
+      { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
   };
@@ -515,15 +518,12 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
                 </DropdownMenu>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input
-                    placeholder="Search bills..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full md:w-80"
-                  />
-                  <Button type="submit">Search</Button>
-                </form>
+                <Input
+                  placeholder="Search bills..."
+                  value={search}
+                  onChange={(e) => handleSearch(e)}
+                  className="w-full md:w-80"
+                />
               </div>
             </div>
 

@@ -18,89 +18,48 @@ use Maatwebsite\Excel\Facades\Excel;
 use App\Imports\InventoryAdjustmentImport;
 use Exception;
 use Illuminate\Support\Facades\Validator;
-use Throwable;
 
 class InventoryAdjustmentController extends Controller
 {
     public function index(Request $request)
     {
         $query = InventoryAdjustment::query()
-            ->with(['product']);
+            ->with('product')
+            ->orderBy("id", "desc");
 
-        // Search functionality
-        if ($request->has('search') && !empty($request->get('search'))) {
-            $search = $request->get('search');
-            // Join with products table to search by product name
-            $query->whereHas('product', function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%");
-            })
-            ->orWhere('description', 'like', "%{$search}%")
-            ->orWhere('adjustment_type', 'like', "%{$search}%");
+        $per_page = $request->get('per_page', 50);
+        $search = $request->get('search', '');
+
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('adjustment_date', 'like', "%{$search}%")
+                    ->orWhereHas('product', function ($q) use ($search) {
+                        $q->where('name', 'like', "%$search%");
+                    });;
+            });
         }
 
-        // Column filtering
-        if ($request->has('columnFilters') && !empty($request->get('columnFilters'))) {
-            $columnFilters = json_decode($request->columnFilters, true);
-            foreach ($columnFilters as $filter) {
-                if ($filter['id'] == 'product.name') {
-                    $query->whereHas('product', function ($q) use ($filter) {
-                        $q->where('name', 'like', "%{$filter['value']}%");
-                    });
-                } else {
-                    $query->where($filter['id'], 'like', "%{$filter['value']}%");
-                }
-            }
-        }
+        // Get vendors with pagination
+        $adjustments = $query->paginate($per_page)->withQueryString();
 
-        // Sorting
-        if ($request->has('sorting') && !empty($request->get('sorting'))) {
-            $sorting = json_decode($request->sorting, true);
-            foreach ($sorting as $sort) {
-                if ($sort['id'] == 'product.name') {
-                    $query->join('products', 'inventory_adjustments.product_id', '=', 'products.id')
-                        ->orderBy('products.name', $sort['desc'] ? 'desc' : 'asc')
-                        ->select('inventory_adjustments.*');
-                } else {
-                    $query->orderBy($sort['id'], $sort['desc'] ? 'desc' : 'asc');
-                }
-            }
-        } else {
-            $query->orderBy('id', 'desc');
-        }
-
-        // Pagination
-        $perPage = $request->input('per_page', 10);
-        $page = $request->input('page', 1);
-        $adjustments = $query->paginate($perPage, ['*'], 'page', $page);
-
-        // Get accounts for dropdown
-        $accounts = Account::all(['id', 'account_name']);
-        
-        // Get products for dropdown
-        $products = Product::where('stock_management', 1)
-            ->select(['id', 'name', 'stock', 'product_unit_id', 'purchase_cost'])
-            ->with('product_unit:id,unit')
-            ->get();
-
-        if ($request->wantsJson()) {
-            return response()->json($adjustments);
-        }
-
+        // Return Inertia view
         return Inertia::render('Backend/User/InventoryAdjustment/List', [
             'adjustments' => $adjustments->items(),
-            'accounts' => $accounts,
-            'products' => $products,
             'meta' => [
-                'total' => $adjustments->total(),
-                'per_page' => $adjustments->perPage(),
                 'current_page' => $adjustments->currentPage(),
+                'from' => $adjustments->firstItem(),
                 'last_page' => $adjustments->lastPage(),
-                'links' => $adjustments->linkCollection()->toArray(),
+                'links' => $adjustments->linkCollection(),
+                'path' => $adjustments->path(),
+                'per_page' => $adjustments->perPage(),
+                'to' => $adjustments->lastItem(),
+                'total' => $adjustments->total(),
             ],
             'filters' => [
-                'search' => $request->get('search', ''),
-                'columnFilters' => !empty($request->columnFilters) ? json_decode($request->columnFilters, true) : [],
-                'sorting' => !empty($request->sorting) ? json_decode($request->sorting, true) : [],
+                'search' => $search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $request->get('sorting', []),
             ],
         ]);
     }
@@ -114,7 +73,7 @@ class InventoryAdjustmentController extends Controller
     {
         // Get accounts for dropdown
         $accounts = Account::all(['id', 'account_name']);
-        
+
         // Get products for dropdown (only those with stock management enabled)
         $products = Product::where('stock_management', 1)
             ->select(['id', 'name', 'stock', 'product_unit_id', 'purchase_cost'])
@@ -141,7 +100,7 @@ class InventoryAdjustmentController extends Controller
         ]);
 
         DB::beginTransaction();
-        
+
         try {
             $adjustment = new InventoryAdjustment();
             $adjustment->adjustment_date = Carbon::parse($request->adjustment_date)->format('Y-m-d');
@@ -228,7 +187,7 @@ class InventoryAdjustmentController extends Controller
             $audit->save();
 
             DB::commit();
-            
+
             return redirect()->route('inventory_adjustments.index')
                 ->with('success', _lang('Inventory adjustment created successfully'));
         } catch (\Exception $e) {
@@ -246,10 +205,10 @@ class InventoryAdjustmentController extends Controller
     public function edit($id)
     {
         $adjustment = InventoryAdjustment::with('product')->findOrFail($id);
-        
+
         // Get accounts for dropdown
         $accounts = Account::all(['id', 'account_name']);
-        
+
         // Get products for dropdown (only those with stock management enabled)
         $products = Product::where('stock_management', 1)
             ->select(['id', 'name', 'stock', 'product_unit_id', 'purchase_cost'])
@@ -276,7 +235,7 @@ class InventoryAdjustmentController extends Controller
         ]);
 
         DB::beginTransaction();
-        
+
         try {
             $adjustment = InventoryAdjustment::findOrFail($id);
             $adjustment->adjustment_date = Carbon::parse($request->adjustment_date)->format('Y-m-d');
@@ -368,7 +327,7 @@ class InventoryAdjustmentController extends Controller
             $audit->save();
 
             DB::commit();
-            
+
             return redirect()->route('inventory_adjustments.index')
                 ->with('success', _lang('Inventory adjustment updated successfully'));
         } catch (\Exception $e) {
@@ -380,11 +339,11 @@ class InventoryAdjustmentController extends Controller
     public function destroy($id)
     {
         DB::beginTransaction();
-        
+
         try {
             $adjustment = InventoryAdjustment::findOrFail($id);
             $product = Product::find($adjustment->product_id);
-            
+
             // Revert stock to original quantity
             $product->stock = $adjustment->quantity_on_hand;
             $product->save();
@@ -402,9 +361,9 @@ class InventoryAdjustmentController extends Controller
             $audit->save();
 
             $adjustment->delete();
-            
+
             DB::commit();
-            
+
             return redirect()->route('inventory_adjustments.index')
                 ->with('success', _lang('Inventory adjustment deleted successfully'));
         } catch (\Exception $e) {
@@ -419,49 +378,36 @@ class InventoryAdjustmentController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function destroy_multiple(Request $request)
+    public function bulk_destroy(Request $request)
     {
-        if ($request->has('ids')) {
-            DB::beginTransaction();
-            
-            try {
-                $ids = $request->ids;
-                $adjustments = InventoryAdjustment::whereIn('id', $ids)->get();
-                
-                foreach ($adjustments as $adjustment) {
-                    $product = Product::find($adjustment->product_id);
-                    
-                    // Revert stock to original quantity
-                    $product->stock = $adjustment->quantity_on_hand;
-                    $product->save();
 
-                    // Delete related transactions
-                    Transaction::where('ref_id', $adjustment->product_id)
-                        ->where('ref_type', 'product adjustment')
-                        ->delete();
+        $ids = $request->ids;
+        $adjustments = InventoryAdjustment::whereIn('id', $ids)->get();
 
-                    // audit log
-                    $audit = new AuditLog();
-                    $audit->date_changed = date('Y-m-d H:i:s');
-                    $audit->changed_by = auth()->user()->id;
-                    $audit->event = 'Inventory Adjustment Deleted For ' . $product->name . ' Quantity Adjusted: ' . $adjustment->adjusted_quantity;
-                    $audit->save();
-                    
-                    $adjustment->delete();
-                }
-                
-                DB::commit();
-                
-                return redirect()->route('inventory_adjustments.index')
-                    ->with('success', _lang('Inventory adjustments deleted successfully'));
-            } catch (\Exception $e) {
-                DB::rollback();
-                return redirect()->back()->with('error', _lang('An error occurred: ') . $e->getMessage());
-            }
+        foreach ($adjustments as $adjustment) {
+            $product = Product::find($adjustment->product_id);
+
+            // Revert stock to original quantity
+            $product->stock = $adjustment->quantity_on_hand;
+            $product->save();
+
+            // Delete related transactions
+            Transaction::where('ref_id', $adjustment->product_id)
+                ->where('ref_type', 'product adjustment')
+                ->delete();
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Inventory Adjustment Deleted For ' . $product->name . ' Quantity Adjusted: ' . $adjustment->adjusted_quantity;
+            $audit->save();
+
+            $adjustment->delete();
         }
-        
+
         return redirect()->route('inventory_adjustments.index')
-            ->with('error', _lang('No inventory adjustments selected'));
+            ->with('success', _lang('Inventory adjustments deleted successfully'));
     }
 
     /**
@@ -533,7 +479,7 @@ class InventoryAdjustmentController extends Controller
     {
         // Get progress from session
         $progress = session('import_progress');
-        
+
         if (!$progress) {
             return response()->json([
                 'status' => 'waiting',
@@ -547,26 +493,26 @@ class InventoryAdjustmentController extends Controller
                 ]
             ]);
         }
-        
+
         // Calculate progress percentage
         $progressPercent = 0;
         if ($progress['total'] > 0) {
             $progressPercent = round(($progress['processed'] / $progress['total']) * 100);
         }
-        
+
         // Determine status
         $status = 'processing';
         $message = 'Processing your inventory adjustments...';
-        
+
         if ($progress['processed'] >= $progress['total']) {
             $status = 'completed';
             $message = 'Import completed successfully.';
-            
+
             if ($progress['failed'] > 0) {
                 $message = 'Import completed with ' . $progress['failed'] . ' failed items.';
             }
         }
-        
+
         return response()->json([
             'status' => $status,
             'message' => $message,
@@ -591,7 +537,7 @@ class InventoryAdjustmentController extends Controller
     {
         if (!session('import_file')) {
             return response()->json([
-                'success' => false, 
+                'success' => false,
                 'message' => _lang('No import file found. Please upload a file first.')
             ]);
         }
@@ -600,7 +546,7 @@ class InventoryAdjustmentController extends Controller
             // Get file name from session
             $importFile = session('import_file');
             $filePath = storage_path('app/imports/' . $importFile);
-            
+
             // Check if file exists
             if (!file_exists($filePath)) {
                 \Log::error('Import file not found at: ' . $filePath);
@@ -609,7 +555,7 @@ class InventoryAdjustmentController extends Controller
                     'message' => _lang('Import file not found on server. Please upload the file again.')
                 ]);
             }
-            
+
             $businessId = $request->activeBusiness->id ?? null;
             if (!$businessId) {
                 \Log::error('No active business found for user: ' . auth()->id());
@@ -622,9 +568,9 @@ class InventoryAdjustmentController extends Controller
             // Validate the file first
             $hasHeading = session('has_heading', true);
             \Log::info('Processing import file: ' . $filePath . ' with heading: ' . ($hasHeading ? 'Yes' : 'No'));
-            
+
             $import = new InventoryAdjustmentImport($businessId, $hasHeading);
-            
+
             try {
                 $rows = Excel::toCollection($import, $filePath)->first();
                 if ($rows->isEmpty()) {
@@ -634,7 +580,7 @@ class InventoryAdjustmentController extends Controller
                         'message' => _lang('The file is empty')
                     ]);
                 }
-                
+
                 \Log::info('Successfully loaded file with ' . count($rows) . ' rows');
             } catch (Exception $e) {
                 \Log::error('Error reading import file: ' . $e->getMessage());
@@ -668,11 +614,11 @@ class InventoryAdjustmentController extends Controller
                 if ($hasHeading && $index === 0) {
                     continue;
                 }
-                
+
                 try {
                     $rowData = $row->toArray();
                     \Log::debug('Processing row ' . ($index + 1) . ': ' . json_encode($rowData));
-                    
+
                     // Extract data from the row
                     $productCode = $rowData[0] ?? null;
                     $adjustmentType = strtolower($rowData[1] ?? '');
@@ -682,30 +628,30 @@ class InventoryAdjustmentController extends Controller
                     $accountName = $rowData[5] ?? null;
                     $currencyCode = strtoupper($rowData[6] ?? 'USD');
                     $notes = $rowData[7] ?? null;
-                    
+
                     // Validate required fields
                     if (!$productCode || !$adjustmentType || !$quantity || !$dateStr || !$accountName) {
                         throw new \Exception("Missing required fields in import row: Product Code, Adjustment Type, Quantity, Date, and Account are required");
                     }
-                    
+
                     // Find the product by code
                     $product = Product::where('business_id', $businessId)
                         ->where('code', $productCode)
                         ->first();
-                        
+
                     if (!$product) {
                         throw new \Exception("Product not found with code: {$productCode}");
                     }
-                    
+
                     // Find the account
                     $account = Account::where('business_id', $businessId)
                         ->where('name', $accountName)
                         ->first();
-                        
+
                     if (!$account) {
                         throw new \Exception("Account not found with name: {$accountName}");
                     }
-                    
+
                     // Process date
                     try {
                         $date = Carbon::createFromFormat('Y-m-d', $dateStr);
@@ -717,29 +663,29 @@ class InventoryAdjustmentController extends Controller
                             \Log::warning("Could not parse date format: {$dateStr}, using current date");
                         }
                     }
-                    
+
                     // Get the currency - ensure ISO 4217 compliance
                     $currency = Currency::where('code', $currencyCode)
                         ->where('business_id', $businessId)
                         ->first();
-                    
+
                     if (!$currency) {
                         // Try to find the default currency (base currency with exchange_rate = 1.000000)
                         \Log::warning("Currency not found with code: {$currencyCode}, trying to use base currency");
                         $currency = Currency::where('business_id', $businessId)
                             ->where('exchange_rate', 1.0)
                             ->first();
-                            
+
                         if (!$currency) {
                             throw new \Exception("Currency not found with code: {$currencyCode} and no base currency available");
                         }
                     }
-                    
+
                     // Validate that currency follows ISO 4217 standards
                     if (strlen($currency->code) !== 3) {
                         throw new \Exception("Currency code not ISO 4217 compliant (must be 3 characters): {$currency->code}");
                     }
-                    
+
                     // Set the adjustment type
                     $type = 'addition';
                     if (in_array($adjustmentType, ['subtraction', 'deduction', 'removal', 'minus', 'negative', 'deduct'])) {
@@ -747,23 +693,23 @@ class InventoryAdjustmentController extends Controller
                         // Ensure quantity is positive for proper calculations
                         $quantity = abs($quantity);
                     }
-                    
+
                     // Get the default warehouse
                     $warehouse = Warehouse::where('business_id', $businessId)
                         ->where('is_default', 1)
                         ->first();
-                        
+
                     if (!$warehouse) {
                         // Get any warehouse if default not found
                         $warehouse = Warehouse::where('business_id', $businessId)->first();
-                        
+
                         if (!$warehouse) {
                             throw new \Exception("No warehouse found for your business");
                         }
                     }
-                    
+
                     DB::beginTransaction();
-                    
+
                     // Create the inventory adjustment
                     $adjustment = new InventoryAdjustment();
                     $adjustment->business_id = $businessId;
@@ -777,14 +723,14 @@ class InventoryAdjustmentController extends Controller
                     $adjustment->currency_id = $currency->id;
                     $adjustment->notes = $notes;
                     $adjustment->save();
-                    
+
                     // Update product stock
                     if ($type === 'addition') {
                         $product->increment('stock', $quantity);
                     } else {
                         $product->decrement('stock', $quantity);
                     }
-                    
+
                     DB::commit();
                     $succeeded++;
                     \Log::info("Successfully processed row " . ($index + 1) . " for product: {$productCode}");
@@ -795,9 +741,9 @@ class InventoryAdjustmentController extends Controller
                     $errors[] = $errorMsg;
                     \Log::error($errorMsg);
                 }
-                
+
                 $processed++;
-                
+
                 // Update progress in session
                 session([
                     'import_progress' => [
@@ -810,7 +756,7 @@ class InventoryAdjustmentController extends Controller
                     ]
                 ]);
             }
-            
+
             // Return success response
             return response()->json([
                 'success' => true,
@@ -822,7 +768,6 @@ class InventoryAdjustmentController extends Controller
                     'failed' => $failed
                 ]
             ]);
-            
         } catch (\Exception $e) {
             \Log::error('Error in import process: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
             return response()->json([
@@ -841,11 +786,11 @@ class InventoryAdjustmentController extends Controller
     public function export(Request $request)
     {
         $businessId = $request->activeBusiness->id;
-        
+
         // Get filtered inventory adjustments
         $query = InventoryAdjustment::with(['product', 'account'])
             ->where('business_id', $businessId);
-            
+
         // Apply filters if provided
         if ($request->has('date_range')) {
             $dates = explode(' - ', $request->date_range);
@@ -855,17 +800,17 @@ class InventoryAdjustmentController extends Controller
                 $query->whereBetween('adjustment_date', [$start_date, $end_date]);
             }
         }
-        
+
         if ($request->has('product_id')) {
             $query->where('product_id', $request->product_id);
         }
-        
+
         if ($request->has('account_id')) {
             $query->where('account_id', $request->account_id);
         }
-        
+
         $adjustments = $query->get();
-        
+
         $exportData = [];
         foreach ($adjustments as $adjustment) {
             $exportData[] = [
@@ -877,7 +822,7 @@ class InventoryAdjustmentController extends Controller
                 'description' => $adjustment->description,
             ];
         }
-        
+
         // Create Excel export with proper currency handling using ISO 4217 codes
         return Excel::download(new \Maatwebsite\Excel\Sheets\Sheet(
             'Inventory Adjustments',

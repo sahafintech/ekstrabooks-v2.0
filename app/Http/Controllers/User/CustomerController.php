@@ -314,6 +314,24 @@ class CustomerController extends Controller
         return redirect()->route('customers.index')->with('success', _lang('Deleted Successfully'));
     }
 
+    public function bulk_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $customer = Customer::find($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Deleted Customer ' . $customer->name;
+            $audit->save();
+
+            $customer->delete();
+        }
+        
+        return redirect()->route('customers.index')->with('success', _lang('Deleted Successfully'));
+    }
+
     public function import_customers(Request $request)
     {
         $request->validate([

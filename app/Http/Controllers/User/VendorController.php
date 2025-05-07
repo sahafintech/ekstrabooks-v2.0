@@ -299,29 +299,6 @@ class VendorController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function bulk_action(Request $request)
-    {
-        if ($request->delete_vendors) {
-            $vendors = explode(",", $request->delete_vendors);
-            $vendors = Vendor::whereIn('id', $vendors)->get();
-
-            foreach ($vendors as $v) {
-                $vendor = Vendor::find($v->id);
-                $vendor->delete();
-
-                // audit log
-                $audit = new AuditLog();
-                $audit->date_changed = date('Y-m-d H:i:s');
-                $audit->changed_by = Auth::id();
-                $audit->event = 'Supplier Deleted ' . $vendor->name;
-                $audit->save();
-            }
-
-            return redirect()->route('vendors.index')->with('success', _lang('Deleted Successfully'));
-        }
-
-        return redirect()->route('vendors.index')->with('error', _lang('Action Not Found'));
-    }
 
     public function import_vendors(Request $request)
     {
@@ -367,13 +344,9 @@ class VendorController extends Controller
         return Excel::download(new SupplierExport, $filename);
     }
 
-    public function vendors_all(Request $request)
+    public function bulk_destroy(Request $request)
     {
-        if ($request->vendors == null) {
-            return redirect()->route('vendors.index')->with('error', _lang('Please Select a Supplier'));
-        }
-
-        $vendors = Vendor::whereIn('id', $request->vendors)->get();
+        $vendors = Vendor::whereIn('id', $request->ids)->get();
 
         // audit log
         $audit = new AuditLog();

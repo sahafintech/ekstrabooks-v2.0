@@ -39,7 +39,7 @@ class DepartmentController extends Controller {
      */
     public function index(Request $request) {
         $search = $request->search;
-        $per_page = $request->per_page ?? 10;
+        $per_page = $request->per_page ?? 50;
 
         $query = Department::query()->where('business_id', $request->activeBusiness->id);
 
@@ -207,7 +207,7 @@ class DepartmentController extends Controller {
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function bulk_delete(Request $request) {
+    public function bulk_destroy(Request $request) {
         $ids = $request->ids;
         $departments = Department::whereIn('id', $ids)->get();
         

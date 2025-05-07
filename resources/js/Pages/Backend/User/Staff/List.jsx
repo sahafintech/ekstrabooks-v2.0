@@ -38,7 +38,7 @@ import { formatCurrency } from "@/lib/utils";
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this staff member?
       </h2>
@@ -66,7 +66,7 @@ const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
 // Bulk Delete Confirmation Modal Component
 const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected staff {count !== 1 ? 'members' : 'member'}?
       </h2>
@@ -161,10 +161,10 @@ export default function List({ employees = [], meta = {}, filters = {} }) {
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
-  const [perPage, setPerPage] = useState(meta.per_page || 10);
+  const [perPage, setPerPage] = useState(meta.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
-  
+
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
@@ -212,9 +212,12 @@ export default function List({ employees = [], meta = {}, filters = {} }) {
 
   const handleSearch = (e) => {
     e.preventDefault();
+    const value = e.target.value;
+    setSearch(value);
+
     router.get(
       route("staffs.index"),
-      { search, page: 1, per_page: perPage },
+      { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
   };
@@ -262,7 +265,7 @@ export default function List({ employees = [], meta = {}, filters = {} }) {
   const handleDelete = (e) => {
     e.preventDefault();
     setIsProcessing(true);
-    
+
     router.delete(route("staffs.destroy", employeeToDelete), {
       preserveState: true,
       onSuccess: () => {
@@ -279,29 +282,32 @@ export default function List({ employees = [], meta = {}, filters = {} }) {
   const handleBulkDeleteConfirm = (e) => {
     e.preventDefault();
     setIsProcessing(true);
-    
-    router.post(route("staffs.bulk_delete"), {
-      ids: selectedEmployees
-    }, {
-      preserveState: true,
-      onSuccess: () => {
-        setSelectedEmployees([]);
-        setIsAllSelected(false);
-        setBulkAction("");
-        setShowBulkDeleteModal(false);
-        setIsProcessing(false);
+
+    router.post(route("staffs.bulk_destroy"),
+      {
+        ids: selectedEmployees
       },
-      onError: () => {
-        setIsProcessing(false);
+      {
+        preserveState: true,
+        onSuccess: () => {
+          setSelectedEmployees([]);
+          setIsAllSelected(false);
+          setBulkAction("");
+          setShowBulkDeleteModal(false);
+          setIsProcessing(false);
+        },
+        onError: () => {
+          setIsProcessing(false);
+        }
       }
-    });
+    );
   };
 
   const handleImport = (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     setIsProcessing(true);
-    
+
     router.post(route('staffs.import'), formData, {
       onSuccess: () => {
         setShowImportModal(false);
@@ -391,15 +397,12 @@ export default function List({ employees = [], meta = {}, filters = {} }) {
                 </DropdownMenu>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input
-                    placeholder="Search staff..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full md:w-80"
-                  />
-                  <Button type="submit">Search</Button>
-                </form>
+                <Input
+                  placeholder="Search staff..."
+                  value={search}
+                  onChange={(e) => handleSearch(e)}
+                  className="w-full md:w-80"
+                />
               </div>
             </div>
 
@@ -517,7 +520,7 @@ export default function List({ employees = [], meta = {}, filters = {} }) {
           </div>
 
           {/* Delete Confirmation Modal */}
-          <DeleteConfirmationModal 
+          <DeleteConfirmationModal
             show={showDeleteModal}
             onClose={() => setShowDeleteModal(false)}
             onConfirm={handleDelete}
@@ -525,7 +528,7 @@ export default function List({ employees = [], meta = {}, filters = {} }) {
           />
 
           {/* Bulk Delete Confirmation Modal */}
-          <BulkDeleteConfirmationModal 
+          <BulkDeleteConfirmationModal
             show={showBulkDeleteModal}
             onClose={() => setShowBulkDeleteModal(false)}
             onConfirm={handleBulkDeleteConfirm}

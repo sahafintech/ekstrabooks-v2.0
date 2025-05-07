@@ -11,54 +11,39 @@ class BrandsController extends Controller
 {
     public function index(Request $request)
     {
-        // Create a query builder for brands
-        $query = Brands::query();
+        $per_page = $request->get('per_page', 50);
+        $search = $request->get('search', '');
 
-        // Apply search filter if provided
-        if ($request->has('search') && !empty($request->get('search'))) {
-            $search = $request->get('search');
-            $query->where('name', 'like', "%{$search}%");
+        $query = Brands::orderBy("id", "desc");
+
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%");
+            });
         }
 
-        // Apply column filters if provided
-        if ($request->has('columnFilters') && !empty($request->get('columnFilters'))) {
-            $columnFilters = json_decode($request->get('columnFilters'), true);
-            foreach ($columnFilters as $filter) {
-                if (isset($filter['id']) && isset($filter['value'])) {
-                    $query->where($filter['id'], 'like', "%{$filter['value']}%");
-                }
-            }
-        }
+        // Get vendors with pagination
+        $brands = $query->paginate($per_page)->withQueryString();
 
-        // Apply sorting if provided
-        if ($request->has('sorting') && !empty($request->get('sorting'))) {
-            $sorting = json_decode($request->get('sorting'), true);
-            foreach ($sorting as $sort) {
-                $query->orderBy($sort['id'], $sort['desc'] ? 'desc' : 'asc');
-            }
-        } else {
-            // Default sorting
-            $query->orderBy('id', 'desc');
-        }
-
-        // Paginate the results
-        $per_page = $request->get('per_page', 10);
-        $brands = $query->paginate($per_page);
-
-        // If Inertia request, return Inertia view
+        // Return Inertia view
         return Inertia::render('Backend/User/ProductBrand/List', [
             'brands' => $brands->items(),
             'meta' => [
                 'current_page' => $brands->currentPage(),
+                'from' => $brands->firstItem(),
+                'last_page' => $brands->lastPage(),
+                'links' => $brands->linkCollection(),
+                'path' => $brands->path(),
                 'per_page' => $brands->perPage(),
+                'to' => $brands->lastItem(),
                 'total' => $brands->total(),
-                'last_page' => $brands->lastPage()
             ],
             'filters' => [
-                'search' => $request->get('search', ''),
-                'columnFilters' => json_decode($request->get('columnFilters', '[]')),
-                'sorting' => json_decode($request->get('sorting', '[]'))
-            ]
+                'search' => $search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $request->get('sorting', []),
+            ],
         ]);
     }
 
@@ -98,12 +83,12 @@ class BrandsController extends Controller
         return redirect()->route('brands.index')->with('success', _lang('Brand Deleted'));
     }
 
-    public function destroy_multiple(Request $request)
+    public function bulk_destroy(Request $request)
     {
         if ($request->has('ids')) {
             $ids = $request->ids;
             $brands = Brands::whereIn('id', $ids)->get();
-            
+
             foreach ($brands as $brand) {
                 // audit log
                 $audit = new AuditLog();
@@ -111,13 +96,13 @@ class BrandsController extends Controller
                 $audit->changed_by = auth()->user()->id;
                 $audit->event = 'Brand Deleted: ' . $brand->name;
                 $audit->save();
-                
+
                 $brand->delete();
             }
-            
+
             return redirect()->route('brands.index')->with('success', _lang('Brands Deleted'));
         }
-        
+
         return redirect()->route('brands.index')->with('error', _lang('No brands selected'));
     }
 

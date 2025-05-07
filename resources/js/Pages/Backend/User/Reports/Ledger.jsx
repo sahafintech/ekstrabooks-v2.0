@@ -50,16 +50,14 @@ export default function Ledger({
 
     const handleSearch = (e) => {
         e.preventDefault();
+        const value = e.target.value;
+        setSearch(value);
+
         router.get(
             route("reports.ledger"),
-            {
-                search: search,
-                per_page: perPage,
-                page: 1
-            },
+            { search: value, page: 1, per_page: perPage },
             { preserveState: true }
         );
-        setCurrentPage(1);
     };
 
     const handleGenerate = (e) => {
@@ -314,15 +312,12 @@ export default function Ledger({
                                 </form>
                             </div>
                             <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                                <form onSubmit={handleSearch} className="flex gap-2">
-                                    <Input
-                                        placeholder="Search account name or number..."
-                                        value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
-                                        className="w-full md:w-80"
-                                    />
-                                    <Button type="submit">Search</Button>
-                                </form>
+                                <Input
+                                    placeholder="Search account name or number..."
+                                    value={search}
+                                    onChange={(e) => handleSearch(e)}
+                                    className="w-full md:w-80"
+                                />
                             </div>
                         </div>
 

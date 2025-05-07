@@ -36,7 +36,7 @@ import { formatCurrency } from "@/lib/utils";
 
 const DeletePurchaseOrderModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this purchase order?
       </h2>
@@ -63,7 +63,7 @@ const DeletePurchaseOrderModal = ({ show, onClose, onConfirm, processing }) => (
 
 const ConvertToBillModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to convert this purchase order to a bill?
       </h2>
@@ -90,7 +90,7 @@ const ConvertToBillModal = ({ show, onClose, onConfirm, processing }) => (
 
 const ConvertToCashPurchaseModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to convert this purchase order to a cash purchase?
       </h2>
@@ -180,7 +180,7 @@ const ImportPurchaseOrdersModal = ({ show, onClose, onSubmit, processing }) => (
 
 const DeleteAllPurchaseOrdersModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected purchase order{count !== 1 ? 's' : ''}?
       </h2>
@@ -224,10 +224,10 @@ export default function List({ orders = [], meta = {}, filters = {} }) {
   const [selectedPurchaseOrders, setSelectedPurchaseOrders] = useState([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
-  const [perPage, setPerPage] = useState(filters.per_page || 10);
+  const [perPage, setPerPage] = useState(filters.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
-  
+
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -273,7 +273,7 @@ export default function List({ orders = [], meta = {}, filters = {} }) {
     setPurchaseOrderToDelete(purchaseOrderId);
     setShowDeleteModal(true);
   };
-  
+
   const handleConvertToBillConfirm = (purchaseOrderId) => {
     setPurchaseOrderToDelete(purchaseOrderId);
     setShowConvertToBillModal(true);
@@ -287,7 +287,7 @@ export default function List({ orders = [], meta = {}, filters = {} }) {
   const handleDelete = (e) => {
     e.preventDefault();
     setProcessing(true);
-  
+
     router.delete(route("purchase_orders.destroy", purchaseOrderToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
@@ -313,7 +313,7 @@ export default function List({ orders = [], meta = {}, filters = {} }) {
   const handleConvertToBill = (e) => {
     e.preventDefault();
     setProcessing(true);
-  
+
     router.post(route("purchase_orders.convert_to_bill", purchaseOrderToDelete), {
       onSuccess: () => {
         setShowConvertToBillModal(false);
@@ -339,7 +339,7 @@ export default function List({ orders = [], meta = {}, filters = {} }) {
   const handleConvertToCashPurchase = (e) => {
     e.preventDefault();
     setProcessing(true);
-  
+
     router.post(route("purchase_orders.convert_to_cash_purchase", purchaseOrderToDelete), {
       onSuccess: () => {
         setShowConvertToCashPurchaseModal(false);
@@ -366,35 +366,40 @@ export default function List({ orders = [], meta = {}, filters = {} }) {
     e.preventDefault();
     setProcessing(true);
 
-    router.delete(route("purchase_orders.delete_all"), {
-      data: { ids: selectedPurchaseOrders },
-      onSuccess: () => {
-        setShowDeleteAllModal(false);
-        setProcessing(false);
-        setSelectedPurchaseOrders([]);
-        setIsAllSelected(false);
-        toast({
-          title: "Purchase Orders Deleted",
-          description: "Selected purchase orders have been deleted successfully.",
-        });
+    router.post(
+      route("purchase_orders.bulk_destroy"),
+      {
+        ids: selectedPurchaseOrders,
       },
-      onError: () => {
-        setProcessing(false);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "There was an error deleting the selected purchase orders.",
-        });
+      {
+        onSuccess: () => {
+          setShowDeleteAllModal(false);
+          setProcessing(false);
+          setSelectedPurchaseOrders([]);
+          setIsAllSelected(false);
+          toast({
+            title: "Purchase Orders Deleted",
+            description: "Selected purchase orders have been deleted successfully.",
+          });
+        },
+        onError: () => {
+          setProcessing(false);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "There was an error deleting the selected purchase orders.",
+          });
+        }
       }
-    });
+    );
   };
 
   const handleImport = (e) => {
     e.preventDefault();
     setProcessing(true);
-    
+
     const formData = new FormData(e.target);
-    
+
     router.post(route("purchase_orders.import"), formData, {
       onSuccess: () => {
         setShowImportModal(false);
@@ -417,9 +422,12 @@ export default function List({ orders = [], meta = {}, filters = {} }) {
 
   const handleSearch = (e) => {
     e.preventDefault();
+    const value = e.target.value;
+    setSearch(value);
+
     router.get(
       route("purchase_orders.index"),
-      { search, page: 1, per_page: perPage },
+      { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
   };
@@ -515,15 +523,12 @@ export default function List({ orders = [], meta = {}, filters = {} }) {
                 </DropdownMenu>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input
-                    placeholder="Search purchase orders..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full md:w-80"
-                  />
-                  <Button type="submit">Search</Button>
-                </form>
+                <Input
+                  placeholder="Search purchase orders..."
+                  value={search}
+                  onChange={(e) => handleSearch(e)}
+                  className="w-full md:w-80"
+                />
               </div>
             </div>
 

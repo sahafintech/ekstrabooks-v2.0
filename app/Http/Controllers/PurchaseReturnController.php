@@ -656,6 +656,49 @@ class PurchaseReturnController extends Controller
         return redirect()->route('purchase_returns.index')->with('success', _lang('Deleted Successfully'));
     }
 
+    public function bulk_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $return = PurchaseReturn::find($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Purchase Return Deleted: ' . $return->return_number;
+            $audit->save();
+
+            // delete transactions
+            $transactions = Transaction::where('ref_id', $return->id)->where('ref_type', 'p return')->get();
+            foreach ($transactions as $transaction) {
+                $transaction->delete();
+            }
+
+            // increase stock
+            foreach ($return->items as $item) {
+                $product = Product::find($item->product_id);
+                if ($product->type == 'product' && $product->stock_management == 1) {
+                    $product->stock = $product->stock + $item->quantity;
+                    $product->save();
+                }
+            }
+
+            // delete p refund transactions
+            $refund_transactions = Transaction::where('ref_id', $return->id)
+                ->where(function ($query) {
+                    $query->where('ref_type', 'p return')
+                        ->orWhere('ref_type', 'p return tax');
+                })
+                ->get();
+            foreach ($refund_transactions as $transaction) {
+                $transaction->delete();
+            }
+
+            $return->delete();
+        }
+        return redirect()->route('purchase_returns.index')->with('success', _lang('Deleted Successfully'));
+    }
+
     public function refund_store(Request $request, $id)
     {
         $request->validate(

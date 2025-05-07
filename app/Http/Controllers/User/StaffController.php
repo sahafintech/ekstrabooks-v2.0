@@ -50,7 +50,7 @@ class StaffController extends Controller
      */
     public function index(Request $request)
     {
-        $per_page = $request->get('per_page', 10);
+        $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
         $query = Employee::with('department', 'designation')
@@ -59,9 +59,9 @@ class StaffController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%$search%")
-                  ->orWhere('employee_id', 'like', "%$search%")
-                  ->orWhere('email', 'like', "%$search%")
-                  ->orWhere('phone', 'like', "%$search%");
+                    ->orWhere('employee_id', 'like', "%$search%")
+                    ->orWhere('email', 'like', "%$search%")
+                    ->orWhere('phone', 'like', "%$search%");
             });
         }
 
@@ -92,7 +92,7 @@ class StaffController extends Controller
     {
         $departments = Department::where('business_id', $request->activeBusiness->id)->get();
         $designations = Designation::where('business_id', $request->activeBusiness->id)->get();
-        
+
         return Inertia::render('Backend/User/Staff/Create', [
             'departments' => $departments,
             'designations' => $designations,
@@ -110,7 +110,7 @@ class StaffController extends Controller
         $validator = Validator::make($request->all(), [
             'employee_id'     => [
                 'required',
-                Rule::unique('employees')->where(function ($query) use($request) {
+                Rule::unique('employees')->where(function ($query) use ($request) {
                     return $query->where('business_id', $request->activeBusiness->id);
                 }),
             ],
@@ -119,7 +119,7 @@ class StaffController extends Controller
             'email'           => [
                 'nullable',
                 'email',
-                Rule::unique('employees')->where(function ($query) use($request) {
+                Rule::unique('employees')->where(function ($query) use ($request) {
                     return $query->where('business_id', $request->activeBusiness->id);
                 }),
             ],
@@ -140,7 +140,7 @@ class StaffController extends Controller
         $employee->business_id     = $request->activeBusiness->id;
         $employee->employee_id     = $request->input('employee_id');
         $employee->name            = $request->input('name');
-        $employee->date_of_birth   = $request->input('date_of_birth')? Carbon::parse($request->input('date_of_birth'))->format('Y-m-d') : null;
+        $employee->date_of_birth   = $request->input('date_of_birth') ? Carbon::parse($request->input('date_of_birth'))->format('Y-m-d') : null;
         $employee->email           = $request->input('email');
         $employee->phone           = $request->input('phone');
         $employee->city            = $request->input('city');
@@ -174,7 +174,7 @@ class StaffController extends Controller
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = Auth::id();
-        $audit->event = 'Created New Staff '.$employee->name;
+        $audit->event = 'Created New Staff ' . $employee->name;
         $audit->save();
 
         return redirect()->route('staffs.index')->with('success', _lang('Saved Successfully'));
@@ -191,7 +191,7 @@ class StaffController extends Controller
         $employee = Employee::with('department', 'designation', 'department_history')
             ->where('business_id', $request->activeBusiness->id)
             ->findOrFail($id);
-            
+
         return Inertia::render('Backend/User/Staff/View', [
             'employee' => $employee
         ]);
@@ -207,10 +207,10 @@ class StaffController extends Controller
     {
         $employee = Employee::where('business_id', $request->activeBusiness->id)
             ->findOrFail($id);
-            
+
         $departments = Department::where('business_id', $request->activeBusiness->id)->get();
         $designations = Designation::where('business_id', $request->activeBusiness->id)->get();
-        
+
         return Inertia::render('Backend/User/Staff/Edit', [
             'employee' => $employee,
             'departments' => $departments,
@@ -244,7 +244,7 @@ class StaffController extends Controller
                 'required_if:update_company_details,1',
                 Rule::unique('employees')->where(function ($query) use ($request, $id) {
                     return $query->where('business_id', $request->activeBusiness->id)
-                    ->where('id', '!=', $id);
+                        ->where('id', '!=', $id);
                 }),
             ],
             'department_id'          => 'required_if:update_company_details,1',
@@ -260,9 +260,9 @@ class StaffController extends Controller
         DB::beginTransaction();
         $employee = Employee::where('business_id', $request->activeBusiness->id)
             ->findOrFail($id);
-            
+
         $employee->name          = $request->input('name');
-        $employee->date_of_birth = $request->input('date_of_birth')? Carbon::parse($request->input('date_of_birth'))->format('Y-m-d') : null;
+        $employee->date_of_birth = $request->input('date_of_birth') ? Carbon::parse($request->input('date_of_birth'))->format('Y-m-d') : null;
         $employee->email         = $request->input('email');
         $employee->phone         = $request->input('phone');
         $employee->city          = $request->input('city');
@@ -299,7 +299,7 @@ class StaffController extends Controller
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = Auth::id();
-        $audit->event = 'Updated Staff '.$employee->name;
+        $audit->event = 'Updated Staff ' . $employee->name;
         $audit->save();
 
         return redirect()->route('staffs.index')->with('success', _lang('Updated Successfully'));
@@ -320,14 +320,33 @@ class StaffController extends Controller
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = Auth::id();
-        $audit->event = 'Deleted Staff '.$employee->name;
+        $audit->event = 'Deleted Staff ' . $employee->name;
         $audit->save();
 
         $employee->delete();
-        
+
         return redirect()->route('staffs.index')->with('success', _lang('Deleted Successfully'));
     }
-    
+
+    public function bulk_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $employee = Employee::where('business_id', $request->activeBusiness->id)
+                ->findOrFail($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Deleted Staff ' . $employee->name;
+            $audit->save();
+
+            $employee->delete();
+        }
+
+        return redirect()->route('staffs.index')->with('success', _lang('Deleted Successfully'));
+    }
+
     /**
      * Bulk delete selected staff members
      * 
@@ -348,18 +367,18 @@ class StaffController extends Controller
         $employees = Employee::whereIn('id', $request->ids)
             ->where('business_id', $request->activeBusiness->id)
             ->get();
-            
+
         foreach ($employees as $employee) {
             // audit log
             $audit = new AuditLog();
             $audit->date_changed = date('Y-m-d H:i:s');
             $audit->changed_by = Auth::id();
-            $audit->event = 'Deleted Staff '.$employee->name;
+            $audit->event = 'Deleted Staff ' . $employee->name;
             $audit->save();
-            
+
             $employee->delete();
         }
-        
+
         return redirect()->route('staffs.index')->with('success', _lang('Selected staff deleted successfully'));
     }
 

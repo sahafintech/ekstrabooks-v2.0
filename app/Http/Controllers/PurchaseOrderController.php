@@ -39,14 +39,14 @@ class PurchaseOrderController extends Controller
 	public function index(Request $request)
 	{
 		$search = $request->get('search', '');
-		$perPage = $request->get('per_page', 10);
+		$perPage = $request->get('per_page', 50);
 
 		$query = PurchaseOrder::with('vendor')
 			->orderBy('id', 'desc');
 
 		if ($search) {
 			$query->where(function ($q) use ($search) {
-				$q->where('bill_no', 'like', "%$search%")
+				$q->where('order_number', 'like', "%$search%")
 					->orWhere('title', 'like', "%$search%")
 					->orWhereHas('vendor', function ($q) use ($search) {
 						$q->where('name', 'like', "%$search%");
@@ -122,7 +122,6 @@ class PurchaseOrderController extends Controller
 	 */
 	public function store(Request $request)
 	{
-		return $request;
 		$validator = Validator::make($request->all(), [
 			'vendor_id' => 'required',
 			'title' => 'required',
@@ -581,6 +580,24 @@ class PurchaseOrderController extends Controller
 		}
 
 		$purchase->delete();
+		return redirect()->route('purchase_orders.index')->with('success', _lang('Deleted Successfully'));
+	}
+
+	public function bulk_destroy(Request $request)
+	{
+		$purchases = PurchaseOrder::whereIn('id', $request->ids)->get();
+
+		// audit log
+		$audit = new AuditLog();
+		$audit->date_changed = date('Y-m-d H:i:s');
+		$audit->changed_by = auth()->user()->id;
+		$audit->event = count($purchases) . 'Purchae Orders Deleted';
+		$audit->save();
+
+		foreach ($purchases as $order) {
+			$order->delete();
+		}
+
 		return redirect()->route('purchase_orders.index')->with('success', _lang('Deleted Successfully'));
 	}
 

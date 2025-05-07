@@ -37,20 +37,6 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
         customer_id: customer_id,
     });
 
-    const handleSearch = (e) => {
-        e.preventDefault();
-        router.get(
-            route("reports.receivables"),
-            {
-                search: search,
-                per_page: perPage,
-                page: 1
-            },
-            { preserveState: true }
-        );
-        setCurrentPage(1);
-    };
-
     const handleGenerate = (e) => {
         e.preventDefault();
         post(route("reports.receivables"), {
@@ -273,17 +259,6 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                                         />
                                         <Button type="submit" disabled={processing}>{processing ? 'Generating...' : 'Generate'}</Button>
                                     </div>
-                                </form>
-                            </div>
-                            <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                                <form onSubmit={handleSearch} className="flex gap-2">
-                                    <Input
-                                        placeholder="Search customer..."
-                                        value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
-                                        className="w-full md:w-80"
-                                    />
-                                    <Button type="submit">Search</Button>
                                 </form>
                             </div>
                         </div>

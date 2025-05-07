@@ -94,7 +94,7 @@ class InvoiceController extends Controller
         $query->orderBy($sortField, $sortDirection);
 
         // Handle pagination
-        $perPage = $request->get('per_page', 10);
+        $perPage = $request->get('per_page', 50);
         $invoices = $query->paginate($perPage);
 
         return Inertia::render('Backend/User/Invoice/List', [
@@ -1042,6 +1042,64 @@ class InvoiceController extends Controller
         }
 
         $invoice->delete();
+        return redirect()->route('invoices.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    public function bulk_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $invoice = Invoice::find($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Deleted Invoice ' . $invoice->invoice_number;
+            $audit->save();
+
+            // increase product stock
+            foreach ($invoice->items as $invoiceItem) {
+                $product = $invoiceItem->product;
+                if ($product->type == 'product' && $product->stock_management == 1) {
+                    $product->stock = $product->stock + $invoiceItem->quantity;
+                    $product->save();
+                }
+            }
+            // delete transactions
+            Transaction::where('ref_id', $invoice->id)
+                ->where(function ($query) {
+                    $query->where('ref_type', 'invoice')
+                        ->orWhere('ref_type', 'invoice tax');
+                })
+                ->delete();
+
+            $invoice_payments = InvoicePayment::where('invoice_id', $invoice->id)->get();
+
+            foreach ($invoice_payments as $invoice_payment) {
+                $receive_payment = ReceivePayment::find($invoice_payment->payment_id);
+                if ($receive_payment) {
+                    $receive_payment->amount = $receive_payment->amount - $invoice_payment->amount;
+                    $receive_payment->save();
+
+                    if ($receive_payment->amount == 0) {
+                        $receive_payment->delete();
+                    }
+
+                    // delete transactions
+                    $transactions = Transaction::where('ref_id', $invoice->id . ',' . $receive_payment->id)->where('ref_type', 'invoice payment')->get();
+                    foreach ($transactions as $transaction) {
+                        $transaction->delete();
+                    }
+                }
+                $invoice_payment->delete();
+
+                if ($receive_payment->invoices == null) {
+                    $receive_payment->delete();
+                }
+            }
+
+            $invoice->delete();
+        }
         return redirect()->route('invoices.index')->with('success', _lang('Deleted Successfully'));
     }
 

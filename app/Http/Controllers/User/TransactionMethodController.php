@@ -130,7 +130,7 @@ class TransactionMethodController extends Controller {
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function bulkDelete(Request $request) {
+    public function bulk_destroy(Request $request) {
         if (!$request->ids || !is_array($request->ids)) {
             return redirect()->route('transaction_methods.index')->with('error', _lang('Please select at least one transaction method'));
         }

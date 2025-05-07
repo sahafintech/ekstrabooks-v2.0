@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, router, usePage } from "@inertiajs/react";
+import { Head, Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -19,13 +19,204 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/Components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { Download, Edit, Eye, Plus, Trash } from "lucide-react";
-import { Toaster } from "@/components/ui/toaster";
+import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit } from "lucide-react";
+import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
+import Modal from "@/Components/Modal";
 import { formatCurrency } from "@/lib/utils";
+
+const DeleteJournalModal = ({ show, onClose, onConfirm, processing }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to delete this journal?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="destructive"
+          disabled={processing}
+        >
+          Delete Journal
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+const ImportJournalsModal = ({ show, onClose, onSubmit, processing }) => (
+  <Modal show={show} onClose={onClose} maxWidth="3xl">
+    <form onSubmit={onSubmit}>
+      <div className="ti-modal-header">
+        <h3 className="text-lg font-bold">Import Journals</h3>
+      </div>
+      <div className="ti-modal-body grid grid-cols-12">
+        <div className="col-span-12">
+          <div className="flex items-center justify-between">
+            <label className="block font-medium text-sm text-gray-700">
+              Journal File
+            </label>
+            <a href="/uploads/media/default/sample_journal.xlsx" download>
+              <Button variant="secondary" size="sm" type="button">
+                Use This Sample File
+              </Button>
+            </a>
+          </div>
+          <input type="file" className="w-full dropify" name="journal_file" required />
+        </div>
+        <div className="col-span-12 mt-4">
+          <ul className="space-y-3 text-sm">
+            <li className="flex space-x-3">
+              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
+              <span className="text-gray-800 dark:text-white/70">
+                Maximum File Size: 1 MB
+              </span>
+            </li>
+            <li className="flex space-x-3">
+              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
+              <span className="text-gray-800 dark:text-white/70">
+                File format Supported: CSV, TSV, XLS
+              </span>
+            </li>
+            <li className="flex space-x-3">
+              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
+              <span className="text-gray-800 dark:text-white/70">
+                Make sure the format of the import file matches our sample file by comparing them.
+              </span>
+            </li>
+          </ul>
+        </div>
+      </div>
+      <div className="ti-modal-footer flex justify-end mt-4">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Close
+        </Button>
+        <Button
+          type="submit"
+          disabled={processing}
+        >
+          Import Journal
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+const DeleteAllJournalsModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to delete {count} selected journal{count !== 1 ? 's' : ''}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="destructive"
+          disabled={processing}
+        >
+          Delete Selected
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+const ApproveAllJournalssModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to approve {count} selected journal{count !== 1 ? 's' : ''}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Approve Selected
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+const RejectAllJournalsModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to reject {count} selected journal{count !== 1 ? 's' : ''}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="destructive"
+          disabled={processing}
+        >
+          Reject Selected
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+const JournalStatusBadge = ({ status }) => {
+  const statusMap = {
+    1: { label: "Approved", className: "text-green-500" },
+    2: { label: "Pending", className: "text-yellow-500" },
+  };
+
+  return (
+    <span className={statusMap[status].className}>
+      {statusMap[status].label}
+    </span>
+  );
+};
 
 export default function List({ journals = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
@@ -33,9 +224,18 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
   const [selectedJournals, setSelectedJournals] = useState([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
-  const [perPage, setPerPage] = useState(meta.per_page || 10);
+  const [perPage, setPerPage] = useState(filters.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
+
+  // Delete confirmation modal states
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [showApproveAllModal, setShowApproveAllModal] = useState(false);
+  const [showRejectAllModal, setShowRejectAllModal] = useState(false);
+  const [journalToDelete, setJournalToDelete] = useState(null);
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -54,38 +254,139 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
     }
   }, [flash, toast]);
 
-  const toggleSelectAll = () => {
-    if (isAllSelected) {
-      setSelectedJournals([]);
-    } else {
-      setSelectedJournals(journals.map((journal) => journal.id));
-    }
-    setIsAllSelected(!isAllSelected);
+  const toggleSelectAll = (checked) => {
+    setIsAllSelected(checked);
+    setSelectedJournals(checked ? journals.map(journal => journal.id) : []);
   };
 
-  const toggleSelectJournal = (id) => {
-    if (selectedJournals.includes(id)) {
-      setSelectedJournals(selectedJournals.filter((journalId) => journalId !== id));
-      setIsAllSelected(false);
-    } else {
-      setSelectedJournals([...selectedJournals, id]);
-      if (selectedJournals.length + 1 === journals.length) {
-        setIsAllSelected(true);
+  const toggleSelectJournal = (journalId) => {
+    setSelectedJournals(prev => {
+      if (prev.includes(journalId)) {
+        return prev.filter(id => id !== journalId);
+      } else {
+        return [...prev, journalId];
       }
-    }
+    });
+  };
+
+  const handleDeleteConfirm = (journalId) => {
+    setJournalToDelete(journalId);
+    setShowDeleteModal(true);
+  };
+
+  const handleDelete = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+
+    router.delete(route("journals.destroy", journalToDelete), {
+      onSuccess: () => {
+        setShowDeleteModal(false);
+        setJournalToDelete(null);
+        setProcessing(false);
+        setSelectedJournals(prev => prev.filter(id => id !== journalToDelete));
+      },
+      onError: () => {
+        setProcessing(false);
+      }
+    });
+  };
+
+  const handleDeleteAll = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+
+    router.post(
+      route("journals.bulk_destroy"),
+      {
+        ids: selectedJournals,
+      },
+      {
+        onSuccess: () => {
+          setShowDeleteAllModal(false);
+          setProcessing(false);
+          setSelectedJournals([]);
+          setIsAllSelected(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
+      });
+  };
+
+  const handleApproveAll = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+
+    router.post(route("journals.bulk_approve"),
+      {
+        ids: selectedJournals,
+      },
+      {
+        onSuccess: () => {
+          setShowApproveAllModal(false);
+          setProcessing(false);
+          setSelectedJournals([]);
+          setIsAllSelected(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
+      });
+  };
+
+  const handleRejectAll = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+
+    router.post(
+      route("journals.bulk_reject"),
+      {
+        ids: selectedJournals,
+      },
+      {
+        onSuccess: () => {
+          setShowRejectAllModal(false);
+          setProcessing(false);
+          setSelectedJournals([]);
+          setIsAllSelected(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
+      });
+  };
+
+  const handleImport = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+
+    const formData = new FormData(e.target);
+
+    router.post(route("journals.import"), formData, {
+      onSuccess: () => {
+        setShowImportModal(false);
+        setProcessing(false);
+      },
+      onError: (errors) => {
+        setProcessing(false);
+      }
+    });
   };
 
   const handleSearch = (e) => {
     e.preventDefault();
+    const value = e.target.value;
+    setSearch(value);
+
     router.get(
       route("journals.index"),
-      { search, page: 1, per_page: perPage },
+      { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
   };
 
   const handlePerPageChange = (value) => {
-    setPerPage(value);
+    setPerPage(parseInt(value));
     router.get(
       route("journals.index"),
       { search, page: 1, per_page: value },
@@ -103,59 +404,23 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
   };
 
   const handleBulkAction = () => {
-    if (bulkAction === "") return;
-
-    if (selectedJournals.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Please select at least one journal entry",
-      });
-      return;
+    if (bulkAction === "delete" && selectedJournals.length > 0) {
+      setShowDeleteAllModal(true);
     }
-
-    router.post(
-      route("journals.all"),
-      {
-        journals: selectedJournals,
-        type: bulkAction
-      },
-      {
-        preserveState: true,
-        onSuccess: () => {
-          setSelectedJournals([]);
-          setIsAllSelected(false);
-          setBulkAction("");
-        }
-      }
-    );
+    if (bulkAction === "approve" && selectedJournals.length > 0) {
+      setShowApproveAllModal(true);
+    }
+    if (bulkAction === "reject" && selectedJournals.length > 0) {
+      setShowRejectAllModal(true);
+    }
   };
 
-  const handleExport = (id) => {
-    window.location.href = route("journals.export_journal", id);
-  };
-
-  const JournalStatusBadge = ({ status }) => {
-    const statusMap = {
-      1: { label: "Approved", className: "text-green-500" },
-      0: { label: "Pending", className: "text-yellow-500" },
-    };
-
-    return (
-      <span className={statusMap[status].className}>
-        {statusMap[status].label}
-      </span>
-    );
-  };
-
-  const handleDelete = (id) => {
-    router.delete(route("journals.destroy", id), {
-      preserveState: true,
-    });
-  };
+  const handleExport = () => {
+    window.location.href = route("journals.export")
+  }
 
   const renderPageNumbers = () => {
-    const totalPages = meta.last_page;
+    const totalPages = meta.last_page || 1;
     const pages = [];
     const maxPagesToShow = 5;
 
@@ -186,34 +451,47 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
 
   return (
     <AuthenticatedLayout>
+      <Head title="Journals" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">
           <PageHeader
-            page="Journal Entries"
+            page="Journals"
             subpage="List"
             url="journals.index"
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div className="flex flex-col md:flex-row gap-4">
-                <Button asChild>
-                  <Link href={route("journals.create")}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Journal Entry
-                  </Link>
-                </Button>
+                <Link href={route("journals.create")}>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Journal
+                  </Button>
+                </Link>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="secondary">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setShowImportModal(true)}>
+                      <FileUp className="mr-2 h-4 w-4" /> Import
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExport}>
+                      <FileDown className="mr-2 h-4 w-4" /> Export
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input
-                    placeholder="Search journal entries..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full md:w-80"
-                  />
-                  <Button type="submit">Search</Button>
-                </form>
+                <Input
+                  placeholder="search journals..."
+                  value={search}
+                  onChange={(e) => handleSearch(e)}
+                  className="w-full md:w-80"
+                />
               </div>
             </div>
 
@@ -234,9 +512,7 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
                 </Button>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">
-                  Show
-                </span>
+                <span className="text-sm text-gray-500">Show</span>
                 <Select value={perPage.toString()} onValueChange={handlePerPageChange}>
                   <SelectTrigger className="w-[80px]">
                     <SelectValue placeholder="10" />
@@ -248,9 +524,7 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
                     <SelectItem value="100">100</SelectItem>
                   </SelectContent>
                 </Select>
-                <span className="text-sm text-gray-500">
-                  entries
-                </span>
+                <span className="text-sm text-gray-500">entries</span>
               </div>
             </div>
 
@@ -275,13 +549,7 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {journals.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8">
-                        No journal entries found
-                      </TableCell>
-                    </TableRow>
-                  ) : (
+                  {journals.length > 0 ? (
                     journals.map((journal) => (
                       <TableRow key={journal.id}>
                         <TableCell>
@@ -320,67 +588,118 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
                               {
                                 label: "View",
                                 icon: <Eye className="h-4 w-4" />,
-                                onClick: () => router.visit(route("journals.show", journal.id))
+                                href: route("journals.show", journal.id),
                               },
                               {
                                 label: "Edit",
                                 icon: <Edit className="h-4 w-4" />,
-                                onClick: () => router.visit(route("journals.edit", journal.id))
-                              },
-                              {
-                                label: "Export",
-                                icon: <Download className="h-4 w-4" />,
-                                onClick: () => handleExport(journal.id)
+                                href: route("journals.edit", journal.id),
                               },
                               {
                                 label: "Delete",
-                                icon: <Trash className="h-4 w-4" />,
-                                onClick: () => {
-                                  if (confirm("Are you sure you want to delete this journal entry? This action cannot be undone.")) {
-                                    handleDelete(journal.id);
-                                  }
-                                },
-                                className: "text-destructive"
-                              }
+                                icon: <Trash2 className="h-4 w-4" />,
+                                onClick: () => handleDeleteConfirm(journal.id),
+                                destructive: true,
+                              },
                             ]}
                           />
                         </TableCell>
                       </TableRow>
                     ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-24 text-center">
+                        No journals found.
+                      </TableCell>
+                    </TableRow>
                   )}
                 </TableBody>
               </Table>
             </div>
 
-            <div className="mt-4 flex items-center justify-between">
-              <div className="text-sm text-gray-500">
-                Showing {meta.from || 0} to {meta.to || 0} of {meta.total || 0} entries
+            {journals.length > 0 && meta.total > 0 && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-gray-500">
+                  Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, meta.total)} of {meta.total} entries
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                  >
+                    First
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  {renderPageNumbers()}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === meta.last_page}
+                  >
+                    Next
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(meta.last_page)}
+                    disabled={currentPage === meta.last_page}
+                  >
+                    Last
+                  </Button>
+                </div>
               </div>
-              <div className="flex items-center">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="mr-1"
-                >
-                  Previous
-                </Button>
-                {renderPageNumbers()}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === meta.last_page}
-                  className="ml-1"
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </SidebarInset>
+
+      <DeleteJournalModal
+        show={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDelete}
+        processing={processing}
+      />
+
+      <DeleteAllJournalsModal
+        show={showDeleteAllModal}
+        onClose={() => setShowDeleteAllModal(false)}
+        onConfirm={handleDeleteAll}
+        processing={processing}
+        count={selectedJournals.length}
+      />
+
+      <ApproveAllJournalssModal
+        show={showApproveAllModal}
+        onClose={() => setShowApproveAllModal(false)}
+        onConfirm={handleApproveAll}
+        processing={processing}
+        count={selectedJournals.length}
+      />
+
+      <RejectAllJournalsModal
+        show={showRejectAllModal}
+        onClose={() => setShowRejectAllModal(false)}
+        onConfirm={handleRejectAll}
+        processing={processing}
+        count={selectedJournals.length}
+      />
+
+      <ImportJournalsModal
+        show={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSubmit={handleImport}
+        processing={processing}
+      />
     </AuthenticatedLayout>
   );
 }

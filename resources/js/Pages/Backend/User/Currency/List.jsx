@@ -30,7 +30,7 @@ import Modal from "@/Components/Modal";
 // Delete Confirmation Modal Component
 const DeleteCurrencyModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this currency?
       </h2>
@@ -58,7 +58,7 @@ const DeleteCurrencyModal = ({ show, onClose, onConfirm, processing }) => (
 // Bulk Delete Confirmation Modal Component
 const DeleteAllCurrencyModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected currency{count !== 1 ? 's' : ''}?
       </h2>
@@ -84,30 +84,30 @@ const DeleteAllCurrencyModal = ({ show, onClose, onConfirm, processing, count })
 );
 
 const CurrencyStatusBadge = ({ status }) => {
-    const statusMap = {
-      1: { label: "Active", className: "text-green-500" },
-      0: { label: "Disabled", className: "text-red-500" },
-    };
-
-    return (
-      <span className={statusMap[status].className}>
-        {statusMap[status].label}
-      </span>
-    );
+  const statusMap = {
+    1: { label: "Active", className: "text-green-500" },
+    0: { label: "Disabled", className: "text-red-500" },
   };
 
-  const CurrencyBaseStatusBadge = ({ status }) => {
-    const statusMap = {
-      1: { label: "Yes", className: "text-green-500" },
-      0: { label: "No", className: "text-red-500" },
-    };
+  return (
+    <span className={statusMap[status].className}>
+      {statusMap[status].label}
+    </span>
+  );
+};
 
-    return (
-      <span className={statusMap[status].className}>
-        {statusMap[status].label}
-      </span>
-    );
+const CurrencyBaseStatusBadge = ({ status }) => {
+  const statusMap = {
+    1: { label: "Yes", className: "text-green-500" },
+    0: { label: "No", className: "text-red-500" },
   };
+
+  return (
+    <span className={statusMap[status].className}>
+      {statusMap[status].label}
+    </span>
+  );
+};
 
 export default function List({ currencies = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
@@ -118,7 +118,7 @@ export default function List({ currencies = [], meta = {}, filters = {} }) {
   const [perPage, setPerPage] = useState(meta.per_page || 10);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
-  
+
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
@@ -168,9 +168,12 @@ export default function List({ currencies = [], meta = {}, filters = {} }) {
 
   const handleSearch = (e) => {
     e.preventDefault();
+    const value = e.target.value;
+    setSearch(value);
+
     router.get(
       route("currency.index"),
-      { search, page: 1, per_page: perPage },
+      { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
   };
@@ -218,7 +221,7 @@ export default function List({ currencies = [], meta = {}, filters = {} }) {
   const handleDelete = (e) => {
     e.preventDefault();
     setProcessing(true);
-    
+
     router.delete(route('currency.destroy', currencyToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
@@ -234,20 +237,23 @@ export default function List({ currencies = [], meta = {}, filters = {} }) {
   const handleDeleteAll = (e) => {
     e.preventDefault();
     setProcessing(true);
-    
-    router.post(route('currency.bulk_action'), {
-      delete_currencies: selectedCurrencies.join(',')
-    }, {
-      onSuccess: () => {
-        setShowDeleteAllModal(false);
-        setSelectedCurrencies([]);
-        setIsAllSelected(false);
-        setProcessing(false);
+
+    router.post(route('currency.bulk_destroy'),
+      {
+        ids: selectedCurrencies
       },
-      onError: () => {
-        setProcessing(false);
+      {
+        onSuccess: () => {
+          setShowDeleteAllModal(false);
+          setSelectedCurrencies([]);
+          setIsAllSelected(false);
+          setProcessing(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
       }
-    });
+    );
   };
 
   const renderPageNumbers = () => {
@@ -302,15 +308,12 @@ export default function List({ currencies = [], meta = {}, filters = {} }) {
                 </Link>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input
-                    placeholder="Search currencies..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full md:w-80"
-                  />
-                  <Button type="submit">Search</Button>
-                </form>
+                <Input
+                  placeholder="search currencies..."
+                  value={search}
+                  onChange={(e) => handleSearch(e)}
+                  className="w-full md:w-80"
+                />
               </div>
             </div>
 
@@ -360,8 +363,8 @@ export default function List({ currencies = [], meta = {}, filters = {} }) {
                     <TableHead>Exchange Rate</TableHead>
                     <TableHead>Base Currency</TableHead>
                     <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
                   {currencies.length > 0 ? (

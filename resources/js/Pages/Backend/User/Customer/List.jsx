@@ -210,9 +210,12 @@ export default function List({ customers = [], meta = {}, filters = {} }) {
 
   const handleSearch = (e) => {
     e.preventDefault();
+    const value = e.target.value;
+    setSearch(value);
+
     router.get(
       route("customers.index"),
-      { search, page: 1, per_page: perPage },
+      { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
   };
@@ -277,19 +280,22 @@ export default function List({ customers = [], meta = {}, filters = {} }) {
     e.preventDefault();
     setProcessing(true);
 
-    router.post(route('customers.bulk_action'), {
-      delete_customers: selectedCustomers.join(',')
-    }, {
-      onSuccess: () => {
-        setShowDeleteAllModal(false);
-        setSelectedCustomers([]);
-        setIsAllSelected(false);
-        setProcessing(false);
+    router.post(route('customers.bulk_destroy'),
+      {
+        ids: selectedCustomers
       },
-      onError: () => {
-        setProcessing(false);
+      {
+        onSuccess: () => {
+          setShowDeleteAllModal(false);
+          setSelectedCustomers([]);
+          setIsAllSelected(false);
+          setProcessing(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
       }
-    });
+    );
   };
 
   const handleImport = (e) => {
@@ -379,15 +385,12 @@ export default function List({ customers = [], meta = {}, filters = {} }) {
                 </DropdownMenu>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input
-                    placeholder="Search customers..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full md:w-80"
-                  />
-                  <Button type="submit">Search</Button>
-                </form>
+                <Input
+                  placeholder="search customers..."
+                  value={search}
+                  onChange={(e) => handleSearch(e)}
+                  className="w-full md:w-80"
+                />
               </div>
             </div>
 

@@ -224,4 +224,24 @@ class CurrencyController extends Controller
         $currency->delete();
         return redirect()->route('currency.index')->with('success', _lang('Deleted Successfully'));
     }
+
+    public function bulk_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $currency = Currency::find($id);
+            if ($currency->base_currency == 1) {
+                return redirect()->route('currency.index')->with('error', _lang('You can not remove base currency !'));
+            }
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Currency Deleted: ' . $currency->name;
+            $audit->save();
+
+            $currency->delete();
+        }
+        return redirect()->route('currency.index')->with('success', _lang('Deleted Successfully'));
+    }
 }

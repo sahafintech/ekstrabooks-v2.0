@@ -163,7 +163,7 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [currentReceiptId, setCurrentReceiptId] = useState(null);
   const [processing, setProcessing] = useState(false);
-  const [perPage, setPerPage] = useState(filters.per_page || 10);
+  const [perPage, setPerPage] = useState(filters.per_page || 50);
   const [search, setSearch] = useState(filters.search || "");
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
 
@@ -186,9 +186,12 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
 
   const handleSearch = (e) => {
     e.preventDefault();
+    const value = e.target.value;
+    setSearch(value);
+
     router.get(
       route("receipts.index"),
-      { search, page: 1, per_page: perPage },
+      { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
   };
@@ -286,26 +289,23 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
     e.preventDefault();
     setProcessing(true);
 
-    router.delete(route("receipts.delete_all"), {
-      onSuccess: () => {
-        toast({
-          title: "All Cash Invoices Deleted",
-          description: "All cash invoices have been deleted successfully.",
-        });
-        closeDeleteAllModal();
-        setProcessing(false);
-        setSelectedRows([]);
-        setSelectAll(false);
+    router.post(
+      route("receipts.bulk_destroy"),
+      {
+        ids: selectedRows
       },
-      onError: (errors) => {
-        toast({
-          title: "Error",
-          description: "Failed to delete all cash invoices.",
-          variant: "destructive",
-        });
-        setProcessing(false);
-      },
-    });
+      {
+        onSuccess: () => {
+          closeDeleteAllModal();
+          setProcessing(false);
+          setSelectedRows([]);
+          setSelectAll(false);
+        },
+        onError: (errors) => {
+          setProcessing(false);
+        },
+      }
+    );
   };
 
   const exportReceipts = () => {
@@ -379,15 +379,12 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
                 </DropdownMenu>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input
-                    placeholder="Search receipts..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full md:w-80"
-                  />
-                  <Button type="submit">Search</Button>
-                </form>
+                <Input
+                  placeholder="search receipts..."
+                  value={search}
+                  onChange={(e) => handleSearch(e)}
+                  className="w-full md:w-80"
+                />
               </div>
             </div>
 

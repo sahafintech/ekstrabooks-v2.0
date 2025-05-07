@@ -988,6 +988,48 @@ class SalesReturnController extends Controller
         return redirect()->route('sales_returns.index')->with('success', _lang('Deleted Successfully'));
     }
 
+    public function bulk_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $return = SalesReturn::find($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Sales Return Deleted' . ' ' . $return->return_number;
+            $audit->save();
+
+            // descrease stock
+            foreach ($return->items as $returnItem) {
+                $product = $returnItem->product;
+                if ($product->type == 'product' && $product->stock_management == 1) {
+                    $product->stock = $product->stock - $returnItem->quantity;
+                    $product->save();
+                }
+            }
+            // delete transactions
+            $transactions = Transaction::where('ref_id', $return->id)
+                ->where(function ($query) {
+                    $query->where('ref_type', 's return')
+                        ->orWhere('ref_type', 's return tax');
+                })
+                ->get();
+            foreach ($transactions as $transaction) {
+                $transaction->delete();
+            }
+
+            // delete refund transactions
+            $transactions = Transaction::where('ref_id', $return->id)->where('ref_type', 's refund')->get();
+            foreach ($transactions as $transaction) {
+                $transaction->delete();
+            }
+
+            $return->delete();
+        }
+        return redirect()->route('sales_returns.index')->with('success', _lang('Deleted Successfully'));
+    }
+
     private function calculateTotal(Request $request)
     {
         $subTotal       = 0;

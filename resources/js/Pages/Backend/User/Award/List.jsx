@@ -14,11 +14,11 @@ import {
 } from "@/Components/ui/table";
 import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogFooter,
 } from "@/Components/ui/dialog";
 import {
@@ -48,7 +48,7 @@ import { cn } from "@/lib/utils";
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this award?
       </h2>
@@ -76,7 +76,7 @@ const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
 // Bulk Delete Confirmation Modal Component
 const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected award{count !== 1 ? 's' : ''}?
       </h2>
@@ -111,7 +111,7 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
   const [dateFilter, setDateFilter] = useState(filters.date || "");
-  
+
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
@@ -172,9 +172,12 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
 
   const handleSearch = (e) => {
     e.preventDefault();
+    const value = e.target.value;
+    setSearch(value);
+
     router.get(
       route("awards.index"),
-      { search, date: dateFilter, page: 1, per_page: perPage },
+      { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
   };
@@ -231,7 +234,7 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
   const handleDelete = (e) => {
     e.preventDefault();
     setIsProcessing(true);
-    
+
     router.delete(route("awards.destroy", awardToDelete), {
       preserveState: true,
       onSuccess: () => {
@@ -248,22 +251,25 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
   const handleBulkDeleteConfirm = (e) => {
     e.preventDefault();
     setIsProcessing(true);
-    
-    router.post(route("awards.bulk_delete"), {
-      ids: selectedAwards
-    }, {
-      preserveState: true,
-      onSuccess: () => {
-        setSelectedAwards([]);
-        setIsAllSelected(false);
-        setBulkAction("");
-        setShowBulkDeleteModal(false);
-        setIsProcessing(false);
+
+    router.post(route("awards.bulk_destroy"),
+      {
+        ids: selectedAwards
       },
-      onError: () => {
-        setIsProcessing(false);
+      {
+        preserveState: true,
+        onSuccess: () => {
+          setSelectedAwards([]);
+          setIsAllSelected(false);
+          setBulkAction("");
+          setShowBulkDeleteModal(false);
+          setIsProcessing(false);
+        },
+        onError: () => {
+          setIsProcessing(false);
+        }
       }
-    });
+    );
   };
 
   // Create form handlers
@@ -282,7 +288,7 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
 
   const handleCreateSubmit = (e) => {
     e.preventDefault();
-    
+
     router.post(route("awards.store"), form, {
       preserveState: true,
       onSuccess: () => {
@@ -305,7 +311,7 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
   // Edit form handlers
   const openEditDialog = (award) => {
     let awardDateObj = null;
-    
+
     // Safe date parsing
     try {
       if (award.award_date) {
@@ -313,7 +319,7 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
         // Check if valid date parts before creating Date object
         if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
           awardDateObj = new Date(year, month - 1, day); // month is 0-indexed in JS
-          
+
           // Verify the date is valid
           const isValidDate = awardDateObj instanceof Date && !isNaN(awardDateObj);
           if (!isValidDate) {
@@ -325,7 +331,7 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
       console.error("Error parsing date:", error);
       awardDateObj = null;
     }
-    
+
     setEditingAward(award);
     setForm({
       employee_id: award.employee_id?.toString() || "",
@@ -393,10 +399,10 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
 
     // First page
     pageNumbers.push(
-      <Button 
-        key="first" 
-        variant="outline" 
-        size="sm" 
+      <Button
+        key="first"
+        variant="outline"
+        size="sm"
         onClick={() => handlePageChange(1)}
         disabled={currentPage === 1}
         className="h-8 w-8 p-0"
@@ -414,10 +420,10 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
     for (let i = startPage; i <= endPage; i++) {
       if (i !== 1 && i !== meta.last_page) {
         pageNumbers.push(
-          <Button 
-            key={i} 
-            variant={currentPage === i ? "default" : "outline"} 
-            size="sm" 
+          <Button
+            key={i}
+            variant={currentPage === i ? "default" : "outline"}
+            size="sm"
             onClick={() => handlePageChange(i)}
             className="h-8 w-8 p-0"
           >
@@ -435,10 +441,10 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
     // Last page
     if (meta.last_page > 1) {
       pageNumbers.push(
-        <Button 
-          key="last" 
-          variant="outline" 
-          size="sm" 
+        <Button
+          key="last"
+          variant="outline"
+          size="sm"
           onClick={() => handlePageChange(meta.last_page)}
           disabled={currentPage === meta.last_page}
           className="h-8 w-8 p-0"
@@ -480,11 +486,11 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
                 </Button>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-2">
+                <div className="flex flex-col md:flex-row gap-2">
                   <Input
                     placeholder="Search awards..."
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => handleSearch(e)}
                     className="w-full md:w-60"
                   />
                   <Popover>
@@ -513,11 +519,7 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
                       />
                     </PopoverContent>
                   </Popover>
-                  <Button type="submit">
-                    <Search className="w-4 h-4 mr-2" />
-                    Search
-                  </Button>
-                </form>
+                </div>
               </div>
             </div>
 
@@ -531,8 +533,8 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
                     <SelectItem value="delete">Delete Selected</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button 
-                  onClick={handleBulkAction} 
+                <Button
+                  onClick={handleBulkAction}
                   variant="outline"
                   disabled={!bulkAction || selectedAwards.length === 0}
                 >

@@ -25,7 +25,7 @@ class RoleController extends Controller
      */
     public function index(Request $request)
     {
-        $per_page = $request->get('per_page', 10);
+        $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
         $query = Role::orderBy("id", "desc");
@@ -145,6 +145,15 @@ class RoleController extends Controller
     {
         $role = Role::findOrFail($id);
         $role->delete();
+        return redirect()->route('roles.index')->with('success', _lang('Deleted Sucessfully'));
+    }
+
+    public function bulk_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $role = Role::findOrFail($id);
+            $role->delete();
+        }
         return redirect()->route('roles.index')->with('success', _lang('Deleted Sucessfully'));
     }
 }

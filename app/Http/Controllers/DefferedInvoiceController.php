@@ -523,6 +523,56 @@ class DefferedInvoiceController extends Controller
         }
     }
 
+    public function bulk_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $invoice = Invoice::find($id);
+            if ($invoice) {
+                $invoice->items()->delete();
+                // deffered payments
+                $defferedPayments = DefferedPayment::where('invoice_id', $id)->get();
+                foreach ($defferedPayments as $defferedPayment) {
+                    $defferedPayment->delete();
+                }
+                // deffered deductions
+                $defferedDeductions = DefferedDeduction::where('invoice_id', $id)->get();
+                foreach ($defferedDeductions as $defferedDeduction) {
+                    $defferedDeduction->delete();
+                }
+                // deffered additions
+                $defferedAdditions = DefferedAddition::where('invoice_id', $id)->get();
+                foreach ($defferedAdditions as $defferedAddition) {
+                    $defferedAddition->delete();
+                }
+                // transactions
+                $transactions = Transaction::where('ref_id', $invoice->id)
+                    ->where(function ($query) {
+                        $query->where('ref_type', 'd invoice')
+                            ->orWhere('ref_type', 'd invoice tax')
+                            ->orWhere('ref_type', 'd invoice payment')
+                            ->orWhere('ref_type', 'd invoice income');
+                    })
+                    ->get();
+                foreach ($transactions as $transaction) {
+                    $transaction->delete();
+                }
+                // delete attachments
+                $attachments = Attachment::where('ref_id', $invoice->id)->where('ref_type', 'invoice')->get();
+                foreach ($attachments as $attachment) {
+                    $filePath = public_path($attachment->path);
+                    if (file_exists($filePath)) {
+                        unlink($filePath);
+                    }
+                    $attachment->delete();
+                }
+                $invoice->delete();
+                return redirect()->route('deffered_invoices.index')->with('success', _lang('Deleted Successfully'));
+            } else {
+                return redirect()->route('deffered_invoices.index')->with('error', _lang('Something going wrong, Please try again'));
+            }
+        }
+    }
+
     public function edit($id)
     {
         $invoice = Invoice::where('id', $id)->with('deffered_earnings', 'items', 'taxes')->first();

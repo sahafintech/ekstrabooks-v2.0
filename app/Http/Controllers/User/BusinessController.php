@@ -50,7 +50,7 @@ class BusinessController extends Controller
      */
     public function index(Request $request)
     {
-        $per_page = $request->get('per_page', 10);
+        $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
         $query = Business::select('business.*')
@@ -62,8 +62,7 @@ class BusinessController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('company_name', 'like', "%{$search}%")
-                    ->orWhere('mobile', 'like', "%{$search}%");
+                    ->orWhere('phone', 'like', "%{$search}%");
             });
         }
 
@@ -211,24 +210,24 @@ class BusinessController extends Controller
     {
         // Find the business first
         $business = Business::findOrFail($id);
-        
+
         $per_page = $request->get('per_page', 10);
         $search = $request->get('search', '');
 
         // Get users related to this business with roles and pagination
         $usersQuery = $business->users()->with('roles');
-        
+
         // Apply search if provided
         if (!empty($search)) {
             $usersQuery->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
-        
+
         // Get paginated results
         $users = $usersQuery->paginate($per_page)->withQueryString();
-        
+
         return Inertia::render('Backend/User/Business/SystemUser/List', [
             'business' => $business->only(['id', 'name']),
             'users' => $users->items(),
@@ -415,6 +414,26 @@ class BusinessController extends Controller
         $audit->save();
 
         $business->delete();
+        return redirect()->route('business.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    public function bulk_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $business = Business::owner()->find($id);
+            if ($business->default == 1 || Business::owner()->count() == 1) {
+                return redirect()->route('business.index')->with('error', _lang('Sorry, You will not be able to delete default business!'));
+            }
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Deleted Business ' . $business->name;
+            $audit->save();
+
+            $business->delete();
+        }
         return redirect()->route('business.index')->with('success', _lang('Deleted Successfully'));
     }
 

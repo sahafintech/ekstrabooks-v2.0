@@ -95,10 +95,10 @@ const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, cou
 export default function List({ taxs = [], meta = {}, filters = {}, accounts = [] }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
-    const [selectedMethods, setSelectedMethods] = useState([]);
+    const [selectedtaxes, setSelectedTaxes] = useState([]);
     const [isAllSelected, setIsAllSelected] = useState(false);
     const [search, setSearch] = useState(filters.search || "");
-    const [perPage, setPerPage] = useState(meta.per_page || 10);
+    const [perPage, setPerPage] = useState(meta.per_page || 50);
     const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
     const [bulkAction, setBulkAction] = useState("");
 
@@ -141,20 +141,20 @@ export default function List({ taxs = [], meta = {}, filters = {}, accounts = []
 
     const toggleSelectAll = () => {
         if (isAllSelected) {
-            setSelectedMethods([]);
+            setSelectedTaxes([]);
         } else {
-            setSelectedMethods(taxs.map((tax) => tax.id));
+            setSelectedTaxes(taxs.map((tax) => tax.id));
         }
         setIsAllSelected(!isAllSelected);
     };
 
     const toggleSelectTax = (id) => {
-        if (selectedMethods.includes(id)) {
-            setSelectedMethods(selectedMethods.filter((taxId) => taxId !== id));
+        if (selectedtaxes.includes(id)) {
+            setSelectedTaxes(selectedtaxes.filter((taxId) => taxId !== id));
             setIsAllSelected(false);
         } else {
-            setSelectedMethods([...selectedMethods, id]);
-            if (selectedMethods.length + 1 === taxs.length) {
+            setSelectedTaxes([...selectedtaxes, id]);
+            if (selectedtaxes.length + 1 === taxs.length) {
                 setIsAllSelected(true);
             }
         }
@@ -162,9 +162,12 @@ export default function List({ taxs = [], meta = {}, filters = {}, accounts = []
 
     const handleSearch = (e) => {
         e.preventDefault();
+        const value = e.target.value;
+        setSearch(value);
+
         router.get(
             route("taxes.index"),
-            { search, page: 1, per_page: perPage },
+            { search: value, page: 1, per_page: perPage },
             { preserveState: true }
         );
     };
@@ -190,11 +193,11 @@ export default function List({ taxs = [], meta = {}, filters = {}, accounts = []
     const handleBulkAction = () => {
         if (bulkAction === "") return;
 
-        if (selectedMethods.length === 0) {
+        if (selectedtaxes.length === 0) {
             toast({
                 variant: "destructive",
                 title: "Error",
-                description: "Please select at least one transaction method",
+                description: "Please select at least one tax",
             });
             return;
         }
@@ -230,21 +233,24 @@ export default function List({ taxs = [], meta = {}, filters = {}, accounts = []
         e.preventDefault();
         setIsProcessing(true);
 
-        router.post(route("taxes.bulk_delete"), {
-            ids: selectedMethods
-        }, {
-            preserveState: true,
-            onSuccess: () => {
-                setSelectedMethods([]);
-                setIsAllSelected(false);
-                setBulkAction("");
-                setShowBulkDeleteModal(false);
-                setIsProcessing(false);
+        router.post(route("taxes.bulk_destroy"),
+            {
+                ids: selectedtaxes
             },
-            onError: () => {
-                setIsProcessing(false);
+            {
+                preserveState: true,
+                onSuccess: () => {
+                    setSelectedTaxes([]);
+                    setIsAllSelected(false);
+                    setBulkAction("");
+                    setShowBulkDeleteModal(false);
+                    setIsProcessing(false);
+                },
+                onError: () => {
+                    setIsProcessing(false);
+                }
             }
-        });
+        );
     };
 
     const renderPageNumbers = () => {
@@ -365,18 +371,12 @@ export default function List({ taxs = [], meta = {}, filters = {}, accounts = []
                                 </Button>
                             </div>
                             <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                                <form onSubmit={handleSearch} className="flex gap-2">
-                                    <Input
-                                        placeholder="Search tax..."
-                                        value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
-                                        className="w-full md:w-80"
-                                    />
-                                    <Button type="submit">
-                                        <Search className="w-4 h-4 mr-2" />
-                                        Search
-                                    </Button>
-                                </form>
+                                <Input
+                                    placeholder="search tax..."
+                                    value={search}
+                                    onChange={(e) => handleSearch(e)}
+                                    className="w-full md:w-80"
+                                />
                             </div>
                         </div>
 
@@ -435,8 +435,8 @@ export default function List({ taxs = [], meta = {}, filters = {}, accounts = []
                                             <TableRow key={tax.id}>
                                                 <TableCell>
                                                     <Checkbox
-                                                        checked={selectedMethods.includes(tax.id)}
-                                                        onCheckedChange={() => toggleSelectMethod(tax.id)}
+                                                        checked={selectedtaxes.includes(tax.id)}
+                                                        onCheckedChange={() => toggleSelectTax(tax.id)}
                                                     />
                                                 </TableCell>
                                                 <TableCell>{tax.id}</TableCell>
@@ -465,7 +465,7 @@ export default function List({ taxs = [], meta = {}, filters = {}, accounts = []
                                         ))
                                     ) : (
                                         <TableRow>
-                                            <TableCell colSpan={5} className="h-24 text-center">
+                                            <TableCell colSpan={7} className="h-24 text-center">
                                                 No tax found.
                                             </TableCell>
                                         </TableRow>
@@ -499,7 +499,7 @@ export default function List({ taxs = [], meta = {}, filters = {}, accounts = []
                                             name="name"
                                             value={form.name}
                                             onChange={handleInputChange}
-                                            placeholder="Enter transaction method name"
+                                            placeholder="Enter tax name"
                                         />
                                         {errors.name && (
                                             <p className="text-sm text-red-500">{errors.name}</p>
@@ -571,7 +571,7 @@ export default function List({ taxs = [], meta = {}, filters = {}, accounts = []
                                             name="name"
                                             value={form.name}
                                             onChange={handleInputChange}
-                                            placeholder="Enter transaction method name"
+                                            placeholder="Enter tax name"
                                         />
                                         {errors.name && (
                                             <p className="text-sm text-red-500">{errors.name}</p>
@@ -642,7 +642,7 @@ export default function List({ taxs = [], meta = {}, filters = {}, accounts = []
                         onClose={() => setShowBulkDeleteModal(false)}
                         onConfirm={handleBulkDeleteConfirm}
                         processing={isProcessing}
-                        count={selectedMethods.length}
+                        count={selectedtaxes.length}
                     />
                 </div>
             </SidebarInset>

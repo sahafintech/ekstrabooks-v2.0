@@ -439,6 +439,47 @@ class BillPaymentsController extends Controller
         return redirect()->route('bill_payments.index')->with('success', _lang('Payment Deleted Successfully'));
     }
 
+    public function bulk_estroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $payment = BillPayment::find($id);
+            $purchase_payments = PurchasePayment::where('payment_id', $id)->get();
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Bill Payment Deleted for ' . $payment->id;
+            $audit->save();
+
+            foreach ($purchase_payments as $purchase_payment) {
+                $purchase = Purchase::find($purchase_payment->purchase_id);
+
+                $purchase->paid = $purchase->paid - $purchase_payment->amount;
+                $purchase->status = 1; //Partially Paid
+                if ($purchase->paid >= $purchase->grand_total) {
+                    $purchase->status = 2; //Paid
+                } else if ($purchase->paid == 0) {
+                    $purchase->status = 0; //Unpaid
+                }
+                $purchase->save();
+
+
+                $transaction = Transaction::where('ref_id', $purchase->id . ',' . $payment->id)->where('ref_type', 'bill payment')->get();
+
+                foreach ($transaction as $trans) {
+                    $trans->delete();
+                }
+
+                $purchase_payment->delete();
+            }
+
+            $payment->delete();
+        }
+
+        return redirect()->route('bill_payments.index')->with('success', _lang('Payment Deleted Successfully'));
+    }
+
     public function show($id)
     {
         $payment = BillPayment::where('id', $id)->with('purchases', 'vendor', 'business')->first();

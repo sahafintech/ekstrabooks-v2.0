@@ -8,8 +8,9 @@ use Illuminate\Http\Request;
 
 class AuditLogController extends Controller
 {
-    public function index(Request $request) {
-        $per_page = $request->get('per_page', 10);
+    public function index(Request $request)
+    {
+        $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
         $query = AuditLog::orderBy("id", "desc")
@@ -19,9 +20,11 @@ class AuditLogController extends Controller
         if (!empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->where('event', 'like', "%{$search}%")
-                ->orWhere('changed_user.name', 'like', "%{$search}%")
-                ->orWhere('changed_user.email', 'like', "%{$search}%")
-                ->orWhere('date_changed', 'like', "%{$search}%");
+                    ->orWhere('date_changed', 'like', "%{$search}%")
+                    ->orWhereHas('changed_user', function ($q2) use($search) {
+                        $q2->orWhere('email', 'like', "%{$search}%")
+                            ->orWhere('name', 'like', "%{$search}%");
+                    });
             });
         }
 

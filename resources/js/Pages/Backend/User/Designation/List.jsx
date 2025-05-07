@@ -21,13 +21,13 @@ import {
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogFooter,
-  DialogTrigger 
+  DialogTrigger
 } from "@/Components/ui/dialog";
 import { Textarea } from "@/Components/ui/textarea";
 import { Plus, Edit, Trash, Search } from "lucide-react";
@@ -40,7 +40,7 @@ import Modal from "@/Components/Modal";
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this designation?
       </h2>
@@ -68,7 +68,7 @@ const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
 // Bulk Delete Confirmation Modal Component
 const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected designation{count !== 1 ? 's' : ''}?
       </h2>
@@ -102,7 +102,7 @@ export default function List({ designations = [], departments = [], meta = {}, f
   const [perPage, setPerPage] = useState(meta.per_page || 10);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
-  
+
   // Form state for Create/Edit dialogs
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -162,9 +162,12 @@ export default function List({ designations = [], departments = [], meta = {}, f
 
   const handleSearch = (e) => {
     e.preventDefault();
+    const value = e.target.value;
+    setSearch(value);
+
     router.get(
       route("designations.index"),
-      { search, page: 1, per_page: perPage },
+      { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
   };
@@ -212,7 +215,7 @@ export default function List({ designations = [], departments = [], meta = {}, f
   const handleDelete = (e) => {
     e.preventDefault();
     setIsProcessing(true);
-    
+
     router.delete(route("designations.destroy", designationToDelete), {
       preserveState: true,
       onSuccess: () => {
@@ -229,33 +232,25 @@ export default function List({ designations = [], departments = [], meta = {}, f
   const handleBulkDeleteConfirm = (e) => {
     e.preventDefault();
     setIsProcessing(true);
-    
-    router.post(route("designations.bulk_delete"), {
-      ids: selectedDesignations
-    }, {
-      preserveState: true,
-      onSuccess: () => {
-        setSelectedDesignations([]);
-        setIsAllSelected(false);
-        setBulkAction("");
-        setShowBulkDeleteModal(false);
-        setIsProcessing(false);
-        
-        toast({
-          title: "Success",
-          description: `Successfully deleted ${selectedDesignations.length} designation(s)`,
-        });
+
+    router.post(route("designations.bulk_destroy"),
+      {
+        ids: selectedDesignations
       },
-      onError: (errors) => {
-        setIsProcessing(false);
-        
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "There was an error deleting the selected designations",
-        });
+      {
+        preserveState: true,
+        onSuccess: () => {
+          setSelectedDesignations([]);
+          setIsAllSelected(false);
+          setBulkAction("");
+          setShowBulkDeleteModal(false);
+          setIsProcessing(false);
+        },
+        onError: (errors) => {
+          setIsProcessing(false);
+        }
       }
-    });
+    );
   };
 
   const renderPageNumbers = () => {
@@ -318,7 +313,7 @@ export default function List({ designations = [], departments = [], meta = {}, f
 
   const handleCreateSubmit = (e) => {
     e.preventDefault();
-    
+
     router.post(route("designations.store"), form, {
       preserveState: true,
       onSuccess: () => {
@@ -382,18 +377,12 @@ export default function List({ designations = [], departments = [], meta = {}, f
                 </Button>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input
-                    placeholder="Search designations..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full md:w-80"
-                  />
-                  <Button type="submit">
-                    <Search className="w-4 h-4 mr-2" />
-                    Search
-                  </Button>
-                </form>
+                <Input
+                  placeholder="Search designations..."
+                  value={search}
+                  onChange={(e) => handleSearch(e)}
+                  className="w-full md:w-80"
+                />
               </div>
             </div>
 
@@ -628,7 +617,7 @@ export default function List({ designations = [], departments = [], meta = {}, f
           </Dialog>
 
           {/* Delete Confirmation Modal */}
-          <DeleteConfirmationModal 
+          <DeleteConfirmationModal
             show={showDeleteModal}
             onClose={() => setShowDeleteModal(false)}
             onConfirm={handleDelete}
@@ -636,7 +625,7 @@ export default function List({ designations = [], departments = [], meta = {}, f
           />
 
           {/* Bulk Delete Confirmation Modal */}
-          <BulkDeleteConfirmationModal 
+          <BulkDeleteConfirmationModal
             show={showBulkDeleteModal}
             onClose={() => setShowBulkDeleteModal(false)}
             onConfirm={handleBulkDeleteConfirm}

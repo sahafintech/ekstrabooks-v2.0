@@ -36,7 +36,7 @@ import { formatCurrency } from "@/lib/utils";
 
 const DeleteInvoiceModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this invoice?
       </h2>
@@ -126,7 +126,7 @@ const ImportInvoicesModal = ({ show, onClose, onSubmit, processing }) => (
 
 const DeleteAllInvoicesModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected invoice{count !== 1 ? 's' : ''}?
       </h2>
@@ -176,7 +176,7 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
   const [perPage, setPerPage] = useState(meta.per_page || 10);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
-  
+
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -224,9 +224,12 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
 
   const handleSearch = (e) => {
     e.preventDefault();
+    const value = e.target.value;
+    setSearch(value);
+
     router.get(
       route("deffered_invoices.index"),
-      { search, page: 1, per_page: perPage },
+      { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
   };
@@ -274,7 +277,7 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
   const handleDelete = (e) => {
     e.preventDefault();
     setProcessing(true);
-    
+
     router.delete(route('deffered_invoices.destroy', invoiceToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
@@ -290,20 +293,23 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
   const handleDeleteAll = (e) => {
     e.preventDefault();
     setProcessing(true);
-    
-    router.post(route('deffered_invoices.destroy-multiple'), {
-      invoices: selectedInvoices
-    }, {
-      onSuccess: () => {
-        setShowDeleteAllModal(false);
-        setSelectedInvoices([]);
-        setIsAllSelected(false);
-        setProcessing(false);
+
+    router.post(route('deffered_invoices.bulk_destroy'),
+      {
+        ids: selectedInvoices
       },
-      onError: () => {
-        setProcessing(false);
+      {
+        onSuccess: () => {
+          setShowDeleteAllModal(false);
+          setSelectedInvoices([]);
+          setIsAllSelected(false);
+          setProcessing(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
       }
-    });
+    );
   };
 
   const handleImport = (e) => {
@@ -393,15 +399,12 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
                 </DropdownMenu>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input
-                    placeholder="Search invoices..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full md:w-80"
-                  />
-                  <Button type="submit">Search</Button>
-                </form>
+                <Input
+                  placeholder="search invoices..."
+                  value={search}
+                  onChange={(e) => handleSearch(e)}
+                  className="w-full md:w-80"
+                />
               </div>
             </div>
 
@@ -507,7 +510,7 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={10} className="h-24 text-center">
+                      <TableCell colSpan={12} className="h-24 text-center">
                         No invoices found.
                       </TableCell>
                     </TableRow>

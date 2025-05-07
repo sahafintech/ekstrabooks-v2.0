@@ -23,7 +23,7 @@ export default function List({ auditLogs = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [search, setSearch] = useState(filters.search || "");
-  const [perPage, setPerPage] = useState(meta.per_page || 10);
+  const [perPage, setPerPage] = useState(meta.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
 
   useEffect(() => {
@@ -43,14 +43,14 @@ export default function List({ auditLogs = [], meta = {}, filters = {} }) {
     }
   }, [flash, toast]);
 
-  const { auth } = usePage().props;
-  const userId = auth.user.id;
-
   const handleSearch = (e) => {
     e.preventDefault();
+    const value = e.target.value;
+    setSearch(value);
+
     router.get(
       route("audit_logs.index"),
-      { search, page: 1, per_page: perPage },
+      { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
   };
@@ -119,15 +119,12 @@ export default function List({ auditLogs = [], meta = {}, filters = {} }) {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div></div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input
-                    placeholder="Search audit logs..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full md:w-80"
-                  />
-                  <Button type="submit">Search</Button>
-                </form>
+                <Input
+                  placeholder="Search audit logs..."
+                  value={search}
+                  onChange={(e) => handleSearch(e)}
+                  className="w-full md:w-80"
+                />
               </div>
             </div>
 
@@ -162,7 +159,7 @@ export default function List({ auditLogs = [], meta = {}, filters = {} }) {
                   {auditLogs.length > 0 ? (
                     auditLogs.map((auditLog) => (
                       <TableRow key={auditLog.id}>
-                        <TableCell>{auditLog.date_changes}</TableCell>
+                        <TableCell>{auditLog.date_changed}</TableCell>
                         <TableCell>{auditLog.changed_user.name} - {auditLog.changed_user.email}</TableCell>
                         <TableCell>{auditLog.event}</TableCell>
                       </TableRow>

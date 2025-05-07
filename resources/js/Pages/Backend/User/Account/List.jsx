@@ -30,7 +30,7 @@ import Modal from "@/Components/Modal";
 // Delete Confirmation Modal Component
 const DeleteAccountModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this account?
       </h2>
@@ -58,7 +58,7 @@ const DeleteAccountModal = ({ show, onClose, onConfirm, processing }) => (
 // Bulk Delete Confirmation Modal Component
 const DeleteAllAccountModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected account{count !== 1 ? 's' : ''}?
       </h2>
@@ -93,7 +93,7 @@ export default function List({ accounts = [], meta = {}, filters = {} }) {
   const [perPage, setPerPage] = useState(meta.per_page || 10);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
-  
+
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
@@ -142,9 +142,12 @@ export default function List({ accounts = [], meta = {}, filters = {} }) {
 
   const handleSearch = (e) => {
     e.preventDefault();
+    const value = e.target.value;
+    setSearch(value);
+
     router.get(
       route("accounts.index"),
-      { search, page: 1, per_page: perPage },
+      { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
   };
@@ -192,7 +195,7 @@ export default function List({ accounts = [], meta = {}, filters = {} }) {
   const handleDelete = (e) => {
     e.preventDefault();
     setProcessing(true);
-    
+
     router.delete(route('accounts.destroy', accountToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
@@ -208,20 +211,22 @@ export default function List({ accounts = [], meta = {}, filters = {} }) {
   const handleDeleteAll = (e) => {
     e.preventDefault();
     setProcessing(true);
-    
-    router.post(route('accounts.bulk_action'), {
-      delete_accounts: selectedAccounts.join(',')
-    }, {
-      onSuccess: () => {
-        setShowDeleteAllModal(false);
-        setSelectedAccounts([]);
-        setIsAllSelected(false);
-        setProcessing(false);
+
+    router.post(route('accounts.bulk_destroy'),
+      {
+        ids: selectedAccounts
       },
-      onError: () => {
-        setProcessing(false);
-      }
-    });
+      {
+        onSuccess: () => {
+          setShowDeleteAllModal(false);
+          setSelectedAccounts([]);
+          setIsAllSelected(false);
+          setProcessing(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
+      });
   };
 
   const renderPageNumbers = () => {
@@ -276,15 +281,12 @@ export default function List({ accounts = [], meta = {}, filters = {} }) {
                 </Link>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input
-                    placeholder="Search accounts..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full md:w-80"
-                  />
-                  <Button type="submit">Search</Button>
-                </form>
+                <Input
+                  placeholder="Search accounts..."
+                  value={search}
+                  onChange={(e) => handleSearch(e)}
+                  className="w-full md:w-80"
+                />
               </div>
             </div>
 
@@ -333,7 +335,7 @@ export default function List({ accounts = [], meta = {}, filters = {} }) {
                     <TableHead>Account Name</TableHead>
                     <TableHead>Account Type</TableHead>
                     <TableHead>Opening Date</TableHead>
-                    <TableHead>Currency</TableHead> 
+                    <TableHead>Currency</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>

@@ -17,9 +17,7 @@ class ProductUnitController extends Controller
      *
      * @return void
      */
-    public function __construct()
-    {
-    }
+    public function __construct() {}
 
     /**
      * Display a listing of the resource.
@@ -28,54 +26,38 @@ class ProductUnitController extends Controller
      */
     public function index(Request $request)
     {
-        $query = ProductUnit::query();
+        $per_page = $request->get('per_page', 50);
+        $search = $request->get('search', '');
 
-        // Search functionality
-        if ($request->has('search') && !empty($request->get('search'))) {
-            $search = $request->get('search');
-            $query->where('unit', 'like', "%{$search}%");
+        $query = ProductUnit::orderBy("id", "desc");
+
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('unit', 'like', "%{$search}%");
+            });
         }
 
-        // Column filtering
-        if ($request->has('columnFilters') && !empty($request->get('columnFilters'))) {
-            $columnFilters = json_decode($request->columnFilters, true);
-            foreach ($columnFilters as $filter) {
-                $query->where($filter['id'], 'like', "%{$filter['value']}%");
-            }
-        }
+        // Get vendors with pagination
+        $units = $query->paginate($per_page)->withQueryString();
 
-        // Sorting
-        if ($request->has('sorting') && !empty($request->get('sorting'))) {
-            $sorting = json_decode($request->sorting, true);
-            foreach ($sorting as $sort) {
-                $query->orderBy($sort['id'], $sort['desc'] ? 'desc' : 'asc');
-            }
-        } else {
-            $query->orderBy('id', 'desc');
-        }
-
-        // Pagination
-        $perPage = $request->input('per_page', 10);
-        $page = $request->input('page', 1);
-        $productUnits = $query->paginate($perPage, ['*'], 'page', $page);
-
-        if ($request->wantsJson()) {
-            return response()->json($productUnits);
-        }
-
+        // Return Inertia view
         return Inertia::render('Backend/User/ProductUnit/List', [
-            'product_units' => $productUnits->items(),
+            'units' => $units->items(),
             'meta' => [
-                'total' => $productUnits->total(),
-                'per_page' => $productUnits->perPage(),
-                'current_page' => $productUnits->currentPage(),
-                'last_page' => $productUnits->lastPage(),
-                'links' => $productUnits->linkCollection()->toArray(),
+                'current_page' => $units->currentPage(),
+                'from' => $units->firstItem(),
+                'last_page' => $units->lastPage(),
+                'links' => $units->linkCollection(),
+                'path' => $units->path(),
+                'per_page' => $units->perPage(),
+                'to' => $units->lastItem(),
+                'total' => $units->total(),
             ],
             'filters' => [
-                'search' => $request->get('search', ''),
-                'columnFilters' => !empty($request->columnFilters) ? json_decode($request->columnFilters, true) : [],
-                'sorting' => !empty($request->sorting) ? json_decode($request->sorting, true) : [],
+                'search' => $search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $request->get('sorting', []),
             ],
         ]);
     }
@@ -174,12 +156,12 @@ class ProductUnitController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function destroy_multiple(Request $request)
+    public function bulk_destroy(Request $request)
     {
         if ($request->has('ids')) {
             $ids = $request->ids;
             $units = ProductUnit::whereIn('id', $ids)->get();
-            
+
             foreach ($units as $unit) {
                 // audit log
                 $audit = new AuditLog();
@@ -187,13 +169,13 @@ class ProductUnitController extends Controller
                 $audit->changed_by = auth()->user()->id;
                 $audit->event = 'Product Unit Deleted: ' . $unit->unit;
                 $audit->save();
-                
+
                 $unit->delete();
             }
-            
+
             return redirect()->route('product_units.index')->with('success', _lang('Product Units Deleted'));
         }
-        
+
         return redirect()->route('product_units.index')->with('error', _lang('No product units selected'));
     }
 }

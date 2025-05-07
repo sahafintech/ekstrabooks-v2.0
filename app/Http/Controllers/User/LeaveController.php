@@ -14,7 +14,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 
-class LeaveController extends Controller {
+class LeaveController extends Controller
+{
 
     /**
      * Create a new controller instance.
@@ -28,10 +29,11 @@ class LeaveController extends Controller {
      *
      * @return \Illuminate\Http\Response
      */
-    public function index(Request $request) {
+    public function index(Request $request)
+    {
         $search = $request->input('search');
         $date = $request->input('date');
-        $perPage = $request->input('per_page', 10);
+        $perPage = $request->input('per_page', 50);
 
         $query = Leave::select('leaves.*')->with('staff');
 
@@ -40,15 +42,15 @@ class LeaveController extends Controller {
             $query->whereHas('staff', function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%");
             })
-            ->orWhere('leave_type', 'like', "%{$search}%")
-            ->orWhere('description', 'like', "%{$search}%");
+                ->orWhere('leave_type', 'like', "%{$search}%")
+                ->orWhere('description', 'like', "%{$search}%");
         }
 
         // Apply date filter if provided
         if ($date) {
             $query->where(function ($q) use ($date) {
                 $q->where('start_date', '<=', $date)
-                  ->where('end_date', '>=', $date);
+                    ->where('end_date', '>=', $date);
             });
         }
 
@@ -141,9 +143,10 @@ class LeaveController extends Controller {
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show(Request $request, $id) {
+    public function show(Request $request, $id)
+    {
         $leave = Leave::with('staff')->find($id);
-        
+
         return Inertia::render('Backend/User/Leave/View', [
             'leave' => $leave
         ]);
@@ -190,7 +193,7 @@ class LeaveController extends Controller {
         }
 
         $leave = Leave::findOrFail($id);
-        
+
         // Save old values for audit log
         $oldValues = $leave->toArray();
 
@@ -220,7 +223,8 @@ class LeaveController extends Controller {
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id) {
+    public function destroy($id)
+    {
         $leave = Leave::find($id);
 
         // audit log
@@ -233,14 +237,14 @@ class LeaveController extends Controller {
         $leave->delete();
         return redirect()->route('leaves.index')->with('success', _lang('Deleted Successfully'));
     }
-    
+
     /**
      * Bulk delete selected leaves
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function bulk_delete(Request $request)
+    public function bulk_destroy(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'ids' => 'required|array',
@@ -253,17 +257,17 @@ class LeaveController extends Controller {
 
         // Get leave types for audit log
         $leaveTypes = Leave::whereIn('id', $request->ids)->pluck('leave_type')->implode(', ');
-        
+
         // Delete the leaves
         Leave::whereIn('id', $request->ids)->delete();
-        
+
         // Audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = Auth::id();
         $audit->event = 'Bulk Deleted Leaves: ' . $leaveTypes;
         $audit->save();
-        
+
         return redirect()->route('leaves.index')->with('success', _lang('Deleted Successfully'));
     }
 }

@@ -221,7 +221,7 @@ class DesignationController extends Controller {
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function bulk_delete(Request $request) {
+    public function bulk_destroy(Request $request) {
         $ids = $request->ids;
         $designations = Designation::whereIn('id', $ids)->get();
         

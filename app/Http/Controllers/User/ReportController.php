@@ -864,8 +864,11 @@ class ReportController extends Controller
 			// Apply search if provided
 			if (!empty($search)) {
 				$query->where(function ($q) use ($search) {
-					$q->where('account.account_name', 'like', "%{$search}%")
-						->orWhere('payee_name', 'like', "%{$search}%");
+					$q->whereHas('account', function ($q2) use ($search) {
+						$q2->where('account_name', 'like', "%{$search}%");
+					})
+						->orWhere('transaction_amount', 'like', "%{$search}%")
+						->orWhere('base_currency_amount', 'like', "%{$search}%");
 				});
 			}
 

@@ -33,7 +33,7 @@ class TaxController extends Controller
             $query->where('name', 'like', '%' . $request->search . '%');
         }
 
-        $taxs = $query->paginate($request->get('per_page', 10));
+        $taxs = $query->paginate($request->get('per_page', 50));
 
         $accounts = Account::all();
 
@@ -149,6 +149,23 @@ class TaxController extends Controller
         $audit->save();
 
         $tax->delete();
+        return redirect()->route('taxes.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    public function bulk_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $tax = Tax::find($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Deleted Tax ' . $tax->name;
+            $audit->save();
+
+            $tax->delete();
+        }
         return redirect()->route('taxes.index')->with('success', _lang('Deleted Successfully'));
     }
 }

@@ -14,11 +14,11 @@ import {
 } from "@/Components/ui/table";
 import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogFooter,
   DialogDescription,
 } from "@/Components/ui/dialog";
@@ -47,7 +47,7 @@ import { cn } from "@/lib/utils";
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this leave record?
       </h2>
@@ -75,7 +75,7 @@ const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
 // Bulk Delete Confirmation Modal Component
 const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete {count} selected leave record{count !== 1 ? 's' : ''}?
       </h2>
@@ -108,7 +108,7 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
   const [bulkAction, setBulkAction] = useState("");
   const [search, setSearch] = useState(filters.search || "");
   const [dateFilter, setDateFilter] = useState(filters.date || "");
-  const [perPage, setPerPage] = useState(filters.per_page || 10);
+  const [perPage, setPerPage] = useState(filters.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
@@ -162,9 +162,12 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
 
   const handleSearch = (e) => {
     e.preventDefault();
+    const value = e.target.value;
+    setSearch(value);
+
     router.get(
       route("leaves.index"),
-      { search, date: dateFilter, page: 1, per_page: perPage },
+      { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
   };
@@ -221,7 +224,7 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
   const handleDelete = (e) => {
     e.preventDefault();
     setIsProcessing(true);
-    
+
     router.delete(route("leaves.destroy", leaveToDelete), {
       preserveState: true,
       onSuccess: () => {
@@ -238,22 +241,25 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
   const handleBulkDeleteConfirm = (e) => {
     e.preventDefault();
     setIsProcessing(true);
-    
-    router.post(route("leaves.bulk_delete"), {
-      ids: selectedLeaves
-    }, {
-      preserveState: true,
-      onSuccess: () => {
-        setSelectedLeaves([]);
-        setIsAllSelected(false);
-        setBulkAction("");
-        setShowBulkDeleteModal(false);
-        setIsProcessing(false);
+
+    router.post(route("leaves.bulk_destroy"),
+      {
+        ids: selectedLeaves
       },
-      onError: () => {
-        setIsProcessing(false);
+      {
+        preserveState: true,
+        onSuccess: () => {
+          setSelectedLeaves([]);
+          setIsAllSelected(false);
+          setBulkAction("");
+          setShowBulkDeleteModal(false);
+          setIsProcessing(false);
+        },
+        onError: () => {
+          setIsProcessing(false);
+        }
       }
-    });
+    );
   };
 
   const formatDate = (dateString) => {
@@ -301,10 +307,10 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
 
     // First page
     pageNumbers.push(
-      <Button 
-        key="first" 
-        variant="outline" 
-        size="sm" 
+      <Button
+        key="first"
+        variant="outline"
+        size="sm"
         onClick={() => handlePageChange(1)}
         disabled={currentPage === 1}
         className="h-8 w-8 p-0"
@@ -322,10 +328,10 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
     for (let i = startPage; i <= endPage; i++) {
       if (i !== 1 && i !== meta.last_page) {
         pageNumbers.push(
-          <Button 
-            key={i} 
-            variant={currentPage === i ? "default" : "outline"} 
-            size="sm" 
+          <Button
+            key={i}
+            variant={currentPage === i ? "default" : "outline"}
+            size="sm"
             onClick={() => handlePageChange(i)}
             className="h-8 w-8 p-0"
           >
@@ -343,10 +349,10 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
     // Last page
     if (meta.last_page > 1) {
       pageNumbers.push(
-        <Button 
-          key="last" 
-          variant="outline" 
-          size="sm" 
+        <Button
+          key="last"
+          variant="outline"
+          size="sm"
           onClick={() => handlePageChange(meta.last_page)}
           disabled={currentPage === meta.last_page}
           className="h-8 w-8 p-0"
@@ -379,11 +385,11 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
                 </Button>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-2">
+                <div className="flex flex-col md:flex-row gap-2">
                   <Input
-                    placeholder="Search leaves..."
+                    placeholder="search leaves..."
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => handleSearch(e)}
                     className="w-full md:w-60"
                   />
                   <Popover>
@@ -412,11 +418,7 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
                       />
                     </PopoverContent>
                   </Popover>
-                  <Button type="submit">
-                    <Search className="w-4 h-4 mr-2" />
-                    Search
-                  </Button>
-                </form>
+                </div>
               </div>
             </div>
 
@@ -430,8 +432,8 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
                     <SelectItem value="delete">Delete Selected</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button 
-                  onClick={handleBulkAction} 
+                <Button
+                  onClick={handleBulkAction}
                   variant="outline"
                   disabled={!bulkAction || selectedLeaves.length === 0}
                 >
