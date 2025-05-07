@@ -1,17 +1,36 @@
-import { Button } from "@/Components/ui/button";
+import React, { useState, useEffect } from "react";
+import { Head, Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { Link, router } from "@inertiajs/react";
+import { SidebarInset } from "@/Components/ui/sidebar";
+import { Button } from "@/Components/ui/button";
+import { Checkbox } from "@/Components/ui/checkbox";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/Components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/Components/ui/select";
+import { Input } from "@/Components/ui/input";
+import { Edit, EyeIcon, Plus, Trash } from "lucide-react";
+import { Toaster } from "@/Components/ui/toaster";
+import { useToast } from "@/hooks/use-toast";
+import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
-import { useState, useMemo } from "react";
-import { SidebarInset } from "@/Components/ui/sidebar";
-import { Checkbox } from "@/Components/ui/checkbox";
-import { DataTable } from "@/Components/ui/data-table/data-table";
-import TableActions from "@/Components/shared/TableActions";
 
-const DeleteMedicalRecordsModal = ({ show, onClose, onConfirm, processing }) => (
+// Delete Confirmation Modal Component
+const DeletePrescriptionModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
         Are you sure you want to delete this prescription?
       </h2>
@@ -29,18 +48,19 @@ const DeleteMedicalRecordsModal = ({ show, onClose, onConfirm, processing }) => 
           variant="destructive"
           disabled={processing}
         >
-          Delete Medical Record
+          Delete
         </Button>
       </div>
     </form>
   </Modal>
 );
 
-const DeleteAllPrescriptionsModal = ({ show, onClose, onConfirm, processing }) => (
+// Bulk Delete Confirmation Modal Component
+const DeleteAllPrescriptionsModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
+    <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to delete all selected prescriptions?
+        Are you sure you want to delete {count} selected prescription{count !== 1 ? 's' : ''}?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -49,41 +69,135 @@ const DeleteAllPrescriptionsModal = ({ show, onClose, onConfirm, processing }) =
           onClick={onClose}
           className="mr-3"
         >
-          Close
+          Cancel
         </Button>
         <Button
           type="submit"
           variant="destructive"
           disabled={processing}
         >
-          Delete All
+          Delete Selected
         </Button>
       </div>
     </form>
   </Modal>
 );
 
-const PrescriptionStatusBadge = ({ status }) => (
-    <span className={status === 0 ? "text-success" : "text-danger"}>
-      {status === 1 ? "Active" : "Disabled"}
-    </span>
-  );
 
-export default function List({ records = [], meta = {}, filters = {} }) {
+export default function List({ prescriptions = [], meta = {}, filters = {} }) {
+  const { flash = {} } = usePage().props;
+  const { toast } = useToast();
+  const [selectedPrescriptions, setSelectedPrescriptions] = useState([]);
+  const [isAllSelected, setIsAllSelected] = useState(false);
+  const [search, setSearch] = useState(filters.search || "");
+  const [perPage, setPerPage] = useState(meta.per_page || 50);
+  const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
+  const [bulkAction, setBulkAction] = useState("");
+
+  // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
-  const [recordToDelete, setRecordToDelete] = useState(null);
-  const [tableRef, setTableRef] = useState(null);
+  const [prescriptionToDelete, setPrescriptionToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
+
+  useEffect(() => {
+    if (flash && flash.success) {
+      toast({
+        title: "Success",
+        description: flash.success,
+      });
+    }
+
+    if (flash && flash.error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: flash.error,
+      });
+    }
+  }, [flash, toast]);
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedPrescriptions([]);
+    } else {
+      setSelectedPrescriptions(prescriptions.map((prescription) => prescription.id));
+    }
+    setIsAllSelected(!isAllSelected);
+  };
+
+  const toggleSelectPrescription = (id) => {
+    if (selectedPrescriptions.includes(id)) {
+      setSelectedPrescriptions(selectedPrescriptions.filter((prescriptionId) => prescriptionId !== id));
+      setIsAllSelected(false);
+    } else {
+      setSelectedPrescriptions([...selectedPrescriptions, id]);
+      if (selectedPrescriptions.length + 1 === prescriptions.length) {
+        setIsAllSelected(true);
+      }
+    }
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    const value = e.target.value;
+    setSearch(value);
+
+    router.get(
+      route("prescriptions.index"),
+      { search: value, page: 1, per_page: perPage },
+      { preserveState: true }
+    );
+  };
+
+  const handlePerPageChange = (value) => {
+    setPerPage(value);
+    router.get(
+      route("prescriptions.index"),
+      { search, page: 1, per_page: value },
+      { preserveState: true }
+    );
+  };
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    router.get(
+      route("prescriptions.index"),
+      { search, page, per_page: perPage },
+      { preserveState: true }
+    );
+  };
+
+  const handleBulkAction = () => {
+    if (bulkAction === "") return;
+
+    if (selectedPrescriptions.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select at least one prescription",
+      });
+      return;
+    }
+
+    if (bulkAction === "delete") {
+      setShowDeleteAllModal(true);
+    }
+  };
+
+  const handleDeleteConfirm = (id) => {
+    setPrescriptionToDelete(id);
+    setShowDeleteModal(true);
+  };
 
   const handleDelete = (e) => {
     e.preventDefault();
     setProcessing(true);
-    
-    router.delete(route('prescriptions.destroy', recordToDelete), {
+
+    router.delete(route('prescriptions.destroy', prescriptionToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
-        setRecordToDelete(null);
+        setPrescriptionToDelete(null);
         setProcessing(false);
       },
       onError: () => {
@@ -94,287 +208,250 @@ export default function List({ records = [], meta = {}, filters = {} }) {
 
   const handleDeleteAll = (e) => {
     e.preventDefault();
-    if (!tableRef) return;
-    
-    const selectedIds = tableRef.getSelectedRowModel().rows.map(row => row.original.id);
-    if (selectedIds.length === 0) return;
-
     setProcessing(true);
-    router.post(route('prescriptions.destroy-multiple'), {
-      prescriptions: selectedIds
-    }, {
-      onSuccess: () => {
-        setShowDeleteAllModal(false);
-        tableRef.toggleAllRowsSelected(false);
-        setProcessing(false);
-      },
-      onError: () => {
-        setProcessing(false);
-      }
-    });
-  };
 
-  const handlePagination = (pagination) => {
-    // Ensure we have valid numeric values for page and page size
-    const pageIndex = isNaN(pagination.pageIndex) ? 0 : pagination.pageIndex;
-    const pageSize = isNaN(pagination.pageSize) ? 10 : pagination.pageSize;
-    
-    // Create query parameters object (only include non-empty values)
-    const params = {
-      page: pageIndex + 1, // Convert 0-indexed to 1-indexed
-      per_page: pageSize,
-    };
-    
-    // Only add search if it's non-empty
-    if (pagination.globalFilter || filters.search) {
-      params.search = pagination.globalFilter || filters.search || '';
-    }
-    
-    // Only add column filters if they exist
-    const columnFiltersArray = pagination.columnFilters || filters.columnFilters || [];
-    if (columnFiltersArray.length > 0) {
-      params.columnFilters = JSON.stringify(columnFiltersArray);
-    }
-    
-    // Only add sorting if it exists
-    const sortingArray = pagination.sorting || filters.sorting || [];
-    if (sortingArray.length > 0) {
-      params.sorting = JSON.stringify(sortingArray);
-    }
-
-    // Debug the parameters being sent to the server
-    console.log('Sending to server:', params);
-    
-    // Update URL and fetch data
-    router.get(route('prescriptions.index'), params, {
-      preserveState: true,
-      preserveScroll: true,
-      only: ['prescriptions', 'meta', 'filters'],
-      replace: false, // Use false to update browser history
-    });
-  };
-
-  const handleDataTableChange = (updatedState) => {
-    // Ensure we have valid numeric values for page and page size
-    const pageIndex = isNaN(updatedState.pagination.pageIndex) ? 0 : updatedState.pagination.pageIndex;
-    const pageSize = isNaN(updatedState.pagination.pageSize) ? 10 : updatedState.pagination.pageSize;
-    
-    // Create query parameters object (only include non-empty values)
-    const params = {
-      page: pageIndex + 1, // Convert 0-indexed to 1-indexed
-      per_page: pageSize,
-    };
-    
-    // Only add search if it's non-empty
-    if (updatedState.globalFilter) {
-      params.search = updatedState.globalFilter;
-    }
-    
-    // Only add column filters if they exist
-    const columnFiltersArray = updatedState.columnFilters || [];
-    if (columnFiltersArray.length > 0) {
-      params.columnFilters = JSON.stringify(columnFiltersArray);
-    }
-    
-    // Only add sorting if it exists
-    const sortingArray = updatedState.sorting || [];
-    if (sortingArray.length > 0) {
-      params.sorting = JSON.stringify(sortingArray);
-    }
-
-    // Debug the parameters being sent to the server
-    console.log('Table state change:', params);
-    
-    // Update URL and fetch data
-    router.get(route('prescriptions.index'), params, {
-      preserveState: true,
-      preserveScroll: true,
-      only: ['prescriptions', 'meta', 'filters'],
-      replace: false, // Use false to update browser history
-    });
-  };
-
-  const columns = useMemo(
-    () => [
+    router.post(route('prescriptions.bulk_destroy'),
       {
-        id: "select",
-        header: ({ table }) => (
-          <Checkbox
-            checked={table.getIsAllPageRowsSelected()}
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-            aria-label="Select all"
-          />
-        ),
-        cell: ({ row }) => (
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label="Select row"
-          />
-        ),
-        enableSorting: false,
-        enableHiding: false,
+        ids: selectedPrescriptions
       },
       {
-        accessorKey: "date",
-        header: "Date",
-        cell: ({ row }) => (
-          <span className="whitespace-nowrap">
-            {row.original.date}
-          </span>
-        )
-      },
-      {
-        accessorKey: "result_date",
-        header: "Result Date",
-        cell: ({ row }) => (
-          <span className="whitespace-nowrap">
-            {row.original.result_date}
-          </span>
-        )
-      },
-      {
-        accessorKey: "customer.name",
-        header: "Name",
-        cell: ({ row }) => (
-          <span className="whitespace-nowrap">
-            {row.original.customer.name}
-          </span>
-        )
-      },
-      {
-        accessorKey: "age",
-        header: "Age",
-        cell: ({ row }) => (
-          <span className="whitespace-nowrap">
-            {row.original.customer.age}
-          </span>
-        )
-      },
-      {
-        accessorKey: "phone",
-        header: "Phone",
-        cell: ({ row }) => (
-          <span className="whitespace-nowrap">
-            {row.original.customer.mobile}
-          </span>
-        )
-      },
-      {
-        accessorKey: "status",
-        header: "Status",
-        cell: ({ row }) => (
-          <div className="text-center">
-            <PrescriptionStatusBadge status={row.original.status} />
-          </div>
-        ),
-        filterFn: (row, id, value) => {
-          return value.includes(row.getValue(id))
+        onSuccess: () => {
+          setShowDeleteAllModal(false);
+          setSelectedPrescriptions([]);
+          setIsAllSelected(false);
+          setProcessing(false);
         },
-      },
-      {
-        id: "actions",
-        header: "Actions",
-        cell: ({ row }) => (
-          <TableActions
-            actions={[
-              {
-                label: "Edit",
-                icon: Edit,
-                onClick: () => router.visit(route('prescriptions.edit', row.original.id))
-              },
-              {
-                label: "View",
-                icon: Eye,
-                onClick: () => router.visit(route('prescriptions.show', row.original.id))
-              },
-              {
-                label: "Delete",
-                icon: Trash2,
-                onClick: () => {
-                  setRecordToDelete(row.original.id);
-                  setShowDeleteModal(true);
-                },
-                className: "text-red-600"
-              }
-            ]}
-          />
-        ),
-      },
-    ],
-    []
-  );
+        onError: () => {
+          setProcessing(false);
+        }
+      }
+    );
+  };
 
-  const filterableColumns = [
-    {
-      id: "status",
-      title: "Status",
-      options: [
-        { label: "Active", value: "1" },
-        { label: "Disabled", value: "0" },
-      ],
-    },
-  ];
 
-  const searchableColumns = [
-    {
-      id: "name",
-      title: "Name",
-    },
-  ];
+  const renderPageNumbers = () => {
+    const totalPages = meta.last_page;
+    const pages = [];
+    const maxPagesToShow = 5;
+
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = startPage + maxPagesToShow - 1;
+
+    if (endPage > totalPages) {
+      endPage = totalPages;
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(
+        <Button
+          key={i}
+          variant={i === currentPage ? "default" : "outline"}
+          size="sm"
+          onClick={() => handlePageChange(i)}
+          className="mx-1"
+        >
+          {i}
+        </Button>
+      );
+    }
+
+    return pages;
+  };
 
   return (
     <AuthenticatedLayout>
+      <Head title="Prescriptions" />
+      <Toaster />
       <SidebarInset>
         <div className="main-content">
-          <PageHeader page="Medical Records" subpage="list" url="medical_records.index" />
-
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-            <div>
-              <Link href={route("prescriptions.create")}>
-                <Button>Add New Prescription</Button>
-              </Link>
+          <PageHeader
+            page="Prescriptions"
+            subpage="List"
+            url="prescriptions.index"
+          />
+          <div className="p-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                <Link href={route("prescriptions.create")}>
+                  <Button>
+                    <Plus className="w-4 h-4" />
+                    Add Prescription
+                  </Button>
+                </Link>
+              </div>
+              <div className="flex flex-col md:flex-row gap-4 md:items-center">
+                <Input
+                  placeholder="search prescriptions..."
+                  value={search}
+                  onChange={(e) => handleSearch(e)}
+                  className="w-full md:w-80"
+                />
+              </div>
             </div>
 
-              <DataTable
-                columns={columns}
-                data={records}
-                filterableColumns={filterableColumns}
-                searchableColumns={searchableColumns}
-                totalRows={meta.total || 0}
-                pageCount={meta.last_page || 1}
-                onPaginationChange={handlePagination}
-                onTableStateChange={handleDataTableChange}
-                serverSide={true}
-                initialState={{
-                  pagination: {
-                    pageIndex: (meta.current_page || 1) - 1,
-                    pageSize: meta.per_page || 10,
-                  },
-                  globalFilter: filters.search || '',
-                  columnFilters: filters.columnFilters || [],
-                  sorting: filters.sorting || [],
-                }}
-                tableRef={setTableRef}
-                meta={meta}
-              />
+            <div className="mb-4 flex flex-col md:flex-row gap-4 justify-between">
+              <div className="flex items-center gap-2">
+                <Select value={bulkAction} onValueChange={setBulkAction}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Bulk actions" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="delete">Delete Selected</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleBulkAction} variant="outline">
+                  Apply
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Show</span>
+                <Select value={perPage.toString()} onValueChange={handlePerPageChange}>
+                  <SelectTrigger className="w-[80px]">
+                    <SelectValue placeholder="10" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-gray-500">entries</span>
+              </div>
+            </div>
+
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px]">
+                      <Checkbox
+                        checked={isAllSelected}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                    </TableHead>
+                    <TableHead className="w-[80px]">ID</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Result Date</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Age</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {prescriptions.length > 0 ? (
+                    prescriptions.map((prescription) => (
+                      <TableRow key={prescription.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedPrescriptions.includes(prescription.id)}
+                            onCheckedChange={() => toggleSelectPrescription(prescription.id)}
+                          />
+                        </TableCell>
+                        <TableCell>{prescription.id}</TableCell>
+                        <TableCell>{prescription.date}</TableCell>
+                        <TableCell>{prescription.result_date}</TableCell>
+                        <TableCell>{prescription.customer?.name}</TableCell>
+                        <TableCell>{prescription.customer?.age}</TableCell>
+                        <TableCell>{prescription.customer?.mobile}</TableCell>
+                        <TableCell className="text-right">
+                          <TableActions
+                            actions={[
+                              {
+                                label: "View",
+                                icon: <EyeIcon className="h-4 w-4" />,
+                                href: route("prescriptions.show", prescription.id),
+                              },
+                              {
+                                label: "Edit",
+                                icon: <Edit className="h-4 w-4" />,
+                                href: route("prescriptions.edit", prescription.id),
+                              },
+                              {
+                                label: "Delete",
+                                icon: <Trash className="h-4 w-4" />,
+                                onClick: () => handleDeleteConfirm(prescription.id),
+                                destructive: true,
+                              },
+                            ]}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={8} className="h-24 text-center">
+                        No prescriptions found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {prescriptions.length > 0 && meta.total > 0 && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-gray-500">
+                  Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, meta.total)} of {meta.total} entries
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                  >
+                    First
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  {renderPageNumbers()}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === meta.last_page}
+                  >
+                    Next
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(meta.last_page)}
+                    disabled={currentPage === meta.last_page}
+                  >
+                    Last
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
-
-          <DeleteMedicalRecordsModal
-            show={showDeleteModal}
-            onClose={() => setShowDeleteModal(false)}
-            onConfirm={handleDelete}
-            processing={processing}
-          />
-
-          <DeleteAllPrescriptionsModal
-            show={showDeleteAllModal}
-            onClose={() => setShowDeleteAllModal(false)}
-            onConfirm={handleDeleteAll}
-            processing={processing}
-          />
         </div>
       </SidebarInset>
+
+      <DeletePrescriptionModal
+        show={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDelete}
+        processing={processing}
+      />
+
+      <DeleteAllPrescriptionsModal
+        show={showDeleteAllModal}
+        onClose={() => setShowDeleteAllModal(false)}
+        onConfirm={handleDeleteAll}
+        processing={processing}
+        count={selectedPrescriptions.length}
+      />
+
     </AuthenticatedLayout>
   );
 }

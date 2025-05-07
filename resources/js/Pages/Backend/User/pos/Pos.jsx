@@ -15,6 +15,7 @@ import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Label } from "@/Components/ui/label";
 import { toast } from "sonner";
 import InputError from "@/Components/InputError";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function POS({ products, categories, currencies, accounts, customers, methods, baseCurrency, holdList, todayList, prescriptionProducts, pos_default_currency_change, pos_default_taxes, pos_product_image, taxes }) {
   // State to track which category is currently active

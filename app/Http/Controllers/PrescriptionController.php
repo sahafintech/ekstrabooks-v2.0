@@ -19,15 +19,18 @@ class PrescriptionController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Prescription::with('customer', 'medical_record')->select('prescriptions.*');
+        $query = Prescription::with('customer', 'medical_record')->orderBy('id', 'desc');
 
         // handle search
         if ($request->has('search') && !empty($request->get('search'))) {
             $search = $request->get('search');
             $query->where(function ($q) use ($search) {
                 $q->where('prescriptions.date', 'like', "%{$search}%")
-                    ->orWhere('prescriptions.customer.name', 'like', "%{$search}%")
-                    ->orWhere('prescriptions.customer.phone', 'like', "%{$search}%");
+                    ->orWhere('prescriptions.result_date', 'like', "%{$search}%")
+                    ->orWhereHas('customer', function ($q2) use ($search) {
+                        $q2->where('name', 'like', "%{$search}%")
+                            ->orWhere('mobile', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -47,7 +50,7 @@ class PrescriptionController extends Controller
         }
 
         // handle pagination
-        $per_page = $request->get('per_page', 10);
+        $per_page = $request->get('per_page', 50);
         $prescriptions = $query->paginate($per_page);
 
         return Inertia::render('Backend/User/Prescription/List', [
@@ -70,7 +73,7 @@ class PrescriptionController extends Controller
     {
         $customers = Customer::all();
         $products = Product::all();
-        
+
         return Inertia::render('Backend/User/Prescription/Create', [
             'customers' => $customers,
             'products' => $products
@@ -79,6 +82,7 @@ class PrescriptionController extends Controller
 
     public function store(Request $request)
     {
+        return $request->all();
         $request->validate([
             'customer_id' => 'required',
             'date' => 'required',
@@ -163,7 +167,15 @@ class PrescriptionController extends Controller
     public function edit($id)
     {
         $prescription = Prescription::with("items")->find($id);
-        return view('backend.user.prescription.edit', compact('prescription', 'id'));
+        $customers = Customer::all();
+        $products = Product::all();
+        $prescriptionProducts = PrescriptionProduct::where('prescription_id', $id)->with('items')->first();
+        return Inertia::render('Backend/User/Prescription/Edit', [
+            'prescription' => $prescription,
+            'customers' => $customers,
+            'products' => $products,
+            'prescriptionProducts' => $prescriptionProducts
+        ]);
     }
 
     public function update(Request $request, $id)
@@ -268,11 +280,11 @@ class PrescriptionController extends Controller
         $prescription = Prescription::with(['customer', 'items.product'])->findOrFail($id);
         $customer = $prescription->customer;
         $prescriptionProduct = PrescriptionProduct::where('prescription_id', $prescription->id)->with('items')->first();
-        
+
         return Inertia::render('Backend/User/Prescription/View', [
             'prescription' => $prescription,
             'customer' => $customer,
-            'products' => $prescriptionProduct ? $prescriptionProduct->items : [],
+            'prescriptionProduct' => $prescriptionProduct,
         ]);
     }
 

@@ -17,6 +17,7 @@ use App\Models\InvoiceItem;
 use App\Models\InvoiceItemTax;
 use App\Models\Prescription;
 use App\Models\PrescriptionProduct;
+use App\Models\PrescriptionProductItem;
 use App\Models\Product;
 use App\Models\Receipt;
 use App\Models\ReceiptItem;
@@ -1255,6 +1256,23 @@ class ReceiptController extends Controller
                 $prescription_products = PrescriptionProduct::find($request->prescription_products_id);
                 $prescription_products->status = 1;
                 $prescription_products->save();
+
+                // delete all items
+                $prescription_products->items()->delete();
+
+                for ($i = 0; $i < count($request->product_id); $i++) {
+                    $prescription_products->items()->save(new PrescriptionProductItem([
+                        'prescription_products_id'   => $prescription_products->id,
+                        'product_id'   => $request->product_id[$i],
+                        'product_name' => $request->product_name[$i],
+                        'description'  => null,
+                        'quantity'     => $request->quantity[$i],
+                        'unit_cost'    => $request->unit_cost[$i],
+                        'sub_total'    => ($request->unit_cost[$i] * $request->quantity[$i]),
+                        'user_id'      => auth()->id(),
+                        'business_id'  => request()->activeBusiness->id,
+                    ]));
+                }
             }
         } elseif ($request->credit_cash == 'credit') {
 
@@ -1441,6 +1459,21 @@ class ReceiptController extends Controller
                 $prescription_products = PrescriptionProduct::find($request->prescription_products_id);
                 $prescription_products->status = 1;
                 $prescription_products->save();
+
+                // delete all items
+                $prescription_products->items()->delete();
+
+                for ($i = 0; $i < count($request->product_id); $i++) {
+                    $prescription_products->items()->save(new PrescriptionProductItem([
+                        'prescription_products_id'   => $prescription_products->id,
+                        'product_id'   => $request->product_id[$i],
+                        'product_name' => $request->product_name[$i],
+                        'description'  => null,
+                        'quantity'     => $request->quantity[$i],
+                        'unit_cost'    => $request->unit_cost[$i],
+                        'sub_total'    => ($request->unit_cost[$i] * $request->quantity[$i]),
+                    ]));
+                }
             }
         } elseif ($request->credit_cash == 'provider') {
             DB::beginTransaction();
@@ -1628,6 +1661,21 @@ class ReceiptController extends Controller
                 $prescription_products = PrescriptionProduct::find($request->prescription_products_id);
                 $prescription_products->status = 1;
                 $prescription_products->save();
+
+                // delete all items
+                $prescription_products->items()->delete();
+
+                for ($i = 0; $i < count($request->product_id); $i++) {
+                    $prescription_products->items()->save(new PrescriptionProductItem([
+                        'prescription_products_id'   => $prescription_products->id,
+                        'product_id'   => $request->product_id[$i],
+                        'product_name' => $request->product_name[$i],
+                        'description'  => null,
+                        'quantity'     => $request->quantity[$i],
+                        'unit_cost'    => $request->unit_cost[$i],
+                        'sub_total'    => ($request->unit_cost[$i] * $request->quantity[$i]),
+                    ]));
+                }
             }
         }
 
