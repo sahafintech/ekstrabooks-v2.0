@@ -33,9 +33,10 @@ class MedicalRecordController extends Controller
         // handle search
         if ($request->has('search') && !empty($request->get('search'))) {
             $search = $request->get('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('medical_records.customer.name', 'like', "%{$search}%")
-                    ->orWhere('medical_records.customer.phone', 'like', "%{$search}%");
+            $query->whereHas('customer', function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('mobile', 'like', "%{$search}%")
+                  ->orWhere('age', 'like', "%{$search}%");
             });
         }
 
@@ -48,10 +49,26 @@ class MedicalRecordController extends Controller
             if (is_array($columnFilters)) {
                 foreach ($columnFilters as $column => $value) {
                     if ($value !== null && $value !== '') {
-                        $query->where('medical_records.customer.' . $column, $value);
+                        $query->whereHas('customer', function ($q) use ($column, $value) {
+                            $q->where($column, $value);
+                        });
                     }
                 }
             }
+        }
+
+        // handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        if (in_array($sortColumn, ['customer.name', 'customer.age', 'customer.mobile'])) {
+            $customerField = explode('.', $sortColumn)[1];
+            $query->join('customers', 'medical_records.customer_id', '=', 'customers.id')
+                  ->orderBy('customers.' . $customerField, $sortDirection)
+                  ->select('medical_records.*');
+        } else {
+            $query->orderBy('medical_records.' . $sortColumn, $sortDirection);
         }
 
         // handle pagination
@@ -68,7 +85,7 @@ class MedicalRecordController extends Controller
             'filters' => [
                 'search' => $request->get('search', ''),
                 'columnFilters' => $request->get('columnFilters', []),
-                'sorting' => $request->get('sorting', []),
+                'sorting' => $sorting,
             ],
         ]);
     }

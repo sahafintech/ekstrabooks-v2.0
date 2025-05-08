@@ -33,7 +33,7 @@ class CurrencyController extends Controller
         $per_page = $request->get('per_page', 10);
         $search = $request->get('search', '');
 
-        $query = Currency::orderBy("id", "desc");
+        $query = Currency::query();
 
         // Apply search if provided
         if (!empty($search)) {
@@ -44,6 +44,13 @@ class CurrencyController extends Controller
                     ->orWhere('base_currency', 'like', "%{$search}%");
             });
         }
+
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        $query->orderBy($sortColumn, $sortDirection);
 
         $currencies = $query->paginate($per_page)->withQueryString();
         return Inertia::render('Backend/User/Currency/List', [
@@ -60,6 +67,7 @@ class CurrencyController extends Controller
             ],
             'filters' => [
                 'search' => $search,
+                'sorting' => $sorting,
             ],
         ]);
     }

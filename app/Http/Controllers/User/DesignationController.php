@@ -42,16 +42,34 @@ class DesignationController extends Controller {
         $search = $request->search;
         $per_page = $request->per_page ?? 10;
 
-        $query = Designation::query()->where('business_id', $request->activeBusiness->id);
+        $query = Designation::query()->where('designations.business_id', $request->activeBusiness->id);
 
         if ($search) {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%$search%")
-                  ->orWhere('descriptions', 'like', "%$search%");
+                $q->where('designations.name', 'like', "%$search%")
+                  ->orWhere('designations.descriptions', 'like', "%$search%");
             });
         }
 
-        $designations = $query->with('department')->orderByDesc('id')->paginate($per_page);
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        // Handle relationship sorting
+        if (str_contains($sortColumn, '.')) {
+            $parts = explode('.', $sortColumn);
+            $relation = $parts[0];
+            $column = $parts[1];
+            $query->join($relation . 's', 'designations.' . $relation . '_id', '=', $relation . 's.id')
+                  ->where($relation . 's.business_id', $request->activeBusiness->id)
+                  ->orderBy($relation . 's.' . $column, $sortDirection)
+                  ->select('designations.*');
+        } else {
+            $query->orderBy('designations.' . $sortColumn, $sortDirection);
+        }
+
+        $designations = $query->with('department')->paginate($per_page);
         $departments = Department::where('business_id', $request->activeBusiness->id)->get();
 
         return Inertia::render('Backend/User/Designation/List', [
@@ -67,6 +85,7 @@ class DesignationController extends Controller {
             ],
             'filters' => [
                 'search' => $search,
+                'sorting' => $sorting,
             ],
         ]);
     }

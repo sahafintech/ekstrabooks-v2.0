@@ -44,32 +44,38 @@ class AwardController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Award::select('awards.*')->with('staff');
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
 
-        // Search functionality
-        if ($request->has('search') && !empty($request->search)) {
-            $search = $request->search;
+        $query = Award::query();
+
+        // Apply search if provided
+        if (!empty($search)) {
             $query->where(function ($q) use ($search) {
-                $q->where('award_name', 'like', "%$search%")
-                    ->orWhere('award', 'like', "%$search%")
-                    ->orWhere('award_date', 'like', "%$search%")
+                $q->where('award_name', 'like', "%{$search}%")
+                    ->orWhere('award', 'like', "%{$search}%")
+                    ->orWhere('award_date', 'like', "%{$search}%")
                     ->orWhereHas('staff', function ($q) use ($search) {
-                        $q->where('name', 'like', "%$search%");
+                        $q->where('name', 'like', "%{$search}%");
                     });
             });
         }
 
-        // Date filter
-        if ($request->has('date') && !empty($request->date)) {
-            $date = $request->date;
-            $query->whereDate('award_date', $date);
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        if ($sortColumn === 'staff.name') {
+            $query->join('employees', 'awards.employee_id', '=', 'employees.id')
+                ->orderBy('employees.name', $sortDirection)
+                ->select('awards.*');
+        } else {
+            $query->orderBy($sortColumn, $sortDirection);
         }
 
-        // Define pagination
-        $per_page = $request->input('per_page', 10);
-
         // Get awards with pagination
-        $awards = $query->orderBy('award_date', 'desc')->paginate($per_page)->withQueryString();
+        $awards = $query->paginate($per_page)->withQueryString();
         $employees = Employee::select('id', 'name')->get();
 
         // Return Inertia view
@@ -80,15 +86,16 @@ class AwardController extends Controller
                 'current_page' => $awards->currentPage(),
                 'from' => $awards->firstItem(),
                 'last_page' => $awards->lastPage(),
+                'links' => $awards->linkCollection(),
                 'path' => $awards->path(),
                 'per_page' => $awards->perPage(),
                 'to' => $awards->lastItem(),
                 'total' => $awards->total(),
             ],
             'filters' => [
-                'search' => $request->search ?? '',
-                'date' => $request->date ?? '',
-                'per_page' => $per_page,
+                'search' => $search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $sorting,
             ],
         ]);
     }

@@ -15,7 +15,11 @@ class SubCategoryController extends Controller
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
-        $query = SubCategory::with('mainCategory')->orderBy("id", "desc");
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        $query = SubCategory::with('mainCategory')->orderBy($sortColumn, $sortDirection);
 
         // Apply search if provided
         if (!empty($search)) {

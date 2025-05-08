@@ -26,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { Edit, EyeIcon, FileDown, FileUp, MoreVertical, Plus, Trash } from "lucide-react";
+import { Edit, EyeIcon, FileDown, FileUp, MoreVertical, Plus, Trash, ChevronUp, ChevronDown } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -169,6 +169,8 @@ export default function List({ adjustments = [], meta = {}, filters = {} }) {
   const [showImportModal, setShowImportModal] = useState(false);
   const [adjustmentsToDelete, setAdjustmentsToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
+
+  const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -315,6 +317,31 @@ export default function List({ adjustments = [], meta = {}, filters = {} }) {
     });
   };
 
+  const handleSort = (column) => {
+    let direction = "asc";
+    if (sorting.column === column && sorting.direction === "asc") {
+      direction = "desc";
+    }
+    setSorting({ column, direction });
+    router.get(
+      route("inventory_adjustments.index"),
+      { ...filters, sorting: { column, direction }, page: 1, per_page: perPage },
+      { preserveState: true }
+    );
+  };
+
+  const renderSortIcon = (column) => {
+    const isActive = sorting.column === column;
+    const upColor = isActive && sorting.direction === "asc" ? "text-gray-900" : "text-gray-300";
+    const downColor = isActive && sorting.direction === "desc" ? "text-gray-900" : "text-gray-300";
+    return (
+      <span className="inline-flex flex-col ml-1">
+        <ChevronUp className={`w-4 h-4 ${upColor}`} />
+        <ChevronDown className={`w-4 h-4 -mt-1 ${downColor}`} />
+      </span>
+    );
+  };
+
   const renderPageNumbers = () => {
     const totalPages = meta.last_page;
     const pages = [];
@@ -449,13 +476,27 @@ export default function List({ adjustments = [], meta = {}, filters = {} }) {
                         onCheckedChange={toggleSelectAll}
                       />
                     </TableHead>
-                    <TableHead className="w-[80px]">ID</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Product Name</TableHead>
-                    <TableHead>Qty on Hand</TableHead>
-                    <TableHead>Qty Adjusted</TableHead>
-                    <TableHead>Adjustment Type</TableHead>
-                    <TableHead>New Quantity</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("id")}>
+                      ID {renderSortIcon("id")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("adjustment_date")}>
+                      Date {renderSortIcon("adjustment_date")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("product.name")}>
+                      Product Name {renderSortIcon("product.name")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("quantity_on_hand")}>
+                      Qty on Hand {renderSortIcon("quantity_on_hand")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("adjusted_quantity")}>
+                      Qty Adjusted {renderSortIcon("adjusted_quantity")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("adjustment_type")}>
+                      Adjustment Type {renderSortIcon("adjustment_type")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("new_quantity_on_hand")}>
+                      New Quantity {renderSortIcon("new_quantity_on_hand")}
+                    </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>

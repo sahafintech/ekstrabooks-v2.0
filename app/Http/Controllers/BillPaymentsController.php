@@ -22,8 +22,22 @@ class BillPaymentsController extends Controller
     {
         $per_page = $request->get('per_page', 10);
         $search = $request->get('search', '');
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
 
-        $query = BillPayment::with('vendor', 'purchases')->orderBy("id", "desc");
+        $query = BillPayment::query();
+
+        // Handle sorting
+        if ($sortColumn === 'vendor.name') {
+            $query->join('vendors', 'bill_payments.vendor_id', '=', 'vendors.id')
+                ->orderBy('vendors.name', $sortDirection)
+                ->select('bill_payments.*');
+        } else {
+            $query->orderBy('bill_payments.' . $sortColumn, $sortDirection);
+        }
+
+        $query->with('vendor', 'purchases');
 
         // Apply search if provided
         if (!empty($search)) {
@@ -53,7 +67,7 @@ class BillPaymentsController extends Controller
             'filters' => [
                 'search' => $search,
                 'columnFilters' => $request->get('columnFilters', []),
-                'sorting' => $request->get('sorting', []),
+                'sorting' => $sorting,
             ],
         ]);
     }

@@ -64,9 +64,17 @@ class PurchaseReturnController extends Controller
         }
 
         // Handle sorting
-        $sortField = $request->get('sort_field', 'id');
-        $sortDirection = $request->get('sort_direction', 'desc');
-        $query->orderBy($sortField, $sortDirection);
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        if ($sortColumn === 'vendor.name') {
+            $query->join('vendors', 'purchase_returns.vendor_id', '=', 'vendors.id')
+                ->orderBy('vendors.name', $sortDirection)
+                ->select('purchase_returns.*');
+        } else {
+            $query->orderBy('purchase_returns.' . $sortColumn, $sortDirection);
+        }
 
         // Handle pagination
         $perPage = $request->get('per_page', 10);
@@ -84,7 +92,11 @@ class PurchaseReturnController extends Controller
                 'from' => $returns->firstItem(),
                 'to' => $returns->lastItem(),
             ],
-            'filters' => $request->filters ?? []
+            'filters' => [
+                'search' => $request->search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $sorting,
+            ],
         ]);
     }
 

@@ -38,32 +38,46 @@ class DepartmentController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function index(Request $request) {
-        $search = $request->search;
-        $per_page = $request->per_page ?? 50;
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
 
-        $query = Department::query()->where('business_id', $request->activeBusiness->id);
+        $query = Department::query();
 
-        if ($search) {
+        // Apply search if provided
+        if (!empty($search)) {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%$search%")
-                  ->orWhere('descriptions', 'like', "%$search%");
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('descriptions', 'like', "%{$search}%");
             });
         }
 
-        $departments = $query->orderByDesc('id')->paginate($per_page);
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
 
+        $query->orderBy($sortColumn, $sortDirection);
+
+        // Get departments with pagination
+        $departments = $query->paginate($per_page)->withQueryString();
+
+        // Return Inertia view
         return Inertia::render('Backend/User/Department/List', [
             'departments' => $departments->items(),
             'meta' => [
                 'current_page' => $departments->currentPage(),
-                'per_page' => $departments->perPage(),
                 'from' => $departments->firstItem(),
+                'last_page' => $departments->lastPage(),
+                'links' => $departments->linkCollection(),
+                'path' => $departments->path(),
+                'per_page' => $departments->perPage(),
                 'to' => $departments->lastItem(),
                 'total' => $departments->total(),
-                'last_page' => $departments->lastPage(),
             ],
             'filters' => [
                 'search' => $search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $sorting,
             ],
         ]);
     }

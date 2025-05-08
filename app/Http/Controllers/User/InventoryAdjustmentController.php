@@ -23,9 +23,19 @@ class InventoryAdjustmentController extends Controller
 {
     public function index(Request $request)
     {
-        $query = InventoryAdjustment::query()
-            ->with('product')
-            ->orderBy("id", "desc");
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        $query = InventoryAdjustment::query()->with('product');
+
+        if ($sortColumn === 'product.name') {
+            $query->join('products', 'inventory_adjustments.product_id', '=', 'products.id')
+                ->orderBy('products.name', $sortDirection)
+                ->select('inventory_adjustments.*');
+        } else {
+            $query->orderBy($sortColumn, $sortDirection);
+        }
 
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');

@@ -33,6 +33,19 @@ class TaxController extends Controller
             $query->where('name', 'like', '%' . $request->search . '%');
         }
 
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        if ($sortColumn === 'account.account_name') {
+            $query->join('accounts', 'taxes.account_id', '=', 'accounts.id')
+                  ->select('taxes.*')
+                  ->orderBy('accounts.account_name', $sortDirection);
+        } else {
+            $query->orderBy($sortColumn, $sortDirection);
+        }
+
         $taxs = $query->paginate($request->get('per_page', 50));
 
         $accounts = Account::all();
@@ -48,7 +61,10 @@ class TaxController extends Controller
                 'total' => $taxs->total(),
                 'last_page' => $taxs->lastPage()
             ],
-            'filters' => $request->only('search')
+            'filters' => [
+                'search' => $request->search,
+                'sorting' => $sorting
+            ]
         ]);
     }
 

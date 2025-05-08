@@ -23,8 +23,22 @@ class ReceivePaymentsController extends Controller
     {
         $per_page = $request->get('per_page', 10);
         $search = $request->get('search', '');
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
 
-        $query = ReceivePayment::where('deffered_payment', 0)->with('customer', 'invoices')->orderBy("id", "desc");
+        $query = ReceivePayment::where('deffered_payment', 0);
+
+        // Handle sorting
+        if ($sortColumn === 'customer.name') {
+            $query->join('customers', 'receive_payments.customer_id', '=', 'customers.id')
+                ->orderBy('customers.name', $sortDirection)
+                ->select('receive_payments.*');
+        } else {
+            $query->orderBy('receive_payments.' . $sortColumn, $sortDirection);
+        }
+
+        $query->with('customer', 'invoices');
 
         // Apply search if provided
         if (!empty($search)) {

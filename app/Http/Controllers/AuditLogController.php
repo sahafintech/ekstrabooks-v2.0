@@ -13,8 +13,7 @@ class AuditLogController extends Controller
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
-        $query = AuditLog::orderBy("id", "desc")
-            ->with('changed_user');
+        $query = AuditLog::with('changed_user');
 
         // Apply search if provided
         if (!empty($search)) {
@@ -26,6 +25,20 @@ class AuditLogController extends Controller
                             ->orWhere('name', 'like', "%{$search}%");
                     });
             });
+        }
+
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'date_changed';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        // Handle special case for sorting by user name
+        if ($sortColumn === 'changed_user.name') {
+            $query->join('users', 'audit_logs.changed_by', '=', 'users.id')
+                  ->orderBy('users.name', $sortDirection)
+                  ->select('audit_logs.*');
+        } else {
+            $query->orderBy($sortColumn, $sortDirection);
         }
 
         $auditLogs = $query->paginate($per_page)->withQueryString();
@@ -43,6 +56,7 @@ class AuditLogController extends Controller
             ],
             'filters' => [
                 'search' => $search,
+                'sorting' => $sorting,
             ],
         ]);
     }

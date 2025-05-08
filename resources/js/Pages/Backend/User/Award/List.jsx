@@ -34,7 +34,7 @@ import {
   PopoverTrigger,
 } from "@/Components/ui/popover";
 import { Calendar } from "@/Components/ui/calendar";
-import { Plus, Edit, Trash, Search, DollarSign, CalendarIcon } from "lucide-react";
+import { Plus, Edit, Trash, Search, DollarSign, CalendarIcon, ChevronUp, ChevronDown } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -110,7 +110,7 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
   const [perPage, setPerPage] = useState(meta.per_page || 10);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
-  const [dateFilter, setDateFilter] = useState(filters.date || "");
+  const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -177,16 +177,7 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
 
     router.get(
       route("awards.index"),
-      { search: value, page: 1, per_page: perPage },
-      { preserveState: true }
-    );
-  };
-
-  const handleDateFilterChange = (date) => {
-    setDateFilter(date ? format(date, "yyyy-MM-dd") : "");
-    router.get(
-      route("awards.index"),
-      { search, date: date ? format(date, "yyyy-MM-dd") : "", page: 1, per_page: perPage },
+      { search: value, page: 1, per_page: perPage, sorting },
       { preserveState: true }
     );
   };
@@ -195,7 +186,7 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
     setPerPage(value);
     router.get(
       route("awards.index"),
-      { search, date: dateFilter, page: 1, per_page: value },
+      { search, page: 1, per_page: value, sorting },
       { preserveState: true }
     );
   };
@@ -204,7 +195,7 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
     setCurrentPage(page);
     router.get(
       route("awards.index"),
-      { search, date: dateFilter, page, per_page: perPage },
+      { search, page, per_page: perPage, sorting },
       { preserveState: true }
     );
   };
@@ -272,6 +263,33 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
     );
   };
 
+  const handleSort = (column) => {
+    let direction = "asc";
+    if (sorting.column === column && sorting.direction === "asc") {
+      direction = "desc";
+    }
+    setSorting({ column, direction });
+    router.get(
+      route("awards.index"),
+      { ...filters, sorting: { column, direction } },
+      { preserveState: true }
+    );
+  };
+
+  const renderSortIcon = (column) => {
+    const isActive = sorting.column === column;
+    return (
+      <span className="inline-flex flex-col ml-1">
+        <ChevronUp
+          className={`w-3 h-3 ${isActive && sorting.direction === "asc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+        <ChevronDown
+          className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+      </span>
+    );
+  };
+
   // Create form handlers
   const openCreateDialog = () => {
     setForm({
@@ -312,17 +330,12 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
   const openEditDialog = (award) => {
     let awardDateObj = null;
 
-    // Safe date parsing
     try {
       if (award.award_date) {
         const [year, month, day] = award.award_date.split('-').map(Number);
-        // Check if valid date parts before creating Date object
         if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
-          awardDateObj = new Date(year, month - 1, day); // month is 0-indexed in JS
-
-          // Verify the date is valid
-          const isValidDate = awardDateObj instanceof Date && !isNaN(awardDateObj);
-          if (!isValidDate) {
+          awardDateObj = new Date(year, month - 1, day);
+          if (!(awardDateObj instanceof Date && !isNaN(awardDateObj))) {
             awardDateObj = null;
           }
         }
@@ -387,83 +400,33 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
   };
 
   const renderPageNumbers = () => {
-    const pageNumbers = [];
-    const pageRangeDisplayed = 5; // Number of pages to display
+    const totalPages = meta.last_page;
+    const pages = [];
+    const maxPagesToShow = 5;
 
-    let startPage = Math.max(1, currentPage - Math.floor(pageRangeDisplayed / 2));
-    let endPage = Math.min(meta.last_page, startPage + pageRangeDisplayed - 1);
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = startPage + maxPagesToShow - 1;
 
-    if (endPage - startPage + 1 < pageRangeDisplayed) {
-      startPage = Math.max(1, endPage - pageRangeDisplayed + 1);
+    if (endPage > totalPages) {
+      endPage = totalPages;
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
     }
 
-    // First page
-    pageNumbers.push(
-      <Button
-        key="first"
-        variant="outline"
-        size="sm"
-        onClick={() => handlePageChange(1)}
-        disabled={currentPage === 1}
-        className="h-8 w-8 p-0"
-      >
-        1
-      </Button>
-    );
-
-    // Ellipsis after first page if needed
-    if (startPage > 2) {
-      pageNumbers.push(<span key="ellipsis1" className="px-2">...</span>);
-    }
-
-    // Page numbers
     for (let i = startPage; i <= endPage; i++) {
-      if (i !== 1 && i !== meta.last_page) {
-        pageNumbers.push(
-          <Button
-            key={i}
-            variant={currentPage === i ? "default" : "outline"}
-            size="sm"
-            onClick={() => handlePageChange(i)}
-            className="h-8 w-8 p-0"
-          >
-            {i}
-          </Button>
-        );
-      }
-    }
-
-    // Ellipsis before last page if needed
-    if (endPage < meta.last_page - 1) {
-      pageNumbers.push(<span key="ellipsis2" className="px-2">...</span>);
-    }
-
-    // Last page
-    if (meta.last_page > 1) {
-      pageNumbers.push(
+      pages.push(
         <Button
-          key="last"
-          variant="outline"
+          key={i}
+          variant={i === currentPage ? "default" : "outline"}
           size="sm"
-          onClick={() => handlePageChange(meta.last_page)}
-          disabled={currentPage === meta.last_page}
-          className="h-8 w-8 p-0"
+          onClick={() => handlePageChange(i)}
+          className="mx-1"
         >
-          {meta.last_page}
+          {i}
         </Button>
       );
     }
 
-    return pageNumbers;
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "-";
-    try {
-      return format(new Date(dateString), "PPP");
-    } catch (error) {
-      return dateString;
-    }
+    return pages;
   };
 
   return (
@@ -486,40 +449,12 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
                 </Button>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                <div className="flex flex-col md:flex-row gap-2">
-                  <Input
-                    placeholder="Search awards..."
-                    value={search}
-                    onChange={(e) => handleSearch(e)}
-                    className="w-full md:w-60"
-                  />
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full md:w-auto justify-start text-left font-normal",
-                          !dateFilter && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dateFilter ? (
-                          format(new Date(dateFilter), "PPP")
-                        ) : (
-                          <span>Filter by date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={dateFilter ? new Date(dateFilter) : undefined}
-                        onSelect={handleDateFilterChange}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
+                <Input
+                  placeholder="Search awards..."
+                  value={search}
+                  onChange={(e) => handleSearch(e)}
+                  className="w-full md:w-80"
+                />
               </div>
             </div>
 
@@ -568,13 +503,21 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
                         onCheckedChange={toggleSelectAll}
                       />
                     </TableHead>
-                    <TableHead className="w-[50px]">ID</TableHead>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Award Title</TableHead>
-                    <TableHead>Gift</TableHead>
-                    <TableHead>Cash Price</TableHead>
-                    <TableHead>Month</TableHead>
-                    <TableHead>Year</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("id")}>
+                      ID {renderSortIcon("id")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("staff.name")}>
+                      Employee {renderSortIcon("staff.name")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("award_name")}>
+                      Award Title {renderSortIcon("award_name")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("award")}>
+                      Award {renderSortIcon("award")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("award_date")}>
+                      Date {renderSortIcon("award_date")}
+                    </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -590,11 +533,9 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
                         </TableCell>
                         <TableCell>{award.id}</TableCell>
                         <TableCell>{award.staff?.name || '-'}</TableCell>
+                        <TableCell>{award.award_name}</TableCell>
                         <TableCell>{award.award}</TableCell>
-                        <TableCell>{award.gift || '-'}</TableCell>
-                        <TableCell>{award.cash_price}</TableCell>
-                        <TableCell>{award.month}</TableCell>
-                        <TableCell>{award.year}</TableCell>
+                        <TableCell>{award.award_date}</TableCell>
                         <TableCell className="text-right">
                           <TableActions
                             actions={[
@@ -616,7 +557,7 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={9} className="h-24 text-center">
+                      <TableCell colSpan={7} className="h-24 text-center">
                         No award records found.
                       </TableCell>
                     </TableRow>
@@ -626,11 +567,45 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
             </div>
 
             {meta.last_page > 1 && (
-              <div className="flex justify-between items-center mt-4">
+              <div className="flex items-center justify-between mt-4">
                 <div className="text-sm text-gray-500">
-                  Showing {meta.from || 0} to {meta.to || 0} of {meta.total} entries
+                  Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, meta.total)} of {meta.total} entries
                 </div>
-                <div className="flex gap-1">{renderPageNumbers()}</div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                  >
+                    First
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  {renderPageNumbers()}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === meta.last_page}
+                  >
+                    Next
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(meta.last_page)}
+                    disabled={currentPage === meta.last_page}
+                  >
+                    Last
+                  </Button>
+                </div>
               </div>
             )}
           </div>

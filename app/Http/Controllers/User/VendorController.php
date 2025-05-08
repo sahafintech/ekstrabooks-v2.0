@@ -36,9 +36,12 @@ class VendorController extends Controller
     {
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
 
         $query = Vendor::select('vendors.*')
-            ->orderBy("vendors.id", "desc");
+            ->orderBy($sortColumn, $sortDirection);
 
         // Apply search if provided
         if (!empty($search)) {

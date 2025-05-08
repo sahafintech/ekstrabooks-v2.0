@@ -29,8 +29,7 @@ class JournalController extends Controller
 
         $query = Journal::query()
             ->where('business_id', request()->activeBusiness->id)
-            ->with('created_user', 'approved_user')
-            ->orderBy('id', 'desc');
+            ->with('created_user', 'approved_user');
 
         if (!empty($search)) {
             $query->where(function ($q) use ($search) {
@@ -38,6 +37,13 @@ class JournalController extends Controller
                     ->orWhere('transaction_amount', 'like', "%$search%");
             });
         }
+
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        $query->orderBy($sortColumn, $sortDirection);
 
         $journals = $query->paginate($perPage);
 
@@ -52,7 +58,8 @@ class JournalController extends Controller
                 'to' => $journals->lastItem()
             ],
             'filters' => [
-                'search' => $search
+                'search' => $search,
+                'sorting' => $sorting
             ]
         ]);
     }

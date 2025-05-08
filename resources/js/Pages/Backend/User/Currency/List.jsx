@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { Edit, EyeIcon, Plus, Settings, Trash, Users } from "lucide-react";
+import { Edit, EyeIcon, Plus, Settings, Trash, Users, ChevronUp, ChevronDown } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -118,6 +118,7 @@ export default function List({ currencies = [], meta = {}, filters = {} }) {
   const [perPage, setPerPage] = useState(meta.per_page || 10);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
+  const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -256,6 +257,33 @@ export default function List({ currencies = [], meta = {}, filters = {} }) {
     );
   };
 
+  const handleSort = (column) => {
+    let direction = "asc";
+    if (sorting.column === column && sorting.direction === "asc") {
+      direction = "desc";
+    }
+    setSorting({ column, direction });
+    router.get(
+      route("currency.index"),
+      { ...filters, sorting: { column, direction } },
+      { preserveState: true }
+    );
+  };
+
+  const renderSortIcon = (column) => {
+    const isActive = sorting.column === column;
+    return (
+      <span className="inline-flex flex-col ml-1">
+        <ChevronUp
+          className={`w-3 h-3 ${isActive && sorting.direction === "asc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+        <ChevronDown
+          className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+      </span>
+    );
+  };
+
   const renderPageNumbers = () => {
     const totalPages = meta.last_page;
     const pages = [];
@@ -358,11 +386,21 @@ export default function List({ currencies = [], meta = {}, filters = {} }) {
                         onCheckedChange={toggleSelectAll}
                       />
                     </TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Exchange Rate</TableHead>
-                    <TableHead>Base Currency</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("name")}>
+                      Name {renderSortIcon("name")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("description")}>
+                      Description {renderSortIcon("description")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("exchange_rate")}>
+                      Exchange Rate {renderSortIcon("exchange_rate")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("base_currency")}>
+                      Base Currency {renderSortIcon("base_currency")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("status")}>
+                      Status {renderSortIcon("status")}
+                    </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>

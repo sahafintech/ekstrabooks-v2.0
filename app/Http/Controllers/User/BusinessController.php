@@ -54,7 +54,6 @@ class BusinessController extends Controller
         $search = $request->get('search', '');
 
         $query = Business::select('business.*')
-            ->orderBy("business.id", "desc")
             ->with('business_type', 'user');
 
         // Apply search if provided
@@ -64,6 +63,19 @@ class BusinessController extends Controller
                     ->orWhere('email', 'like', "%{$search}%")
                     ->orWhere('phone', 'like', "%{$search}%");
             });
+        }
+
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        if ($sortColumn === 'business_type.name') {
+            $query->join('business_types', 'business.business_type_id', '=', 'business_types.id')
+                ->orderBy('business_types.name', $sortDirection)
+                ->select('business.*');
+        } else {
+            $query->orderBy('business.' . $sortColumn, $sortDirection);
         }
 
         $businesses = $query->paginate($per_page)->withQueryString();
@@ -81,6 +93,7 @@ class BusinessController extends Controller
             ],
             'filters' => [
                 'search' => $search,
+                'sorting' => $sorting,
             ],
         ]);
     }

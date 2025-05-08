@@ -28,10 +28,20 @@ class CashPurchaseController extends Controller
 	{
 		$search = $request->get('search', '');
 		$perPage = $request->get('per_page', 10);
+		$sorting = $request->get('sorting', []);
+		$sortColumn = $sorting['column'] ?? 'id';
+		$sortDirection = $sorting['direction'] ?? 'desc';
 
 		$query = Purchase::with('vendor')
-			->where('cash', 1)
-			->orderBy('id', 'desc');
+			->where('cash', 1);
+
+		if ($sortColumn === 'vendor.name') {
+			$query->join('vendors', 'purchases.vendor_id', '=', 'vendors.id')
+				->orderBy('vendors.name', $sortDirection)
+				->select('purchases.*');
+		} else {
+			$query->orderBy($sortColumn, $sortDirection);
+		}
 
 		if ($search) {
 			$query->where(function ($q) use ($search) {
@@ -55,7 +65,8 @@ class CashPurchaseController extends Controller
 			],
 			'filters' => [
 				'search' => $search,
-				'per_page' => $perPage,
+				'columnFilters' => $request->get('columnFilters', []),
+				'sorting' => $sorting,
 			],
 		]);
 	}

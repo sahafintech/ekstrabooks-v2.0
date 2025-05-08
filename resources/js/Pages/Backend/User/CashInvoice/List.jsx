@@ -26,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit } from "lucide-react";
+import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -166,6 +166,7 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
   const [perPage, setPerPage] = useState(filters.per_page || 50);
   const [search, setSearch] = useState(filters.search || "");
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
+  const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -184,14 +185,40 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
     }
   }, [flash, toast]);
 
+  const handleSort = (column) => {
+    let direction = "asc";
+    if (sorting.column === column && sorting.direction === "asc") {
+      direction = "desc";
+    }
+    setSorting({ column, direction });
+    router.get(
+      route("receipts.index"),
+      { ...filters, sorting: { column, direction } },
+      { preserveState: true }
+    );
+  };
+
+  const renderSortIcon = (column) => {
+    const isActive = sorting.column === column;
+    return (
+      <span className="inline-flex flex-col ml-1">
+        <ChevronUp
+          className={`w-3 h-3 ${isActive && sorting.direction === "asc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+        <ChevronDown
+          className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+      </span>
+    );
+  };
+
   const handleSearch = (e) => {
     e.preventDefault();
     const value = e.target.value;
     setSearch(value);
-
     router.get(
       route("receipts.index"),
-      { search: value, page: 1, per_page: perPage },
+      { search: value, page: 1, per_page: perPage, sorting },
       { preserveState: true }
     );
   };
@@ -200,7 +227,7 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
     setCurrentPage(page);
     router.get(
       route("receipts.index"),
-      { search, page, per_page: perPage },
+      { search, page, per_page: perPage, sorting },
       { preserveState: true }
     );
   };
@@ -449,10 +476,10 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
                         aria-label="Select all"
                       />
                     </TableHead>
-                    <TableHead>Invoice Number</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Grand Total</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("receipt_number")}>Invoice # {renderSortIcon("receipt_number")}</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("customer.name")}>Customer {renderSortIcon("customer.name")}</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("receipt_date")}>Date {renderSortIcon("receipt_date")}</TableHead>
+                    <TableHead className="text-right cursor-pointer" onClick={() => handleSort("grand_total")}>Grand Total {renderSortIcon("grand_total")}</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -469,7 +496,7 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
                         </TableCell>
                         <TableCell>{receipt.receipt_number}</TableCell>
                         <TableCell>
-                          {receipt.customer ? receipt.customer.name : "N/A"}
+                          {receipt.customer ? receipt.customer.name : "-"}
                         </TableCell>
                         <TableCell>
                           {receipt.receipt_date}

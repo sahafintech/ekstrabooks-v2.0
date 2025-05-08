@@ -30,7 +30,7 @@ import {
   DialogTrigger
 } from "@/Components/ui/dialog";
 import { Textarea } from "@/Components/ui/textarea";
-import { Plus, Edit, Trash, Search } from "lucide-react";
+import { Plus, Edit, Trash, Search, ChevronUp, ChevronDown } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -102,6 +102,7 @@ export default function List({ departments = [], meta = {}, filters = {} }) {
   const [perPage, setPerPage] = useState(meta.per_page || 10);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
+  const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
 
   // Form state for Create/Edit dialogs
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -249,6 +250,33 @@ export default function List({ departments = [], meta = {}, filters = {} }) {
           setIsProcessing(false);
         }
       }
+    );
+  };
+
+  const handleSort = (column) => {
+    let direction = "asc";
+    if (sorting.column === column && sorting.direction === "asc") {
+      direction = "desc";
+    }
+    setSorting({ column, direction });
+    router.get(
+      route("departments.index"),
+      { ...filters, sorting: { column, direction } },
+      { preserveState: true }
+    );
+  };
+
+  const renderSortIcon = (column) => {
+    const isActive = sorting.column === column;
+    return (
+      <span className="inline-flex flex-col ml-1">
+        <ChevronUp
+          className={`w-3 h-3 ${isActive && sorting.direction === "asc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+        <ChevronDown
+          className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+      </span>
     );
   };
 
@@ -415,9 +443,15 @@ export default function List({ departments = [], meta = {}, filters = {} }) {
                         onCheckedChange={toggleSelectAll}
                       />
                     </TableHead>
-                    <TableHead className="w-[50px]">ID</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Description</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("id")}>
+                      ID {renderSortIcon("id")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("name")}>
+                      Name {renderSortIcon("name")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("descriptions")}>
+                      Description {renderSortIcon("descriptions")}
+                    </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>

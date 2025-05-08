@@ -41,7 +41,7 @@ class AccountController extends Controller
         $per_page = $request->get('per_page', 10);
         $search = $request->get('search', '');
 
-        $query = Account::orderBy("id", "desc");
+        $query = Account::query();
 
         // Apply search if provided
         if (!empty($search)) {
@@ -50,6 +50,13 @@ class AccountController extends Controller
                     ->orWhere('account_code', 'like', "%{$search}%");
             });
         }
+
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        $query->orderBy($sortColumn, $sortDirection);
 
         $accounts = $query->paginate($per_page)->withQueryString();
         return Inertia::render('Backend/User/Account/List', [
@@ -66,6 +73,7 @@ class AccountController extends Controller
             ],
             'filters' => [
                 'search' => $search,
+                'sorting' => $sorting,
             ],
         ]);
     }

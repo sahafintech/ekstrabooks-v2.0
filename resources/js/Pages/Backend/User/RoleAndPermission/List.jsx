@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { Edit, Plus, Shield, Trash } from "lucide-react";
+import { Edit, Plus, Shield, Trash, ChevronUp, ChevronDown } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -92,6 +92,7 @@ export default function List({ roles = [], meta = {}, filters = {} }) {
   const [perPage, setPerPage] = useState(meta.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
+  const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -185,6 +186,33 @@ export default function List({ roles = [], meta = {}, filters = {} }) {
     if (bulkAction === "delete") {
       setShowDeleteAllModal(true);
     }
+  };
+
+  const handleSort = (column) => {
+    let direction = "asc";
+    if (sorting.column === column && sorting.direction === "asc") {
+      direction = "desc";
+    }
+    setSorting({ column, direction });
+    router.get(
+      route("roles.index"),
+      { ...filters, sorting: { column, direction } },
+      { preserveState: true }
+    );
+  };
+
+  const renderSortIcon = (column) => {
+    const isActive = sorting.column === column;
+    return (
+      <span className="inline-flex flex-col ml-1">
+        <ChevronUp
+          className={`w-3 h-3 ${isActive && sorting.direction === "asc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+        <ChevronDown
+          className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+      </span>
+    );
   };
 
   const handleDeleteConfirm = (id) => {
@@ -332,8 +360,15 @@ export default function List({ roles = [], meta = {}, filters = {} }) {
                         onCheckedChange={toggleSelectAll}
                       />
                     </TableHead>
-                    <TableHead>Role Name</TableHead>
-                    <TableHead>Description</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("id")}>
+                      ID {renderSortIcon("id")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("name")}>
+                      Role Name {renderSortIcon("name")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("description")}>
+                      Description {renderSortIcon("description")}
+                    </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -347,6 +382,7 @@ export default function List({ roles = [], meta = {}, filters = {} }) {
                             onCheckedChange={() => toggleSelectRole(role.id)}
                           />
                         </TableCell>
+                        <TableCell>{role.id}</TableCell>
                         <TableCell>{role.name}</TableCell>
                         <TableCell>{role.description || "-"}</TableCell>
                         <TableCell className="text-right">

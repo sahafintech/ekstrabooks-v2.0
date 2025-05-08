@@ -30,6 +30,13 @@ class TransactionMethodController extends Controller {
         if ($request->has('search') && $request->search != '') {
             $query->where('name', 'like', '%' . $request->search . '%');
         }
+
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        $query->orderBy($sortColumn, $sortDirection);
         
         $transaction_methods = $query->paginate($request->get('per_page', 10));
         
@@ -43,7 +50,7 @@ class TransactionMethodController extends Controller {
                 'total' => $transaction_methods->total(),
                 'last_page' => $transaction_methods->lastPage()
             ],
-            'filters' => $request->only('search')
+            'filters' => array_merge($request->only('search'), ['sorting' => $sorting])
         ]);
     }
 

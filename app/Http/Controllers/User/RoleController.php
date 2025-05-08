@@ -28,7 +28,7 @@ class RoleController extends Controller
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
-        $query = Role::orderBy("id", "desc");
+        $query = Role::query();
 
         // Apply search if provided
         if (!empty($search)) {
@@ -37,7 +37,14 @@ class RoleController extends Controller
             });
         }
 
-        // Get vendors with pagination
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        $query->orderBy($sortColumn, $sortDirection);
+
+        // Get roles with pagination
         $roles = $query->paginate($per_page)->withQueryString();
         return Inertia::render('Backend/User/RoleAndPermission/List', [
             'roles' => $roles->items(),
@@ -52,7 +59,8 @@ class RoleController extends Controller
                 'path' => $roles->path(),
             ],
             'filters' => [
-                'search' => $search
+                'search' => $search,
+                'sorting' => $sorting
             ]
         ]);
     }

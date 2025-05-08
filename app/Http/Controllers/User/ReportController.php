@@ -394,6 +394,29 @@ class ReportController extends Controller
 			});
 		}
 
+		// Get sorting parameters
+		$sorting = request('sorting', ['column' => 'customer_name', 'direction' => 'asc']);
+		$column = $sorting['column'] ?? 'customer_name';
+		$direction = $sorting['direction'] ?? 'asc';
+
+		// Sort the data array
+		usort($data_array, function ($a, $b) use ($column, $direction) {
+			$a_value = $a[$column];
+			$b_value = $b[$column];
+
+			// Handle numeric values
+			if (in_array($column, ['total_income', 'total_paid', 'total_due'])) {
+				$a_value = floatval($a_value);
+				$b_value = floatval($b_value);
+			}
+
+			if ($direction === 'asc') {
+				return $a_value <=> $b_value;
+			} else {
+				return $b_value <=> $a_value;
+			}
+		});
+
 		// Calculate grand totals
 		foreach ($data_array as $item) {
 			$grand_total_income += $item['total_income'];
@@ -442,6 +465,7 @@ class ReportController extends Controller
 			],
 			'filters' => [
 				'search' => $search,
+				'sorting' => $sorting,
 			],
 		]);
 	}
@@ -453,7 +477,7 @@ class ReportController extends Controller
 		$date2 = $request->date2 ?? Carbon::now()->format('Y-m-d');
 		$customer_id = $request->customer_id ?? '';
 		$search = $request->search ?? '';
-		$per_page = $request->per_page ?? 10;
+		$per_page = $request->per_page ?? 50;
 
 		// Session storage (keep for backwards compatibility)
 		session(['start_date' => $date1]);
@@ -578,16 +602,17 @@ class ReportController extends Controller
 		$vendor_id = $request->vendor_id ?? '';
 		$search = $request->search ?? '';
 		$per_page = $request->per_page ?? 10;
+		$sorting = $request->input('sorting', ['column' => 'purchase_date', 'direction' => 'desc']);
 
 		// Session storage (keep for backwards compatibility)
 		session(['start_date' => $date1]);
 		session(['end_date' => $date2]);
 		session(['vendor_id' => $vendor_id]);
 
-		return $this->generate_payables_report($date1, $date2, $vendor_id, $search, $per_page);
+		return $this->generate_payables_report($date1, $date2, $vendor_id, $search, $per_page, $sorting);
 	}
 
-	public function generate_payables_report($date1, $date2, $vendor_id, $search, $per_page)
+	private function generate_payables_report($date1, $date2, $vendor_id, $search, $per_page, $sorting)
 	{
 		// Get vendors list for dropdown
 		$vendors = Vendor::select('id', 'name', 'mobile', 'email')
@@ -637,6 +662,19 @@ class ReportController extends Controller
 			$data_array = array_values($data_array);
 		}
 
+		// Apply sorting
+		usort($data_array, function ($a, $b) use ($sorting) {
+			$column = $sorting['column'];
+			$direction = $sorting['direction'];
+			$multiplier = $direction === 'asc' ? 1 : -1;
+
+			if ($column === 'grand_total' || $column === 'paid_amount' || $column === 'due_amount') {
+				return $multiplier * (floatval($a[$column]) <=> floatval($b[$column]));
+			}
+
+			return $multiplier * strcasecmp($a[$column], $b[$column]);
+		});
+
 		// Calculate total receivables
 		$total_grand = 0;
 		$total_paid = 0;
@@ -676,17 +714,15 @@ class ReportController extends Controller
 			'date1' => $date1,
 			'date2' => $date2,
 			'vendor_id' => $vendor_id,
-			'pagination' => [
+			'meta' => [
 				'current_page' => $paginator->currentPage(),
 				'last_page' => $paginator->lastPage(),
-				'from' => $paginator->firstItem(),
-				'path' => $paginator->path(),
 				'per_page' => $paginator->perPage(),
-				'to' => $paginator->lastItem(),
 				'total' => $paginator->total(),
 			],
 			'filters' => [
 				'search' => $search,
+				'sorting' => $sorting,
 			],
 		]);
 	}
@@ -857,6 +893,7 @@ class ReportController extends Controller
 
 			$per_page = $request->get('per_page', 50);
 			$search = $request->get('search', '');
+			$sorting = $request->get('sorting', ['column' => 'trans_date', 'direction' => 'desc']);
 
 			$query = Transaction::with('account')
 				->whereRaw("date(transactions.trans_date) >= '$date1' AND date(transactions.trans_date) <= '$date2'");
@@ -870,6 +907,22 @@ class ReportController extends Controller
 						->orWhere('transaction_amount', 'like', "%{$search}%")
 						->orWhere('base_currency_amount', 'like', "%{$search}%");
 				});
+			}
+
+			// Apply sorting
+			if (!empty($sorting)) {
+				$column = $sorting['column'];
+				$direction = $sorting['direction'];
+
+				// Handle relationship sorting
+				if (str_contains($column, '.')) {
+					[$relation, $field] = explode('.', $column);
+					$query->join('accounts', 'transactions.account_id', '=', 'accounts.id')
+						->orderBy("accounts.{$field}", $direction)
+						->select('transactions.*');
+				} else {
+					$query->orderBy($column, $direction);
+				}
 			}
 
 			$transactions = $query->paginate($per_page);
@@ -898,9 +951,10 @@ class ReportController extends Controller
 				],
 				'filters' => [
 					'search' => $search,
+					'sorting' => $sorting,
 				],
 			]);
-		} else if ($request->isMethod('post')) {
+		} else {
 			@ini_set('max_execution_time', 0);
 			@set_time_limit(0);
 
@@ -912,6 +966,7 @@ class ReportController extends Controller
 
 			$per_page = $request->get('per_page', 50);
 			$search = $request->get('search', '');
+			$sorting = $request->get('sorting', ['column' => 'trans_date', 'direction' => 'desc']);
 
 			$query = Transaction::with('account')
 				->whereRaw("date(transactions.trans_date) >= '$date1' AND date(transactions.trans_date) <= '$date2'");
@@ -919,9 +974,28 @@ class ReportController extends Controller
 			// Apply search if provided
 			if (!empty($search)) {
 				$query->where(function ($q) use ($search) {
-					$q->where('account.account_name', 'like', "%{$search}%")
-						->orWhere('payee_name', 'like', "%{$search}%");
+					$q->whereHas('account', function ($q2) use ($search) {
+						$q2->where('account_name', 'like', "%{$search}%");
+					})
+						->orWhere('transaction_amount', 'like', "%{$search}%")
+						->orWhere('base_currency_amount', 'like', "%{$search}%");
 				});
+			}
+
+			// Apply sorting
+			if (!empty($sorting)) {
+				$column = $sorting['column'];
+				$direction = $sorting['direction'];
+
+				// Handle relationship sorting
+				if (str_contains($column, '.')) {
+					[$relation, $field] = explode('.', $column);
+					$query->join('accounts', 'transactions.account_id', '=', 'accounts.id')
+						->orderBy("accounts.{$field}", $direction)
+						->select('transactions.*');
+				} else {
+					$query->orderBy($column, $direction);
+				}
 			}
 
 			$transactions = $query->paginate($per_page);
@@ -947,6 +1021,7 @@ class ReportController extends Controller
 				],
 				'filters' => [
 					'search' => $search,
+					'sorting' => $sorting,
 				],
 			]);
 		}

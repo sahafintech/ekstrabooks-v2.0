@@ -31,40 +31,81 @@ class LeaveController extends Controller
      */
     public function index(Request $request)
     {
-        $search = $request->input('search');
-        $date = $request->input('date');
-        $perPage = $request->input('per_page', 50);
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
+        $date = $request->get('date', '');
 
         $query = Leave::select('leaves.*')->with('staff');
 
-        // Apply search filter if provided
-        if ($search) {
-            $query->whereHas('staff', function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%");
-            })
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('staff', function ($q2) use ($search) {
+                    $q2->where('name', 'like', "%{$search}%");
+                })
                 ->orWhere('leave_type', 'like', "%{$search}%")
                 ->orWhere('description', 'like', "%{$search}%");
+            });
         }
 
         // Apply date filter if provided
-        if ($date) {
+        if (!empty($date)) {
             $query->where(function ($q) use ($date) {
                 $q->where('start_date', '<=', $date)
                     ->where('end_date', '>=', $date);
             });
         }
 
-        $leaves = $query->orderBy('id', 'DESC')->paginate($perPage);
+        // Handle column filters
+        if ($request->has('columnFilters')) {
+            $columnFilters = $request->get('columnFilters');
+            if (is_string($columnFilters)) {
+                $columnFilters = json_decode($columnFilters, true);
+            }
+            if (is_array($columnFilters)) {
+                foreach ($columnFilters as $column => $value) {
+                    if ($value !== null && $value !== '') {
+                        if ($column === 'staff.name') {
+                            $query->whereHas('staff', function ($q) use ($value) {
+                                $q->where('name', $value);
+                            });
+                        } else if ($column === 'leave_type') {
+                            $query->where('leave_type', $value);
+                        } else if ($column === 'status') {
+                            $query->where('status', $value);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        if ($sortColumn === 'staff.name') {
+            $query->join('employees', 'leaves.employee_id', '=', 'employees.id')
+                ->orderBy('employees.name', $sortDirection)
+                ->select('leaves.*');
+        } else {
+            $query->orderBy('leaves.' . $sortColumn, $sortDirection);
+        }
+
+        // Get leaves with pagination
+        $leaves = $query->paginate($per_page)->withQueryString();
 
         // Get staff for dropdown
         $staff = Employee::select('id', 'name')->get();
 
+        // Return Inertia view
         return Inertia::render('Backend/User/Leave/List', [
             'leaves' => $leaves->items(),
             'meta' => [
                 'current_page' => $leaves->currentPage(),
                 'from' => $leaves->firstItem(),
                 'last_page' => $leaves->lastPage(),
+                'links' => $leaves->linkCollection(),
                 'path' => $leaves->path(),
                 'per_page' => $leaves->perPage(),
                 'to' => $leaves->lastItem(),
@@ -73,7 +114,8 @@ class LeaveController extends Controller
             'filters' => [
                 'search' => $search,
                 'date' => $date,
-                'per_page' => $perPage,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $sorting,
             ],
             'staff' => $staff,
         ]);

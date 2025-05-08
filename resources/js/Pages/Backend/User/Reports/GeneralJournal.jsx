@@ -24,11 +24,23 @@ import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
 import { formatAmount, parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
+import { ChevronUp, ChevronDown } from "lucide-react";
 
-export default function GeneralJournal({ transactions, date1, date2, meta = {}, base_currency, business_name }) {
-    const [search, setSearch] = useState("");
+export default function GeneralJournal({
+    transactions,
+    date1,
+    date2,
+    meta = {},
+    base_currency,
+    business_name,
+    filters = {},
+}) {
+    const [search, setSearch] = useState(filters.search || "");
     const [perPage, setPerPage] = useState(50);
     const [currentPage, setCurrentPage] = useState(1);
+    const [sorting, setSorting] = useState(
+        filters.sorting || { column: "trans_date", direction: "desc" }
+    );
 
     const { data, setData, post, processing } = useForm({
         date1: parseDateObject(date1),
@@ -46,7 +58,7 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
 
         router.get(
             route("reports.journal"),
-            { search: value, page: 1, per_page: perPage },
+            { search: value, page: 1, per_page: perPage, sorting },
             { preserveState: true }
         );
     };
@@ -59,6 +71,7 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
             search: search,
             per_page: perPage,
             page: 1,
+            sorting,
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => {
@@ -72,7 +85,7 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
         setPerPage(value);
         router.get(
             route("reports.journal"),
-            { search, page: 1, per_page: value },
+            { search, page: 1, per_page: value, sorting },
             { preserveState: true }
         );
     };
@@ -81,29 +94,67 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
         setCurrentPage(page);
         router.get(
             route("reports.journal"),
-            { search, page, per_page: perPage },
+            { search, page, per_page: perPage, sorting },
             { preserveState: true }
         );
     };
 
-    const getRefType = (ref_type) => {
-        if (ref_type == 'receipt') {
-            return 'cash invoice'
-        } else if (ref_type == 's return') {
-            return 'sales return'
-        } else if (ref_type == 's refund') {
-            return 'sales return refund'
-        } else {
-            return ref_type
+    const handleSort = (column) => {
+        let direction = "asc";
+        if (sorting.column === column && sorting.direction === "asc") {
+            direction = "desc";
         }
-    }
+        setSorting({ column, direction });
+        router.get(
+            route("reports.journal"),
+            { ...filters, sorting: { column, direction } },
+            { preserveState: true }
+        );
+    };
+
+    const renderSortIcon = (column) => {
+        const isActive = sorting.column === column;
+        return (
+            <span className="inline-flex flex-col ml-1">
+                <ChevronUp
+                    className={`w-3 h-3 ${
+                        isActive && sorting.direction === "asc"
+                            ? "text-gray-800"
+                            : "text-gray-300"
+                    }`}
+                />
+                <ChevronDown
+                    className={`w-3 h-3 -mt-1 ${
+                        isActive && sorting.direction === "desc"
+                            ? "text-gray-800"
+                            : "text-gray-300"
+                    }`}
+                />
+            </span>
+        );
+    };
+
+    const getRefType = (ref_type) => {
+        if (ref_type == "receipt") {
+            return "cash invoice";
+        } else if (ref_type == "s return") {
+            return "sales return";
+        } else if (ref_type == "s refund") {
+            return "sales return refund";
+        } else {
+            return ref_type;
+        }
+    };
 
     const renderPageNumbers = () => {
         const totalPages = meta.last_page;
         const pages = [];
         const maxPagesToShow = 5;
 
-        let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+        let startPage = Math.max(
+            1,
+            currentPage - Math.floor(maxPagesToShow / 2)
+        );
         let endPage = startPage + maxPagesToShow - 1;
 
         if (endPage > totalPages) {
@@ -130,7 +181,7 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
 
     const handlePrint = () => {
         // Create a new window for printing
-        const printWindow = window.open('', '_blank', 'width=800,height=600');
+        const printWindow = window.open("", "_blank", "width=800,height=600");
 
         // Generate CSS for the print window
         const style = `
@@ -178,21 +229,41 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
 
         // Add table rows from transactions data
         if (transactions.length > 0) {
-            transactions.forEach(transaction => {
+            transactions.forEach((transaction) => {
                 printContent += `
                     <tr>
-                        <td>${transaction.trans_date || 'N/A'}</td>
-                        <td>${transaction.account.account_name || 'N/A'}</td>
-                        <td>${transaction.description || 'N/A'}</td>
-                        <td>${transaction.ref_type === 'receipt' ? 'cash invoice' : transaction.ref_type || 'N/A'}</td>
-                        <td>${transaction.payee_name || 'N/A'}</td>
-                        <td>${transaction.transaction_currency || 'N/A'}</td>
-                        <td>${transaction.dr_cr === 'dr' ? transaction.transaction_amount : 0}</td>
-                        <td>${transaction.dr_cr === 'cr' ? transaction.transaction_amount : 0}</td>
-                        <td>${transaction.currency_rate || 'N/A'}</td>
+                        <td>${transaction.trans_date || "N/A"}</td>
+                        <td>${transaction.account.account_name || "N/A"}</td>
+                        <td>${transaction.description || "N/A"}</td>
+                        <td>${
+                            transaction.ref_type === "receipt"
+                                ? "cash invoice"
+                                : transaction.ref_type || "N/A"
+                        }</td>
+                        <td>${transaction.payee_name || "N/A"}</td>
+                        <td>${transaction.transaction_currency || "N/A"}</td>
+                        <td>${
+                            transaction.dr_cr === "dr"
+                                ? transaction.transaction_amount
+                                : 0
+                        }</td>
+                        <td>${
+                            transaction.dr_cr === "cr"
+                                ? transaction.transaction_amount
+                                : 0
+                        }</td>
+                        <td>${transaction.currency_rate || "N/A"}</td>
                         <td>${base_currency}</td>
-                        <td>${transaction.dr_cr === 'dr' ? transaction.base_currency_amount : 0}</td>
-                        <td>${transaction.dr_cr === 'cr' ? transaction.base_currency_amount : 0}</td>
+                        <td>${
+                            transaction.dr_cr === "dr"
+                                ? transaction.base_currency_amount
+                                : 0
+                        }</td>
+                        <td>${
+                            transaction.dr_cr === "cr"
+                                ? transaction.base_currency_amount
+                                : 0
+                        }</td>
                     </tr>
                 `;
             });
@@ -241,23 +312,37 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
                     <div className="p-4">
                         <div className="flex flex-col justify-between items-start mb-6 gap-4">
                             <div className="flex flex-col md:flex-row gap-4">
-                                <form onSubmit={handleGenerate} className="flex gap-2">
+                                <form
+                                    onSubmit={handleGenerate}
+                                    className="flex gap-2"
+                                >
                                     <div className="flex items-center gap-2">
                                         <DateTimePicker
                                             value={data.date1}
-                                            onChange={(date) => setData("date1", date)}
+                                            onChange={(date) =>
+                                                setData("date1", date)
+                                            }
                                             className="md:w-1/2 w-full"
                                             required
                                         />
 
                                         <DateTimePicker
                                             value={data.date2}
-                                            onChange={(date) => setData("date2", date)}
+                                            onChange={(date) =>
+                                                setData("date2", date)
+                                            }
                                             className="md:w-1/2 w-full"
                                             required
                                         />
 
-                                        <Button type="submit" disabled={processing}>{processing ? 'Generating...' : 'Generate'}</Button>
+                                        <Button
+                                            type="submit"
+                                            disabled={processing}
+                                        >
+                                            {processing
+                                                ? "Generating..."
+                                                : "Generate"}
+                                        </Button>
                                     </div>
                                 </form>
                             </div>
@@ -276,11 +361,21 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
                                 <Button variant="outline" onClick={handlePrint}>
                                     Print
                                 </Button>
-                                <Button variant="outline" onClick={handleExport}>Export</Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={handleExport}
+                                >
+                                    Export
+                                </Button>
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className="text-sm text-gray-500">Show</span>
-                                <Select value={perPage.toString()} onValueChange={handlePerPageChange}>
+                                <span className="text-sm text-gray-500">
+                                    Show
+                                </span>
+                                <Select
+                                    value={perPage.toString()}
+                                    onValueChange={handlePerPageChange}
+                                >
                                     <SelectTrigger className="w-[80px]">
                                         <SelectValue placeholder="10" />
                                     </SelectTrigger>
@@ -291,7 +386,9 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
                                         <SelectItem value="100">100</SelectItem>
                                     </SelectContent>
                                 </Select>
-                                <span className="text-sm text-gray-500">entries</span>
+                                <span className="text-sm text-gray-500">
+                                    entries
+                                </span>
                             </div>
                         </div>
 
@@ -299,45 +396,196 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
                             <ReportTable>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead className="!text-[10px]">Date</TableHead>
-                                        <TableHead className="!text-[10px]">Account</TableHead>
-                                        <TableHead className="!text-[10px]">Description</TableHead>
-                                        <TableHead className="!text-[10px]">Type</TableHead>
-                                        <TableHead className="!text-[10px]">Name</TableHead>
-                                        <TableHead className="!text-[10px]">Transaction Currency</TableHead>
-                                        <TableHead className="!text-[10px]">Transaction Amount[Debit]</TableHead>
-                                        <TableHead className="!text-[10px]">Transaction Amount[Credit]</TableHead>
-                                        <TableHead className="!text-[10px]">Currency Rate</TableHead>
-                                        <TableHead className="!text-[10px]">Rate</TableHead>
-                                        <TableHead className="!text-[10px]">Base Currency</TableHead>
-                                        <TableHead className="!text-[10px]">Base Amount[Debit]</TableHead>
-                                        <TableHead className="!text-[10px]">Base Amount[Credit]</TableHead>
+                                        <TableHead
+                                            className="!text-[10px] cursor-pointer"
+                                            onClick={() =>
+                                                handleSort("trans_date")
+                                            }
+                                        >
+                                            Date {renderSortIcon("trans_date")}
+                                        </TableHead>
+                                        <TableHead
+                                            className="!text-[10px] cursor-pointer"
+                                            onClick={() =>
+                                                handleSort(
+                                                    "account.account_name"
+                                                )
+                                            }
+                                        >
+                                            Account{" "}
+                                            {renderSortIcon(
+                                                "account.account_name"
+                                            )}
+                                        </TableHead>
+                                        <TableHead
+                                            className="!text-[10px] cursor-pointer"
+                                            onClick={() =>
+                                                handleSort("description")
+                                            }
+                                        >
+                                            Description{" "}
+                                            {renderSortIcon("description")}
+                                        </TableHead>
+                                        <TableHead
+                                            className="!text-[10px] cursor-pointer"
+                                            onClick={() =>
+                                                handleSort("ref_type")
+                                            }
+                                        >
+                                            Type {renderSortIcon("ref_type")}
+                                        </TableHead>
+                                        <TableHead
+                                            className="!text-[10px]">
+                                            Name
+                                        </TableHead>
+                                        <TableHead
+                                            className="!text-[10px] cursor-pointer"
+                                            onClick={() =>
+                                                handleSort(
+                                                    "transaction_currency"
+                                                )
+                                            }
+                                        >
+                                            Transaction Currency{" "}
+                                            {renderSortIcon(
+                                                "transaction_currency"
+                                            )}
+                                        </TableHead>
+                                        <TableHead
+                                            className="!text-[10px] cursor-pointer"
+                                            onClick={() =>
+                                                handleSort("transaction_amount")
+                                            }
+                                        >
+                                            Transaction Amount[Debit]{" "}
+                                            {renderSortIcon(
+                                                "transaction_amount"
+                                            )}
+                                        </TableHead>
+                                        <TableHead
+                                            className="!text-[10px] cursor-pointer"
+                                            onClick={() =>
+                                                handleSort("transaction_amount")
+                                            }
+                                        >
+                                            Transaction Amount[Credit]{" "}
+                                            {renderSortIcon(
+                                                "transaction_amount"
+                                            )}
+                                        </TableHead>
+                                        <TableHead
+                                            className="!text-[10px] cursor-pointer"
+                                            onClick={() =>
+                                                handleSort("currency_rate")
+                                            }
+                                        >
+                                            Rate{" "}
+                                            {renderSortIcon("currency_rate")}
+                                        </TableHead>
+                                        <TableHead className="!text-[10px]">
+                                            Base Currency
+                                        </TableHead>
+                                        <TableHead
+                                            className="!text-[10px] cursor-pointer"
+                                            onClick={() =>
+                                                handleSort(
+                                                    "base_currency_amount"
+                                                )
+                                            }
+                                        >
+                                            Base Amount[Debit]{" "}
+                                            {renderSortIcon(
+                                                "base_currency_amount"
+                                            )}
+                                        </TableHead>
+                                        <TableHead
+                                            className="!text-[10px] cursor-pointer"
+                                            onClick={() =>
+                                                handleSort(
+                                                    "base_currency_amount"
+                                                )
+                                            }
+                                        >
+                                            Base Amount[Credit]{" "}
+                                            {renderSortIcon(
+                                                "base_currency_amount"
+                                            )}
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {transactions.length > 0 ? (
                                         transactions.map((transaction) => (
                                             <TableRow key={transaction.id}>
-                                                <TableCell className="!text-[10px]">{transaction.trans_date || 'N/A'}</TableCell>
-                                                <TableCell className="!text-[10px]">{transaction.account.account_name || 'N/A'}</TableCell>
-                                                <TableCell className="!text-[10px]">{transaction.description || 'N/A'}</TableCell>
                                                 <TableCell className="!text-[10px]">
-                                                    {getRefType(transaction.ref_type) || 'N/A'}
+                                                    {transaction.trans_date ||
+                                                        "N/A"}
                                                 </TableCell>
-                                                <TableCell className="!text-[10px]">{transaction.payee_name || 'N/A'}</TableCell>
-                                                <TableCell className="text-right !text-[10px]">{formatAmount(transaction.transaction_amount) || 'N/A'}</TableCell>
-                                                <TableCell className="text-right !text-[10px]">{transaction.dr_cr === 'dr' ? formatAmount(transaction.transaction_amount) : 0}</TableCell>
-                                                <TableCell className="text-right !text-[10px]">{transaction.dr_cr === 'cr' ? formatAmount(transaction.transaction_amount) : 0}</TableCell>
-                                                <TableCell className="!text-[10px]">{transaction.transaction_currency || 'N/A'}</TableCell>
-                                                <TableCell className="text-right !text-[10px]">{formatAmount(transaction.currency_rate) || 'N/A'}</TableCell>
-                                                <TableCell className="!text-[10px]">{base_currency}</TableCell>
-                                                <TableCell className="text-right !text-[10px]">{transaction.dr_cr === 'dr' ? formatAmount(transaction.base_currency_amount) : 0}</TableCell>
-                                                <TableCell className="text-right !text-[10px]">{transaction.dr_cr === 'cr' ? formatAmount(transaction.base_currency_amount) : 0}</TableCell>
+                                                <TableCell className="!text-[10px]">
+                                                    {transaction.account
+                                                        .account_name || "N/A"}
+                                                </TableCell>
+                                                <TableCell className="!text-[10px]">
+                                                    {transaction.description ||
+                                                        "N/A"}
+                                                </TableCell>
+                                                <TableCell className="!text-[10px]">
+                                                    {getRefType(
+                                                        transaction.ref_type
+                                                    ) || "N/A"}
+                                                </TableCell>
+                                                <TableCell className="!text-[10px]">
+                                                    {transaction.payee_name ||
+                                                        "N/A"}
+                                                </TableCell>
+                                                <TableCell className="text-right !text-[10px]">
+                                                    {transaction.transaction_currency ||
+                                                        "N/A"}
+                                                </TableCell>
+                                                <TableCell className="text-right !text-[10px]">
+                                                    {transaction.dr_cr === "dr"
+                                                        ? formatAmount(
+                                                              transaction.transaction_amount
+                                                          )
+                                                        : 0}
+                                                </TableCell>
+                                                <TableCell className="text-right !text-[10px]">
+                                                    {transaction.dr_cr === "cr"
+                                                        ? formatAmount(
+                                                              transaction.transaction_amount
+                                                          )
+                                                        : 0}
+                                                </TableCell>
+                                                <TableCell className="text-right !text-[10px]">
+                                                    {formatAmount(
+                                                        transaction.currency_rate
+                                                    ) || "N/A"}
+                                                </TableCell>
+                                                <TableCell className="!text-[10px]">
+                                                    {base_currency}
+                                                </TableCell>
+                                                <TableCell className="text-right !text-[10px]">
+                                                    {transaction.dr_cr === "dr"
+                                                        ? formatAmount(
+                                                              transaction.base_currency_amount
+                                                          )
+                                                        : 0}
+                                                </TableCell>
+                                                <TableCell className="text-right !text-[10px]">
+                                                    {transaction.dr_cr === "cr"
+                                                        ? formatAmount(
+                                                              transaction.base_currency_amount
+                                                          )
+                                                        : 0}
+                                                </TableCell>
                                             </TableRow>
                                         ))
                                     ) : (
                                         <TableRow>
-                                            <TableCell colSpan={13} className="h-24 text-center">
+                                            <TableCell
+                                                colSpan={13}
+                                                className="h-24 text-center"
+                                            >
                                                 No transactions found.
                                             </TableCell>
                                         </TableRow>
@@ -349,7 +597,12 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
                         {transactions.length > 0 && meta.total > 0 && (
                             <div className="flex items-center justify-between mt-4">
                                 <div className="text-sm text-gray-500">
-                                    Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, meta.total)} of {meta.total} entries
+                                    Showing {(currentPage - 1) * perPage + 1} to{" "}
+                                    {Math.min(
+                                        currentPage * perPage,
+                                        meta.total
+                                    )}{" "}
+                                    of {meta.total} entries
                                 </div>
                                 <div className="flex items-center space-x-2">
                                     <Button
@@ -363,7 +616,9 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => handlePageChange(currentPage - 1)}
+                                        onClick={() =>
+                                            handlePageChange(currentPage - 1)
+                                        }
                                         disabled={currentPage === 1}
                                     >
                                         Previous
@@ -372,16 +627,24 @@ export default function GeneralJournal({ transactions, date1, date2, meta = {}, 
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => handlePageChange(currentPage + 1)}
-                                        disabled={currentPage === meta.last_page}
+                                        onClick={() =>
+                                            handlePageChange(currentPage + 1)
+                                        }
+                                        disabled={
+                                            currentPage === meta.last_page
+                                        }
                                     >
                                         Next
                                     </Button>
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => handlePageChange(meta.last_page)}
-                                        disabled={currentPage === meta.last_page}
+                                        onClick={() =>
+                                            handlePageChange(meta.last_page)
+                                        }
+                                        disabled={
+                                            currentPage === meta.last_page
+                                        }
                                     >
                                         Last
                                     </Button>

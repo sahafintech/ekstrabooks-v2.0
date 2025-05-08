@@ -40,9 +40,19 @@ class PurchaseOrderController extends Controller
 	{
 		$search = $request->get('search', '');
 		$perPage = $request->get('per_page', 50);
+		$sortColumn = $request->get('sorting.column', 'id');
+		$sortDirection = $request->get('sorting.direction', 'desc');
 
-		$query = PurchaseOrder::with('vendor')
-			->orderBy('id', 'desc');
+		$query = PurchaseOrder::with('vendor');
+
+		// Handle sorting
+		if ($sortColumn === 'vendor.name') {
+			$query->join('vendors', 'purchase_orders.vendor_id', '=', 'vendors.id')
+				->orderBy('vendors.name', $sortDirection)
+				->select('purchase_orders.*');
+		} else {
+			$query->orderBy($sortColumn, $sortDirection);
+		}
 
 		if ($search) {
 			$query->where(function ($q) use ($search) {
@@ -67,6 +77,7 @@ class PurchaseOrderController extends Controller
 			'filters' => [
 				'search' => $search,
 				'per_page' => $perPage,
+				'sorting' => $request->get('sorting', []),
 			],
 		]);
 	}

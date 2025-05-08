@@ -19,17 +19,19 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/Components/ui/select";
-import { Input } from "@/Components/ui/input";
 import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
 import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import DateTimePicker from "@/Components/DateTimePicker";
+import { ChevronUp, ChevronDown } from "lucide-react";
+import { Input } from '@/Components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/Components/ui/card';
+import { format } from 'date-fns';
 
-export default function Payables({ report_data, date1, date2, meta = {}, filters = {}, business_name, currency, grand_total, paid_amount, due_amount, vendors = [], vendor_id = '' }) {
-    const [search, setSearch] = useState(filters.search || "");
-    const [perPage, setPerPage] = useState(10);
-    const [currentPage, setCurrentPage] = useState(1);
+export default function Payables({ auth, report_data, vendors, currency, grand_total, paid_amount, due_amount, business_name, date1, date2, vendor_id, meta, filters }) {
+    const [search, setSearch] = useState(filters.search || '');
+    const [sorting, setSorting] = useState(filters.sorting || { column: 'purchase_date', direction: 'desc' });
 
     const { data, setData, post, processing } = useForm({
         date1: parseDateObject(date1),
@@ -37,62 +39,65 @@ export default function Payables({ report_data, date1, date2, meta = {}, filters
         vendor_id: vendor_id,
     });
 
-
-    const handleGenerate = (e) => {
-        e.preventDefault();
-        post(route("reports.payables"), {
+    const handleGenerate = () => {
+        post(route('reports.payables'), {
             date1: data.date1,
             date2: data.date2,
             vendor_id: data.vendor_id,
-            search: search,
-            per_page: perPage,
-            page: 1,
-            preserveScroll: true,
-            preserveState: true,
-            onSuccess: () => {
-                toast.success("Report Generated successfully");
-                setCurrentPage(1);
-            },
+            search,
+            sorting,
+            per_page: meta.per_page,
         });
     };
 
     const handlePerPageChange = (value) => {
-        setPerPage(value);
-        router.get(
-            route("reports.payables"),
-            { search, page: 1, per_page: value },
-            { preserveState: true }
-        );
+        router.post(route('reports.payables'), {
+            date1: data.date1,
+            date2: data.date2,
+            vendor_id: data.vendor_id,
+            search,
+            sorting,
+            per_page: value,
+        });
     };
 
     const handlePageChange = (page) => {
-        setCurrentPage(page);
-        router.get(
-            route("reports.payables"),
-            { search, page, per_page: perPage },
-            { preserveState: true }
-        );
+        router.post(route('reports.payables'), {
+            date1: data.date1,
+            date2: data.date2,
+            vendor_id: data.vendor_id,
+            search,
+            sorting,
+            per_page: meta.per_page,
+            page,
+        });
+    };
+
+    const handleSort = (column) => {
+        const newDirection = sorting.column === column && sorting.direction === 'asc' ? 'desc' : 'asc';
+        setSorting({ column, direction: newDirection });
+        router.post(route('reports.payables'), {
+            date1: data.date1,
+            date2: data.date2,
+            vendor_id: data.vendor_id,
+            search,
+            sorting: { column, direction: newDirection },
+            per_page: meta.per_page,
+        });
+    };
+
+    const renderSortIcon = (column) => {
+        if (sorting.column !== column) return null;
+        return sorting.direction === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
     };
 
     const renderPageNumbers = () => {
-        const totalPages = meta.last_page;
         const pages = [];
-        const maxPagesToShow = 5;
-
-        let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
-        let endPage = startPage + maxPagesToShow - 1;
-
-        if (endPage > totalPages) {
-            endPage = totalPages;
-            startPage = Math.max(1, endPage - maxPagesToShow + 1);
-        }
-
-        for (let i = startPage; i <= endPage; i++) {
+        for (let i = 1; i <= meta.last_page; i++) {
             pages.push(
                 <Button
                     key={i}
-                    variant={i === currentPage ? "default" : "outline"}
-                    size="sm"
+                    variant={meta.current_page === i ? 'default' : 'outline'}
                     onClick={() => handlePageChange(i)}
                     className="mx-1"
                 >
@@ -100,119 +105,110 @@ export default function Payables({ report_data, date1, date2, meta = {}, filters
                 </Button>
             );
         }
-
         return pages;
     };
 
     const ItemStatusBadge = ({ status }) => {
-        const statusMap = {
-            0: { label: "Unpaid", className: "text-red-500" },
-            2: { label: "Paid", className: "text-green-500" },
-            1: { label: "Partial Paid", className: "text-blue-500" },
+        const getStatusColor = (status) => {
+            switch (status) {
+                case 'Unpaid':
+                    return 'bg-red-100 text-red-800';
+                case 'Paid':
+                    return 'bg-green-100 text-green-800';
+                case 'Partial Paid':
+                    return 'bg-yellow-100 text-yellow-800';
+                default:
+                    return 'bg-gray-100 text-gray-800';
+            }
         };
 
         return (
-            <span className={statusMap[status].className}>
-                {statusMap[status].label}
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(status)}`}>
+                {status}
             </span>
         );
     };
 
     const handlePrint = () => {
-        // Create a new window for printing
-        const printWindow = window.open('', '_blank', 'width=800,height=600');
-
-        // Generate CSS for the print window
-        const style = `
-            <style>
-                body { font-family: Arial, sans-serif; }
-                table { width: 100%; border-collapse: collapse; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f2f2f2; }
-                h2, h1 { text-align: center; margin-bottom: 20px; }
-                .text-right { text-align: right; }
-                .total-row { font-weight: bold; background-color: #f9f9f9; }
-            </style>
-        `;
-
-        // Start building the HTML content for the print window
-        let printContent = `
-            <!DOCTYPE html>
+        const printWindow = window.open('', '_blank');
+        const content = `
             <html>
-            <head>
-                <title>Payables</title>
-                ${style}
-            </head>
-            <body>
-                <h1>${business_name}</h1>
-                <h2>Payables (${data.date1} - ${data.date2})</h2>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Supplier</th>
-                            <th class="text-right">Purchase Amount (${currency})</th>
-                            <th class="text-right">Paid Amount (${currency})</th>
-                            <th class="text-right">Due Amount (${currency})</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
-
-        // Add table rows from report_data
-        if (report_data.length > 0) {
-            report_data.forEach(item => {
-                printContent += `
-                    <tr>
-                        <td>${item.vendor_name || 'N/A'}</td>
-                        <td class="text-right">${formatCurrency(item.grand_total)}</td>
-                        <td class="text-right">${formatCurrency(item.paid_amount)}</td>
-                        <td class="text-right">${formatCurrency(item.due_amount)}</td>
-                    </tr>
-                `;
-            });
-
-            // Add totals row
-            printContent += `
-                <tr class="total-row">
-                    <td>Total</td>
-                    <td class="text-right">${formatCurrency(grand_total)}</td>
-                    <td class="text-right">${formatCurrency(paid_amount)}</td>
-                    <td class="text-right">${formatCurrency(due_amount)}</td>
-                </tr>
-            `;
-        } else {
-            printContent += `
-                <tr>
-                    <td colspan="4" style="text-align: center;">No data found.</td>
-                </tr>
-            `;
-        }
-
-        // Complete the HTML content
-        printContent += `
-                    </tbody>
-                </table>
-            </body>
+                <head>
+                    <title>Payables Report</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th { background-color: #f5f5f5; }
+                        .header { text-align: center; margin-bottom: 20px; }
+                        .totals { margin-top: 20px; }
+                        .status-badge {
+                            padding: 4px 8px;
+                            border-radius: 12px;
+                            font-size: 12px;
+                            font-weight: 500;
+                        }
+                        .status-unpaid { background-color: #fee2e2; color: #991b1b; }
+                        .status-paid { background-color: #dcfce7; color: #166534; }
+                        .status-partial { background-color: #fef9c3; color: #854d0e; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>${business_name}</h1>
+                        <h2>Payables Report</h2>
+                        <p>Period: ${format(new Date(date1), 'dd/MM/yyyy')} - ${format(new Date(date2), 'dd/MM/yyyy')}</p>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Purchase #</th>
+                                <th>Vendor</th>
+                                <th>Date</th>
+                                <th>Due Date</th>
+                                <th>Total</th>
+                                <th>Paid</th>
+                                <th>Due</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${report_data.map(item => `
+                                <tr>
+                                    <td>${item.purchase_number}</td>
+                                    <td>${item.vendor_name}</td>
+                                    <td>${format(new Date(item.purchase_date), 'dd/MM/yyyy')}</td>
+                                    <td>${format(new Date(item.due_date), 'dd/MM/yyyy')}</td>
+                                    <td>${currency} ${item.grand_total.toFixed(2)}</td>
+                                    <td>${currency} ${item.paid_amount.toFixed(2)}</td>
+                                    <td>${currency} ${item.due_amount.toFixed(2)}</td>
+                                    <td>
+                                        <span class="status-badge status-${item.status.toLowerCase().replace(' ', '-')}">
+                                            ${item.status}
+                                        </span>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    <div class="totals">
+                        <p><strong>Grand Total:</strong> ${currency} ${grand_total.toFixed(2)}</p>
+                        <p><strong>Total Paid:</strong> ${currency} ${paid_amount.toFixed(2)}</p>
+                        <p><strong>Total Due:</strong> ${currency} ${due_amount.toFixed(2)}</p>
+                    </div>
+                </body>
             </html>
         `;
-
-        // Write the content to the print window and trigger print
-        printWindow.document.open();
-        printWindow.document.write(printContent);
+        printWindow.document.write(content);
         printWindow.document.close();
-
-        // Wait for content to load before printing
-        setTimeout(() => {
-            printWindow.print();
-            // Close the window after printing
-            printWindow.onafterprint = function () {
-                printWindow.close();
-            };
-        }, 300);
+        printWindow.print();
     };
 
     return (
-        <AuthenticatedLayout>
+        <AuthenticatedLayout
+            user={auth.user}
+            header={<h2 className="font-semibold text-xl text-gray-800 leading-tight">Payables Report</h2>}
+        >
             <Head title="Payables Report" />
             <Toaster />
             <SidebarInset>
@@ -274,7 +270,7 @@ export default function Payables({ report_data, date1, date2, meta = {}, filters
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-sm text-gray-500">Show</span>
-                                <Select value={perPage.toString()} onValueChange={handlePerPageChange}>
+                                <Select value={meta.per_page.toString()} onValueChange={handlePerPageChange}>
                                     <SelectTrigger className="w-[80px]">
                                         <SelectValue placeholder="10" />
                                     </SelectTrigger>
@@ -293,14 +289,30 @@ export default function Payables({ report_data, date1, date2, meta = {}, filters
                             <ReportTable>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Purchase Date</TableHead>
-                                        <TableHead>Vendor</TableHead>
-                                        <TableHead>Purchase Number</TableHead>
-                                        <TableHead className="text-right">Purchase Amount ({currency})</TableHead>
-                                        <TableHead className="text-right">Paid Amount ({currency})</TableHead>
-                                        <TableHead className="text-right">Due Amount ({currency})</TableHead>
-                                        <TableHead>Due Date</TableHead>
-                                        <TableHead>Status</TableHead>
+                                        <TableHead onClick={() => handleSort("purchase_date")} className="cursor-pointer">
+                                            Purchase Date {renderSortIcon("purchase_date")}
+                                        </TableHead>
+                                        <TableHead onClick={() => handleSort("vendor_name")} className="cursor-pointer">
+                                            Vendor {renderSortIcon("vendor_name")}
+                                        </TableHead>
+                                        <TableHead onClick={() => handleSort("purchase_number")} className="cursor-pointer">
+                                            Purchase Number {renderSortIcon("purchase_number")}
+                                        </TableHead>
+                                        <TableHead onClick={() => handleSort("grand_total")} className="cursor-pointer text-right">
+                                            Purchase Amount ({currency}) {renderSortIcon("grand_total")}
+                                        </TableHead>
+                                        <TableHead onClick={() => handleSort("paid_amount")} className="cursor-pointer text-right">
+                                            Paid Amount ({currency}) {renderSortIcon("paid_amount")}
+                                        </TableHead>
+                                        <TableHead onClick={() => handleSort("due_amount")} className="cursor-pointer text-right">
+                                            Due Amount ({currency}) {renderSortIcon("due_amount")}
+                                        </TableHead>
+                                        <TableHead onClick={() => handleSort("due_date")} className="cursor-pointer">
+                                            Due Date {renderSortIcon("due_date")}
+                                        </TableHead>
+                                        <TableHead onClick={() => handleSort("status")} className="cursor-pointer">
+                                            Status {renderSortIcon("status")}
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -343,22 +355,22 @@ export default function Payables({ report_data, date1, date2, meta = {}, filters
                         {report_data.length > 0 && meta.total > 0 && (
                             <div className="flex items-center justify-between mt-4">
                                 <div className="text-sm text-gray-500">
-                                    Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, meta.total)} of {meta.total} entries
+                                    Showing {(meta.current_page - 1) * meta.per_page + 1} to {Math.min(meta.current_page * meta.per_page, meta.total)} of {meta.total} entries
                                 </div>
                                 <div className="flex items-center space-x-2">
                                     <Button
                                         variant="outline"
                                         size="sm"
                                         onClick={() => handlePageChange(1)}
-                                        disabled={currentPage === 1}
+                                        disabled={meta.current_page === 1}
                                     >
                                         First
                                     </Button>
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => handlePageChange(currentPage - 1)}
-                                        disabled={currentPage === 1}
+                                        onClick={() => handlePageChange(meta.current_page - 1)}
+                                        disabled={meta.current_page === 1}
                                     >
                                         Previous
                                     </Button>
@@ -366,8 +378,8 @@ export default function Payables({ report_data, date1, date2, meta = {}, filters
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => handlePageChange(currentPage + 1)}
-                                        disabled={currentPage === meta.last_page}
+                                        onClick={() => handlePageChange(meta.current_page + 1)}
+                                        disabled={meta.current_page === meta.last_page}
                                     >
                                         Next
                                     </Button>
@@ -375,7 +387,7 @@ export default function Payables({ report_data, date1, date2, meta = {}, filters
                                         variant="outline"
                                         size="sm"
                                         onClick={() => handlePageChange(meta.last_page)}
-                                        disabled={currentPage === meta.last_page}
+                                        disabled={meta.current_page === meta.last_page}
                                     >
                                         Last
                                     </Button>

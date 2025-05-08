@@ -52,17 +52,35 @@ class StaffController extends Controller
     {
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
+        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
 
         $query = Employee::with('department', 'designation')
-            ->where('business_id', $request->activeBusiness->id);
+            ->where('employees.business_id', $request->activeBusiness->id);
 
         if ($search) {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%$search%")
-                    ->orWhere('employee_id', 'like', "%$search%")
-                    ->orWhere('email', 'like', "%$search%")
-                    ->orWhere('phone', 'like', "%$search%");
+                $q->where('employees.name', 'like', "%$search%")
+                    ->orWhere('employees.employee_id', 'like', "%$search%")
+                    ->orWhere('employees.email', 'like', "%$search%")
+                    ->orWhere('employees.phone', 'like', "%$search%");
             });
+        }
+
+        // Handle sorting
+        if (isset($sorting['column']) && isset($sorting['direction'])) {
+            $column = $sorting['column'];
+            $direction = $sorting['direction'];
+
+            // Handle relationship sorting
+            if (str_contains($column, '.')) {
+                [$relation, $field] = explode('.', $column);
+                $query->join($relation . 's', 'employees.' . $relation . '_id', '=', $relation . 's.id')
+                    ->where($relation . 's.business_id', $request->activeBusiness->id)
+                    ->orderBy($relation . 's.' . $field, $direction)
+                    ->select('employees.*');
+            } else {
+                $query->orderBy('employees.' . $column, $direction);
+            }
         }
 
         $employees = $query->paginate($per_page);
@@ -79,6 +97,7 @@ class StaffController extends Controller
             ],
             'filters' => [
                 'search' => $search,
+                'sorting' => $sorting,
             ],
         ]);
     }

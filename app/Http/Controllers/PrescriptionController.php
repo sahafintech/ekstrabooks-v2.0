@@ -19,7 +19,7 @@ class PrescriptionController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Prescription::with('customer', 'medical_record')->orderBy('id', 'desc');
+        $query = Prescription::with('customer', 'medical_record');
 
         // handle search
         if ($request->has('search') && !empty($request->get('search'))) {
@@ -34,19 +34,18 @@ class PrescriptionController extends Controller
             });
         }
 
-        // handle column filters
-        if ($request->has('columnFilters')) {
-            $columnFilters = $request->get('columnFilters');
-            if (is_string($columnFilters)) {
-                $columnFilters = json_decode($columnFilters, true);
-            }
-            if (is_array($columnFilters)) {
-                foreach ($columnFilters as $column => $value) {
-                    if ($value !== null && $value !== '') {
-                        $query->where('prescriptions.' . $column, $value);
-                    }
-                }
-            }
+        // handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        if (in_array($sortColumn, ['customer.name', 'customer.age', 'customer.mobile'])) {
+            $customerField = explode('.', $sortColumn)[1];
+            $query->join('customers', 'prescriptions.customer_id', '=', 'customers.id')
+                  ->orderBy('customers.' . $customerField, $sortDirection)
+                  ->select('prescriptions.*');
+        } else {
+            $query->orderBy('prescriptions.' . $sortColumn, $sortDirection);
         }
 
         // handle pagination
@@ -64,7 +63,7 @@ class PrescriptionController extends Controller
             'filters' => [
                 'search' => $request->get('search', ''),
                 'columnFilters' => $request->get('columnFilters', []),
-                'sorting' => $request->get('sorting', []),
+                'sorting' => $sorting,
             ],
         ]);
     }

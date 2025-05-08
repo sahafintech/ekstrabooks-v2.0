@@ -49,8 +49,9 @@ class DefferedInvoiceController extends Controller
     {
         $per_page = $request->get('per_page', 10);
         $search = $request->get('search', '');
+        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
 
-        $query = Invoice::where('is_deffered', 1)->with('customer')->orderBy("id", "desc");
+        $query = Invoice::where('is_deffered', 1)->with('customer');
 
         // Apply search if provided
         if (!empty($search)) {
@@ -63,7 +64,19 @@ class DefferedInvoiceController extends Controller
             });
         }
 
-        // Get vendors with pagination
+        // Apply sorting
+        $sortColumn = $sorting['column'];
+        $sortDirection = $sorting['direction'];
+
+        if ($sortColumn === 'customer.name') {
+            $query->join('customers', 'invoices.customer_id', '=', 'customers.id')
+                ->orderBy('customers.name', $sortDirection)
+                ->select('invoices.*');
+        } else {
+            $query->orderBy('invoices.' . $sortColumn, $sortDirection);
+        }
+
+        // Get invoices with pagination
         $invoices = $query->paginate($per_page)->withQueryString();
 
         // Return Inertia view
@@ -82,7 +95,7 @@ class DefferedInvoiceController extends Controller
             'filters' => [
                 'search' => $search,
                 'columnFilters' => $request->get('columnFilters', []),
-                'sorting' => $request->get('sorting', []),
+                'sorting' => $sorting,
             ],
         ]);
     }

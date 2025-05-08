@@ -25,11 +25,13 @@ import PageHeader from "@/Components/PageHeader";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { formatCurrency, parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
+import { ChevronUp, ChevronDown } from "lucide-react";
 
 export default function IncomeByCustomer({ report_data, date1, date2, meta = {}, filters = {}, business_name, currency, grand_total_income, grand_total_paid, grand_total_due, customers = [], customer_id = '' }) {
     const [search, setSearch] = useState(filters.search || "");
     const [perPage, setPerPage] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
+    const [sorting, setSorting] = useState(filters.sorting || { column: "customer_name", direction: "asc" });
 
     const { data, setData, post, processing } = useForm({
         date1: parseDateObject(date1),
@@ -46,6 +48,7 @@ export default function IncomeByCustomer({ report_data, date1, date2, meta = {},
             search: search,
             per_page: perPage,
             page: 1,
+            sorting: sorting,
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => {
@@ -59,7 +62,7 @@ export default function IncomeByCustomer({ report_data, date1, date2, meta = {},
         setPerPage(value);
         router.get(
             route("reports.income_by_customer"),
-            { search, page: 1, per_page: value },
+            { search, page: 1, per_page: value, sorting },
             { preserveState: true }
         );
     };
@@ -68,8 +71,35 @@ export default function IncomeByCustomer({ report_data, date1, date2, meta = {},
         setCurrentPage(page);
         router.get(
             route("reports.income_by_customer"),
-            { search, page, per_page: perPage },
+            { search, page, per_page: perPage, sorting },
             { preserveState: true }
+        );
+    };
+
+    const handleSort = (column) => {
+        let direction = "asc";
+        if (sorting.column === column && sorting.direction === "asc") {
+            direction = "desc";
+        }
+        setSorting({ column, direction });
+        router.get(
+            route("reports.income_by_customer"),
+            { ...filters, sorting: { column, direction } },
+            { preserveState: true }
+        );
+    };
+
+    const renderSortIcon = (column) => {
+        const isActive = sorting.column === column;
+        return (
+            <span className="inline-flex flex-col ml-1">
+                <ChevronUp
+                    className={`w-3 h-3 ${isActive && sorting.direction === "asc" ? "text-gray-800" : "text-gray-300"}`}
+                />
+                <ChevronDown
+                    className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc" ? "text-gray-800" : "text-gray-300"}`}
+                />
+            </span>
         );
     };
 
@@ -278,10 +308,18 @@ export default function IncomeByCustomer({ report_data, date1, date2, meta = {},
                             <ReportTable>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Customer</TableHead>
-                                        <TableHead className="text-right">Income Amount ({currency})</TableHead>
-                                        <TableHead className="text-right">Paid Amount ({currency})</TableHead>
-                                        <TableHead className="text-right">Due Amount ({currency})</TableHead>
+                                        <TableHead className="cursor-pointer" onClick={() => handleSort("customer_name")}>
+                                            Customer {renderSortIcon("customer_name")}
+                                        </TableHead>
+                                        <TableHead className="text-right cursor-pointer" onClick={() => handleSort("total_income")}>
+                                            Income Amount ({currency}) {renderSortIcon("total_income")}
+                                        </TableHead>
+                                        <TableHead className="text-right cursor-pointer" onClick={() => handleSort("total_paid")}>
+                                            Paid Amount ({currency}) {renderSortIcon("total_paid")}
+                                        </TableHead>
+                                        <TableHead className="text-right cursor-pointer" onClick={() => handleSort("total_due")}>
+                                            Due Amount ({currency}) {renderSortIcon("total_due")}
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>

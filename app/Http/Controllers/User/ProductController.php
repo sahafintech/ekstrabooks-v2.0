@@ -39,8 +39,11 @@ class ProductController extends Controller
     {
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
 
-        $query = Product::orderBy("id", "desc");
+        $query = Product::orderBy($sortColumn, $sortDirection);
 
         // Apply search if provided
         if (!empty($search)) {
@@ -70,7 +73,7 @@ class ProductController extends Controller
             'filters' => [
                 'search' => $search,
                 'columnFilters' => $request->get('columnFilters', []),
-                'sorting' => $request->get('sorting', []),
+                'sorting' => $sorting,
             ],
         ]);
     }

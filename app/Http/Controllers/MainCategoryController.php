@@ -15,7 +15,11 @@ class MainCategoryController extends Controller
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
-        $query = MainCategory::orderBy("id", "desc");
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        $query = MainCategory::orderBy($sortColumn, $sortDirection);
 
         // Apply search if provided
         if (!empty($search)) {

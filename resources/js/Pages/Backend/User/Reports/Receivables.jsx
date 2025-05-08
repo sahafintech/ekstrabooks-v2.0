@@ -19,17 +19,17 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/Components/ui/select";
-import { Input } from "@/Components/ui/input";
 import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
 import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import DateTimePicker from "@/Components/DateTimePicker";
+import { ChevronUp, ChevronDown } from "lucide-react";
 
 export default function Receivables({ report_data, date1, date2, meta = {}, filters = {}, business_name, currency, grand_total, paid_amount, due_amount, customers = [], customer_id = '' }) {
-    const [search, setSearch] = useState(filters.search || "");
-    const [perPage, setPerPage] = useState(10);
+    const [perPage, setPerPage] = useState(50);
     const [currentPage, setCurrentPage] = useState(1);
+    const [sorting, setSorting] = useState(filters.sorting || { column: 'invoice_date', direction: 'desc' });
 
     const { data, setData, post, processing } = useForm({
         date1: parseDateObject(date1),
@@ -43,9 +43,9 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
             date1: data.date1,
             date2: data.date2,
             customer_id: data.customer_id,
-            search: search,
             per_page: perPage,
             page: 1,
+            sorting: sorting,
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => {
@@ -59,7 +59,7 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
         setPerPage(value);
         router.get(
             route("reports.receivables"),
-            { search, page: 1, per_page: value },
+            { page: 1, per_page: value, sorting: sorting },
             { preserveState: true }
         );
     };
@@ -68,8 +68,35 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
         setCurrentPage(page);
         router.get(
             route("reports.receivables"),
-            { search, page, per_page: perPage },
+            { page, per_page: perPage, sorting: sorting },
             { preserveState: true }
+        );
+    };
+
+    const handleSort = (column) => {
+        let direction = "asc";
+        if (sorting.column === column && sorting.direction === "asc") {
+            direction = "desc";
+        }
+        setSorting({ column, direction });
+        router.get(
+            route("reports.receivables"),
+            { ...filters, sorting: { column, direction } },
+            { preserveState: true }
+        );
+    };
+
+    const renderSortIcon = (column) => {
+        const isActive = sorting.column === column;
+        return (
+            <span className="inline-flex flex-col ml-1">
+                <ChevronUp
+                    className={`w-3 h-3 ${isActive && sorting.direction === "asc" ? "text-gray-800" : "text-gray-300"}`}
+                />
+                <ChevronDown
+                    className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc" ? "text-gray-800" : "text-gray-300"}`}
+                />
+            </span>
         );
     };
 
@@ -293,15 +320,33 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                             <ReportTable>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Invoice Date</TableHead>
-                                        <TableHead>Customer(Provider)</TableHead>
-                                        <TableHead>Client</TableHead>
-                                        <TableHead>Invoice Number</TableHead>
-                                        <TableHead className="text-right">Invoice Amount ({currency})</TableHead>
-                                        <TableHead className="text-right">Paid Amount ({currency})</TableHead>
-                                        <TableHead className="text-right">Due Amount ({currency})</TableHead>
-                                        <TableHead>Due Date</TableHead>
-                                        <TableHead>Status</TableHead>
+                                        <TableHead className="cursor-pointer" onClick={() => handleSort("invoice_date")}>
+                                            Invoice Date {renderSortIcon("invoice_date")}
+                                        </TableHead>
+                                        <TableHead className="cursor-pointer" onClick={() => handleSort("customer_name")}>
+                                            Customer(Provider) {renderSortIcon("customer_name")}
+                                        </TableHead>
+                                        <TableHead className="cursor-pointer" onClick={() => handleSort("client_name")}>
+                                            Client {renderSortIcon("client_name")}
+                                        </TableHead>
+                                        <TableHead className="cursor-pointer" onClick={() => handleSort("invoice_number")}>
+                                            Invoice Number {renderSortIcon("invoice_number")}
+                                        </TableHead>
+                                        <TableHead className="cursor-pointer text-right" onClick={() => handleSort("grand_total")}>
+                                            Invoice Amount ({currency}) {renderSortIcon("grand_total")}
+                                        </TableHead>
+                                        <TableHead className="cursor-pointer text-right" onClick={() => handleSort("paid_amount")}>
+                                            Paid Amount ({currency}) {renderSortIcon("paid_amount")}
+                                        </TableHead>
+                                        <TableHead className="cursor-pointer text-right" onClick={() => handleSort("due_amount")}>
+                                            Due Amount ({currency}) {renderSortIcon("due_amount")}
+                                        </TableHead>
+                                        <TableHead className="cursor-pointer" onClick={() => handleSort("due_date")}>
+                                            Due Date {renderSortIcon("due_date")}
+                                        </TableHead>
+                                        <TableHead className="cursor-pointer" onClick={() => handleSort("status")}>
+                                            Status {renderSortIcon("status")}
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>

@@ -26,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit } from "lucide-react";
+import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -176,6 +176,7 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
   const [perPage, setPerPage] = useState(meta.per_page || 10);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
+  const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -222,14 +223,40 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
     }
   };
 
+  const handleSort = (column) => {
+    let direction = "asc";
+    if (sorting.column === column && sorting.direction === "asc") {
+      direction = "desc";
+    }
+    setSorting({ column, direction });
+    router.get(
+      route("deffered_invoices.index"),
+      { ...filters, sorting: { column, direction } },
+      { preserveState: true }
+    );
+  };
+
+  const renderSortIcon = (column) => {
+    const isActive = sorting.column === column;
+    return (
+      <span className="inline-flex flex-col ml-1">
+        <ChevronUp
+          className={`w-3 h-3 ${isActive && sorting.direction === "asc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+        <ChevronDown
+          className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+      </span>
+    );
+  };
+
   const handleSearch = (e) => {
     e.preventDefault();
     const value = e.target.value;
     setSearch(value);
-
     router.get(
       route("deffered_invoices.index"),
-      { search: value, page: 1, per_page: perPage },
+      { search: value, page: 1, per_page: perPage, sorting },
       { preserveState: true }
     );
   };
@@ -238,7 +265,7 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
     setPerPage(value);
     router.get(
       route("deffered_invoices.index"),
-      { search, page: 1, per_page: value },
+      { search, page: 1, per_page: value, sorting },
       { preserveState: true }
     );
   };
@@ -247,7 +274,7 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
     setCurrentPage(page);
     router.get(
       route("deffered_invoices.index"),
-      { search, page, per_page: perPage },
+      { search, page, per_page: perPage, sorting },
       { preserveState: true }
     );
   };
@@ -449,16 +476,36 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
                         onCheckedChange={toggleSelectAll}
                       />
                     </TableHead>
-                    <TableHead>Policy Number</TableHead>
-                    <TableHead>Policy Start</TableHead>
-                    <TableHead>Policy End</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Invoiece Date</TableHead>
-                    <TableHead>Due Date</TableHead>
-                    <TableHead className="text-right">Grand Total</TableHead>
-                    <TableHead className="text-right">Paid</TableHead>
-                    <TableHead className="text-right">Due</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("order_number")}>
+                      Policy Number {renderSortIcon("order_number")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("deffered_start")}>
+                      Policy Start {renderSortIcon("deffered_start")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("deffered_end")}>
+                      Policy End {renderSortIcon("deffered_end")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("customer.name")}>
+                      Customer {renderSortIcon("customer.name")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("invoice_date")}>
+                      Invoice Date {renderSortIcon("invoice_date")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("due_date")}>
+                      Due Date {renderSortIcon("due_date")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer text-right" onClick={() => handleSort("grand_total")}>
+                      Grand Total {renderSortIcon("grand_total")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer text-right" onClick={() => handleSort("paid")}>
+                      Paid {renderSortIcon("paid")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer text-right" onClick={() => handleSort("grand_total")}>
+                      Due {renderSortIcon("grand_total")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("status")}>
+                      Status {renderSortIcon("status")}
+                    </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>

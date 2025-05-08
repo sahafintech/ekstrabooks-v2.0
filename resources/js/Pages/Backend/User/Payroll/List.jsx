@@ -26,7 +26,7 @@ import {
     DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { Edit, EyeIcon, FileDown, MoreVertical, Plus, Trash } from "lucide-react";
+import { Edit, EyeIcon, FileDown, MoreVertical, Plus, Trash, ChevronUp, ChevronDown } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -346,6 +346,7 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
     const [advanceAccountId, setAdvanceAccountId] = useState(null);
     const [paymentMethod, setPaymentMethod] = useState(null);
     const [paymentDate, setPaymentDate] = useState(null);
+    const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
 
     useEffect(() => {
         if (flash && flash.success) {
@@ -608,6 +609,33 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
         );
     };
 
+    const handleSort = (column) => {
+        let direction = "asc";
+        if (sorting.column === column && sorting.direction === "asc") {
+            direction = "desc";
+        }
+        setSorting({ column, direction });
+        router.get(
+            route("payslips.index"),
+            { ...filters, sorting: { column, direction } },
+            { preserveState: true }
+        );
+    };
+
+    const renderSortIcon = (column) => {
+        const isActive = sorting.column === column;
+        return (
+            <span className="inline-flex flex-col ml-1">
+                <ChevronUp
+                    className={`w-3 h-3 ${isActive && sorting.direction === "asc" ? "text-gray-800" : "text-gray-300"}`}
+                />
+                <ChevronDown
+                    className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc" ? "text-gray-800" : "text-gray-300"}`}
+                />
+            </span>
+        );
+    };
+
     const renderPageNumbers = () => {
         const totalPages = meta.last_page;
         const pages = [];
@@ -777,16 +805,36 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                                                 onCheckedChange={toggleSelectAll}
                                             />
                                         </TableHead>
-                                        <TableHead>NO</TableHead>
-                                        <TableHead>Employee ID</TableHead>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Basic Salary</TableHead>
-                                        <TableHead>Additions</TableHead>
-                                        <TableHead>Payroll Tax</TableHead>
-                                        <TableHead>Other Deductions</TableHead>
-                                        <TableHead>Salary Advance Deductions</TableHead>
-                                        <TableHead>Net Salary</TableHead>
-                                        <TableHead>Status</TableHead>
+                                        <TableHead className="w-[80px] cursor-pointer" onClick={() => handleSort("id")}>
+                                            NO {renderSortIcon("id")}
+                                        </TableHead>
+                                        <TableHead className="cursor-pointer" onClick={() => handleSort("employee_id")}>
+                                            Employee ID {renderSortIcon("employee_id")}
+                                        </TableHead>
+                                        <TableHead className="cursor-pointer" onClick={() => handleSort("staff.name")}>
+                                            Name {renderSortIcon("staff.name")}
+                                        </TableHead>
+                                        <TableHead className="cursor-pointer" onClick={() => handleSort("current_salary")}>
+                                            Basic Salary {renderSortIcon("current_salary")}
+                                        </TableHead>
+                                        <TableHead className="cursor-pointer" onClick={() => handleSort("total_allowance")}>
+                                            Additions {renderSortIcon("total_allowance")}
+                                        </TableHead>
+                                        <TableHead className="cursor-pointer" onClick={() => handleSort("tax_amount")}>
+                                            Payroll Tax {renderSortIcon("tax_amount")}
+                                        </TableHead>
+                                        <TableHead className="cursor-pointer" onClick={() => handleSort("total_deduction")}>
+                                            Other Deductions {renderSortIcon("total_deduction")}
+                                        </TableHead>
+                                        <TableHead className="cursor-pointer" onClick={() => handleSort("advance")}>
+                                            Salary Advance Deductions {renderSortIcon("advance")}
+                                        </TableHead>
+                                        <TableHead className="cursor-pointer" onClick={() => handleSort("net_salary")}>
+                                            Net Salary {renderSortIcon("net_salary")}
+                                        </TableHead>
+                                        <TableHead className="cursor-pointer" onClick={() => handleSort("status")}>
+                                            Status {renderSortIcon("status")}
+                                        </TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>

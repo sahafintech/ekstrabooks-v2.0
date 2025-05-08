@@ -53,7 +53,7 @@ class CustomerController extends Controller
         $per_page = $request->get('per_page', 10);
         $search = $request->get('search', '');
 
-        $query = Customer::orderBy("id", "desc");
+        $query = Customer::query();
 
         // Apply search if provided
         if (!empty($search)) {
@@ -65,7 +65,14 @@ class CustomerController extends Controller
             });
         }
 
-        // Get vendors with pagination
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        $query->orderBy($sortColumn, $sortDirection);
+
+        // Get customers with pagination
         $customers = $query->paginate($per_page)->withQueryString();
 
         // Return Inertia view
@@ -84,7 +91,7 @@ class CustomerController extends Controller
             'filters' => [
                 'search' => $search,
                 'columnFilters' => $request->get('columnFilters', []),
-                'sorting' => $request->get('sorting', []),
+                'sorting' => $sorting,
             ],
         ]);
     }

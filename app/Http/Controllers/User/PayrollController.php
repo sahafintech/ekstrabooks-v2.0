@@ -60,50 +60,62 @@ class PayrollController extends Controller
      */
     public function index(Request $request)
     {
-        session(['month' => $request->month ?? date('m')]);
-        session(['year' => $request->year ?? date('Y')]);
+        $month = $request->month ?? date('m');
+        $year = $request->year ?? date('Y');
+        $search = $request->search;
+        $per_page = $request->per_page ?? 10;
 
-        $month = session('month');
-        $year  = session('year');
+        // Store month and year in session
+        session(['month' => $month, 'year' => $year]);
 
-        $per_page = $request->get('per_page', 10);
-        $search = $request->get('search', '');
-
-        $query = Payroll::with('staff')
-            ->where('month', session('month'))
-            ->where('year', session('year'));
+        $query = Payroll::query()
+            ->where('payslips.business_id', $request->activeBusiness->id)
+            ->where('month', $month)
+            ->where('year', $year)
+            ->with('staff');
 
         if ($search) {
-            $query->whereHas('staff', function ($q) use ($search) {
-                $q->where('name', 'like', "%$search%")
-                    ->orWhere('basic_salary', 'like', "%$search%");
+            $query->where(function ($q) use ($search) {
+                $q->where('employee_id', 'like', "%$search%")
+                  ->orWhereHas('employee', function ($q) use ($search) {
+                      $q->where('name', 'like', "%$search%");
+                  })
+                  ->orWhere('current_salary', 'like', "%$search%");
             });
+        }
+
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        // Handle relationship sorting
+        if (str_contains($sortColumn, '.')) {
+            $parts = explode('.', $sortColumn);
+            $relation = $parts[0];
+            $column = $parts[1];
+            $query->join('employees', 'payslips.employee_id', '=', 'employees.id')
+                  ->where('employees.business_id', $request->activeBusiness->id)
+                  ->orderBy('employees.' . $column, $sortDirection)
+                  ->select('payslips.*');
+        } else {
+            $query->orderBy('payslips.' . $sortColumn, $sortDirection);
         }
 
         $payrolls = $query->paginate($per_page);
 
-        $total_netsalary = $query->get()->sum('net_salary');
-        $total_basicsalary = $query->get()->sum('current_salary');
-        $total_allowance = $query->get()->sum('total_allowance');
-        $total_deduction = $query->get()->sum('total_deduction');
-        $total_tax = $query->get()->sum('tax_amount');
-        $total_advance = $query->get()->sum('advance');
-        $accounts = Account::all();
-        $methods = TransactionMethod::all();
-
-        $years = [];
-        for ($y = 2020; $y <= date('Y'); $y++) {
-            $years[] = $y;
-        }
+        // Calculate totals
+        $totals = [
+            'net_salary' => $payrolls->sum('net_salary'),
+            'current_salary' => $payrolls->sum('current_salary'),
+            'total_allowance' => $payrolls->sum('total_allowance'),
+            'total_deduction' => $payrolls->sum('total_deduction'),
+            'tax_amount' => $payrolls->sum('tax_amount'),
+            'advance' => $payrolls->sum('advance'),
+        ];
 
         return Inertia::render('Backend/User/Payroll/List', [
             'payrolls' => $payrolls->items(),
-            'total_netsalary' => $total_netsalary,
-            'total_basicsalary' => $total_basicsalary,
-            'total_allowance' => $total_allowance,
-            'total_deduction' => $total_deduction,
-            'total_tax' => $total_tax,
-            'total_advance' => $total_advance,
             'meta' => [
                 'current_page' => $payrolls->currentPage(),
                 'per_page' => $payrolls->perPage(),
@@ -114,12 +126,14 @@ class PayrollController extends Controller
             ],
             'filters' => [
                 'search' => $search,
+                'sorting' => $sorting,
             ],
-            'years' => $years,
-            'month' => $month,
+            'years' => range(date('Y') - 5, date('Y') + 5),
             'year' => $year,
-            'accounts' => $accounts,
-            'methods' => $methods,
+            'month' => $month,
+            'totals' => $totals,
+            'accounts' => Account::where('business_id', $request->activeBusiness->id)->get(),
+            'methods' => TransactionMethod::where('business_id', $request->activeBusiness->id)->get(),
         ]);
     }
 
@@ -317,7 +331,7 @@ class PayrollController extends Controller
     public function edit($id)
     {
         $payroll = Payroll::with('staff')
-            ->with(['staff.employee_benefits' => function ($query) use ($id) {
+            ->with(['employee.employee_benefits' => function ($query) use ($id) {
                 $query->where('month', Payroll::find($id)->month)
                     ->where('year', Payroll::find($id)->year)
                     ->with('salary_benefits');

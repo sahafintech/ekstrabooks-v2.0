@@ -67,9 +67,17 @@ class SalesReturnController extends Controller
         }
 
         // Handle sorting
-        $sortField = $request->get('sort_field', 'id');
-        $sortDirection = $request->get('sort_direction', 'desc');
-        $query->orderBy($sortField, $sortDirection);
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        if ($sortColumn === 'customer.name') {
+            $query->join('customers', 'sales_returns.customer_id', '=', 'customers.id')
+                ->orderBy('customers.name', $sortDirection)
+                ->select('sales_returns.*');
+        } else {
+            $query->orderBy('sales_returns.' . $sortColumn, $sortDirection);
+        }
 
         // Handle pagination
         $perPage = $request->get('per_page', 10);
@@ -87,7 +95,11 @@ class SalesReturnController extends Controller
                 'from' => $returns->firstItem(),
                 'to' => $returns->lastItem(),
             ],
-            'filters' => $request->filters ?? []
+            'filters' => [
+                'search' => $request->search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $sorting,
+            ],
         ]);
     }
 

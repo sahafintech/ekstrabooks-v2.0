@@ -101,9 +101,17 @@ class QuotationController extends Controller
         }
 
         // Handle sorting
-        $sortField = $request->get('sort_field', 'id');
-        $sortDirection = $request->get('sort_direction', 'desc');
-        $query->orderBy($sortField, $sortDirection);
+        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
+        $sortColumn = $sorting['column'];
+        $sortDirection = $sorting['direction'];
+
+        if ($sortColumn === 'customer.name') {
+            $query->join('customers', 'quotations.customer_id', '=', 'customers.id')
+                ->orderBy('customers.name', $sortDirection)
+                ->select('quotations.*');
+        } else {
+            $query->orderBy('quotations.' . $sortColumn, $sortDirection);
+        }
 
         // Handle pagination
         $perPage = $request->get('per_page', 10);
@@ -119,7 +127,9 @@ class QuotationController extends Controller
                 'from' => $quotations->firstItem(),
                 'to' => $quotations->lastItem(),
             ],
-            'filters' => $request->filters ?? []
+            'filters' => array_merge($request->filters ?? [], [
+                'sorting' => $sorting,
+            ]),
         ]);
     }
 

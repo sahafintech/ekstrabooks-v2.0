@@ -26,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit } from "lucide-react";
+import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -227,6 +227,7 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
   const [perPage, setPerPage] = useState(filters.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
+  const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -419,6 +420,33 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
     window.location.href = route("journals.export")
   }
 
+  const handleSort = (column) => {
+    let direction = "asc";
+    if (sorting.column === column && sorting.direction === "asc") {
+      direction = "desc";
+    }
+    setSorting({ column, direction });
+    router.get(
+      route("journals.index"),
+      { ...filters, sorting: { column, direction } },
+      { preserveState: true }
+    );
+  };
+
+  const renderSortIcon = (column) => {
+    const isActive = sorting.column === column;
+    return (
+      <span className="inline-flex flex-col ml-1">
+        <ChevronUp
+          className={`w-3 h-3 ${isActive && sorting.direction === "asc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+        <ChevronDown
+          className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+      </span>
+    );
+  };
+
   const renderPageNumbers = () => {
     const totalPages = meta.last_page || 1;
     const pages = [];
@@ -539,12 +567,24 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
                         aria-label="Select all"
                       />
                     </TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Journal #</TableHead>
-                    <TableHead className="text-right">Transaction Amount</TableHead>
-                    <TableHead className="text-right">Currency Rate</TableHead>
-                    <TableHead className="text-right">Base Currency Amount</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("date")}>
+                      Date {renderSortIcon("date")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("journal_number")}>
+                      Journal # {renderSortIcon("journal_number")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer text-right" onClick={() => handleSort("transaction_amount")}>
+                      Transaction Amount {renderSortIcon("transaction_amount")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer text-right" onClick={() => handleSort("currency_rate")}>
+                      Currency Rate {renderSortIcon("currency_rate")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer text-right" onClick={() => handleSort("base_currency_amount")}>
+                      Base Currency Amount {renderSortIcon("base_currency_amount")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("status")}>
+                      Status {renderSortIcon("status")}
+                    </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>

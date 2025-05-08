@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { Book, Edit, Eye, Plus, Settings, Trash, Users } from "lucide-react";
+import { Book, Edit, Eye, Plus, Settings, Trash, Users, ChevronUp, ChevronDown } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -93,6 +93,7 @@ export default function List({ accounts = [], meta = {}, filters = {} }) {
   const [perPage, setPerPage] = useState(meta.per_page || 10);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
+  const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -187,6 +188,19 @@ export default function List({ accounts = [], meta = {}, filters = {} }) {
     }
   };
 
+  const handleSort = (column) => {
+    let direction = "asc";
+    if (sorting.column === column && sorting.direction === "asc") {
+      direction = "desc";
+    }
+    setSorting({ column, direction });
+    router.get(
+      route("accounts.index"),
+      { ...filters, sorting: { column, direction } },
+      { preserveState: true }
+    );
+  };
+
   const handleDeleteConfirm = (id) => {
     setAccountToDelete(id);
     setShowDeleteModal(true);
@@ -227,6 +241,20 @@ export default function List({ accounts = [], meta = {}, filters = {} }) {
           setProcessing(false);
         }
       });
+  };
+
+  const renderSortIcon = (column) => {
+    const isActive = sorting.column === column;
+    return (
+      <span className="inline-flex flex-col ml-1">
+        <ChevronUp
+          className={`w-3 h-3 ${isActive && sorting.direction === "asc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+        <ChevronDown
+          className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+      </span>
+    );
   };
 
   const renderPageNumbers = () => {
@@ -331,11 +359,21 @@ export default function List({ accounts = [], meta = {}, filters = {} }) {
                         onCheckedChange={toggleSelectAll}
                       />
                     </TableHead>
-                    <TableHead>Account Code</TableHead>
-                    <TableHead>Account Name</TableHead>
-                    <TableHead>Account Type</TableHead>
-                    <TableHead>Opening Date</TableHead>
-                    <TableHead>Currency</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("account_code")}>
+                      Account Code {renderSortIcon("account_code")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("account_name")}>
+                      Account Name {renderSortIcon("account_name")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("account_type")}>
+                      Account Type {renderSortIcon("account_type")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("opening_date")}>
+                      Opening Date {renderSortIcon("opening_date")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("currency")}>
+                      Currency {renderSortIcon("currency")}
+                    </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>

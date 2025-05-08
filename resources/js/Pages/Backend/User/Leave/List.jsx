@@ -35,7 +35,7 @@ import {
   PopoverTrigger,
 } from "@/Components/ui/popover";
 import { Calendar } from "@/Components/ui/calendar";
-import { Plus, Edit, Trash, Search, CalendarIcon } from "lucide-react";
+import { Plus, Edit, Trash, Search, CalendarIcon, EyeIcon, FileDown, FileUp, MoreVertical, ChevronUp, ChevronDown } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -43,6 +43,12 @@ import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+} from "@/Components/ui/dropdown-menu";
 
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
@@ -103,17 +109,20 @@ const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, cou
 export default function List({ leaves = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
-  const [isAllSelected, setIsAllSelected] = useState(false);
   const [selectedLeaves, setSelectedLeaves] = useState([]);
-  const [bulkAction, setBulkAction] = useState("");
+  const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
   const [dateFilter, setDateFilter] = useState(filters.date || "");
-  const [perPage, setPerPage] = useState(filters.per_page || 50);
+  const [perPage, setPerPage] = useState(meta.per_page || 10);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
+  const [bulkAction, setBulkAction] = useState("");
+  const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
+
+  // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [leaveToDelete, setLeaveToDelete] = useState(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -212,7 +221,7 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
     }
 
     if (bulkAction === "delete") {
-      setShowBulkDeleteModal(true);
+      setShowDeleteAllModal(true);
     }
   };
 
@@ -223,24 +232,24 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
 
   const handleDelete = (e) => {
     e.preventDefault();
-    setIsProcessing(true);
+    setProcessing(true);
 
     router.delete(route("leaves.destroy", leaveToDelete), {
       preserveState: true,
       onSuccess: () => {
         setShowDeleteModal(false);
         setLeaveToDelete(null);
-        setIsProcessing(false);
+        setProcessing(false);
       },
       onError: () => {
-        setIsProcessing(false);
+        setProcessing(false);
       }
     });
   };
 
   const handleBulkDeleteConfirm = (e) => {
     e.preventDefault();
-    setIsProcessing(true);
+    setProcessing(true);
 
     router.post(route("leaves.bulk_destroy"),
       {
@@ -252,13 +261,40 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
           setSelectedLeaves([]);
           setIsAllSelected(false);
           setBulkAction("");
-          setShowBulkDeleteModal(false);
-          setIsProcessing(false);
+          setShowDeleteAllModal(false);
+          setProcessing(false);
         },
         onError: () => {
-          setIsProcessing(false);
+          setProcessing(false);
         }
       }
+    );
+  };
+
+  const handleSort = (column) => {
+    let direction = "asc";
+    if (sorting.column === column && sorting.direction === "asc") {
+      direction = "desc";
+    }
+    setSorting({ column, direction });
+    router.get(
+      route("leaves.index"),
+      { ...filters, sorting: { column, direction } },
+      { preserveState: true }
+    );
+  };
+
+  const renderSortIcon = (column) => {
+    const isActive = sorting.column === column;
+    return (
+      <span className="inline-flex flex-col ml-1">
+        <ChevronUp
+          className={`w-3 h-3 ${isActive && sorting.direction === "asc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+        <ChevronDown
+          className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+      </span>
     );
   };
 
@@ -293,76 +329,34 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
     }
   };
 
-  // Generate pagination buttons
   const renderPageNumbers = () => {
-    const pageNumbers = [];
-    const pageRangeDisplayed = 5; // Number of pages to display
+    const totalPages = meta.last_page;
+    const pages = [];
+    const maxPagesToShow = 5;
 
-    let startPage = Math.max(1, currentPage - Math.floor(pageRangeDisplayed / 2));
-    let endPage = Math.min(meta.last_page, startPage + pageRangeDisplayed - 1);
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = startPage + maxPagesToShow - 1;
 
-    if (endPage - startPage + 1 < pageRangeDisplayed) {
-      startPage = Math.max(1, endPage - pageRangeDisplayed + 1);
+    if (endPage > totalPages) {
+      endPage = totalPages;
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
     }
 
-    // First page
-    pageNumbers.push(
-      <Button
-        key="first"
-        variant="outline"
-        size="sm"
-        onClick={() => handlePageChange(1)}
-        disabled={currentPage === 1}
-        className="h-8 w-8 p-0"
-      >
-        1
-      </Button>
-    );
-
-    // Ellipsis after first page if needed
-    if (startPage > 2) {
-      pageNumbers.push(<span key="ellipsis1" className="px-2">...</span>);
-    }
-
-    // Page numbers
     for (let i = startPage; i <= endPage; i++) {
-      if (i !== 1 && i !== meta.last_page) {
-        pageNumbers.push(
-          <Button
-            key={i}
-            variant={currentPage === i ? "default" : "outline"}
-            size="sm"
-            onClick={() => handlePageChange(i)}
-            className="h-8 w-8 p-0"
-          >
-            {i}
-          </Button>
-        );
-      }
-    }
-
-    // Ellipsis before last page if needed
-    if (endPage < meta.last_page - 1) {
-      pageNumbers.push(<span key="ellipsis2" className="px-2">...</span>);
-    }
-
-    // Last page
-    if (meta.last_page > 1) {
-      pageNumbers.push(
+      pages.push(
         <Button
-          key="last"
-          variant="outline"
+          key={i}
+          variant={i === currentPage ? "default" : "outline"}
           size="sm"
-          onClick={() => handlePageChange(meta.last_page)}
-          disabled={currentPage === meta.last_page}
-          className="h-8 w-8 p-0"
+          onClick={() => handlePageChange(i)}
+          className="mx-1"
         >
-          {meta.last_page}
+          {i}
         </Button>
       );
     }
 
-    return pageNumbers;
+    return pages;
   };
 
   return (
@@ -378,47 +372,19 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-4">
-                <Button onClick={() => router.visit(route("leaves.create"))}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Leave
-                </Button>
-              </div>
+                <Link href={route("leaves.create")}>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Leave
+                  </Button>
+                </Link>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                <div className="flex flex-col md:flex-row gap-2">
-                  <Input
-                    placeholder="search leaves..."
-                    value={search}
-                    onChange={(e) => handleSearch(e)}
-                    className="w-full md:w-60"
-                  />
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full md:w-auto justify-start text-left font-normal",
-                          !dateFilter && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dateFilter ? (
-                          format(new Date(dateFilter), "PPP")
-                        ) : (
-                          <span>Filter by date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={dateFilter ? new Date(dateFilter) : undefined}
-                        onSelect={handleDateFilterChange}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
+                <Input
+                  placeholder="search leaves..."
+                  value={search}
+                  onChange={(e) => handleSearch(e)}
+                  className="w-full md:w-80"
+                />
               </div>
             </div>
 
@@ -467,14 +433,30 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
                         onCheckedChange={toggleSelectAll}
                       />
                     </TableHead>
-                    <TableHead className="w-[50px]">ID</TableHead>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Leave Type</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Start Date</TableHead>
-                    <TableHead>End Date</TableHead>
-                    <TableHead>Total Days</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("id")}>
+                      ID {renderSortIcon("id")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("staff.name")}>
+                      Employee {renderSortIcon("staff.name")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("leave_type")}>
+                      Leave Type {renderSortIcon("leave_type")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("leave_duration")}>
+                      Duration {renderSortIcon("leave_duration")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("start_date")}>
+                      Start Date {renderSortIcon("start_date")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("end_date")}>
+                      End Date {renderSortIcon("end_date")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("total_days")}>
+                      Total Days {renderSortIcon("total_days")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("status")}>
+                      Status {renderSortIcon("status")}
+                    </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -500,9 +482,14 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
                           <TableActions
                             actions={[
                               {
+                                label: "View",
+                                icon: <EyeIcon className="h-4 w-4" />,
+                                href: route("leaves.show", leave.id),
+                              },
+                              {
                                 label: "Edit",
                                 icon: <Edit className="h-4 w-4" />,
-                                onClick: () => router.visit(route('leaves.edit', leave.id)),
+                                href: route("leaves.edit", leave.id),
                               },
                               {
                                 label: "Delete",
@@ -526,34 +513,66 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
               </Table>
             </div>
 
-            {meta.last_page > 1 && (
-              <div className="flex justify-between items-center mt-4">
+            {leaves.length > 0 && meta.total > 0 && (
+              <div className="flex items-center justify-between mt-4">
                 <div className="text-sm text-gray-500">
-                  Showing {meta.from || 0} to {meta.to || 0} of {meta.total} entries
+                  Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, meta.total)} of {meta.total} entries
                 </div>
-                <div className="flex gap-1">{renderPageNumbers()}</div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                  >
+                    First
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  {renderPageNumbers()}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === meta.last_page}
+                  >
+                    Next
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(meta.last_page)}
+                    disabled={currentPage === meta.last_page}
+                  >
+                    Last
+                  </Button>
+                </div>
               </div>
             )}
           </div>
-
-          {/* Delete Confirmation Modal */}
-          <DeleteConfirmationModal
-            show={showDeleteModal}
-            onClose={() => setShowDeleteModal(false)}
-            onConfirm={handleDelete}
-            processing={isProcessing}
-          />
-
-          {/* Bulk Delete Confirmation Modal */}
-          <BulkDeleteConfirmationModal
-            show={showBulkDeleteModal}
-            onClose={() => setShowBulkDeleteModal(false)}
-            onConfirm={handleBulkDeleteConfirm}
-            processing={isProcessing}
-            count={selectedLeaves.length}
-          />
         </div>
       </SidebarInset>
+
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDelete}
+        processing={processing}
+      />
+
+      <BulkDeleteConfirmationModal
+        show={showDeleteAllModal}
+        onClose={() => setShowDeleteAllModal(false)}
+        onConfirm={handleBulkDeleteConfirm}
+        processing={processing}
+        count={selectedLeaves.length}
+      />
     </AuthenticatedLayout>
   );
 }

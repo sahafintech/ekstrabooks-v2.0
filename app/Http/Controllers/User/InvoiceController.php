@@ -89,9 +89,16 @@ class InvoiceController extends Controller
         }
 
         // Handle sorting
-        $sortField = $request->get('sort_field', 'id');
-        $sortDirection = $request->get('sort_direction', 'desc');
-        $query->orderBy($sortField, $sortDirection);
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+        if ($sortColumn === 'customer.name') {
+            $query->join('customers', 'invoices.customer_id', '=', 'customers.id')
+                ->orderBy('customers.name', $sortDirection)
+                ->select('invoices.*');
+        } else {
+            $query->orderBy('invoices.' . $sortColumn, $sortDirection);
+        }
 
         // Handle pagination
         $perPage = $request->get('per_page', 50);
@@ -107,7 +114,9 @@ class InvoiceController extends Controller
                 'from' => $invoices->firstItem(),
                 'to' => $invoices->lastItem(),
             ],
-            'filters' => $request->filters ?? []
+            'filters' => array_merge($request->filters ?? [], [
+                'sorting' => $sorting,
+            ]),
         ]);
     }
 

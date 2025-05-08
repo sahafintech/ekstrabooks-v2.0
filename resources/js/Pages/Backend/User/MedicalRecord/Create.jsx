@@ -7,14 +7,6 @@ import { Button } from "@/Components/ui/button";
 import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
 import { Checkbox } from "@/Components/ui/checkbox";
-import { ArrowLeft, CalendarIcon } from "lucide-react";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/Components/ui/popover";
-import { format } from "date-fns";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import DateTimePicker from "@/Components/DateTimePicker";
 
@@ -25,17 +17,12 @@ export default function Create({ customers = [] }) {
         date: "",
         ocular_history: "",
         occupation: "",
-
         va_unaided_re: "",
         va_unaided_le: "",
         va_aided_re: "",
         va_aided_le: "",
         va_pinhole_re: "",
         va_pinhole_le: "",
-
-        va_test_used_re: "",
-        va_test_used_le: "",
-
         rf_unaided_d_re: "",
         rf_unaided_d_le: "",
         rf_unaided_n_re: "",
@@ -44,13 +31,12 @@ export default function Create({ customers = [] }) {
         rf_aided_d_le: "",
         rf_aided_n_re: "",
         rf_aided_n_le: "",
-
-        rf_best_corrected_re: "",
         rf_best_corrected_le: "",
+        rf_best_corrected_re: "",
         rf_test_type_used_re: "",
         rf_test_type_used_le: "",
-        rf_lensometer_re: "",
         rf_lensometer_le: "",
+        rf_lensometer_re: "",
         rf_autorefraction_re: "",
         rf_autorefraction_le: "",
         rf_dry_retinoscopy_re: "",
@@ -63,26 +49,12 @@ export default function Create({ customers = [] }) {
         rf_near_le: "",
         rf_final_prescription_re: "",
         rf_final_prescription_le: "",
-
-        keratometry_re: "",
-        keratometry_le: "",
-
-        trial_frame_va_re: "",
-        trial_frame_va_le: "",
-
-        // Additional Fields
-        va_unaided_re_n: "",
-        va_unaided_le_n: "",
-        va_aided_re_n: "",
-        va_aided_le_n: "",
-
-        eso: false,
-        exo: false,
-        hypo: false,
-        hyper: false,
-        tropia: false,
-        phoria: false,
-
+        eso: 0,
+        exo: 0,
+        hypo: 0,
+        hyper: 0,
+        tropia: 0,
+        phoria: 0,
         eso_distance_5m_6m: "",
         eso_near_30cm_50cm: "",
         exo_distance_5m_6m: "",
@@ -98,14 +70,17 @@ export default function Create({ customers = [] }) {
         post(route("medical_records.store"));
     };
 
+    // Helper for boolean fields to store 0/1
+    const handleBooleanChange = (field, checked) => {
+        setData(field, checked ? 1 : 0);
+    };
+
     return (
         <AuthenticatedLayout>
             <SidebarInset>
                 <PageHeader page="Medical Records" subpage="Add New" url="medical_records.index" />
-
                 <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
                     <h2 className="text-center text-xl font-semibold mb-6">Add New Medical Record</h2>
-
                     <form onSubmit={handleSubmit}>
                         <div className="max-w-4xl mx-auto">
                             {/* Basic Information */}
@@ -518,7 +493,6 @@ export default function Create({ customers = [] }) {
                             {/* Ocular Muscle Balance */}
                             <div className="mb-6">
                                 <h3 className="text-center text-lg font-medium mb-4 border-b pb-2">Ocular Muscle Balance</h3>
-
                                 <div className="w-full">
                                     {/* Headers */}
                                     <div className="grid grid-cols-3 mb-6">
@@ -526,14 +500,13 @@ export default function Create({ customers = [] }) {
                                         <div className="p-2 text-center font-medium">DISTANCE AT 5 M/ 6 M</div>
                                         <div className="p-2 text-center font-medium">NEAR AT 30-50 CM</div>
                                     </div>
-
                                     {/* ESO row */}
                                     <div className="grid grid-cols-3 mb-3">
                                         <div className="py-2 flex items-center">
                                             <Checkbox
                                                 id="eso"
-                                                checked={data.eso}
-                                                onCheckedChange={(checked) => setData("eso", checked)}
+                                                checked={!!data.eso}
+                                                onCheckedChange={(checked) => handleBooleanChange("eso", checked)}
                                             />
                                             <Label htmlFor="eso" className="ml-2">ESO</Label>
                                         </div>
@@ -552,14 +525,13 @@ export default function Create({ customers = [] }) {
                                             />
                                         </div>
                                     </div>
-
                                     {/* EXO row */}
                                     <div className="grid grid-cols-3 mb-3">
                                         <div className="py-2 flex items-center">
                                             <Checkbox
                                                 id="exo"
-                                                checked={data.exo}
-                                                onCheckedChange={(checked) => setData("exo", checked)}
+                                                checked={!!data.exo}
+                                                onCheckedChange={(checked) => handleBooleanChange("exo", checked)}
                                             />
                                             <Label htmlFor="exo" className="ml-2">EXO</Label>
                                         </div>
@@ -578,14 +550,13 @@ export default function Create({ customers = [] }) {
                                             />
                                         </div>
                                     </div>
-
                                     {/* HYPO row */}
                                     <div className="grid grid-cols-3 mb-3">
                                         <div className="py-2 flex items-center">
                                             <Checkbox
                                                 id="hypo"
-                                                checked={data.hypo}
-                                                onCheckedChange={(checked) => setData("hypo", checked)}
+                                                checked={!!data.hypo}
+                                                onCheckedChange={(checked) => handleBooleanChange("hypo", checked)}
                                             />
                                             <Label htmlFor="hypo" className="ml-2">HYPO</Label>
                                         </div>
@@ -604,14 +575,13 @@ export default function Create({ customers = [] }) {
                                             />
                                         </div>
                                     </div>
-
                                     {/* HYPER row */}
                                     <div className="grid grid-cols-3 mb-3">
                                         <div className="py-2 flex items-center">
                                             <Checkbox
                                                 id="hyper"
-                                                checked={data.hyper}
-                                                onCheckedChange={(checked) => setData("hyper", checked)}
+                                                checked={!!data.hyper}
+                                                onCheckedChange={(checked) => handleBooleanChange("hyper", checked)}
                                             />
                                             <Label htmlFor="hyper" className="ml-2">HYPER</Label>
                                         </div>
@@ -630,7 +600,6 @@ export default function Create({ customers = [] }) {
                                             />
                                         </div>
                                     </div>
-
                                     {/* Tropia row */}
                                     <div className="grid grid-cols-3 mb-3">
                                         <div className="py-2">Tropia</div>
@@ -641,8 +610,8 @@ export default function Create({ customers = [] }) {
                                                     id="tropia-yes"
                                                     name="tropia"
                                                     className="mr-2"
-                                                    checked={data.tropia}
-                                                    onChange={() => setData("tropia", true)}
+                                                    checked={data.tropia === 1}
+                                                    onChange={() => setData("tropia", 1)}
                                                 />
                                                 <label htmlFor="tropia-yes">Yes</label>
                                             </div>
@@ -652,14 +621,13 @@ export default function Create({ customers = [] }) {
                                                     id="tropia-no"
                                                     name="tropia"
                                                     className="mr-2"
-                                                    checked={!data.tropia}
-                                                    onChange={() => setData("tropia", false)}
+                                                    checked={data.tropia === 0}
+                                                    onChange={() => setData("tropia", 0)}
                                                 />
                                                 <label htmlFor="tropia-no">No</label>
                                             </div>
                                         </div>
                                     </div>
-
                                     {/* Phoria row */}
                                     <div className="grid grid-cols-3 mb-3">
                                         <div className="py-2">Phoria</div>
@@ -670,8 +638,8 @@ export default function Create({ customers = [] }) {
                                                     id="phoria-yes"
                                                     name="phoria"
                                                     className="mr-2"
-                                                    checked={data.phoria}
-                                                    onChange={() => setData("phoria", true)}
+                                                    checked={data.phoria === 1}
+                                                    onChange={() => setData("phoria", 1)}
                                                 />
                                                 <label htmlFor="phoria-yes">Yes</label>
                                             </div>
@@ -681,8 +649,8 @@ export default function Create({ customers = [] }) {
                                                     id="phoria-no"
                                                     name="phoria"
                                                     className="mr-2"
-                                                    checked={!data.phoria}
-                                                    onChange={() => setData("phoria", false)}
+                                                    checked={data.phoria === 0}
+                                                    onChange={() => setData("phoria", 0)}
                                                 />
                                                 <label htmlFor="phoria-no">No</label>
                                             </div>

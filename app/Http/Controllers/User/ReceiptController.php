@@ -59,9 +59,19 @@ class ReceiptController extends Controller
 
     public function index()
     {
+        $sorting = request()->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
         $query = Receipt::select('receipts.*')
-            ->with('customer')
-            ->orderBy("receipts.id", "desc");
+            ->with('customer');
+
+        if ($sortColumn === 'customer.name') {
+            $query->join('customers', 'receipts.customer_id', '=', 'customers.id')
+                ->orderBy('customers.name', $sortDirection);
+        } else {
+            $query->orderBy($sortColumn, $sortDirection);
+        }
 
         // Handle search
         if (request()->has('search') && !empty(request('search'))) {
@@ -91,6 +101,9 @@ class ReceiptController extends Controller
                 'last_page' => $receipts->lastPage(),
             ],
             'filters' => request()->only(['search', 'per_page']),
+            'sorting' => $sorting,
+            'sortColumn' => $sortColumn,
+            'sortDirection' => $sortDirection,
         ]);
     }
 

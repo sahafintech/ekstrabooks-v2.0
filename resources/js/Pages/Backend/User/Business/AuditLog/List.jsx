@@ -18,6 +18,7 @@ import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import PageHeader from "@/Components/PageHeader";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
+import { ChevronUp, ChevronDown } from "lucide-react";
 
 export default function List({ auditLogs = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
@@ -25,6 +26,7 @@ export default function List({ auditLogs = [], meta = {}, filters = {} }) {
   const [search, setSearch] = useState(filters.search || "");
   const [perPage, setPerPage] = useState(meta.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
+  const [sorting, setSorting] = useState(filters.sorting || { column: "date_changed", direction: "desc" });
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -50,7 +52,7 @@ export default function List({ auditLogs = [], meta = {}, filters = {} }) {
 
     router.get(
       route("audit_logs.index"),
-      { search: value, page: 1, per_page: perPage },
+      { search: value, page: 1, per_page: perPage, sorting },
       { preserveState: true }
     );
   };
@@ -59,7 +61,7 @@ export default function List({ auditLogs = [], meta = {}, filters = {} }) {
     setPerPage(value);
     router.get(
       route("audit_logs.index"),
-      { search, page: 1, per_page: value },
+      { search, page: 1, per_page: value, sorting },
       { preserveState: true }
     );
   };
@@ -68,11 +70,37 @@ export default function List({ auditLogs = [], meta = {}, filters = {} }) {
     setCurrentPage(page);
     router.get(
       route("audit_logs.index"),
-      { search, page, per_page: perPage },
+      { search, page, per_page: perPage, sorting },
       { preserveState: true }
     );
   };
 
+  const handleSort = (column) => {
+    let direction = "asc";
+    if (sorting.column === column && sorting.direction === "asc") {
+      direction = "desc";
+    }
+    setSorting({ column, direction });
+    router.get(
+      route("audit_logs.index"),
+      { ...filters, sorting: { column, direction } },
+      { preserveState: true }
+    );
+  };
+
+  const renderSortIcon = (column) => {
+    const isActive = sorting.column === column;
+    return (
+      <span className="inline-flex flex-col ml-1">
+        <ChevronUp
+          className={`w-3 h-3 ${isActive && sorting.direction === "asc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+        <ChevronDown
+          className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+      </span>
+    );
+  };
 
   const renderPageNumbers = () => {
     const totalPages = meta.last_page;
@@ -150,9 +178,15 @@ export default function List({ auditLogs = [], meta = {}, filters = {} }) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date Changed</TableHead>
-                    <TableHead>User</TableHead>
-                    <TableHead>Event</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("date_changed")}>
+                      Date Changed {renderSortIcon("date_changed")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("changed_user.name")}>
+                      User {renderSortIcon("changed_user.name")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("event")}>
+                      Event {renderSortIcon("event")}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
