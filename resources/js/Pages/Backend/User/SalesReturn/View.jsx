@@ -21,6 +21,7 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import { Table, TableBody, TableHeader, TableRow, TableHead, TableCell } from "@/Components/ui/table";
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function View({ sales_return, attachments, decimalPlace }) {
     const [isLoading, setIsLoading] = useState({
@@ -164,7 +165,7 @@ export default function View({ sales_return, attachments, decimalPlace }) {
                                             <img
                                                 src={`/uploads/media/${sales_return.business.logo}`}
                                                 alt="Business Logo"
-                                                className="max-h-16 object-contain"
+                                                className="max-h-32 object-contain"
                                             />
                                         </div>
                                     )}
@@ -182,6 +183,15 @@ export default function View({ sales_return, attachments, decimalPlace }) {
                                     <div className="mt-2 text-sm">
                                         <p><span className="font-medium">Sales Return #:</span> {sales_return.return_number}</p>
                                         <p><span className="font-medium">Sales Return Date:</span> {sales_return.return_date}</p>
+                                    </div>
+                                    <div className="mt-4 md:flex md:justify-end">
+                                        <QRCodeSVG 
+                                            value={route('sales_returns.show_public_sales_return', sales_return.short_code)}
+                                            size={100}
+                                            level="H"
+                                            includeMargin={true}
+                                            className="print:block"
+                                        />
                                     </div>
                                 </div>
                             </div>

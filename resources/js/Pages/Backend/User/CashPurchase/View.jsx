@@ -21,6 +21,7 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import { Table, TableBody, TableHeader, TableRow, TableHead, TableCell } from "@/Components/ui/table";
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function View({ bill, attachments, decimalPlace }) {
     const [isLoading, setIsLoading] = useState({
@@ -158,7 +159,7 @@ export default function View({ bill, attachments, decimalPlace }) {
                                             <img
                                                 src={`/uploads/media/${bill.business.logo}`}
                                                 alt="Business Logo"
-                                                className="max-h-16 object-contain"
+                                                className="max-h-32 object-contain"
                                             />
                                         </div>
                                     )}
@@ -180,6 +181,15 @@ export default function View({ bill, attachments, decimalPlace }) {
                                         {bill.order_number && (
                                             <p><span className="font-medium">Order Number:</span> {bill.order_number}</p>
                                         )}
+                                    </div>
+                                    <div className="mt-4 md:flex md:justify-end">
+                                        <QRCodeSVG 
+                                            value={route('cash_purchases.show_public_cash_purchase', bill.short_code)}
+                                            size={100}
+                                            level="H"
+                                            includeMargin={true}
+                                            className="print:block"
+                                        />
                                     </div>
                                 </div>
                             </div>

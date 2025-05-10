@@ -141,7 +141,7 @@ export default function PublicView({ invoice }) {
                                         <img
                                             src={`/uploads/media/${invoice.business.logo}`}
                                             alt="Business Logo"
-                                            className="max-h-16 object-contain"
+                                            className="max-h-32 object-contain"
                                         />
                                     </div>
                                 )}

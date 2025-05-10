@@ -28,6 +28,7 @@ import { Label } from "@/Components/ui/label";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import InputError from "@/Components/InputError";
 import RichTextEditor from "@/Components/RichTextEditor";
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function View({ bill, attachments, decimalPlace, email_templates }) {
     const { flash = {} } = usePage().props;
@@ -338,7 +339,7 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
                                             <img
                                                 src={`/uploads/media/${bill.business.logo}`}
                                                 alt="Business Logo"
-                                                className="max-h-16 object-contain"
+                                                className="max-h-32 object-contain"
                                             />
                                         </div>
                                     )}
@@ -360,6 +361,15 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
                                         {bill.order_number && (
                                             <p><span className="font-medium">Order Number:</span> {bill.order_number}</p>
                                         )}
+                                    </div>
+                                    <div className="mt-4 md:flex md:justify-end">
+                                        <QRCodeSVG 
+                                            value={route('bill_invoices.show_public_bill_invoice', bill.short_code)}
+                                            size={100}
+                                            level="H"
+                                            includeMargin={true}
+                                            className="print:block"
+                                        />
                                     </div>
                                 </div>
                             </div>

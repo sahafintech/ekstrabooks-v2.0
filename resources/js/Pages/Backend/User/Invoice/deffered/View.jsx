@@ -29,6 +29,7 @@ import { Label } from "@/Components/ui/label";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import InputError from "@/Components/InputError";
 import RichTextEditor from "@/Components/RichTextEditor";
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function View({ invoice, attachments, decimalPlace, email_templates }) {
     const { flash = {} } = usePage().props;
@@ -338,7 +339,7 @@ export default function View({ invoice, attachments, decimalPlace, email_templat
                                             <img
                                                 src={`/uploads/media/${invoice.business.logo}`}
                                                 alt="Business Logo"
-                                                className="max-h-16 object-contain"
+                                                className="max-h-32 object-contain"
                                             />
                                         </div>
                                     )}
@@ -360,6 +361,15 @@ export default function View({ invoice, attachments, decimalPlace, email_templat
                                         )}
                                         <p><span className="font-medium">Invoice Date:</span> {invoice.invoice_date}</p>
                                         <p><span className="font-medium">Due Date:</span> {invoice.due_date}</p>
+                                    </div>
+                                    <div className="mt-4 md:flex md:justify-end">
+                                        <QRCodeSVG 
+                                            value={route('deffered_invoices.show_public_invoice', invoice.short_code)}
+                                            size={100}
+                                            level="H"
+                                            includeMargin={true}
+                                            className="print:block"
+                                        />
                                     </div>
                                 </div>
                             </div>

@@ -141,7 +141,7 @@ export default function PublicView({ bill }) {
                                         <img
                                             src={`/uploads/media/${bill.business.logo}`}
                                             alt="Business Logo"
-                                            className="max-h-16 object-contain"
+                                            className="max-h-32 object-contain"
                                         />
                                     </div>
                                 )}

@@ -35,6 +35,7 @@ import { Label } from "@/Components/ui/label";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import InputError from "@/Components/InputError";
 import RichTextEditor from "@/Components/RichTextEditor";
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function View({purchase_order,attachments,email_templates}) {
     const { flash = {} } = usePage().props;
@@ -361,7 +362,7 @@ export default function View({purchase_order,attachments,email_templates}) {
                                             <img
                                                 src={`/uploads/media/${purchase_order.business.logo}`}
                                                 alt="Business Logo"
-                                                className="max-h-16 object-contain"
+                                                className="max-h-32 object-contain"
                                             />
                                         </div>
                                     )}
@@ -391,6 +392,15 @@ export default function View({purchase_order,attachments,email_templates}) {
                                             </span>{" "}
                                             {purchase_order.order_date}
                                         </p>
+                                    </div>
+                                    <div className="mt-4 md:flex md:justify-end">
+                                        <QRCodeSVG 
+                                            value={route('purchase_orders.show_public_purchase_order', purchase_order.short_code)}
+                                            size={100}
+                                            level="H"
+                                            includeMargin={true}
+                                            className="print:block"
+                                        />
                                     </div>
                                 </div>
                             </div>

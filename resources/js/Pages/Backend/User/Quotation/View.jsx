@@ -21,6 +21,7 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import { Table, TableBody, TableHeader, TableRow, TableHead, TableCell } from "@/Components/ui/table";
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function View({ quotation, decimalPlace }) {
     const [isLoading, setIsLoading] = useState({
@@ -186,7 +187,7 @@ export default function View({ quotation, decimalPlace }) {
                                             <img
                                                 src={`/uploads/media/${quotation.business.logo}`}
                                                 alt="Business Logo"
-                                                className="max-h-16 object-contain"
+                                                className="max-h-32 object-contain"
                                             />
                                         </div>
                                     )}
@@ -207,6 +208,15 @@ export default function View({ quotation, decimalPlace }) {
                                         {quotation.order_number && (
                                             <p><span className="font-medium">Order Number:</span> {quotation.order_number}</p>
                                         )}
+                                    </div>
+                                    <div className="mt-4 md:flex md:justify-end">
+                                        <QRCodeSVG 
+                                            value={route('quotations.show_public_quotation', quotation.short_code)}
+                                            size={100}
+                                            level="H"
+                                            includeMargin={true}
+                                            className="print:block"
+                                        />
                                     </div>
                                 </div>
                             </div>

@@ -141,7 +141,7 @@ export default function PublicView({ sales_return }) {
                                         <img
                                             src={`/uploads/media/${sales_return.business.logo}`}
                                             alt="Business Logo"
-                                            className="max-h-16 object-contain"
+                                            className="max-h-32 object-contain"
                                         />
                                     </div>
                                 )}

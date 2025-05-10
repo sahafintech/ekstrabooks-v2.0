@@ -141,7 +141,7 @@ export default function PublicView({ quotation }) {
                                         <img
                                             src={`/uploads/media/${quotation.business.logo}`}
                                             alt="Business Logo"
-                                            className="max-h-16 object-contain"
+                                            className="max-h-32 object-contain"
                                         />
                                     </div>
                                 )}
