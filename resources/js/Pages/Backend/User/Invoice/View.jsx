@@ -18,7 +18,10 @@ import {
     DownloadIcon,
     MoreVertical,
     ShareIcon,
-    Edit
+    Edit,
+    Facebook,
+    MessageCircle,
+    Copy
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Table, TableBody, TableHeader, TableRow, TableHead, TableCell } from "@/Components/ui/table";
@@ -39,6 +42,8 @@ export default function View({ invoice, attachments, decimalPlace, email_templat
         pdf: false
     });
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [shareLink, setShareLink] = useState('');
 
     const { data, setData, post, processing, errors, reset } = useForm({
         email: invoice?.customer?.email || "",
@@ -155,9 +160,26 @@ export default function View({ invoice, attachments, decimalPlace, email_templat
     };
 
     const handleShareLink = () => {
-        router.visit(route('invoices.link', invoice.id), {
-            preserveScroll: true
+        const link = route('invoices.show_public_invoice', invoice.short_code);
+        setShareLink(link);
+        setIsShareModalOpen(true);
+    };
+
+    const handleCopyLink = () => {
+        navigator.clipboard.writeText(shareLink);
+        toast({
+            title: "Success",
+            description: "Link copied to clipboard",
         });
+    };
+
+    const handleWhatsAppShare = () => {
+        const text = `Check out this invoice: ${shareLink}`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    };
+
+    const handleFacebookShare = () => {
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareLink)}`, '_blank');
     };
 
     return (
@@ -337,6 +359,66 @@ export default function View({ invoice, attachments, decimalPlace, email_templat
                                 </Button>
                             </div>
                         </form>
+                    </Modal>
+
+                    {/* Share Modal */}
+                    <Modal
+                        show={isShareModalOpen}
+                        onClose={() => setIsShareModalOpen(false)}
+                        maxWidth="2xl"
+                    >
+                        <div className="mb-6">
+                            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                                Share Invoice
+                            </h2>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="flex items-center space-x-2">
+                                <Input
+                                    value={shareLink}
+                                    readOnly
+                                    className="flex-1"
+                                />
+                                <Button
+                                    variant="outline"
+                                    onClick={handleCopyLink}
+                                    className="flex items-center"
+                                >
+                                    <Copy className="mr-2 h-4 w-4" />
+                                    Copy
+                                </Button>
+                            </div>
+
+                            <div className="flex justify-center space-x-4 pt-4">
+                                <Button
+                                    variant="outline"
+                                    onClick={handleWhatsAppShare}
+                                    className="flex items-center"
+                                >
+                                    <MessageCircle className="mr-2 h-4 w-4" />
+                                    WhatsApp
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={handleFacebookShare}
+                                    className="flex items-center"
+                                >
+                                    <Facebook className="mr-2 h-4 w-4" />
+                                    Facebook
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 flex justify-end">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsShareModalOpen(false)}
+                            >
+                                Close
+                            </Button>
+                        </div>
                     </Modal>
 
                     <div className="print-container">

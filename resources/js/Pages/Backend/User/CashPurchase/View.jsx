@@ -16,18 +16,25 @@ import {
     DownloadIcon,
     MoreVertical,
     ShareIcon,
-    Edit
+    Edit,
+    Facebook,
+    MessageCircle,
+    Copy
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Table, TableBody, TableHeader, TableRow, TableHead, TableCell } from "@/Components/ui/table";
 import { QRCodeSVG } from 'qrcode.react';
+import Modal from "@/Components/Modal";
+import { Input } from "@/Components/ui/input";
 
 export default function View({ bill, attachments, decimalPlace }) {
     const [isLoading, setIsLoading] = useState({
         print: false,
         pdf: false
     });
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [shareLink, setShareLink] = useState('');
 
     const handlePrint = () => {
         setIsLoading(prev => ({ ...prev, print: true }));
@@ -90,9 +97,23 @@ export default function View({ bill, attachments, decimalPlace }) {
     };
 
     const handleShareLink = () => {
-        router.visit(route('cash_purchases.link', bill.id), {
-            preserveScroll: true
-        });
+        const link = route('cash_purchases.show_public_cash_purchase', bill.short_code);
+        setShareLink(link);
+        setIsShareModalOpen(true);
+    };
+
+    const handleCopyLink = () => {
+        navigator.clipboard.writeText(shareLink);
+        toast.success("Link copied to clipboard");
+    };
+
+    const handleWhatsAppShare = () => {
+        const text = `Check out this cash purchase: ${shareLink}`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    };
+
+    const handleFacebookShare = () => {
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareLink)}`, '_blank');
     };
 
     return (
@@ -361,6 +382,66 @@ export default function View({ bill, attachments, decimalPlace }) {
                     </div>
                 </div>
             </SidebarInset>
+
+            {/* Share Modal */}
+            <Modal
+                show={isShareModalOpen}
+                onClose={() => setIsShareModalOpen(false)}
+                maxWidth="2xl"
+            >
+                <div className="mb-6">
+                    <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                        Share Cash Purchase
+                    </h2>
+                </div>
+
+                <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                        <Input
+                            value={shareLink}
+                            readOnly
+                            className="flex-1"
+                        />
+                        <Button
+                            variant="outline"
+                            onClick={handleCopyLink}
+                            className="flex items-center"
+                        >
+                            <Copy className="mr-2 h-4 w-4" />
+                            Copy
+                        </Button>
+                    </div>
+
+                    <div className="flex justify-center space-x-4 pt-4">
+                        <Button
+                            variant="outline"
+                            onClick={handleWhatsAppShare}
+                            className="flex items-center"
+                        >
+                            <MessageCircle className="mr-2 h-4 w-4" />
+                            WhatsApp
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={handleFacebookShare}
+                            className="flex items-center"
+                        >
+                            <Facebook className="mr-2 h-4 w-4" />
+                            Facebook
+                        </Button>
+                    </div>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsShareModalOpen(false)}
+                    >
+                        Close
+                    </Button>
+                </div>
+            </Modal>
 
             {/* Print Styles */}
             <style jsx global>{`

@@ -353,7 +353,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('pos/store', [ReceiptController::class, 'pos_store'])->name('receipts.pos_store');
 		Route::post('receipts/bulk_destroy', [ReceiptController::class, 'bulk_destroy'])->name('receipts.bulk_destroy');
 		Route::get('export_receipts', [ReceiptController::class, 'export_receipts'])->name('receipts.export');
-		Route::get('receipts/{id}/public', [ReceiptController::class, 'show_public_receipt'])->name('receipts.show_public_receipt');
 
 		// hold pos invoices
 		Route::resource('hold_pos_invoices', HoldPosInvoiceController::class);
@@ -665,7 +664,7 @@ Route::get('quotation/{short_code}', [QuotationController::class, 'show_public_q
 Route::get('bill_invoice/{short_code}', [PurchaseController::class, 'show_public_bill_invoice'])->name('bill_invoices.show_public_bill_invoice');
 Route::get('bill_payment/{id}', [BillPaymentsController::class, 'show_public_bill_payment'])->name('bill_payments.show_public_bill_payment');
 Route::get('purchase_return/{short_code}', [PurchaseReturnController::class, 'show_public_purchase_return'])->name('purchase_returns.show_public_purchase_return');
-Route::get('cash_invoice/{short_code}', [ReceiptController::class, 'show_public_cash_invoice'])->name('cash_purchases.show_public_cash_invoice');
+Route::get('cash_invoice/{short_code}', [ReceiptController::class, 'show_public_cash_invoice'])->name('cash_invoices.show_public_cash_invoice');
 Route::get('deffered_invoice/{short_code}', [DefferedInvoiceController::class, 'show_public_deffered_invoice'])->name('deffered_invoices.show_public_deffered_invoice');
 Route::get('receive_payment/{id}', [ReceivePaymentsController::class, 'show_public_receive_payment'])->name('receive_payments.show_public_receive_payment');
 Route::get('sales_return/{short_code}', [SalesReturnController::class, 'show_public_sales_return'])->name('sales_returns.show_public_sales_return');
