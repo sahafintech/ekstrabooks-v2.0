@@ -12,6 +12,7 @@ use App\Models\DefferedAddition;
 use App\Models\DefferedDeduction;
 use App\Models\DefferedEarning;
 use App\Models\DefferedPayment;
+use App\Models\EmailTemplate;
 use App\Models\InsuranceBenefit;
 use App\Models\InsuranceFamilySize;
 use App\Models\Invoice;
@@ -20,9 +21,12 @@ use App\Models\InvoiceItemTax;
 use App\Models\Product;
 use App\Models\Tax;
 use App\Models\Transaction;
+use App\Notifications\SendDefferedInvoice;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 
@@ -997,13 +1001,78 @@ class DefferedInvoiceController extends Controller
         return redirect()->route('deffered_invoices.show', $invoice->id)->with('success', _lang('Invoice Updated Successfully'));
     }
 
+    public function send_email(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'email'   => 'required',
+            'subject' => 'required',
+            'message' => 'required',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()->with('error', $validator->errors()->all());
+        }
+
+        $customMessage = [
+            'subject' => $request->subject,
+            'message' => $request->message,
+        ];
+
+        $defferedInvoice         = Invoice::find($id);
+        $customer        = $defferedInvoice->customer;
+        $customer->email = $request->email;
+
+        try {
+            Notification::send($customer, new SendDefferedInvoice($defferedInvoice, $customMessage, $request->template));
+            $defferedInvoice->email_send    = 1;
+            $defferedInvoice->email_send_at = now();
+            $defferedInvoice->save();
+            return redirect()->back()->with('success', _lang('Email has been sent'));
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Sent Deffered Invoice ' . $defferedInvoice->invoice_number . ' to ' . $customer->email;
+        $audit->save();
+    }
+
+    /**
+     * Preview Public Invoice
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function show_public_deffered_invoice($short_code, $export = 'preview')
+    {
+        $defferedInvoice   = Invoice::withoutGlobalScopes()->with(['customer', 'business', 'items', 'taxes'])
+            ->where('short_code', $short_code)
+            ->first();
+
+        $request = request();
+        // add activeBusiness object to request
+        $request->merge(['activeBusiness' => $defferedInvoice->business]);
+
+        if ($export == 'pdf') {
+            $pdf = Pdf::loadView('backend.user.invoice.pdf', compact('defferedInvoice'));
+            return $pdf->download('deffered_invoice#-' . $defferedInvoice->invoice_number . '.pdf');
+        }
+
+        return Inertia::render('Backend/User/Invoice/Deffered/GuestView', [
+            'defferedInvoice' => $defferedInvoice,
+        ]);
+    }
+
     /**
      * Preview Private Invoice
      *
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show(Request $request, $id)
+    public function show($id)
     {
         $invoice = Invoice::with([
             'business',
@@ -1018,11 +1087,15 @@ class DefferedInvoiceController extends Controller
             ->get();
 
         $decimalPlaces = get_business_option('decimal_places', 2);
+        $email_templates = EmailTemplate::whereIn('slug', ['NEW_DEFFERED_INVOICE_CREATED'])
+            ->where('email_status', 1)
+            ->get();
 
         return Inertia::render('Backend/User/Invoice/Deffered/View', [
             'invoice' => $invoice,
             'attachments' => $attachments,
-            'decimalPlaces' => $decimalPlaces
+            'decimalPlaces' => $decimalPlaces,
+            'email_templates' => $email_templates
         ]);
     }
 

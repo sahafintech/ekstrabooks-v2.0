@@ -25,7 +25,6 @@ import { Table, TableBody, TableHeader, TableRow, TableHead, TableCell } from "@
 export default function View({ payment, decimalPlace }) {
     const [isLoading, setIsLoading] = useState({
         print: false,
-        email: false,
         pdf: false
     });
 
@@ -35,21 +34,6 @@ export default function View({ payment, decimalPlace }) {
             window.print();
             setIsLoading(prev => ({ ...prev, print: false }));
         }, 300);
-    };
-
-    const handleEmailInvoice = () => {
-        setIsLoading(prev => ({ ...prev, email: true }));
-        router.visit(route('invoices.send_email', invoice.id), {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Email form opened successfully');
-                setIsLoading(prev => ({ ...prev, email: false }));
-            },
-            onError: () => {
-                toast.error('Failed to open email form');
-                setIsLoading(prev => ({ ...prev, email: false }));
-            }
-        });
     };
 
     const handleDownloadPDF = () => {
@@ -87,16 +71,6 @@ export default function View({ payment, decimalPlace }) {
                         >
                             <PrinterIcon className="mr-2 h-4 w-4" />
                             {isLoading.print ? "Printing..." : "Print"}
-                        </Button>
-
-                        <Button
-                            variant="outline"
-                            onClick={handleEmailInvoice}
-                            disabled={isLoading.email}
-                            className="flex items-center"
-                        >
-                            <MailIcon className="mr-2 h-4 w-4" />
-                            {isLoading.email ? "Sending..." : "Email"}
                         </Button>
 
                         <Button

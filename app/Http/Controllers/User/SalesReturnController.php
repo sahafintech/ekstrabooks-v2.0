@@ -16,7 +16,6 @@ use App\Models\SalesReturnItem;
 use App\Models\SalesReturnItemTax;
 use App\Models\Tax;
 use App\Models\Transaction;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -573,21 +572,6 @@ class SalesReturnController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-
-    public function export_pdf(Request $request, $id)
-    {
-        $sales_return = SalesReturn::with(['business', 'items'])->find($id);
-        $pdf     = Pdf::loadView('backend.user.sales_return.pdf', compact('sales_return', 'id'));
-
-        // audit log
-        $audit = new AuditLog();
-        $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Sales Return PDF Exported' . ' ' . $sales_return->return_number;
-        $audit->save();
-
-        return $pdf->download('sales return#-' . $sales_return->return_number . '.pdf');
-    }
 
     /**
      * Show the form for editing the specified resource.

@@ -25,7 +25,6 @@ import { Table, TableBody, TableHeader, TableRow, TableHead, TableCell } from "@
 export default function View({ purchase_return, attachments, decimalPlace }) {
     const [isLoading, setIsLoading] = useState({
         print: false,
-        email: false,
         pdf: false
     });
 
@@ -37,27 +36,62 @@ export default function View({ purchase_return, attachments, decimalPlace }) {
         }, 300);
     };
 
-    const handleEmailInvoice = () => {
-        setIsLoading(prev => ({ ...prev, email: true }));
-        router.visit(route('purchase_returns.send_email', purchase_return.id), {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Email form opened successfully');
-                setIsLoading(prev => ({ ...prev, email: false }));
-            },
-            onError: () => {
-                toast.error('Failed to open email form');
-                setIsLoading(prev => ({ ...prev, email: false }));
-            }
-        });
-    };
-
-    const handleDownloadPDF = () => {
+    const handleDownloadPDF = async () => {
         setIsLoading(prev => ({ ...prev, pdf: true }));
-        window.open(route('purchase_returns.pdf', purchase_return.id), '_blank');
-        setTimeout(() => {
+        try {
+            // Dynamically import the required libraries
+            const html2canvas = (await import('html2canvas')).default;
+            const { jsPDF } = await import('jspdf');
+
+            // Get the content element
+            const content = document.querySelector('.print-container');
+            
+            // Create a canvas from the content
+            const canvas = await html2canvas(content, {
+                scale: 4,
+                useCORS: true, // Enable CORS for images
+                logging: false,
+                windowWidth: content.scrollWidth,
+                windowHeight: content.scrollHeight,
+                allowTaint: true,
+                backgroundColor: '#ffffff'
+            });
+
+            // Calculate dimensions
+            const imgWidth = 210; // A4 width in mm
+            const pageHeight = 297; // A4 height in mm
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            
+            // Create PDF with higher quality
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            let heightLeft = imgHeight;
+            let position = 0;
+            let pageData = canvas.toDataURL('image/jpeg', 1.0);
+
+            // Add first page
+            pdf.addImage(pageData, 'JPEG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+
+            // Add subsequent pages if content is longer than one page
+            while (heightLeft >= 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(pageData, 'JPEG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+
+            // Save the PDF
+            pdf.save(`Purchase_Return_${purchase_return.return_number}.pdf`);
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to generate PDF. Please try again.",
+            });
+        } finally {
             setIsLoading(prev => ({ ...prev, pdf: false }));
-        }, 1000);
+        }
     };
 
     const handleShareLink = () => {
@@ -87,16 +121,6 @@ export default function View({ purchase_return, attachments, decimalPlace }) {
                         >
                             <PrinterIcon className="mr-2 h-4 w-4" />
                             {isLoading.print ? "Printing..." : "Print"}
-                        </Button>
-
-                        <Button
-                            variant="outline"
-                            onClick={handleEmailInvoice}
-                            disabled={isLoading.email}
-                            className="flex items-center"
-                        >
-                            <MailIcon className="mr-2 h-4 w-4" />
-                            {isLoading.email ? "Sending..." : "Email"}
                         </Button>
 
                         <Button

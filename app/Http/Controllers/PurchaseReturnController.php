@@ -13,7 +13,6 @@ use App\Models\PurchaseReturnItemTax;
 use App\Models\Tax;
 use App\Models\Transaction;
 use App\Models\Vendor;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -828,20 +827,5 @@ class PurchaseReturnController extends Controller
         $audit->save();
 
         return redirect()->route('purchase_returns.index')->with('success', _lang('Saved Successfully'));
-    }
-
-    public function export_pdf(Request $request, $id)
-    {
-        $purchase_return = PurchaseReturn::with(['business', 'items'])->find($id);
-        $pdf     = Pdf::loadView('backend.user.purchase_return.pdf', compact('purchase_return', 'id'));
-
-        // audit log
-        $audit = new AuditLog();
-        $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Purchase Return PDF Exported: ' . $purchase_return->return_number;
-        $audit->save();
-
-        return $pdf->download('purchase_return#-' . $purchase_return->return_number . '.pdf');
     }
 }

@@ -1,10 +1,20 @@
-import GuestLayout from "@/Layouts/GuestLayout";
 import { Head, Link, useForm } from "@inertiajs/react";
 import { Button } from "@/Components/ui/button";
 import FormInput from "@/Components/shared/FormInput";
-import { SocialLoginButton, SocialLoginIcons } from "@/Components/auth/SocialLogin";
+import {
+    SocialLoginButton,
+    SocialLoginIcons,
+} from "@/Components/auth/SocialLogin";
+import AuthLayout from "@/Layouts/AuthLayout";
 
-const LoginForm = ({ onSubmit, data, setData, errors, processing, canResetPassword }) => (
+const LoginForm = ({
+    onSubmit,
+    data,
+    setData,
+    errors,
+    processing,
+    canResetPassword,
+}) => (
     <form onSubmit={onSubmit} className="p-6 md:p-8">
         <div className="flex flex-col gap-6">
             <div className="flex flex-col items-center text-center">
@@ -55,12 +65,19 @@ const LoginForm = ({ onSubmit, data, setData, errors, processing, canResetPasswo
             </div>
             <div className="grid grid-cols-3 gap-4">
                 {Object.entries(SocialLoginIcons).map(([provider, icon]) => (
-                    <SocialLoginButton key={provider} provider={provider} icon={icon} />
+                    <SocialLoginButton
+                        key={provider}
+                        provider={provider}
+                        icon={icon}
+                    />
                 ))}
             </div>
             <div className="text-center text-sm">
                 Don&apos;t have an account?{" "}
-                <Link href={route("register")} className="underline underline-offset-4">
+                <Link
+                    href={route("register")}
+                    className="underline underline-offset-4"
+                >
                     Sign up
                 </Link>
             </div>
@@ -83,10 +100,12 @@ export default function Login({ status, canResetPassword }) {
     };
 
     return (
-        <GuestLayout>
+        <AuthLayout>
             <Head title="Log in" />
             {status && (
-                <div className="mb-4 text-sm font-medium text-green-600">{status}</div>
+                <div className="mb-4 text-sm font-medium text-green-600">
+                    {status}
+                </div>
             )}
             <div className="flex flex-col gap-6">
                 <div className="overflow-hidden bg-white">
@@ -114,6 +133,6 @@ export default function Login({ status, canResetPassword }) {
                     <a href="#">Privacy Policy</a>.
                 </div>
             </div>
-        </GuestLayout>
+        </AuthLayout>
     );
 }

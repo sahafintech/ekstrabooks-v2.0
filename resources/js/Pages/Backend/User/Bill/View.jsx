@@ -1,8 +1,10 @@
-import { Head, Link, router, usePage } from "@inertiajs/react";
+import { Head, Link, router, useForm, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset, SidebarSeparator } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
 import { formatCurrency } from "@/lib/utils";
+import { Toaster } from "@/Components/ui/toaster";
+import { useToast } from "@/hooks/use-toast";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -18,15 +20,30 @@ import {
     ShareIcon,
     Edit
 } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
+import { useState, useEffect } from "react";
 import { Table, TableBody, TableHeader, TableRow, TableHead, TableCell } from "@/Components/ui/table";
+import Modal from "@/Components/Modal";
+import { Input } from "@/Components/ui/input";
+import { Label } from "@/Components/ui/label";
+import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import InputError from "@/Components/InputError";
+import RichTextEditor from "@/Components/RichTextEditor";
 
-export default function View({ bill, attachments, decimalPlace }) {
+export default function View({ bill, attachments, decimalPlace, email_templates }) {
+    const { flash = {} } = usePage().props;
+    const { toast } = useToast();
     const [isLoading, setIsLoading] = useState({
         print: false,
         email: false,
         pdf: false
+    });
+    const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+
+    const { data, setData, post, processing, errors, reset } = useForm({
+        email: bill?.vendor?.email || "",
+        subject: "",
+        message: "",
+        template: "",
     });
 
     const handlePrint = () => {
@@ -37,27 +54,103 @@ export default function View({ bill, attachments, decimalPlace }) {
         }, 300);
     };
 
+    useEffect(() => {
+        if (flash && flash.success) {
+          toast({
+            title: "Success",
+            description: flash.success,
+          });
+        }
+    
+        if (flash && flash.error) {
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: flash.error,
+          });
+        }
+      }, [flash, toast]);
+
     const handleEmailInvoice = () => {
-        setIsLoading(prev => ({ ...prev, email: true }));
-        router.visit(route('bill_invoices.send_email', bill.id), {
+        setIsEmailModalOpen(true);
+    };
+
+    const handleEmailSubmit = (e) => {
+        e.preventDefault();
+        post(route("bill_invoices.send_email", bill.id), {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success('Email form opened successfully');
-                setIsLoading(prev => ({ ...prev, email: false }));
+                setIsEmailModalOpen(false);
+                reset();
             },
-            onError: () => {
-                toast.error('Failed to open email form');
-                setIsLoading(prev => ({ ...prev, email: false }));
-            }
         });
     };
 
-    const handleDownloadPDF = () => {
+    const handleTemplateChange = (templateSlug) => {
+        const template = email_templates.find(t => t.slug === templateSlug);
+        if (template) {
+            setData("template", templateSlug);
+            setData("subject", template.subject);
+            setData("message", template.email_body);
+        }
+    };
+
+    const handleDownloadPDF = async () => {
         setIsLoading(prev => ({ ...prev, pdf: true }));
-        window.open(route('bill_invoices.pdf', bill.id), '_blank');
-        setTimeout(() => {
+        try {
+            // Dynamically import the required libraries
+            const html2canvas = (await import('html2canvas')).default;
+            const { jsPDF } = await import('jspdf');
+
+            // Get the content element
+            const content = document.querySelector('.print-container');
+            
+            // Create a canvas from the content
+            const canvas = await html2canvas(content, {
+                scale: 4,
+                useCORS: true, // Enable CORS for images
+                logging: false,
+                windowWidth: content.scrollWidth,
+                windowHeight: content.scrollHeight,
+                allowTaint: true,
+                backgroundColor: '#ffffff'
+            });
+
+            // Calculate dimensions
+            const imgWidth = 210; // A4 width in mm
+            const pageHeight = 297; // A4 height in mm
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            
+            // Create PDF with higher quality
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            let heightLeft = imgHeight;
+            let position = 0;
+            let pageData = canvas.toDataURL('image/jpeg', 1.0);
+
+            // Add first page
+            pdf.addImage(pageData, 'JPEG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+
+            // Add subsequent pages if content is longer than one page
+            while (heightLeft >= 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(pageData, 'JPEG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+
+            // Save the PDF
+            pdf.save(`Bill_${bill.bill_no}.pdf`);
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to generate PDF. Please try again.",
+            });
+        } finally {
             setIsLoading(prev => ({ ...prev, pdf: false }));
-        }, 1000);
+        }
     };
 
     const handleShareLink = () => {
@@ -69,6 +162,8 @@ export default function View({ bill, attachments, decimalPlace }) {
     return (
         <AuthenticatedLayout>
             <Head title={`Bill Invoices #${bill.bill_no}`} />
+
+            <Toaster />
 
             <SidebarInset>
                 <div className="space-y-4">
@@ -129,6 +224,109 @@ export default function View({ bill, attachments, decimalPlace }) {
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
+
+                    {/* Email Modal */}
+                    <Modal
+                        show={isEmailModalOpen}
+                        onClose={() => setIsEmailModalOpen(false)}
+                        maxWidth="3xl"
+                    >
+                        <div className="mb-6">
+                            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                                Send Bill Email
+                            </h2>
+                        </div>
+
+                        <form
+                            onSubmit={handleEmailSubmit}
+                            className="space-y-4"
+                        >
+                            <div className="grid gap-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="email">
+                                        Recipient Email
+                                    </Label>
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        value={data.email}
+                                        onChange={(e) =>
+                                            setData("email", e.target.value)
+                                        }
+                                        required
+                                    />
+                                    <InputError
+                                        message={errors.email}
+                                        className="text-sm"
+                                    />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="template">
+                                        Email Template
+                                    </Label>
+                                    <SearchableCombobox
+                                        options={email_templates?.map(
+                                            (template) => ({
+                                                id: template.slug,
+                                                name: template.name,
+                                            })
+                                        )}
+                                        value={data.template}
+                                        onChange={handleTemplateChange}
+                                        placeholder="Select a template"
+                                        emptyMessage="No templates found"
+                                    />
+                                    <InputError
+                                        message={errors.template}
+                                        className="text-sm"
+                                    />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="subject">Subject</Label>
+                                    <Input
+                                        id="subject"
+                                        value={data.subject}
+                                        onChange={(e) =>
+                                            setData("subject", e.target.value)
+                                        }
+                                        required
+                                    />
+                                    <InputError
+                                        message={errors.subject}
+                                        className="text-sm"
+                                    />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="message">Message</Label>
+                                    <RichTextEditor
+                                        value={data.message}
+                                        onChange={(content) => setData("message", content)}
+                                        height={250}
+                                    />
+                                    <InputError
+                                        message={errors.message}
+                                        className="text-sm"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="mt-6 flex justify-end space-x-3">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setIsEmailModalOpen(false)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button type="submit" disabled={processing}>
+                                    {processing ? "Sending..." : "Send Email"}
+                                </Button>
+                            </div>
+                        </form>
+                    </Modal>
 
                     <div className="print-container">
                         <div className="p-6 sm:p-8">

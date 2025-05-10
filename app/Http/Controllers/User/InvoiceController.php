@@ -21,7 +21,6 @@ use App\Models\ReceivePayment;
 use App\Models\Tax;
 use App\Models\Transaction;
 use App\Notifications\SendInvoice;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -447,11 +446,14 @@ class InvoiceController extends Controller
             ->get();
 
         $decimalPlaces = get_business_option('decimal_places', 2);
+        $email_templates = EmailTemplate::whereIn('slug', ['NEW_INVOICE_CREATED', 'INVOICE_PAYMENT_REMINDER'])
+            ->where('email_status', 1)->get();
 
         return Inertia::render('Backend/User/Invoice/View', [
             'invoice' => $invoice,
             'attachments' => $attachments,
-            'decimalPlaces' => $decimalPlaces
+            'decimalPlaces' => $decimalPlaces,
+            'email_templates' => $email_templates
         ]);
     }
 
@@ -526,27 +528,7 @@ class InvoiceController extends Controller
         // add activeBusiness object to request
         $request->merge(['activeBusiness' => $invoice->business]);
 
-        if ($export == 'pdf') {
-            $pdf = Pdf::loadView('backend.user.invoice.pdf', compact('invoice'));
-            return $pdf->download('invoice#-' . $invoice->invoice_number . '.pdf');
-        }
-
         return view('backend.guest.invoice.view', compact('invoice'));
-    }
-
-    public function export_pdf(Request $request, $id)
-    {
-        $invoice = Invoice::with(['business', 'items'])->find($id);
-        $pdf     = Pdf::loadView('backend.user.invoice.pdf', compact('invoice', 'id'));
-
-        // audit log
-        $audit = new AuditLog();
-        $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Exported Invoice ' . $invoice->invoice_number . ' to PDF';
-        $audit->save();
-
-        return $pdf->download('invoice#-' . $invoice->invoice_number . '.pdf');
     }
 
     /**

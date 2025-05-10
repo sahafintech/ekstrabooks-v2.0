@@ -19,11 +19,8 @@ use App\Models\quotationItemTax;
 use App\Models\Tax;
 use App\Models\Transaction;
 use App\Notifications\SendQuotation;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
-use DataTables;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Inertia;
@@ -267,9 +264,12 @@ class QuotationController extends Controller
     public function show(Request $request, $id)
     {
         $quotation = quotation::with(['business', 'items', 'customer', 'taxes'])->find($id);
+        $email_templates = EmailTemplate::whereIn('slug', ['NEW_QUOTATION_CREATED'])
+            ->where('email_status', 1)->get();
 
         return Inertia::render('Backend/User/Quotation/View', [
             'quotation' => $quotation,
+            'email_templates' => $email_templates
         ]);
     }
 
@@ -284,15 +284,6 @@ class QuotationController extends Controller
 
     public function send_email(Request $request, $id)
     {
-        if (!$request->ajax()) {
-            return back();
-        }
-        if ($request->isMethod('get')) {
-            $email_templates = EmailTemplate::whereIn('slug', ['NEW_QUOTATION_CREATED'])
-                ->where('email_status', 1)->get();
-            $quotation = Quotation::find($id);
-            return view('backend.user.quotation.modal.send_email', compact('quotation', 'id', 'email_templates'));
-        } else {
             $validator = Validator::make($request->all(), [
                 'email'   => 'required',
                 'subject' => 'required',
@@ -312,12 +303,11 @@ class QuotationController extends Controller
             $customer        = $quotation->customer;
             $customer->email = $request->email;
 
-            try {
-                Notification::send($customer, new SendQuotation($quotation, $customMessage, $request->template));
-                return response()->json(['result' => 'success', 'message' => _lang('Email has been sent')]);
-            } catch (\Exception $e) {
-                return response()->json(['result' => 'error', 'message' => $e->getMessage()]);
-            }
+        try {
+            Notification::send($customer, new SendQuotation($quotation, $customMessage, $request->template));
+            return redirect()->back()->with('success', _lang('Email has been sent'));
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
         }
     }
 
@@ -333,19 +323,8 @@ class QuotationController extends Controller
         $quotation = Quotation::withoutGlobalScopes()->with(['customer', 'business', 'items', 'taxes'])
             ->where('short_code', $short_code)
             ->first();
-        if ($export == 'pdf') {
-            $pdf = Pdf::loadView('backend.user.quotation.pdf', compact('quotation'));
-            return $pdf->download('quotation#-' . $quotation->quotation_number . '.pdf');
-        }
 
         return view('backend.guest.quotation.view', compact('quotation', 'alert_col'));
-    }
-
-    public function export_pdf(Request $request, $id)
-    {
-        $quotation = Quotation::with(['business', 'items'])->find($id);
-        $pdf = Pdf::loadView('backend.user.quotation.pdf', compact('quotation', 'id'));
-        return $pdf->download('quotation#-' . $quotation->quotation_number . '.pdf');
     }
 
     /**

@@ -11,6 +11,7 @@ use App\Models\AuditLog;
 use App\Models\BillPayment;
 use App\Models\BusinessSetting;
 use App\Models\Currency;
+use App\Models\EmailTemplate;
 use App\Models\PendingTransaction;
 use App\Models\Product;
 use App\Models\Purchase;
@@ -20,9 +21,12 @@ use App\Models\PurchasePayment;
 use App\Models\Tax;
 use App\Models\Transaction;
 use App\Models\Vendor;
+use App\Notifications\SendBillInvoice;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Validator;
@@ -885,6 +889,81 @@ class PurchaseController extends Controller
 					->where('order', 0);
 			}])
 			->first();
+	}
+
+	public function show($id)
+	{
+		$bill = Purchase::with(['business', 'items', 'taxes', 'vendor'])->find($id);
+		$attachments = Attachment::where('ref_type', 'bill invoice')->where('ref_id', $id)->get();
+		$email_templates = EmailTemplate::whereIn('slug', ['NEW_BILL_CREATED'])
+			->where('email_status', 1)
+			->get();
+
+		return Inertia::render('Backend/User/Bill/View', [
+			'bill' => $bill,
+			'attachments' => $attachments,
+			'email_templates' => $email_templates,
+		]);
+	}
+
+	public function show_public_bill_invoice($short_code, $export = 'preview')
+	{
+		$purchase   = Purchase::withoutGlobalScopes()->with(['vendor', 'business', 'items', 'taxes'])
+			->where('short_code', $short_code)
+			->first();
+
+		$request = request();
+		// add activeBusiness object to request
+		$request->merge(['activeBusiness' => $purchase->business]);
+
+		if ($export == 'pdf') {
+			$pdf = Pdf::loadView('backend.user.purchase.pdf', compact('purchase'));
+			return $pdf->download('bill_invoice#-' . $purchase->bill_no . '.pdf');
+		}
+
+		return Inertia::render('Backend/User/Bill/GuestView', compact('purchase'));
+	}
+
+	public function send_email(Request $request, $id)
+	{
+		$validator = Validator::make($request->all(), [
+			'email'   => 'required|email',
+			'subject' => 'required',
+			'message' => 'required',
+		]);
+
+		if ($validator->fails()) {
+			return response()->json([
+				'message' => $validator->errors()->first()
+			], 422);
+		}
+
+		$customMessage = [
+			'subject' => $request->subject,
+			'message' => $request->message,
+		];
+
+		$purchase = Purchase::find($id);
+		$vendor = $purchase->vendor;
+		$vendor->email = $request->email;
+
+		try {
+			Notification::send($vendor, new SendBillInvoice($purchase, $customMessage, $request->template));
+			$purchase->email_send = 1;
+			$purchase->email_send_at = now();
+			$purchase->save();
+
+			// audit log
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = auth()->user()->id;
+			$audit->event = 'Sent Bill Invoice ' . $purchase->bill_no . ' to ' . $vendor->email;
+			$audit->save();
+
+			return redirect()->back()->with('success', _lang('Email has been sent'));
+		} catch (\Exception $e) {
+			return redirect()->back()->with('error', $e->getMessage());
+		}
 	}
 
 	public function import_bills(Request $request)

@@ -1,11 +1,20 @@
 import InputError from "@/Components/InputError";
-import GuestLayout from "@/Layouts/GuestLayout";
+import AuthLayout from "@/Layouts/AuthLayout";
 import { Head, Link, useForm } from "@inertiajs/react";
 import { Button } from "@/Components/ui/button";
 import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
-import { SocialLoginButton, SocialLoginIcons } from "@/Components/auth/SocialLogin";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/Components/ui/select";
+import {
+    SocialLoginButton,
+    SocialLoginIcons,
+} from "@/Components/auth/SocialLogin";
 import FormInput from "@/Components/shared/FormInput";
 
 const countryCodes = [
@@ -52,7 +61,9 @@ const RegisterForm = ({ onSubmit, data, setData, errors, processing }) => (
                 <div className="flex gap-2">
                     <Select
                         value={data.country_code}
-                        onValueChange={(value) => setData("country_code", value)}
+                        onValueChange={(value) =>
+                            setData("country_code", value)
+                        }
                     >
                         <SelectTrigger className="w-[140px]">
                             <SelectValue placeholder="Select" />
@@ -94,7 +105,9 @@ const RegisterForm = ({ onSubmit, data, setData, errors, processing }) => (
                 name="password_confirmation"
                 value={data.password_confirmation}
                 autoComplete="new-password"
-                onChange={(e) => setData("password_confirmation", e.target.value)}
+                onChange={(e) =>
+                    setData("password_confirmation", e.target.value)
+                }
                 error={errors.password_confirmation}
             />
             <Button type="submit" className="w-full" disabled={processing}>
@@ -107,12 +120,19 @@ const RegisterForm = ({ onSubmit, data, setData, errors, processing }) => (
             </div>
             <div className="grid grid-cols-3 gap-4">
                 {Object.entries(SocialLoginIcons).map(([provider, icon]) => (
-                    <SocialLoginButton key={provider} provider={provider} icon={icon} />
+                    <SocialLoginButton
+                        key={provider}
+                        provider={provider}
+                        icon={icon}
+                    />
                 ))}
             </div>
             <div className="text-center text-sm">
                 Already have an account?{" "}
-                <Link href={route("login")} className="underline underline-offset-4">
+                <Link
+                    href={route("login")}
+                    className="underline underline-offset-4"
+                >
                     Login
                 </Link>
             </div>
@@ -138,7 +158,7 @@ export default function Register() {
     };
 
     return (
-        <GuestLayout>
+        <AuthLayout>
             <Head title="Register" />
             <div className="flex flex-col gap-6">
                 <div className="overflow-hidden bg-white">
@@ -165,6 +185,6 @@ export default function Register() {
                     <Link href="#">Privacy Policy</Link>.
                 </div>
             </div>
-        </GuestLayout>
+        </AuthLayout>
     );
 }

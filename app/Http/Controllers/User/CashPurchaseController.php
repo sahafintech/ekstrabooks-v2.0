@@ -8,6 +8,7 @@ use App\Models\Attachment;
 use App\Models\AuditLog;
 use App\Models\BusinessSetting;
 use App\Models\Currency;
+use App\Models\EmailTemplate;
 use App\Models\PendingTransaction;
 use App\Models\Product;
 use App\Models\Purchase;
@@ -16,9 +17,12 @@ use App\Models\PurchaseItemTax;
 use App\Models\Tax;
 use App\Models\Transaction;
 use App\Models\Vendor;
+use App\Notifications\SendCashPurchase;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Inertia;
 use Validator;
 
@@ -580,11 +584,33 @@ class CashPurchaseController extends Controller
 	{
 		$bill = Purchase::with(['business', 'items', 'taxes', 'vendor'])->find($id);
 		$attachments = Attachment::where('ref_type', 'cash purchase')->where('ref_id', $id)->get();
+		$email_templates = EmailTemplate::whereIn('slug', ['NEW_CASH_PURCHASE_CREATED'])
+			->where('email_status', 1)
+			->get();
 
 		return Inertia::render('Backend/User/CashPurchase/View', [
 			'bill' => $bill,
 			'attachments' => $attachments,
+			'email_templates' => $email_templates,
 		]);
+	}
+
+	public function show_public_cash_purchase($short_code, $export = 'preview')
+	{
+		$purchase   = Purchase::withoutGlobalScopes()->with(['vendor', 'business', 'items', 'taxes'])
+			->where('short_code', $short_code)
+			->first();
+
+		$request = request();
+		// add activeBusiness object to request
+		$request->merge(['activeBusiness' => $purchase->business]);
+
+		if ($export == 'pdf') {
+			$pdf = Pdf::loadView('backend.user.cash_purchase.pdf', compact('purchase'));
+			return $pdf->download('cash_purchase#-' . $purchase->bill_no . '.pdf');
+		}
+
+		return Inertia::render('Backend/User/CashPurchase/GuestView', compact('purchase'));
 	}
 
 	/**
@@ -1352,6 +1378,48 @@ class CashPurchaseController extends Controller
 
 			$bill->delete();
 			return redirect()->route('cash_purchases.index')->with('success', _lang('Deleted Successfully'));
+		}
+	}
+
+	public function send_email(Request $request, $id)
+	{
+		$validator = Validator::make($request->all(), [
+			'email'   => 'required|email',
+			'subject' => 'required',
+			'message' => 'required',
+		]);
+
+		if ($validator->fails()) {
+			return response()->json([
+				'message' => $validator->errors()->first()
+			], 422);
+		}
+
+		$customMessage = [
+			'subject' => $request->subject,
+			'message' => $request->message,
+		];
+
+		$purchase = Purchase::find($id);
+		$vendor = $purchase->vendor;
+		$vendor->email = $request->email;
+
+		try {
+			Notification::send($vendor, new SendCashPurchase($purchase, $customMessage, $request->template));
+			$purchase->email_send = 1;
+			$purchase->email_send_at = now();
+			$purchase->save();
+
+			// audit log
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = auth()->user()->id;
+			$audit->event = 'Sent Cash Purchase ' . $purchase->bill_no . ' to ' . $vendor->email;
+			$audit->save();
+
+			return redirect()->back()->with('success', _lang('Email has been sent'));
+		} catch (\Exception $e) {
+			return redirect()->back()->with('error', $e->getMessage());
 		}
 	}
 

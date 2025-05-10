@@ -26,7 +26,6 @@ use App\Models\SubCategory;
 use App\Models\Tax;
 use App\Models\Transaction;
 use App\Models\TransactionMethod;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -981,21 +980,6 @@ class ReceiptController extends Controller
             'discountAmount' => $discountAmount,
             'grandTotal'     => $grandTotal,
         );
-    }
-
-    public function export_pdf(Request $request, $id)
-    {
-        $receipt = Receipt::with(['business', 'items'])->find($id);
-        $pdf     = Pdf::loadView('backend.user.receipt.pdf', compact('receipt', 'id'));
-
-        // audit log
-        $audit = new AuditLog();
-        $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->id();
-        $audit->event = 'Cash Invoice PDF Exported' . ' ' . $receipt->receipt_number;
-        $audit->save();
-
-        return $pdf->download('receipt#-' . $receipt->receipt_number . '.pdf');
     }
 
     public function pos_store(Request $request)

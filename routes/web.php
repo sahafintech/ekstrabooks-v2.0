@@ -314,7 +314,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::match(['get', 'post'], 'invoices/receive_payment', [InvoiceController::class, 'receive_payment'])->name('invoices.receive_payment');
 		Route::get('invoices/{id}/duplicate', [InvoiceController::class, 'duplicate'])->name('invoices.duplicate');
 		Route::get('invoices/{id}/get_invoice_link', [InvoiceController::class, 'get_invoice_link'])->name('invoices.get_invoice_link');
-		Route::get('invoices/{id}/export_pdf', [InvoiceController::class, 'export_pdf'])->name('invoices.export_pdf');
 		Route::post('invoices/get_table_data', [InvoiceController::class, 'get_table_data']);
 		Route::resource('invoices', InvoiceController::class);
 		Route::resource('receive_payments', ReceivePaymentsController::class);
@@ -327,18 +326,14 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('sales_returns', SalesReturnController::class);
 		Route::post('sales_returns/refund/store/{id}', [SalesReturnController::class, 'refund_store'])->name('sales_returns.refund.store');
 		Route::post('sales_returns/bulk_destroy', [SalesReturnController::class, 'bulk_destroy'])->name('sales_returns.bulk_destroy');
-		Route::get('sales_returns/{id}/export_pdf', [SalesReturnController::class, 'export_pdf'])->name('sales_returns.export_pdf');
 		Route::match(['get', 'post'], 'sales_returns/{id}/send_email', [SalesReturnController::class, 'send_email'])->name('sales_returns.send_email');
-		Route::get('sales_return/{id}/export_pdf', [SalesReturnController::class, 'export_pdf'])->name('sales_returns.export_pdf');
 
 		// purchase return
 		Route::resource('purchase_returns', PurchaseReturnController::class);
 		Route::get('purchase_returns/refund/{id}', [PurchaseReturnController::class, 'refund'])->name('purchase_returns.refund');
 		Route::post('purchase_returns/refund/store/{id}', [PurchaseReturnController::class, 'refund_store'])->name('purchase_returns.refund.store');
 		Route::post('purchase_returns/bulk_destroy', [PurchaseReturnController::class, 'bulk_destroy'])->name('purchase_returns.bulk_destroy');
-		Route::get('purchase_returns/{id}/export_pdf', [PurchaseReturnController::class, 'export_pdf'])->name('purchase_returns.export_pdf');
 		Route::match(['get', 'post'], 'purchase_returns/{id}/send_email', [PurchaseReturnController::class, 'send_email'])->name('purchase_returns.send_email');
-		Route::get('purchase_return/{id}/export_pdf', [PurchaseReturnController::class, 'export_pdf'])->name('purchase_returns.export_pdf');
 
 		// Journal Entry
 		Route::resource('journals', JournalController::class);
@@ -352,7 +347,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('receipts', ReceiptController::class);
 		Route::match(['get', 'post'], 'receipts/{id}/send_email', [ReceiptController::class, 'send_email'])->name('receipts.send_email');
 		Route::match(['get', 'post'], 'receipts/receive_payment', [ReceiptController::class, 'receive_payment'])->name('receipts.receive_payment');
-		Route::get('receipts/{id}/export_pdf', [ReceiptController::class, 'export_pdf'])->name('receipts.export_pdf');
 		Route::get('pos', [ReceiptController::class, 'pos'])->name('receipts.pos');
 		Route::post('import_receipts', [ReceiptController::class, 'import_receipts'])->name('receipts.import');
 		Route::post('receipts/filter', [ReceiptController::class, 'receipts_filter'])->name('receipts.filter');
@@ -377,6 +371,8 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('deffered_invoices/earnings/{id}', [DefferedInvoiceController::class, 'earnings'])->name('deffered_invoices.earnings');
 		Route::post('deffered_invoices/filter', [DefferedInvoiceController::class, 'deffered_invoices_filter'])->name('deffered_invoices.filter');
 		Route::post('deffered_invoices/bulk_destroy', [DefferedInvoiceController::class, 'bulk_destroy'])->name('deffered_invoices.bulk_destroy');
+		Route::post('deffered_invoices/send_email/{id}', [DefferedInvoiceController::class, 'send_email'])->name('deffered_invoices.send_email');
+		Route::get('deffered_invoices/{id}/', [DefferedInvoiceController::class, 'show_public_deffered_invoice'])->name('deffered_invoices.show_public_deffered_invoice');
 
 		// deffered payments
 		Route::resource('deffered_receive_payments', DefferedPaymentController::class);
@@ -391,7 +387,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::match(['get', 'post'], 'quotations/{id}/send_email', [QuotationController::class, 'send_email'])->name('quotations.send_email');
 		Route::get('quotations/{id}/convert_to_invoice', [QuotationController::class, 'convert_to_invoice'])->name('quotations.convert_to_invoice');
 		Route::get('quotations/{id}/duplicate', [QuotationController::class, 'duplicate'])->name('quotations.duplicate');
-		Route::get('quotations/{id}/export_pdf', [QuotationController::class, 'export_pdf'])->name('quotations.export_pdf');
 		Route::post('quotations/bulk_destroy', [QuotationController::class, 'bulk_destroy'])->name('quotations.bulk_destroy');
 		Route::resource('quotations', QuotationController::class);
 
@@ -408,6 +403,8 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('bill_invoices/bulk_approve', [PurchaseController::class, 'bulk_approve'])->name('bill_invoices.bulk_approve');
 		Route::post('bill_invoices/bulk_reject', [PurchaseController::class, 'bulk_reject'])->name('bill_invoices.bulk_reject');
 		Route::post('bill_invoices/bulk_destroy', [PurchaseController::class, 'bulk_destroy'])->name('bill_invoices.bulk_destroy');
+		Route::get('bill_invoices/{id}/', [PurchaseController::class, 'show_public_bill_invoice'])->name('bill_invoices.show_public_bill_invoice');
+		Route::post('bill_invoices/send_email/{id}', [PurchaseController::class, 'send_email'])->name('bill_invoices.send_email');
 
 		//Cash Purchases
 		Route::resource('cash_purchases', CashPurchaseController::class);
@@ -419,6 +416,8 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('cash_purchases/bulk_approve', [CashPurchaseController::class, 'bulk_approve'])->name('cash_purchases.bulk_approve');
 		Route::post('cash_purchases/bulk_reject', [CashPurchaseController::class, 'bulk_reject'])->name('cash_purchases.bulk_reject');
 		Route::post('cash_purchases/bulk_destroy', [CashPurchaseController::class, 'bulk_destroy'])->name('cash_purchases.bulk_destroy');
+		Route::post('cash_purchases/{id}/send_email', [CashPurchaseController::class, 'send_email'])->name('cash_purchases.send_email');
+		Route::get('cash_purchases/{id}/', [CashPurchaseController::class, 'show_public_cash_purchase'])->name('cash_purchases.show_public_cash_purchase');
 
 		// purchase orders
 		Route::get('purchase_orders/{id}/duplicate', [PurchaseOrderController::class, 'duplicate'])->name('purchase_orders.duplicate');
@@ -429,6 +428,8 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('export_purchase_orders', [PurchaseOrderController::class, 'export_purchase_orders'])->name('purchase_orders.export');
 		Route::post('purchase_orders/{id}/convert_to_bill', [PurchaseOrderController::class, 'convert_to_bill'])->name('purchase_orders.convert_to_bill');
 		Route::post('purchase_orders/{id}/convert_to_cash', [PurchaseOrderController::class, 'convert_to_cash_purchase'])->name('purchase_orders.convert_to_cash_purchase');
+		Route::post('purchase_orders/{id}/send_email', [PurchaseOrderController::class, 'send_email'])->name('purchase_orders.send_email');
+		Route::get('purchase_orders/{id}/', [PurchaseOrderController::class, 'show_public_purchase_order'])->name('purchase_orders.show_public_purchase_order');
 
 		// medical records
 		Route::resource('medical_records', MedicalRecordController::class);
@@ -661,6 +662,9 @@ Route::get('membership/make_payment/{gateway}', [MembershipController::class, 'm
 Route::get('invoice/make_payment/{short_code}/{gateway}', [OnlinePaymentController::class, 'make_payment'])->name('invoices.make_payment');
 Route::get('invoice/payment_methods/{short_code}', [OnlinePaymentController::class, 'payment_methods'])->name('invoices.payment_methods');
 Route::get('invoice/{short_code}/{export?}', [InvoiceController::class, 'show_public_invoice'])->name('invoices.show_public_invoice');
+
+//Public Purchase Order VIew
+Route::get('purchase_order/{short_code}/{export?}', [PurchaseOrderController::class, 'show_public_purchase_order'])->name('purchase_orders.show_public_purchase_order');
 
 //Public Quotation VIew
 Route::get('quotations/{short_code}/{export?}', [QuotationController::class, 'show_public_quotation'])->name('quotations.show_public_quotation');

@@ -1,12 +1,21 @@
-import ApplicationLogo from "@/Components/ApplicationLogo";
-import { Link } from "@inertiajs/react";
+import { initSettings } from '@/lib/settings';
+import { usePage } from "@inertiajs/react";
 
 export default function GuestLayout({ children }) {
+    const { decimalPlace, decimalSep, thousandSep, baseCurrency, currencyPosition, date_format } = usePage().props;
+
+    initSettings({
+        decimalPlace: decimalPlace,
+        decimalSep: decimalSep,
+        thousandSep: thousandSep,
+        baseCurrency: baseCurrency,
+        currencyPosition: currencyPosition,
+        date_format: date_format,
+    });
+
     return (
-        <div className="flex min-h-svh flex-col items-center justify-center bg-muted p-6 md:p-10">
-            <div className="w-full max-w-sm md:max-w-3xl">
-                {children}
-            </div>
+        <div>
+            {children}
         </div>
     );
 }

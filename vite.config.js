@@ -10,4 +10,13 @@ export default defineConfig({
         }),
         react(),
     ],
+    resolve: {
+        alias: {
+            'html2canvas': 'html2canvas',
+            'jspdf': 'jspdf'
+        }
+    },
+    optimizeDeps: {
+        include: ['html2canvas', 'jspdf']
+    }
 });

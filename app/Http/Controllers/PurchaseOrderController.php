@@ -15,12 +15,16 @@ use App\Models\PurchaseOrderItemTax;
 use App\Models\Tax;
 use App\Models\Transaction;
 use App\Models\Vendor;
+use App\Notifications\SendPurchaseOrder;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Models\EmailTemplate;
 
 class PurchaseOrderController extends Controller
 {
@@ -316,10 +320,14 @@ class PurchaseOrderController extends Controller
 	{
 		$purchase_order = PurchaseOrder::with(['business', 'items', 'taxes', 'vendor'])->find($id);
 		$attachments = Attachment::where('ref_id', $id)->where('ref_type', 'purchase order')->get();
+		$email_templates = EmailTemplate::whereIn('slug', ['NEW_PURCHASE_ORDER_CREATED'])
+			->where('email_status', 1)
+			->get();
 
 		return Inertia::render('Backend/User/PurchaseOrder/View', [
 			'purchase_order' => $purchase_order,
 			'attachments' => $attachments,
+			'email_templates' => $email_templates,
 		]);
 	}
 
@@ -869,6 +877,66 @@ class PurchaseOrderController extends Controller
 			DB::rollback();
 			return redirect()->route('purchase_orders.index')->with('error', _lang('An error occurred while converting the purchase order'));
 		}
+	}
+
+	public function send_email(Request $request, $id)
+	{
+		$validator = Validator::make($request->all(), [
+			'email'   => 'required|email',
+			'subject' => 'required',
+			'message' => 'required',
+		]);
+
+		if ($validator->fails()) {
+			return response()->json([
+				'message' => $validator->errors()->first()
+			], 422);
+		}
+
+		$customMessage = [
+			'subject' => $request->subject,
+			'message' => $request->message,
+		];
+
+		$purchase_order = PurchaseOrder::find($id);
+		$vendor = $purchase_order->vendor;
+		$vendor->email = $request->email;
+
+		try {
+			Notification::send($vendor, new SendPurchaseOrder($purchase_order, $customMessage, $request->template));
+			$purchase_order->email_send = 1;
+			$purchase_order->email_send_at = now();
+			$purchase_order->save();
+
+			// audit log
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = auth()->user()->id;
+			$audit->event = 'Sent Purchase Order ' . $purchase_order->order_number . ' to ' . $vendor->email;
+			$audit->save();
+
+			return redirect()->back()->with('success', _lang('Email has been sent'));
+		} catch (\Exception $e) {
+			return redirect()->back()->with('error', $e->getMessage());
+		}
+	}
+
+	public function show_public_purchase_order($short_code, $export = 'preview')
+	{
+		$purchase_order   = PurchaseOrder::withoutGlobalScopes()->with(['vendor', 'business', 'items', 'taxes'])
+			->where('short_code', $short_code)
+			->first();
+
+		$request = request();
+		// add activeBusiness object to request
+		$request->merge(['activeBusiness' => $purchase_order->business]);
+
+		if ($export == 'pdf') {
+			$pdf = Pdf::loadView('backend.user.purchase_order.pdf', compact('purchase_order'));
+			return $pdf->download('purchase_order#-' . $purchase_order->order_number . '.pdf');
+		}
+
+		return Inertia::render('Backend/User/PurchaseOrder/GuestView', compact('purchase_order'));
 	}
 
 	public function convert_to_cash_purchase($id)

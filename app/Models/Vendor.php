@@ -4,10 +4,11 @@ namespace App\Models;
 
 use App\Traits\MultiTenant;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Notifications\Notifiable;
 
 class Vendor extends Model
 {
-    use MultiTenant;
+    use MultiTenant, Notifiable;
     /**
      * The table associated with the model.
      *
