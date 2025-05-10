@@ -9,7 +9,7 @@ import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import {
@@ -30,6 +30,11 @@ export default function Edit({ customers = [], products = [], currencies = [], t
         description: "",
         quantity: 1,
         unit_cost: 0,
+    }]);
+
+    const [attachments, setAttachments] = useState([{
+        file_name: "",
+        file: null
     }]);
 
     const [exchangeRate, setExchangeRate] = useState(1);
@@ -55,7 +60,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
         template: invoice.template,
         note: invoice.note,
         footer: invoice.footer,
-        attachment: null,
+        attachments: [],
         product_id: [],
         product_name: [],
         description: [],
@@ -92,6 +97,15 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                 family_size: item.family_size
             }));
             setInvoiceItems(formattedItems);
+        }
+
+        // Initialize attachments from existing invoice
+        if (invoice && invoice.attachments && invoice.attachments.length > 0) {
+            const formattedAttachments = invoice.attachments.map(attachment => ({
+                file_name: attachment.file_name,
+                file: attachment.file_path
+            }));
+            setAttachments(formattedAttachments);
         }
 
         // Set the initial currency and exchange rate
@@ -211,11 +225,11 @@ export default function Edit({ customers = [], products = [], currencies = [], t
         // inclusive days
         const totalDays = Math.floor((endDate - startDate) / msPerDay) + 1;
 
-        // convert subtotal → “cents” (or smallest unit)
+        // convert subtotal → "cents" (or smallest unit)
         const factor = Math.pow(10, dp);
         const subTotalUnits = Math.round(subTotal * factor);
 
-        // integer per‑day cost (floor)
+        // integer per-day cost (floor)
         const unitsPerDay = Math.floor(subTotalUnits / totalDays);
 
         // build the schedule in integer units
@@ -311,7 +325,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
             const base = Number(item.quantity) * Number(item.unit_cost);
 
             const itemTax = data.taxes.reduce((taxSum, taxIdStr) => {
-                // convert the incoming tax‐ID string to a Number
+                // convert the incoming tax-ID string to a Number
                 const taxId = Number(taxIdStr);
 
                 // look up the rate; if missing, default to 0
@@ -453,6 +467,10 @@ export default function Edit({ customers = [], products = [], currencies = [], t
             limits: invoiceItems.map(item => item.limits),
             benefits: invoiceItems.map(item => item.benefits),
             family_size: invoiceItems.map(item => item.family_size),
+            attachments: attachments.map(attachment => ({
+                file_name: attachment.file_name,
+                file: attachment.file
+            }))
         };
 
         // Post the form data directly instead of using setData first
@@ -471,6 +489,10 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                     limits: 0,
                     benefits: "",
                     family_size: "",
+                }]);
+                setAttachments([{
+                    file_name: "",
+                    file: null
                 }]);
             },
         });
@@ -836,11 +858,11 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                                     {data.earnings && data.earnings.length > 0 ? (
                                         data.earnings.map((earning, index) => (
                                             <TableRow key={index} className={earning.status === 1 ? "bg-gray-100" : ""}>
-                                                <TableCell>{earning.start_date}</TableCell>
-                                                <TableCell>{earning.end_date}</TableCell>
+                                                <TableCell>{new Date(earning.start_date).toLocaleDateString()}</TableCell>
+                                                <TableCell>{new Date(earning.end_date).toLocaleDateString()}</TableCell>
                                                 <TableCell>{earning.number_of_days}</TableCell>
                                                 <TableCell className="text-right">
-                                                    {Number(earning.amount).toFixed(decimalPlace)}
+                                                    {formatCurrency({ amount: earning.amount })}
                                                     {earning.status === 1 && <span className="ml-2 text-xs text-green-600">(Earned)</span>}
                                                 </TableCell>
                                             </TableRow>
@@ -855,7 +877,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                                     <TableRow>
                                         <TableCell>TOTAL:</TableCell>
                                         <TableCell colSpan={9} className="text-right">
-                                            {data.deffered_total}
+                                            {formatCurrency({ amount: data.deffered_total })}
                                         </TableCell>
                                     </TableRow>
                                 </TableBody>
@@ -955,17 +977,108 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                         </div>
 
                         <div className="grid grid-cols-12 mt-2">
-                            <Label htmlFor="attachment" className="md:col-span-2 col-span-12">
-                                Attachment
+                            <Label htmlFor="attachments" className="md:col-span-2 col-span-12">
+                                Attachments
                             </Label>
-                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                                <Input
-                                    id="attachment"
-                                    type="file"
-                                    onChange={(e) => setData("attachment", e.target.files[0])}
-                                    className="md:w-1/2 w-full"
-                                />
-                                <InputError message={errors.attachment} className="text-sm" />
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2 space-y-2">
+                                <div className="border rounded-md overflow-hidden">
+                                    <table className="w-full">
+                                        <thead className="bg-gray-50 border-b">
+                                            <tr>
+                                                <th className="text-left py-2 px-4 font-medium text-gray-700 w-1/3">File Name</th>
+                                                <th className="text-left py-2 px-4 font-medium text-gray-700">Attachment</th>
+                                                <th className="text-center py-2 px-4 font-medium text-gray-700 w-24">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {attachments.map((item, index) => (
+                                                <tr key={`attachment-${index}`} className="border-b last:border-b-0">
+                                                    <td className="py-3 px-4">
+                                                        <Input
+                                                            id={`filename-${index}`}
+                                                            type="text"
+                                                            placeholder="Enter file name"
+                                                            value={item.file_name}
+                                                            onChange={(e) => {
+                                                                const newAttachments = [...attachments];
+                                                                newAttachments[index] = {
+                                                                    ...newAttachments[index],
+                                                                    file_name: e.target.value
+                                                                };
+                                                                setAttachments(newAttachments);
+                                                            }}
+                                                            className="w-full"
+                                                        />
+                                                    </td>
+                                                    <td className="py-3 px-4">
+                                                        <Input
+                                                            id={`attachment-${index}`}
+                                                            type="file"
+                                                            onChange={(e) => {
+                                                                const newAttachments = [...attachments];
+                                                                newAttachments[index] = {
+                                                                    ...newAttachments[index],
+                                                                    file: e.target.files[0],
+                                                                };
+                                                                setAttachments(newAttachments);
+                                                            }}
+                                                            className="w-full"
+                                                        />
+                                                        {item.file && (
+                                                            <div className="text-xs text-gray-500 mt-1 flex items-center justify-between truncate">
+                                                                <span className="truncate">
+                                                                    {typeof item.file === 'string'
+                                                                        ? item.file.split('/').pop()
+                                                                        : item.file.name}
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const newAttachments = [...attachments];
+                                                                        newAttachments[index] = { ...newAttachments[index], file: null };
+                                                                        setAttachments(newAttachments);
+                                                                    }}
+                                                                    className="ml-2 text-red-500 hover:text-red-700"
+                                                                    title="Remove file"
+                                                                >
+                                                                    <X className="w-6 h-6" />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-3 px-4 text-center">
+                                                        {attachments.length > 1 && (
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="text-red-500"
+                                                                onClick={() => {
+                                                                    const newAttachments = [...attachments];
+                                                                    newAttachments.splice(index, 1);
+                                                                    setAttachments(newAttachments);
+                                                                }}
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </Button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => {
+                                        setAttachments([...attachments, { file_name: "", file: null }]);
+                                    }}
+                                >
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Add Attachment
+                                </Button>
+                                <InputError message={errors.attachments} className="text-sm" />
                             </div>
                         </div>
 

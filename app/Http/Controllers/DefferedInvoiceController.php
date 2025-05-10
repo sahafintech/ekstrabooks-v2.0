@@ -266,10 +266,10 @@ class DefferedInvoiceController extends Controller
         $invoice->save();
 
         // if attachments then upload
-        if (isset($request->attachments['file'])) {
-            if ($request->attachments['file'] != null) {
-                for ($i = 0; $i < count($request->attachments['file']); $i++) {
-                    $theFile = $request->file("attachments.file.$i");
+        if (isset($request->attachments)) {
+            if ($request->attachments != null) {
+                for ($i = 0; $i < count($request->attachments); $i++) {
+                    $theFile = $request->file("attachments.$i.file");
                     if ($theFile == null) {
                         continue;
                     }
@@ -277,7 +277,7 @@ class DefferedInvoiceController extends Controller
                     $theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
 
                     $attachment = new Attachment();
-                    $attachment->file_name = $request->attachments['file_name'][$i];
+                    $attachment->file_name = $request->attachments[$i]['file_name'];
                     $attachment->path = "/uploads/media/attachments/" . $theAttachment;
                     $attachment->ref_type = 'invoice';
                     $attachment->ref_id = $invoice->id;
@@ -718,8 +718,8 @@ class DefferedInvoiceController extends Controller
 
         foreach ($attachments as $attachment) {
             // Only delete the file if it exist in the request attachments
-            if (isset($request->attachments['file'])) {
-                if (!$request->attachments['file'] == null && !in_array($attachment->path, $request->attachments['file'])) {
+            if (isset($request->attachments)) {
+                if (!$request->attachments == null && !in_array($attachment->path, $request->attachments)) {
                     $filePath = public_path($attachment->path);
                     if (file_exists($filePath)) {
                         unlink($filePath); // Delete the file
@@ -730,10 +730,10 @@ class DefferedInvoiceController extends Controller
         }
 
         // if attachments then upload
-        if (isset($request->attachments['file'])) {
-            if ($request->attachments['file'] != null) {
-                for ($i = 0; $i < count($request->attachments['file']); $i++) {
-                    $theFile = $request->file("attachments.file.$i");
+        if (isset($request->attachments)) {
+            if ($request->attachments != null) {
+                for ($i = 0; $i < count($request->attachments); $i++) {
+                    $theFile = $request->file("attachments.$i.file");
                     if ($theFile == null) {
                         continue;
                     }
@@ -741,7 +741,7 @@ class DefferedInvoiceController extends Controller
                     $theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
 
                     $attachment = new Attachment();
-                    $attachment->file_name = $request->attachments['file_name'][$i];
+                    $attachment->file_name = $request->attachments[$i]['file_name'];
                     $attachment->path = "/uploads/media/attachments/" . $theAttachment;
                     $attachment->ref_type = 'invoice';
                     $attachment->ref_id = $invoice->id;

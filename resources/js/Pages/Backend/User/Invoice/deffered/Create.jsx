@@ -21,7 +21,7 @@ import {
 } from "@/Components/ui/table";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 import DateTimePicker from "@/Components/DateTimePicker";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 
 export default function Create({ customers = [], products = [], currencies = [], taxes = [], invoice_title, decimalPlace, familySizes = [], benefits = [], dateFormat, base_currency }) {
     const [invoiceItems, setInvoiceItems] = useState([{
@@ -30,6 +30,11 @@ export default function Create({ customers = [], products = [], currencies = [],
         description: "",
         quantity: 1,
         unit_cost: 0,
+    }]);
+
+    const [attachments, setAttachments] = useState([{
+        file_name: "",
+        file: null
     }]);
 
     const [exchangeRate, setExchangeRate] = useState(1);
@@ -55,7 +60,7 @@ export default function Create({ customers = [], products = [], currencies = [],
         template: 0,
         note: "",
         footer: "",
-        attachment: null,
+        attachments: [],
         product_id: [],
         product_name: [],
         description: [],
@@ -152,11 +157,11 @@ export default function Create({ customers = [], products = [], currencies = [],
         // inclusive days
         const totalDays = Math.floor((endDate - startDate) / msPerDay) + 1;
 
-        // convert subtotal → “cents” (or smallest unit)
+        // convert subtotal → "cents" (or smallest unit)
         const factor = Math.pow(10, dp);
         const subTotalUnits = Math.round(subTotal * factor);
 
-        // integer per‑day cost (floor)
+        // integer per-day cost (floor)
         const unitsPerDay = Math.floor(subTotalUnits / totalDays);
 
         // build the schedule in integer units
@@ -210,7 +215,7 @@ export default function Create({ customers = [], products = [], currencies = [],
             const { schedule, totalDays, costPerDay } = calculateEarnings();
             setData('earnings', schedule);
 
-            // now push form‑fields back into your Inertia form
+            // now push form-fields back into your Inertia form
             setData('active_days', totalDays);
             setData('cost_per_day', +costPerDay.toFixed(decimalPlace));
 
@@ -228,7 +233,7 @@ export default function Create({ customers = [], products = [], currencies = [],
             const base = Number(item.quantity) * Number(item.unit_cost);
 
             const itemTax = data.taxes.reduce((taxSum, taxIdStr) => {
-                // convert the incoming tax‐ID string to a Number
+                // convert the incoming tax-ID string to a Number
                 const taxId = Number(taxIdStr);
 
                 // look up the rate; if missing, default to 0
@@ -370,6 +375,10 @@ export default function Create({ customers = [], products = [], currencies = [],
             limits: invoiceItems.map(item => item.limits),
             benefits: invoiceItems.map(item => item.benefits),
             family_size: invoiceItems.map(item => item.family_size),
+            attachments: attachments.map(attachment => ({
+                file_name: attachment.file_name,
+                file: attachment.file
+            }))
         };
 
         // Log the data being sent to help debug
@@ -391,6 +400,10 @@ export default function Create({ customers = [], products = [], currencies = [],
                     limits: 0,
                     benefits: "",
                     family_size: "",
+                }]);
+                setAttachments([{
+                    file_name: "",
+                    file: null
                 }]);
             },
         });
@@ -757,8 +770,8 @@ export default function Create({ customers = [], products = [], currencies = [],
                                     {data.earnings.length > 0 ? (
                                         data.earnings.map((earning) => (
                                             <TableRow key={earning.id}>
-                                                <TableCell>{earning.start_date}</TableCell>
-                                                <TableCell>{earning.end_date}</TableCell>
+                                                <TableCell>{new Date(earning.start_date).toLocaleDateString()}</TableCell>
+                                                <TableCell>{new Date(earning.end_date).toLocaleDateString()}</TableCell>
                                                 <TableCell>{earning.number_of_days}</TableCell>
                                                 <TableCell className="text-right">{formatCurrency({ amount: earning.amount })}</TableCell>
                                             </TableRow>
@@ -773,7 +786,7 @@ export default function Create({ customers = [], products = [], currencies = [],
                                     <TableRow>
                                         <TableCell>TOTAL:</TableCell>
                                         <TableCell colSpan={9} className="text-right">
-                                            {data.deffered_total.toFixed(decimalPlace)}
+                                            {formatCurrency({ amount: data.deffered_total })}
                                         </TableCell>
                                     </TableRow>
                                 </TableBody>
@@ -873,17 +886,108 @@ export default function Create({ customers = [], products = [], currencies = [],
                         </div>
 
                         <div className="grid grid-cols-12 mt-2">
-                            <Label htmlFor="attachment" className="md:col-span-2 col-span-12">
-                                Attachment
+                            <Label htmlFor="attachments" className="md:col-span-2 col-span-12">
+                                Attachments
                             </Label>
-                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                                <Input
-                                    id="attachment"
-                                    type="file"
-                                    onChange={(e) => setData("attachment", e.target.files[0])}
-                                    className="md:w-1/2 w-full"
-                                />
-                                <InputError message={errors.attachment} className="text-sm" />
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2 space-y-2">
+                                <div className="border rounded-md overflow-hidden">
+                                    <table className="w-full">
+                                        <thead className="bg-gray-50 border-b">
+                                            <tr>
+                                                <th className="text-left py-2 px-4 font-medium text-gray-700 w-1/3">File Name</th>
+                                                <th className="text-left py-2 px-4 font-medium text-gray-700">Attachment</th>
+                                                <th className="text-center py-2 px-4 font-medium text-gray-700 w-24">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {attachments.map((item, index) => (
+                                                <tr key={`attachment-${index}`} className="border-b last:border-b-0">
+                                                    <td className="py-3 px-4">
+                                                        <Input
+                                                            id={`filename-${index}`}
+                                                            type="text"
+                                                            placeholder="Enter file name"
+                                                            value={item.file_name}
+                                                            onChange={(e) => {
+                                                                const newAttachments = [...attachments];
+                                                                newAttachments[index] = {
+                                                                    ...newAttachments[index],
+                                                                    file_name: e.target.value
+                                                                };
+                                                                setAttachments(newAttachments);
+                                                            }}
+                                                            className="w-full"
+                                                        />
+                                                    </td>
+                                                    <td className="py-3 px-4">
+                                                        <Input
+                                                            id={`attachment-${index}`}
+                                                            type="file"
+                                                            onChange={(e) => {
+                                                                const newAttachments = [...attachments];
+                                                                newAttachments[index] = {
+                                                                    ...newAttachments[index],
+                                                                    file: e.target.files[0],
+                                                                };
+                                                                setAttachments(newAttachments);
+                                                            }}
+                                                            className="w-full"
+                                                        />
+                                                        {item.file && (
+                                                            <div className="text-xs text-gray-500 mt-1 flex items-center justify-between truncate">
+                                                                <span className="truncate">
+                                                                    {typeof item.file === 'string'
+                                                                        ? item.file.split('/').pop()
+                                                                        : item.file.name}
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const newAttachments = [...attachments];
+                                                                        newAttachments[index] = { ...newAttachments[index], file: null };
+                                                                        setAttachments(newAttachments);
+                                                                    }}
+                                                                    className="ml-2 text-red-500 hover:text-red-700"
+                                                                    title="Remove file"
+                                                                >
+                                                                    <X className="w-6 h-6" />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-3 px-4 text-center">
+                                                        {attachments.length > 1 && (
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="text-red-500"
+                                                                onClick={() => {
+                                                                    const newAttachments = [...attachments];
+                                                                    newAttachments.splice(index, 1);
+                                                                    setAttachments(newAttachments);
+                                                                }}
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </Button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => {
+                                        setAttachments([...attachments, { file_name: "", file: null }]);
+                                    }}
+                                >
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Add Attachment
+                                </Button>
+                                <InputError message={errors.attachments} className="text-sm" />
                             </div>
                         </div>
 
