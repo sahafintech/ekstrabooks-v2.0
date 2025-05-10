@@ -26,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown } from "lucide-react";
+import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown, Receipt, DollarSign, Users, Calendar } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -152,6 +152,66 @@ const DeleteAllReceiptsModal = ({ show, onClose, onConfirm, processing, count })
   </Modal>
 );
 
+const SummaryCards = ({ receipts = [] }) => {
+  const totalInvoices = receipts.length;
+  const grandTotal = receipts.reduce((sum, receipt) => sum + parseFloat(receipt.grand_total), 0);
+  const uniqueCustomers = new Set(receipts.map(receipt => receipt.customer?.id)).size;
+  const todayInvoices = receipts.filter(receipt => {
+    const receiptDate = new Date(receipt.receipt_date);
+    const today = new Date();
+    return receiptDate.toDateString() === today.toDateString();
+  }).length;
+
+  const cards = [
+    {
+      title: "Total Invoices",
+      value: totalInvoices,
+      description: "Total cash invoices",
+      icon: Receipt,
+      iconColor: "text-blue-500"
+    },
+    {
+      title: "Grand Total",
+      value: formatCurrency({ amount: grandTotal, currency: receipts[0]?.currency || 'USD' }),
+      description: "Total amount of all invoices",
+      icon: DollarSign,
+      iconColor: "text-green-500"
+    },
+    {
+      title: "Unique Customers",
+      value: uniqueCustomers,
+      description: "Number of unique customers",
+      icon: Users,
+      iconColor: "text-purple-500"
+    },
+    {
+      title: "Today's Invoices",
+      value: todayInvoices,
+      description: "Invoices created today",
+      icon: Calendar,
+      iconColor: "text-orange-500"
+    }
+  ];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {cards.map((card, index) => (
+        <div key={index} className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <h3 className="text-sm font-medium">
+              {card.title}
+            </h3>
+            <card.icon className={`h-4 w-4 ${card.iconColor}`} />
+          </div>
+          <div className="text-2xl font-bold">{card.value}</div>
+          <p className="text-xs text-muted-foreground">
+            {card.description}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 export default function List({ receipts = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
@@ -381,6 +441,7 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
             url="receipts.index"
           />
           <div className="p-4">
+            <SummaryCards receipts={receipts} />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div className="flex flex-col md:flex-row gap-4">
                 <Link href={route("receipts.create")}>

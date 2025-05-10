@@ -26,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown } from "lucide-react";
+import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown, Receipt, DollarSign, CreditCard, AlertCircle } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -229,6 +229,64 @@ const BillStatusBadge = ({ status }) => {
     <span className={statusMap[status].className}>
       {statusMap[status].label}
     </span>
+  );
+};
+
+const SummaryCards = ({ bills = [] }) => {
+  const totalBills = bills.length;
+  const grandTotal = bills.reduce((sum, bill) => sum + parseFloat(bill.grand_total), 0);
+  const totalPaid = bills.reduce((sum, bill) => sum + parseFloat(bill.paid), 0);
+  const totalDue = grandTotal - totalPaid;
+
+  const cards = [
+    {
+      title: "Total Bills",
+      value: totalBills,
+      description: "Total number of bills",
+      icon: Receipt,
+      iconColor: "text-blue-500"
+    },
+    {
+      title: "Grand Total",
+      value: formatCurrency({ amount: grandTotal }),
+      description: "Total amount of all bills",
+      icon: DollarSign,
+      iconColor: "text-green-500"
+    },
+    {
+      title: "Total Paid",
+      value: formatCurrency({ amount: totalPaid }),
+      description: "Total amount paid",
+      icon: CreditCard,
+      iconColor: "text-purple-500"
+    },
+    {
+      title: "Total Due",
+      value: formatCurrency({ amount: totalDue }),
+      description: "Total amount due",
+      icon: AlertCircle,
+      iconColor: "text-orange-500"
+    }
+  ];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {cards.map((card, index) => (
+        <div key={index} className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <h3 className="text-sm font-medium">
+              {card.title}
+            </h3>
+            <card.icon className={`h-4 w-4 ${card.iconColor}`} />
+          </div>
+          <div className="text-2xl font-bold">{card.value}
+          <p className="text-xs text-muted-foreground">
+            {card.description}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 };
 
@@ -521,6 +579,7 @@ export default function List({ bills = [], meta = {}, filters = {} }) {
             url="bill_invoices.index"
           />
           <div className="p-4">
+            <SummaryCards bills={bills} />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div className="flex flex-col md:flex-row gap-4">
                 <Link href={route("bill_invoices.create")}>

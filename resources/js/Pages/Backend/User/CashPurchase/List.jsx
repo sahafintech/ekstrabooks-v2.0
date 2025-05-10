@@ -26,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown } from "lucide-react";
+import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown, ShoppingCart, DollarSign, CheckCircle, Clock } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -220,6 +220,63 @@ const PurchaseApprovalStatusBadge = ({ status }) => {
   );
 };
 
+const SummaryCards = ({ purchases = [] }) => {
+  const totalPurchases = purchases.length;
+  const totalApproved = purchases.filter(purchase => purchase.approval_status === 1).length;
+  const totalPending = purchases.filter(purchase => purchase.approval_status === 0).length;
+  const grandTotal = purchases.reduce((sum, purchase) => sum + parseFloat(purchase.grand_total), 0);
+
+  const cards = [
+    {
+      title: "Total Purchases",
+      value: totalPurchases,
+      description: "Total cash purchases",
+      icon: ShoppingCart,
+      iconColor: "text-blue-500"
+    },
+    {
+      title: "Grand Total",
+      value: formatCurrency({ amount: grandTotal }),
+      description: "Total amount of all purchases",
+      icon: DollarSign,
+      iconColor: "text-green-500"
+    },
+    {
+      title: "Total Approved",
+      value: totalApproved,
+      description: "Approved cash purchases",
+      icon: CheckCircle,
+      iconColor: "text-purple-500"
+    },
+    {
+      title: "Total Pending",
+      value: totalPending,
+      description: "Pending cash purchases",
+      icon: Clock,
+      iconColor: "text-orange-500"
+    }
+  ];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {cards.map((card, index) => (
+        <div key={index} className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <h3 className="text-sm font-medium">
+              {card.title}
+            </h3>
+            <card.icon className={`h-4 w-4 ${card.iconColor}`} />
+          </div>
+          <div className="text-2xl font-bold">{card.value}
+          <p className="text-xs text-muted-foreground">
+            {card.description}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 export default function List({ purchases = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
@@ -488,6 +545,7 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
             url="cash_purchases.index"
           />
           <div className="p-4">
+            <SummaryCards purchases={purchases} />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div className="flex flex-col md:flex-row gap-4">
                 <Link href={route("cash_purchases.create")}>

@@ -26,13 +26,14 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, Check, X, ChevronUp, ChevronDown } from "lucide-react";
+import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, Check, X, ChevronUp, ChevronDown, ShoppingCart, DollarSign, FileText, CreditCard } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 import { formatCurrency } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/Components/ui/card";
 
 const DeletePurchaseOrderModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
@@ -215,6 +216,66 @@ const PurchaseOrderStatusBadge = ({ status }) => {
     <span className={statusMap[status].className}>
       {statusMap[status].label}
     </span>
+  );
+};
+
+const SummaryCards = ({ orders = [] }) => {
+  const totalOrders = orders.length;
+  const totalConverted = orders.filter(order => order.status === 1).length;
+  const grandTotal = orders.reduce((sum, order) => sum + parseFloat(order.grand_total), 0);
+  const convertedGrandTotal = orders
+    .filter(order => order.status === 1)
+    .reduce((sum, order) => sum + parseFloat(order.grand_total), 0);
+
+  const cards = [
+    {
+      title: "Total Orders",
+      value: totalOrders,
+      description: "Total purchase orders",
+      icon: ShoppingCart,
+      iconColor: "text-blue-500"
+    },
+    {
+      title: "Grand Total",
+      value: formatCurrency({ amount: grandTotal, currency: orders[0]?.currency || 'USD' }),
+      description: "Total amount of all orders",
+      icon: DollarSign,
+      iconColor: "text-green-500"
+    },
+    {
+      title: "Total Converted",
+      value: totalConverted,
+      description: "Orders converted to bills",
+      icon: FileText,
+      iconColor: "text-purple-500"
+    },
+    {
+      title: "Converted Grand Total",
+      value: formatCurrency({ amount: convertedGrandTotal, currency: orders[0]?.currency || 'USD' }),
+      description: "Total amount of converted orders",
+      icon: CreditCard,
+      iconColor: "text-orange-500"
+    }
+  ];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {cards.map((card, index) => (
+        <div key={index} className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <h3 className="text-sm font-medium">
+              {card.title}
+            </h3>
+            <card.icon className={`h-4 w-4 ${card.iconColor}`} />
+          </div>
+          <div className="text-2xl font-bold">{card.value}
+          <p className="text-xs text-muted-foreground">
+            {card.description}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 };
 
@@ -526,6 +587,7 @@ export default function List({ orders = [], meta = {}, filters = {} }) {
             url="purchase_orders.index"
           />
           <div className="p-4">
+            <SummaryCards orders={orders} />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div className="flex flex-col md:flex-row gap-4">
                 <Link href={route("purchase_orders.create")}>

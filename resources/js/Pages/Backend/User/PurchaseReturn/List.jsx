@@ -26,7 +26,7 @@ import {
     DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, RefreshCcw, CalendarIcon, ChevronUp, ChevronDown } from "lucide-react";
+import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, RefreshCcw, CalendarIcon, ChevronUp, ChevronDown, ShoppingCart, DollarSign, FileText, CreditCard } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -271,6 +271,64 @@ const PurchaseReturnStatusBadge = ({ status }) => {
         <span className={statusMap[status].className}>
             {statusMap[status].label}
         </span>
+    );
+};
+
+const SummaryCards = ({ returns = [] }) => {
+    const totalReturns = returns.length;
+    const totalRefunded = returns.filter(return_item => return_item.status === 1).length;
+    const grandTotal = returns.reduce((sum, return_item) => sum + parseFloat(return_item.grand_total), 0);
+    const totalDue = returns.reduce((sum, return_item) => sum + (parseFloat(return_item.grand_total) - parseFloat(return_item.paid)), 0);
+
+    const cards = [
+        {
+            title: "Total Returns",
+            value: totalReturns,
+            description: "Total purchase returns",
+            icon: ShoppingCart,
+            iconColor: "text-blue-500"
+        },
+        {
+            title: "Grand Total",
+            value: formatCurrency({ amount: grandTotal, currency: returns[0]?.currency || 'USD' }),
+            description: "Total amount of all returns",
+            icon: DollarSign,
+            iconColor: "text-green-500"
+        },
+        {
+            title: "Total Refunded",
+            value: totalRefunded,
+            description: "Returns that have been refunded",
+            icon: FileText,
+            iconColor: "text-purple-500"
+        },
+        {
+            title: "Total Due",
+            value: formatCurrency({ amount: totalDue, currency: returns[0]?.currency || 'USD' }),
+            description: "Total amount due for returns",
+            icon: CreditCard,
+            iconColor: "text-orange-500"
+        }
+    ];
+
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {cards.map((card, index) => (
+                <div key={index} className="bg-white rounded-lg shadow-sm p-4">
+                    <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <h3 className="text-sm font-medium">
+                            {card.title}
+                        </h3>
+                        <card.icon className={`h-4 w-4 ${card.iconColor}`} />
+                    </div>
+                    <div className="text-2xl font-bold">{card.value}
+                        <p className="text-xs text-muted-foreground">
+                            {card.description}
+                        </p>
+                    </div>
+                </div>
+            ))}
+        </div>
     );
 };
 
@@ -545,6 +603,7 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                         url="purchase_returns.index"
                     />
                     <div className="p-4">
+                        <SummaryCards returns={returns} />
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                             <div className="flex flex-col md:flex-row gap-4">
                                 <Link href={route("purchase_returns.create")}>

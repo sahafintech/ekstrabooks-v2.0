@@ -26,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown } from "lucide-react";
+import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown, FileText, DollarSign, Clock, CheckCircle } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -161,6 +161,64 @@ const QuotationStatusBadge = ({ expired_date }) => {
     <span className={statusMap[expired_date > new Date() ? 0 : 1].className}>
       {statusMap[expired_date > new Date() ? 0 : 1].label}
     </span>
+  );
+};
+
+const SummaryCards = ({ quotations = [] }) => {
+  const totalQuotations = quotations.length;
+  const activeQuotations = quotations.filter(quotation => new Date(quotation.expired_date) > new Date()).length;
+  const expiredQuotations = quotations.filter(quotation => new Date(quotation.expired_date) <= new Date()).length;
+  const grandTotal = quotations.reduce((sum, quotation) => sum + parseFloat(quotation.grand_total), 0);
+
+  const cards = [
+    {
+      title: "Total Quotations",
+      value: totalQuotations,
+      description: "Total number of quotations",
+      icon: FileText,
+      iconColor: "text-blue-500"
+    },
+    {
+      title: "Grand Total",
+      value: formatCurrency({ amount: grandTotal, currency: quotations[0]?.currency || 'USD' }),
+      description: "Total amount of all quotations",
+      icon: DollarSign,
+      iconColor: "text-green-500"
+    },
+    {
+      title: "Active Quotations",
+      value: activeQuotations,
+      description: "Quotations that are still valid",
+      icon: CheckCircle,
+      iconColor: "text-purple-500"
+    },
+    {
+      title: "Expired Quotations",
+      value: expiredQuotations,
+      description: "Quotations that have expired",
+      icon: Clock,
+      iconColor: "text-orange-500"
+    }
+  ];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {cards.map((card, index) => (
+        <div key={index} className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <h3 className="text-sm font-medium">
+              {card.title}
+            </h3>
+            <card.icon className={`h-4 w-4 ${card.iconColor}`} />
+          </div>
+          <div className="text-2xl font-bold">{card.value}
+            <p className="text-xs text-muted-foreground">
+              {card.description}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 };
 
@@ -398,6 +456,7 @@ export default function List({ quotations = [], meta = {}, filters = {} }) {
             url="quotations.index"
           />
           <div className="p-4">
+            <SummaryCards quotations={quotations} />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div className="flex flex-col md:flex-row gap-4">
                 <Link href={route("quotations.create")}>
