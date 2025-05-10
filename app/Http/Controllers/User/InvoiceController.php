@@ -62,28 +62,36 @@ class InvoiceController extends Controller
         $query = Invoice::with('customer')
             ->where('is_deffered', 0);
 
-        // Apply filters if any
-        if ($request->has('filters')) {
-            $filters = $request->filters;
+        // Apply search if provided
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('customer', function ($q2) use ($search) {
+                    $q2->where('name', 'like', "%{$search}%");
+                })
+                ->orWhere('invoice_number', 'like', "%{$search}%")
+                ->orWhere('order_number', 'like', "%{$search}%");
+            });
+        }
 
-            // Filter by customer
-            if (!empty($filters['customer_id'])) {
-                $query->where('customer_id', $filters['customer_id']);
+        // Filter by customer
+        if ($request->customer_id) {
+            $query->where('customer_id', $request->customer_id);
+        }
+
+        // Filter by status
+        if ($request->status) {
+            $query->where('status', $request->status);
+        }
+
+        // Filter by date range
+        if ($request->date_range) {
+            $dateRange = $request->date_range;
+            if (!empty($dateRange[0])) {
+                $query->whereDate('invoice_date', '>=', $dateRange[0]);
             }
-
-            // Filter by status
-            if (isset($filters['status']) && $filters['status'] !== '') {
-                $query->where('status', $filters['status']);
-            }
-
-            // Filter by date range
-            if (!empty($filters['date_range'])) {
-                if (!empty($filters['date_range']['start'])) {
-                    $query->where('invoice_date', '>=', $filters['date_range']['start']);
-                }
-                if (!empty($filters['date_range']['end'])) {
-                    $query->where('invoice_date', '<=', $filters['date_range']['end']);
-                }
+            if (!empty($dateRange[1])) {
+                $query->whereDate('invoice_date', '<=', $dateRange[1]);
             }
         }
 
@@ -113,9 +121,10 @@ class InvoiceController extends Controller
                 'from' => $invoices->firstItem(),
                 'to' => $invoices->lastItem(),
             ],
-            'filters' => array_merge($request->filters ?? [], [
+            'filters' => array_merge($request->only(['search', 'customer_id', 'status', 'date_range']), [
                 'sorting' => $sorting,
             ]),
+            'customers' => Customer::select('id', 'name')->orderBy('id')->get(),
         ]);
     }
 

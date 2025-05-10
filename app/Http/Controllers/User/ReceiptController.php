@@ -56,38 +56,48 @@ class ReceiptController extends Controller
     //     });
     // }
 
-    public function index()
+    public function index(Request $request)
     {
-        $sorting = request()->get('sorting', []);
+        $search = $request->get('search', '');
+        $perPage = $request->get('per_page', 50);
+        $sorting = $request->get('sorting', []);
         $sortColumn = $sorting['column'] ?? 'id';
         $sortDirection = $sorting['direction'] ?? 'desc';
+        $customerId = $request->get('customer_id', '');
+        $dateRange = $request->get('date_range', []);
 
-        $query = Receipt::select('receipts.*')
-            ->with('customer');
+        $query = Receipt::with('customer');
 
         if ($sortColumn === 'customer.name') {
             $query->join('customers', 'receipts.customer_id', '=', 'customers.id')
-                ->orderBy('customers.name', $sortDirection);
+                ->orderBy('customers.name', $sortDirection)
+                ->select('receipts.*');
         } else {
             $query->orderBy($sortColumn, $sortDirection);
         }
 
-        // Handle search
-        if (request()->has('search') && !empty(request('search'))) {
-            $searchTerm = request('search');
-            $query->where(function ($q) use ($searchTerm) {
-                $q->where('title', 'like', "%{$searchTerm}%")
-                    ->orWhere('receipt_number', 'like', "%{$searchTerm}%")
-                    ->orWhere('order_number', 'like', "%{$searchTerm}%")
-                    ->orWhereHas('customer', function ($q) use ($searchTerm) {
-                        $q->where('name', 'like', "%{$searchTerm}%");
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('receipt_number', 'like', "%$search%")
+                    ->orWhere('title', 'like', "%$search%")
+                    ->orWhereHas('customer', function ($q) use ($search) {
+                        $q->where('name', 'like', "%$search%");
                     });
             });
         }
 
-        // Pagination
-        $perPage = request('per_page', 50);
-        $receipts = $query->paginate($perPage)->withQueryString();
+        // Filter by customer
+        if ($customerId) {
+            $query->where('customer_id', $customerId);
+        }
+
+        // Filter by date range
+        if (!empty($dateRange)) {
+            $query->whereDate('receipt_date', '>=', $dateRange[0])
+                ->whereDate('receipt_date', '<=', $dateRange[1]);
+        }
+
+        $receipts = $query->paginate($perPage);
 
         return Inertia::render('Backend/User/CashInvoice/List', [
             'receipts' => $receipts->items(),
@@ -99,10 +109,8 @@ class ReceiptController extends Controller
                 'total' => $receipts->total(),
                 'last_page' => $receipts->lastPage(),
             ],
-            'filters' => request()->only(['search', 'per_page']),
-            'sorting' => $sorting,
-            'sortColumn' => $sortColumn,
-            'sortDirection' => $sortDirection,
+            'filters' => request()->only(['search', 'per_page', 'customer_id', 'date_range']),
+            'customers' => Customer::select('id', 'name')->orderBy('id')->get(),
         ]);
     }
 

@@ -45,6 +45,8 @@ class PurchaseOrderController extends Controller
 		$perPage = $request->get('per_page', 50);
 		$sortColumn = $request->get('sorting.column', 'id');
 		$sortDirection = $request->get('sorting.direction', 'desc');
+		$vendorId = $request->get('vendor_id', '');
+		$dateRange = $request->get('date_range', '');
 
 		$query = PurchaseOrder::with('vendor');
 
@@ -67,7 +69,19 @@ class PurchaseOrderController extends Controller
 			});
 		}
 
+		if ($vendorId) {
+			$query->where('vendor_id', $vendorId);
+		}
+
+		if ($dateRange) {
+			$startDate = Carbon::parse($dateRange[0])->startOfDay();
+			$endDate = Carbon::parse($dateRange[1])->endOfDay();
+			$query->whereBetween('order_date', [$startDate, $endDate]);
+		}
+
 		$orders = $query->paginate($perPage)->withQueryString();
+
+		$vendors = Vendor::orderBy('name')->get();
 
 		return Inertia::render('Backend/User/PurchaseOrder/List', [
 			'orders' => $orders->items(),
@@ -81,7 +95,10 @@ class PurchaseOrderController extends Controller
 				'search' => $search,
 				'per_page' => $perPage,
 				'sorting' => $request->get('sorting', []),
+				'vendor_id' => $vendorId,
+				'date_range' => $dateRange,
 			],
+			'vendors' => $vendors,
 		]);
 	}
 

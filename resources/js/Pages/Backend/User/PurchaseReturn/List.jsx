@@ -43,6 +43,7 @@ import {
 import { cn, formatCurrency } from "@/lib/utils";
 import InputError from "@/Components/InputError";
 import { format } from "date-fns";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 const DeletePurchaseReturnModal = ({ show, onClose, onConfirm, processing }) => (
     <Modal show={show} onClose={onClose}>
@@ -332,7 +333,7 @@ const SummaryCards = ({ returns = [] }) => {
     );
 };
 
-export default function List({ returns = [], meta = {}, filters = {}, accounts = [], errors = {} }) {
+export default function List({ returns = [], meta = {}, filters = {}, accounts = [], errors = {}, vendors = [] }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
     const [selectedPurchaseReturns, setSelectedPurchaseReturns] = useState([]);
@@ -357,6 +358,10 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
     const [refundDate, setRefundDate] = useState(format(new Date(), "yyyy-MM-dd"));
     const [refundAmount, setRefundAmount] = useState("");
     const [paymentAccount, setPaymentAccount] = useState("");
+
+    const [selectedVendor, setSelectedVendor] = useState(filters.vendor_id || "");
+    const [dateRange, setDateRange] = useState(filters.date_range || null);
+    const [selectedStatus, setSelectedStatus] = useState(filters.status || "");
 
     useEffect(() => {
         if (flash && flash.success) {
@@ -591,6 +596,54 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
         router.get(route("purchase_returns.export"));
     };
 
+    const handleVendorChange = (value) => {
+        setSelectedVendor(value);
+        router.get(
+            route("purchase_returns.index"),
+            {
+                search,
+                page: 1,
+                per_page: perPage,
+                vendor_id: value,
+                date_range: dateRange,
+                status: selectedStatus,
+            },
+            { preserveState: true }
+        );
+    };
+
+    const handleDateRangeChange = (dates) => {
+        setDateRange(dates);
+        router.get(
+            route("purchase_returns.index"),
+            {
+                search,
+                page: 1,
+                per_page: perPage,
+                vendor_id: selectedVendor,
+                date_range: dates,
+                status: selectedStatus,
+            },
+            { preserveState: true }
+        );
+    };
+
+    const handleStatusChange = (value) => {
+        setSelectedStatus(value);
+        router.get(
+            route("purchase_returns.index"),
+            {
+                search,
+                page: 1,
+                per_page: perPage,
+                vendor_id: selectedVendor,
+                date_range: dateRange,
+                status: value,
+            },
+            { preserveState: true }
+        );
+    };
+
     return (
         <AuthenticatedLayout>
             <Head title="Purchase Returns" />
@@ -651,6 +704,35 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                                 <Button onClick={handleBulkAction} variant="outline">
                                     Apply
                                 </Button>
+                                <SearchableCombobox
+                                    options={vendors.map(vendor => ({
+                                        id: vendor.id,
+                                        name: vendor.name
+                                    }))}
+                                    value={selectedVendor}
+                                    onChange={handleVendorChange}
+                                    placeholder="Select vendor"
+                                    className="w-[200px]"
+                                />
+                                <DateTimePicker
+                                    value={dateRange}
+                                    onChange={handleDateRangeChange}
+                                    isRange={true}
+                                    className="w-[200px]"
+                                    placeholder="Select date range"
+                                />
+                                <SearchableCombobox
+                                    options={[
+                                        { id: "", name: "All Status" },
+                                        { id: "0", name: "Active" },
+                                        { id: "1", name: "Refunded" },
+                                        { id: "2", name: "Partially Refunded" }
+                                    ]}
+                                    value={selectedStatus}
+                                    onChange={handleStatusChange}
+                                    placeholder="Select status"
+                                    className="w-[150px]"
+                                />
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-sm text-gray-500">Show</span>

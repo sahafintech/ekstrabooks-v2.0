@@ -72,28 +72,35 @@ class QuotationController extends Controller
     {
         $query = Quotation::with('customer');
 
-        // Apply filters if any
-        if ($request->has('filters')) {
-            $filters = $request->filters;
+        // Apply search filter
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('quotation_number', 'like', "%{$search}%")
+                  ->orWhere('title', 'like', "%{$search}%")
+                  ->orWhereHas('customer', function($q) use ($search) {
+                      $q->where('name', 'like', "%{$search}%");
+                  });
+            });
+        }
 
-            // Filter by customer
-            if (!empty($filters['customer_id'])) {
-                $query->where('customer_id', $filters['customer_id']);
-            }
+        // Filter by customer
+        if ($request->has('customer_id') && $request->customer_id !== '') {
+            $query->where('customer_id', $request->customer_id);
+        }
 
-            // Filter by status
-            if (isset($filters['status']) && $filters['status'] !== '') {
-                $query->where('status', $filters['status']);
-            }
+        // Filter by date range
+        if ($request->has('date_range') && $request->date_range) {
+            $query->where('quotation_date', '>=', $request->date_range[0])
+                ->orWhere('quotation_date', '<=', $request->date_range[1]);
+        }
 
-            // Filter by date range
-            if (!empty($filters['date_range'])) {
-                if (!empty($filters['date_range']['start'])) {
-                    $query->where('quotation_date', '>=', $filters['date_range']['start']);
-                }
-                if (!empty($filters['date_range']['end'])) {
-                    $query->where('quotation_date', '<=', $filters['date_range']['end']);
-                }
+        // Filter by status
+        if ($request->status) {
+            if ($request->status === '0') {
+                $query->where('expired_date', '>', now());
+            } else if ($request->status === '1') {
+                $query->where('expired_date', '<=', now());
             }
         }
 
@@ -111,8 +118,11 @@ class QuotationController extends Controller
         }
 
         // Handle pagination
-        $perPage = $request->get('per_page', 10);
+        $perPage = $request->get('per_page', 50);
         $quotations = $query->paginate($perPage);
+
+        // Get all customers for the filter
+        $customers = Customer::all();
 
         return Inertia::render('Backend/User/Quotation/List', [
             'quotations' => $quotations->items(),
@@ -124,9 +134,10 @@ class QuotationController extends Controller
                 'from' => $quotations->firstItem(),
                 'to' => $quotations->lastItem(),
             ],
-            'filters' => array_merge($request->filters ?? [], [
+            'filters' => array_merge($request->all(), [
                 'sorting' => $sorting,
             ]),
+            'customers' => $customers,
         ]);
     }
 
@@ -723,9 +734,9 @@ class QuotationController extends Controller
             $subTotal = ($subTotal + $line_total);
 
             //Calculate Taxes
-            if (isset($request->taxes[$request->product_id[$i]])) {
-                for ($j = 0; $j < count($request->taxes[$request->product_id[$i]]); $j++) {
-                    $taxId       = $request->taxes[$request->product_id[$i]][$j];
+            if (isset($request->taxes)) {
+                for ($j = 0; $j < count($request->taxes); $j++) {
+                    $taxId       = $request->taxes[$j];
                     $tax         = Tax::find($taxId);
                     $product_tax = ($line_total / 100) * $tax->rate;
                     $taxAmount += $product_tax;

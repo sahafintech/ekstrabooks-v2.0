@@ -33,6 +33,8 @@ import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 import { formatCurrency } from "@/lib/utils";
+import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 const DeleteCashPurchaseModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
@@ -278,7 +280,7 @@ const SummaryCards = ({ purchases = [] }) => {
   );
 };
 
-export default function List({ purchases = [], meta = {}, filters = {} }) {
+export default function List({ purchases = [], meta = {}, filters = {}, vendors = [] }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedPurchases, setSelectedPurchases] = useState([]);
@@ -288,6 +290,9 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
   const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
+  const [selectedVendor, setSelectedVendor] = useState(filters.vendor_id || "");
+  const [dateRange, setDateRange] = useState(filters.date_range || []);
+  const [selectedStatus, setSelectedStatus] = useState(filters.status || "");
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -533,6 +538,35 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
     return pages;
   };
 
+  const handleFilter = (filterType, value) => {
+    // Update the state first
+    switch (filterType) {
+      case 'vendor':
+        setSelectedVendor(value);
+        break;
+      case 'date':
+        setDateRange(value);
+        break;
+      case 'status':
+        setSelectedStatus(value);
+        break;
+    }
+
+    // Use the new value directly in the request instead of state
+    router.get(
+      route("cash_purchases.index"),
+      { 
+        search, 
+        page: 1, 
+        per_page: perPage,
+        vendor_id: filterType === 'vendor' ? value : selectedVendor,
+        date_range: filterType === 'date' ? value : dateRange,
+        status: filterType === 'status' ? value : selectedStatus
+      },
+      { preserveState: true }
+    );
+  };
+
   return (
     <AuthenticatedLayout>
       <Head title="Cash Purchases" />
@@ -580,8 +614,8 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
               </div>
             </div>
 
-            <div className="mb-4 flex flex-col md:flex-row gap-4 justify-between">
-              <div className="flex items-center gap-2">
+            <div className="mb-4 flex flex-col md:flex-row gap-2 justify-between">
+              <div className="flex flex-col md:flex-row gap-2">
                 <Select value={bulkAction} onValueChange={setBulkAction}>
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Bulk actions" />
@@ -595,6 +629,39 @@ export default function List({ purchases = [], meta = {}, filters = {} }) {
                 <Button onClick={handleBulkAction} variant="outline">
                   Apply
                 </Button>
+
+                <div className="flex flex-col md:flex-row gap-4">
+                  <SearchableCombobox
+                    options={vendors.map(vendor => ({
+                      id: vendor.id,
+                      name: vendor.name
+                    }))}
+                    value={selectedVendor}
+                    onChange={(value) => handleFilter('vendor', value)}
+                    placeholder="Select vendor"
+                    className="w-[200px]"
+                  />
+
+                  <DateTimePicker
+                    value={dateRange}
+                    onChange={(dates) => handleFilter('date', dates)}
+                    isRange={true}
+                    className="w-[200px]"
+                    placeholder="Select date range"
+                  />
+
+                  <SearchableCombobox
+                    options={[
+                      { id: "", name: "All Status" },
+                      { id: "0", name: "Pending" },
+                      { id: "1", name: "Approved" }
+                    ]}
+                    value={selectedStatus}
+                    onChange={(value) => handleFilter('status', value)}
+                    placeholder="Select status"
+                    className="w-[150px]"
+                  />
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Show</span>

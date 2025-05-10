@@ -27,6 +27,8 @@ import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 import { formatCurrency } from "@/lib/utils";
+import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 // Delete Confirmation Modal Component
 const DeletePaymentModal = ({ show, onClose, onConfirm, processing }) => (
@@ -84,7 +86,7 @@ const DeleteAllPaymentsModal = ({ show, onClose, onConfirm, processing, count })
     </Modal>
 );
 
-export default function List({ payments = [], meta = {}, filters = {} }) {
+export default function List({ payments = [], meta = {}, filters = {}, vendors = [] }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
     const [selectedPayments, setSelectedPayments] = useState([]);
@@ -94,6 +96,8 @@ export default function List({ payments = [], meta = {}, filters = {} }) {
     const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
     const [bulkAction, setBulkAction] = useState("");
     const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
+    const [selectedVendor, setSelectedVendor] = useState(filters.vendor_id || "");
+    const [dateRange, setDateRange] = useState(filters.date_range || null);
 
     // Delete confirmation modal states
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -286,6 +290,36 @@ export default function List({ payments = [], meta = {}, filters = {} }) {
         return pages;
     };
 
+    const handleVendorChange = (value) => {
+        setSelectedVendor(value);
+        router.get(
+            route("bill_payments.index"),
+            { 
+                search, 
+                page: 1, 
+                per_page: perPage,
+                vendor_id: value,
+                date_range: dateRange
+            },
+            { preserveState: true }
+        );
+    };
+
+    const handleDateRangeChange = (dates) => {
+        setDateRange(dates);
+        router.get(
+            route("bill_payments.index"),
+            { 
+                search, 
+                page: 1, 
+                per_page: perPage,
+                vendor_id: selectedVendor,
+                date_range: dates
+            },
+            { preserveState: true }
+        );
+    };
+
     return (
         <AuthenticatedLayout>
             <Head title="Payments" />
@@ -328,6 +362,23 @@ export default function List({ payments = [], meta = {}, filters = {} }) {
                                 <Button onClick={handleBulkAction} variant="outline">
                                     Apply
                                 </Button>
+                                <SearchableCombobox
+                                    options={vendors.map(vendor => ({
+                                        id: vendor.id,
+                                        name: vendor.name
+                                    }))}
+                                    value={selectedVendor}
+                                    onChange={handleVendorChange}
+                                    placeholder="Select vendor..."
+                                    className="w-[200px]"
+                                />
+                                <DateTimePicker
+                                    value={dateRange}
+                                    onChange={handleDateRangeChange}
+                                    isRange={true}
+                                    className="w-[300px]"
+                                    placeholder="Select date range..."
+                                />
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-sm text-gray-500">Show</span>

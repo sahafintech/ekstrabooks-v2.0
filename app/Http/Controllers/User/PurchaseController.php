@@ -53,6 +53,10 @@ class PurchaseController extends Controller
 		$sorting = $request->get('sorting', []);
 		$sortColumn = $sorting['column'] ?? 'id';
 		$sortDirection = $sorting['direction'] ?? 'desc';
+		$vendorId = $request->get('vendor_id', '');
+		$dateRange = $request->get('date_range', '');
+		$approvalStatus = $request->get('approval_status', '');
+		$status = $request->get('status', '');
 
 		$query = Purchase::query()
 			->where('cash', 0)
@@ -67,6 +71,7 @@ class PurchaseController extends Controller
 			$query->orderBy('purchases.' . $sortColumn, $sortDirection);
 		}
 
+		// Apply filters
 		if ($search) {
 			$query->where(function ($q) use ($search) {
 				$q->where('purchases.bill_no', 'like', "%$search%")
@@ -77,7 +82,25 @@ class PurchaseController extends Controller
 			});
 		}
 
+		if ($vendorId) {
+			$query->where('vendor_id', $vendorId);
+		}
+
+		if ($dateRange) {
+			$query->whereDate('purchase_date', '>=', Carbon::parse($dateRange[0])->format('Y-m-d'))
+				->whereDate('purchase_date', '<=', Carbon::parse($dateRange[1])->format('Y-m-d'));
+		}
+
+		if ($approvalStatus) {
+			$query->where('approval_status', $approvalStatus);
+		}
+
+		if ($status) {
+			$query->where('status', $status);
+		}
+
 		$bills = $query->with('vendor')->paginate($perPage)->withQueryString();
+		$vendors = Vendor::all();
 
 		return Inertia::render('Backend/User/Bill/List', [
 			'bills' => $bills->items(),
@@ -89,9 +112,13 @@ class PurchaseController extends Controller
 			],
 			'filters' => [
 				'search' => $search,
-				'columnFilters' => $request->get('columnFilters', []),
+				'vendor_id' => $vendorId,
+				'date_range' => $dateRange,
+				'approval_status' => $approvalStatus,
+				'status' => $status,
 				'sorting' => $sorting,
 			],
+			'vendors' => $vendors,
 		]);
 	}
 

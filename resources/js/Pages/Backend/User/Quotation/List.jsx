@@ -33,6 +33,8 @@ import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 import { formatCurrency } from "@/lib/utils";
+import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 const DeleteQuotationModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
@@ -222,16 +224,19 @@ const SummaryCards = ({ quotations = [] }) => {
   );
 };
 
-export default function List({ quotations = [], meta = {}, filters = {} }) {
+export default function List({ quotations = [], meta = {}, filters = {}, customers = [] }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedQuotations, setSelectedQuotations] = useState([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
-  const [perPage, setPerPage] = useState(meta.per_page || 10);
+  const [perPage, setPerPage] = useState(meta.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
   const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
+  const [selectedCustomer, setSelectedCustomer] = useState(filters.customer_id || "");
+  const [dateRange, setDateRange] = useState(filters.date_range || null);
+  const [selectedStatus, setSelectedStatus] = useState(filters.status || "");
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -311,7 +316,15 @@ export default function List({ quotations = [], meta = {}, filters = {} }) {
     setSearch(value);
     router.get(
       route("quotations.index"),
-      { search: value, page: 1, per_page: perPage, sorting },
+      { 
+        search: value, 
+        page: 1, 
+        per_page: perPage, 
+        sorting,
+        customer_id: selectedCustomer,
+        date_range: dateRange,
+        status: selectedStatus
+      },
       { preserveState: true }
     );
   };
@@ -320,7 +333,15 @@ export default function List({ quotations = [], meta = {}, filters = {} }) {
     setPerPage(value);
     router.get(
       route("quotations.index"),
-      { search, page: 1, per_page: value, sorting },
+      { 
+        search, 
+        page: 1, 
+        per_page: value, 
+        sorting,
+        customer_id: selectedCustomer,
+        date_range: dateRange,
+        status: selectedStatus
+      },
       { preserveState: true }
     );
   };
@@ -329,7 +350,66 @@ export default function List({ quotations = [], meta = {}, filters = {} }) {
     setCurrentPage(page);
     router.get(
       route("quotations.index"),
-      { search, page, per_page: perPage, sorting },
+      { 
+        search, 
+        page, 
+        per_page: perPage, 
+        sorting,
+        customer_id: selectedCustomer,
+        date_range: dateRange,
+        status: selectedStatus
+      },
+      { preserveState: true }
+    );
+  };
+
+  const handleCustomerChange = (value) => {
+    setSelectedCustomer(value);
+    router.get(
+      route("quotations.index"),
+      { 
+        search, 
+        page: 1, 
+        per_page: perPage, 
+        sorting,
+        customer_id: value,
+        date_range: dateRange,
+        status: selectedStatus
+      },
+      { preserveState: true }
+    );
+  };
+
+  const handleDateRangeChange = (dates) => {
+    setDateRange(dates);
+    router.get(
+      route("quotations.index"),
+      { 
+        search, 
+        page: 1, 
+        per_page: perPage, 
+        sorting,
+        customer_id: selectedCustomer,
+        date_range: dates,
+        status: selectedStatus
+      },
+      { preserveState: true }
+    );
+  };
+
+  const handleStatusChange = (value) => {
+    setSelectedStatus(value);
+    router.get(
+      route("quotations.index"),
+      { 
+        search, 
+        page: 1, 
+        per_page: perPage, 
+        sorting,
+        customer_id: selectedCustomer,
+        date_range: dateRange,
+        status: value
+      },
       { preserveState: true }
     );
   };
@@ -504,6 +584,34 @@ export default function List({ quotations = [], meta = {}, filters = {} }) {
                 <Button onClick={handleBulkAction} variant="outline">
                   Apply
                 </Button>
+                <SearchableCombobox
+                  options={customers.map(customer => ({
+                    id: customer.id,
+                    name: customer.name
+                  }))}
+                  value={selectedCustomer}
+                  onChange={handleCustomerChange}
+                  placeholder="Select customer"
+                  className="w-[200px]"
+                />
+                <DateTimePicker
+                  value={dateRange}
+                  onChange={handleDateRangeChange}
+                  isRange={true}
+                  className="w-[200px]"
+                  placeholder="Select date range"
+                />
+                <SearchableCombobox
+                  options={[
+                    { id: "", name: "All Status" },
+                    { id: "0", name: "Active" },
+                    { id: "1", name: "Expired" }
+                  ]}
+                  value={selectedStatus}
+                  onChange={handleStatusChange}
+                  placeholder="Select status"
+                  className="w-[150px]"
+                />
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Show</span>

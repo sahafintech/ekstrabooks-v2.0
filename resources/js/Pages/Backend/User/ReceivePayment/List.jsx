@@ -27,6 +27,8 @@ import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 import { formatCurrency } from "@/lib/utils";
+import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 // Delete Confirmation Modal Component
 const DeletePaymentModal = ({ show, onClose, onConfirm, processing }) => (
@@ -84,7 +86,7 @@ const DeleteAllPaymentsModal = ({ show, onClose, onConfirm, processing, count })
     </Modal>
 );
 
-export default function List({ payments = [], meta = {}, filters = {} }) {
+export default function List({ payments = [], meta = {}, filters = {}, customers = [] }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
     const [selectedPayments, setSelectedPayments] = useState([]);
@@ -93,15 +95,15 @@ export default function List({ payments = [], meta = {}, filters = {} }) {
     const [perPage, setPerPage] = useState(meta.per_page || 10);
     const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
     const [bulkAction, setBulkAction] = useState("");
+    const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
+    const [selectedCustomer, setSelectedCustomer] = useState(filters.customer_id || "");
+    const [dateRange, setDateRange] = useState(filters.date_range || null);
 
     // Delete confirmation modal states
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
     const [paymentToDelete, setPaymentToDelete] = useState(null);
     const [processing, setProcessing] = useState(false);
-
-    // Add sorting state
-    const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
 
     useEffect(() => {
         if (flash && flash.success) {
@@ -284,6 +286,38 @@ export default function List({ payments = [], meta = {}, filters = {} }) {
         return pages;
     };
 
+    const handleCustomerChange = (value) => {
+        setSelectedCustomer(value);
+        router.get(
+            route("receive_payments.index"),
+            { 
+                search, 
+                page: 1, 
+                per_page: perPage,
+                customer_id: value,
+                date_range: dateRange,
+                sorting
+            },
+            { preserveState: true }
+        );
+    };
+
+    const handleDateRangeChange = (dates) => {
+        setDateRange(dates);
+        router.get(
+            route("receive_payments.index"),
+            { 
+                search, 
+                page: 1, 
+                per_page: perPage,
+                customer_id: selectedCustomer,
+                date_range: dates,
+                sorting
+            },
+            { preserveState: true }
+        );
+    };
+
     return (
         <AuthenticatedLayout>
             <Head title="Payments" />
@@ -329,6 +363,23 @@ export default function List({ payments = [], meta = {}, filters = {} }) {
                                 <Button onClick={handleBulkAction} variant="outline">
                                     Apply
                                 </Button>
+                                <SearchableCombobox
+                                    options={customers.map(customer => ({
+                                        id: customer.id,
+                                        name: customer.name
+                                    }))}
+                                    value={selectedCustomer}
+                                    onChange={handleCustomerChange}
+                                    placeholder="Select customer"
+                                    className="w-[200px]"
+                                />
+                                <DateTimePicker
+                                    value={dateRange}
+                                    onChange={handleDateRangeChange}
+                                    isRange={true}
+                                    className="w-[200px]"
+                                    placeholder="Select date range"
+                                />
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-sm text-gray-500">Show</span>

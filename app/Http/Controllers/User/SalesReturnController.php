@@ -33,36 +33,30 @@ class SalesReturnController extends Controller
     {
         $query = SalesReturn::with('customer');
 
-        // Apply filters if any
-        if ($request->has('filters')) {
-            $filters = $request->filters;
-
-            // Filter by customer
-            if (!empty($filters['customer_id'])) {
-                $query->where('customer_id', $filters['customer_id']);
-            }
-
-            // Filter by status
-            if (isset($filters['status']) && $filters['status'] !== '') {
-                $query->where('status', $filters['status']);
-            }
-
-            // Filter by date range
-            if (!empty($filters['date_range'])) {
-                if (!empty($filters['date_range']['start'])) {
-                    $query->where('return_date', '>=', $filters['date_range']['start']);
-                }
-                if (!empty($filters['date_range']['end'])) {
-                    $query->where('return_date', '<=', $filters['date_range']['end']);
-                }
-            }
+        // Apply search filter
+        if (!empty($request->search)) {
+            $query->where(function ($q) use ($request) {
+                $q->where('return_number', 'like', "%{$request->search}%")
+                    ->orWhereHas('customer', function ($query) use ($request) {
+                        $query->where('name', 'like', "%{$request->search}%");
+                    });
+            });
         }
 
-        if (!empty($request->search)) {
-            $query->where('return_number', 'like', "%{$request->search}%")
-                ->whereHas('customer', function ($query) use ($request) {
-                    $query->where('name', 'like', "%{$request->search}%");
-                });
+        // Apply customer filter
+        if (!empty($request->customer_id)) {
+            $query->where('customer_id', $request->customer_id);
+        }
+
+        // Apply status filter
+        if ($request->status) {
+            $query->where('status', $request->status);
+        }
+
+        // Apply date range filter
+        if (!empty($request->date_range)) {
+            $query->where('return_date', '>=', $request->date_range[0])
+                ->orWhere('return_date', '<=', $request->date_range[1]);
         }
 
         // Handle sorting
@@ -82,10 +76,12 @@ class SalesReturnController extends Controller
         $perPage = $request->get('per_page', 10);
         $returns = $query->paginate($perPage);
         $accounts = Account::all();
+        $customers = Customer::all();
 
         return Inertia::render('Backend/User/SalesReturn/List', [
             'returns' => $returns->items(),
             'accounts' => $accounts,
+            'customers' => $customers,
             'meta' => [
                 'total' => $returns->total(),
                 'per_page' => $returns->perPage(),
@@ -96,7 +92,9 @@ class SalesReturnController extends Controller
             ],
             'filters' => [
                 'search' => $request->search,
-                'columnFilters' => $request->get('columnFilters', []),
+                'customer_id' => $request->customer_id,
+                'date_range' => $request->date_range,
+                'status' => $request->status,
                 'sorting' => $sorting,
             ],
         ]);

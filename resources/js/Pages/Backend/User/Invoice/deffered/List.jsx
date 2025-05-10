@@ -33,6 +33,8 @@ import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 import { formatCurrency } from "@/lib/utils";
+import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 const DeleteInvoiceModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
@@ -153,11 +155,11 @@ const DeleteAllInvoicesModal = ({ show, onClose, onConfirm, processing, count })
 
 const InvoiceStatusBadge = ({ status }) => {
   const statusMap = {
-    0: { label: "Draft", className: "text-gray-600" },
-    1: { label: "Active", className: "text-blue-600" },
-    2: { label: "Paid", className: "text-green-600" },
-    3: { label: "Partially Paid", className: "text-yellow-600" },
-    4: { label: "Canceled", className: "text-red-600" }
+    0: { label: "Draft", className: "text-gray-600 bg-gray-200 px-3 py-1 rounded text-sm" },
+    1: { label: "Active", className: "text-blue-600 bg-blue-200 px-3 py-1 rounded text-sm" },
+    2: { label: "Paid", className: "text-green-600 bg-green-200 px-3 py-1 rounded text-sm" },
+    3: { label: "Partially Paid", className: "text-yellow-600 bg-yellow-200 px-3 py-1 rounded text-sm" },
+    4: { label: "Canceled", className: "text-red-600 bg-red-200 px-3 py-1 rounded text-sm" }
   };
 
   return (
@@ -225,16 +227,19 @@ const SummaryCards = ({ invoices = [] }) => {
   );
 };
 
-export default function List({ invoices = [], meta = {}, filters = {} }) {
+export default function List({ invoices = [], meta = {}, filters = {}, customers = [] }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedInvoices, setSelectedInvoices] = useState([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
-  const [perPage, setPerPage] = useState(meta.per_page || 10);
+  const [perPage, setPerPage] = useState(meta.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
   const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
+  const [selectedCustomer, setSelectedCustomer] = useState(filters.customer_id || "");
+  const [dateRange, setDateRange] = useState(filters.date_range || null);
+  const [selectedStatus, setSelectedStatus] = useState(filters.status || "");
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -413,6 +418,57 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
     });
   };
 
+  const handleCustomerChange = (value) => {
+    setSelectedCustomer(value);
+    router.get(
+        route("deffered_invoices.index"),
+        {
+            search,
+            page: 1,
+            per_page: perPage,
+            customer_id: value,
+            date_range: dateRange,
+            status: selectedStatus,
+            sorting,
+        },
+        { preserveState: true }
+    );
+  };
+
+  const handleDateRangeChange = (dates) => {
+    setDateRange(dates);
+    router.get(
+        route("deffered_invoices.index"),
+        {
+            search,
+            page: 1,
+            per_page: perPage,
+            customer_id: selectedCustomer,
+            date_range: dates,
+            status: selectedStatus,
+            sorting,
+        },
+        { preserveState: true }
+    );
+  };
+
+  const handleStatusChange = (value) => {
+    setSelectedStatus(value);
+    router.get(
+        route("deffered_invoices.index"),
+        {
+            search,
+            page: 1,
+            per_page: perPage,
+            customer_id: selectedCustomer,
+            date_range: dateRange,
+            status: value,
+            sorting,
+        },
+        { preserveState: true }
+    );
+  };
+
   const renderPageNumbers = () => {
     const totalPages = meta.last_page;
     const pages = [];
@@ -507,6 +563,37 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
                 <Button onClick={handleBulkAction} variant="outline">
                   Apply
                 </Button>
+                <SearchableCombobox
+                  options={customers.map(customer => ({
+                      id: customer.id,
+                      name: customer.name
+                  }))}
+                  value={selectedCustomer}
+                  onChange={handleCustomerChange}
+                  placeholder="Select customer"
+                  className="w-[200px]"
+                />
+                <DateTimePicker
+                  value={dateRange}
+                  onChange={handleDateRangeChange}
+                  isRange={true}
+                  className="w-[200px]"
+                  placeholder="Select date range"
+                />
+                <SearchableCombobox
+                  options={[
+                      { id: "", name: "All Status" },
+                      { id: "0", name: "Draft" },
+                      { id: "1", name: "Active" },
+                      { id: "2", name: "Paid" },
+                      { id: "3", name: "Partially Paid" },
+                      { id: "4", name: "Canceled" }
+                  ]}
+                  value={selectedStatus}
+                  onChange={handleStatusChange}
+                  placeholder="Select status"
+                  className="w-[150px]"
+                />
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Show</span>

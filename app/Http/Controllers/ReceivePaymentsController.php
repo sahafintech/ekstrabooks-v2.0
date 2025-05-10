@@ -26,6 +26,8 @@ class ReceivePaymentsController extends Controller
         $sorting = $request->get('sorting', []);
         $sortColumn = $sorting['column'] ?? 'id';
         $sortDirection = $sorting['direction'] ?? 'desc';
+        $customer_id = $request->get('customer_id', '');
+        $date_range = $request->get('date_range', null);
 
         $query = ReceivePayment::where('deffered_payment', 0);
 
@@ -50,7 +52,18 @@ class ReceivePaymentsController extends Controller
             });
         }
 
+        // Apply customer filter
+        if (!empty($customer_id)) {
+            $query->where('customer_id', $customer_id);
+        }
+
+        // Apply date range filter
+        if (!empty($date_range)) {
+            $query->whereBetween('date', [$date_range[0], $date_range[1]]);
+        }
+
         $payments = $query->paginate($per_page)->withQueryString();
+        $customers = Customer::all();
 
         // Return Inertia view
         return Inertia::render('Backend/User/ReceivePayment/List', [
@@ -69,7 +82,10 @@ class ReceivePaymentsController extends Controller
                 'search' => $search,
                 'columnFilters' => $request->get('columnFilters', []),
                 'sorting' => $request->get('sorting', []),
+                'customer_id' => $customer_id,
+                'date_range' => $date_range,
             ],
+            'customers' => $customers,
         ]);
     }
 

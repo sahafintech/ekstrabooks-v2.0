@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Auth;
 
 class PurchaseReturnController extends Controller
 {
@@ -28,45 +29,18 @@ class PurchaseReturnController extends Controller
      */
     public function index(Request $request)
     {
-        $query = PurchaseReturn::with('vendor');
-
-        // Apply filters if any
-        if ($request->has('filters')) {
-            $filters = $request->filters;
-
-            // Filter by vendor
-            if (!empty($filters['vendor_id'])) {
-                $query->where('vendor_id', $filters['vendor_id']);
-            }
-
-            // Filter by status
-            if (isset($filters['status']) && $filters['status'] !== '') {
-                $query->where('status', $filters['status']);
-            }
-
-            // Filter by date range
-            if (!empty($filters['date_range'])) {
-                if (!empty($filters['date_range']['start'])) {
-                    $query->where('return_date', '>=', $filters['date_range']['start']);
-                }
-                if (!empty($filters['date_range']['end'])) {
-                    $query->where('return_date', '<=', $filters['date_range']['end']);
-                }
-            }
-        }
-
-        if (!empty($request->search)) {
-            $query->where('return_number', 'like', "%{$request->search}%")
-                ->whereHas('vendor', function ($query) use ($request) {
-                    $query->where('name', 'like', "%{$request->search}%");
-                });
-        }
-
-        // Handle sorting
+        $search = $request->get('search', '');
+        $perPage = $request->get('per_page', 10);
         $sorting = $request->get('sorting', []);
         $sortColumn = $sorting['column'] ?? 'id';
         $sortDirection = $sorting['direction'] ?? 'desc';
+        $vendorId = $request->get('vendor_id', '');
+        $dateRange = $request->get('date_range', '');
+        $status = $request->get('status', '');
 
+        $query = PurchaseReturn::with('vendor');
+
+        // Handle sorting
         if ($sortColumn === 'vendor.name') {
             $query->join('vendors', 'purchase_returns.vendor_id', '=', 'vendors.id')
                 ->orderBy('vendors.name', $sortDirection)
@@ -75,14 +49,37 @@ class PurchaseReturnController extends Controller
             $query->orderBy('purchase_returns.' . $sortColumn, $sortDirection);
         }
 
-        // Handle pagination
-        $perPage = $request->get('per_page', 10);
+        // Apply filters
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('return_number', 'like', "%$search%")
+                    ->orWhereHas('vendor', function ($q) use ($search) {
+                        $q->where('name', 'like', "%$search%");
+                    });
+            });
+        }
+
+        if ($vendorId) {
+            $query->where('vendor_id', $vendorId);
+        }
+
+        if ($dateRange) {
+            $query->whereDate('return_date', '>=', Carbon::parse($dateRange[0])->format('Y-m-d'))
+                ->whereDate('return_date', '<=', Carbon::parse($dateRange[1])->format('Y-m-d'));
+        }
+
+        if ($status) {
+            $query->where('status', $status);
+        }
+
         $returns = $query->paginate($perPage);
         $accounts = Account::all();
+        $vendors = Vendor::all();
 
         return Inertia::render('Backend/User/PurchaseReturn/List', [
             'returns' => $returns->items(),
             'accounts' => $accounts,
+            'vendors' => $vendors,
             'meta' => [
                 'total' => $returns->total(),
                 'per_page' => $returns->perPage(),
@@ -92,8 +89,10 @@ class PurchaseReturnController extends Controller
                 'to' => $returns->lastItem(),
             ],
             'filters' => [
-                'search' => $request->search,
-                'columnFilters' => $request->get('columnFilters', []),
+                'search' => $search,
+                'vendor_id' => $vendorId,
+                'date_range' => $dateRange,
+                'status' => $status,
                 'sorting' => $sorting,
             ],
         ]);
@@ -329,7 +328,7 @@ class PurchaseReturnController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Purchase Return Created: ' . $return->return_number;
         $audit->save();
 
@@ -629,7 +628,7 @@ class PurchaseReturnController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Purchase Return Updated: ' . $return->return_number;
         $audit->save();
 
@@ -647,7 +646,7 @@ class PurchaseReturnController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Purchase Return Deleted: ' . $return->return_number;
         $audit->save();
 
@@ -689,7 +688,7 @@ class PurchaseReturnController extends Controller
             // audit log
             $audit = new AuditLog();
             $audit->date_changed = date('Y-m-d H:i:s');
-            $audit->changed_by = auth()->user()->id;
+            $audit->changed_by = Auth::id();
             $audit->event = 'Purchase Return Deleted: ' . $return->return_number;
             $audit->save();
 
@@ -836,7 +835,7 @@ class PurchaseReturnController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Purchase Return Refund: ' . $purchaseReturn->return_number;
         $audit->save();
 

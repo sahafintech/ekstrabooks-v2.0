@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { Head, Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
@@ -33,6 +33,8 @@ import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 import { formatCurrency } from "@/lib/utils";
+import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 const DeleteInvoiceModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
@@ -225,7 +227,7 @@ const SummaryCards = ({ invoices = [] }) => {
   );
 };
 
-export default function List({ invoices = [], meta = {}, filters = {} }) {
+export default function List({ invoices = [], meta = {}, filters = {}, customers = [] }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedInvoices, setSelectedInvoices] = useState([]);
@@ -235,6 +237,9 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
   const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
+  const [selectedCustomer, setSelectedCustomer] = useState(filters.customer_id || "");
+  const [dateRange, setDateRange] = useState(filters.date_range || null);
+  const [selectedStatus, setSelectedStatus] = useState(filters.status || "");
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -314,7 +319,15 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
     setSearch(value);
     router.get(
       route("invoices.index"),
-      { search: value, page: 1, per_page: perPage, sorting },
+      { 
+        search: value, 
+        page: 1, 
+        per_page: perPage, 
+        sorting,
+        customer_id: selectedCustomer,
+        date_range: dateRange,
+        status: selectedStatus
+      },
       { preserveState: true }
     );
   };
@@ -323,7 +336,15 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
     setPerPage(value);
     router.get(
       route("invoices.index"),
-      { search, page: 1, per_page: value, sorting },
+      { 
+        search, 
+        page: 1, 
+        per_page: value, 
+        sorting,
+        customer_id: selectedCustomer,
+        date_range: dateRange,
+        status: selectedStatus
+      },
       { preserveState: true }
     );
   };
@@ -332,7 +353,66 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
     setCurrentPage(page);
     router.get(
       route("invoices.index"),
-      { search, page, per_page: perPage, sorting },
+      { 
+        search, 
+        page, 
+        per_page: perPage, 
+        sorting,
+        customer_id: selectedCustomer,
+        date_range: dateRange,
+        status: selectedStatus
+      },
+      { preserveState: true }
+    );
+  };
+
+  const handleCustomerChange = (value) => {
+    setSelectedCustomer(value);
+    router.get(
+      route("invoices.index"),
+      { 
+        search, 
+        page: 1, 
+        per_page: perPage, 
+        sorting,
+        customer_id: value,
+        date_range: dateRange,
+        status: selectedStatus
+      },
+      { preserveState: true }
+    );
+  };
+
+  const handleDateRangeChange = (dates) => {
+    setDateRange(dates);
+    router.get(
+      route("invoices.index"),
+      { 
+        search, 
+        page: 1, 
+        per_page: perPage, 
+        sorting,
+        customer_id: selectedCustomer,
+        date_range: dates,
+        status: selectedStatus
+      },
+      { preserveState: true }
+    );
+  };
+
+  const handleStatusChange = (value) => {
+    setSelectedStatus(value);
+    router.get(
+      route("invoices.index"),
+      { 
+        search, 
+        page: 1, 
+        per_page: perPage, 
+        sorting,
+        customer_id: selectedCustomer,
+        date_range: dateRange,
+        status: value
+      },
       { preserveState: true }
     );
   };
@@ -507,6 +587,37 @@ export default function List({ invoices = [], meta = {}, filters = {} }) {
                 <Button onClick={handleBulkAction} variant="outline">
                   Apply
                 </Button>
+                <SearchableCombobox
+                  options={customers.map(customer => ({
+                    id: customer.id,
+                    name: customer.name
+                  }))}
+                  value={selectedCustomer}
+                  onChange={handleCustomerChange}
+                  placeholder="Select customer"
+                  className="w-[200px]"
+                />
+                <DateTimePicker
+                  value={dateRange}
+                  onChange={handleDateRangeChange}
+                  isRange={true}
+                  className="w-[200px]"
+                  placeholder="Select date range"
+                />
+                <SearchableCombobox
+                  options={[
+                    { id: "", name: "All Status" },
+                    { id: "0", name: "Draft" },
+                    { id: "1", name: "Active" },
+                    { id: "2", name: "Paid" },
+                    { id: "3", name: "Partially Paid" },
+                    { id: "4", name: "Canceled" }
+                  ]}
+                  value={selectedStatus}
+                  onChange={handleStatusChange}
+                  placeholder="Select status"
+                  className="w-[150px]"
+                />
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Show</span>

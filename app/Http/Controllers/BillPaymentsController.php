@@ -25,6 +25,8 @@ class BillPaymentsController extends Controller
         $sorting = $request->get('sorting', []);
         $sortColumn = $sorting['column'] ?? 'id';
         $sortDirection = $sorting['direction'] ?? 'desc';
+        $vendor_id = $request->get('vendor_id');
+        $dateRange = $request->get('date_range');
 
         $query = BillPayment::query();
 
@@ -49,7 +51,19 @@ class BillPaymentsController extends Controller
             });
         }
 
+        // Apply vendor filter
+        if (!empty($vendor_id)) {
+            $query->where('vendor_id', $vendor_id);
+        }
+
+        // Apply date range filter
+        if (!empty($dateRange)) {
+            $query->where('date', '>=', $dateRange[0])
+                ->where('date', '<=', $dateRange[1]);
+        }
+
         $payments = $query->paginate($per_page)->withQueryString();
+        $vendors = Vendor::all();
 
         // Return Inertia view
         return Inertia::render('Backend/User/BillPayment/List', [
@@ -68,7 +82,10 @@ class BillPaymentsController extends Controller
                 'search' => $search,
                 'columnFilters' => $request->get('columnFilters', []),
                 'sorting' => $sorting,
+                'vendor_id' => $vendor_id,
+                'date_range' => $dateRange,
             ],
+            'vendors' => $vendors,
         ]);
     }
 

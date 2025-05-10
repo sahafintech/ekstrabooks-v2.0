@@ -34,6 +34,9 @@ class CashPurchaseController extends Controller
 		$sorting = $request->get('sorting', []);
 		$sortColumn = $sorting['column'] ?? 'id';
 		$sortDirection = $sorting['direction'] ?? 'desc';
+		$vendorId = $request->get('vendor_id', '');
+		$dateRange = $request->get('date_range', []);
+		$status = $request->get('status', '');
 
 		$query = Purchase::with('vendor')
 			->where('cash', 1);
@@ -56,7 +59,27 @@ class CashPurchaseController extends Controller
 			});
 		}
 
+		// Filter by vendor
+		if ($vendorId) {
+			$query->where('vendor_id', $vendorId);
+		}
+
+		// Filter by date range
+		if (!empty($dateRange) && count($dateRange) === 2) {
+			$startDate = Carbon::parse($dateRange[0])->startOfDay();
+			$endDate = Carbon::parse($dateRange[1])->endOfDay();
+			$query->whereBetween('purchase_date', [$startDate, $endDate]);
+		}
+
+		// Filter by status
+		if ($status !== '') {
+			$query->where('approval_status', $status);
+		}
+
 		$purchases = $query->paginate($perPage)->withQueryString();
+
+		// Get all vendors for the filter dropdown
+		$vendors = Vendor::orderBy('name')->get();
 
 		return Inertia::render('Backend/User/CashPurchase/List', [
 			'purchases' => $purchases->items(),
@@ -70,7 +93,11 @@ class CashPurchaseController extends Controller
 				'search' => $search,
 				'columnFilters' => $request->get('columnFilters', []),
 				'sorting' => $sorting,
+				'vendor_id' => $vendorId,
+				'date_range' => $dateRange,
+				'status' => $status,
 			],
+			'vendors' => $vendors,
 		]);
 	}
 

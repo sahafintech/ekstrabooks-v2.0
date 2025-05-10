@@ -51,9 +51,12 @@ class DefferedInvoiceController extends Controller
 
     public function index(Request $request)
     {
-        $per_page = $request->get('per_page', 10);
+        $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
         $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
+        $customer_id = $request->get('customer_id', '');
+        $dateRange = $request->get('date_range', null);
+        $status = $request->get('status', '');
 
         $query = Invoice::where('is_deffered', 1)->with('customer');
 
@@ -66,6 +69,23 @@ class DefferedInvoiceController extends Controller
                     ->orWhere('grand_total', 'like', "%{$search}%")
                     ->orWhere('order_number', 'like', "%{$search}%");
             });
+        }
+
+        // Apply customer filter
+        if (!empty($customer_id)) {
+            $query->where('customer_id', $customer_id);
+        }
+
+        // Apply date range filter
+        if (!empty($dateRange)) {
+
+            $query->whereDate('invoice_date', '>=', Carbon::parse($dateRange[0]))
+                ->whereDate('invoice_date', '<=', Carbon::parse($dateRange[1]));
+        }
+
+        // Apply status filter
+        if ($status) {
+            $query->where('status', $status);
         }
 
         // Apply sorting
@@ -83,6 +103,9 @@ class DefferedInvoiceController extends Controller
         // Get invoices with pagination
         $invoices = $query->paginate($per_page)->withQueryString();
 
+        // Get all customers for the filter dropdown
+        $customers = Customer::all();
+
         // Return Inertia view
         return Inertia::render('Backend/User/Invoice/Deffered/List', [
             'invoices' => $invoices->items(),
@@ -98,9 +121,12 @@ class DefferedInvoiceController extends Controller
             ],
             'filters' => [
                 'search' => $search,
-                'columnFilters' => $request->get('columnFilters', []),
+                'customer_id' => $customer_id,
+                'date_range' => $dateRange,
+                'status' => $status,
                 'sorting' => $sorting,
             ],
+            'customers' => $customers,
         ]);
     }
 

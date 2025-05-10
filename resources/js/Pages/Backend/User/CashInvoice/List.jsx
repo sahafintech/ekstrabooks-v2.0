@@ -33,6 +33,8 @@ import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 import { formatCurrency } from "@/lib/utils";
+import DateTimePicker from "@/Components/DateTimePicker";
+import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 
 const DeleteReceiptModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
@@ -213,7 +215,7 @@ const SummaryCards = ({ receipts = [] }) => {
   );
 };
 
-export default function List({ receipts = [], meta = {}, filters = {} }) {
+export default function List({ receipts = [], meta = {}, filters = {}, customers = [] }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedRows, setSelectedRows] = useState([]);
@@ -227,6 +229,8 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
   const [search, setSearch] = useState(filters.search || "");
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
+  const [selectedCustomer, setSelectedCustomer] = useState(filters.customer_id || "");
+  const [dateRange, setDateRange] = useState(filters.date_range || null);
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -429,6 +433,36 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
     return pages;
   };
 
+  const handleCustomerChange = (value) => {
+    setSelectedCustomer(value);
+    router.get(
+      route("receipts.index"),
+      {
+        search,
+        page: 1,
+        per_page: perPage,
+        customer_id: value,
+        date_range: dateRange,
+      },
+      { preserveState: true }
+    );
+  };
+
+  const handleDateRangeChange = (dates) => {
+    setDateRange(dates);
+    router.get(
+      route("receipts.index"),
+      {
+        search,
+        page: 1,
+        per_page: perPage,
+        customer_id: selectedCustomer,
+        date_range: dates,
+      },
+      { preserveState: true }
+    );
+  };
+
   return (
     <AuthenticatedLayout>
       <Head title="Cash Invoices" />
@@ -500,6 +534,23 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
                 >
                   Apply
                 </Button>
+                <SearchableCombobox
+                  options={customers.map(customer => ({
+                    id: customer.id,
+                    name: customer.name
+                  }))}
+                  value={selectedCustomer}
+                  onChange={handleCustomerChange}
+                  placeholder="Select customer"
+                  className="w-[200px]"
+                />
+                <DateTimePicker
+                  value={dateRange}
+                  onChange={handleDateRangeChange}
+                  isRange={true}
+                  className="w-[200px]"
+                  placeholder="Select date range"
+                />
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Show</span>
@@ -507,7 +558,7 @@ export default function List({ receipts = [], meta = {}, filters = {} }) {
                   setPerPage(parseInt(value));
                   router.get(
                     route("receipts.index"),
-                    { search, page: 1, per_page: value },
+                    { search, page: 1, per_page: value, customer_id: selectedCustomer, date_range: dateRange },
                     { preserveState: true }
                   );
                 }}>

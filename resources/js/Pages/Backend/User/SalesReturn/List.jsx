@@ -43,6 +43,7 @@ import {
 import { cn, formatCurrency } from "@/lib/utils";
 import InputError from "@/Components/InputError";
 import { format } from "date-fns";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 const DeleteSalesReturnModal = ({ show, onClose, onConfirm, processing }) => (
     <Modal show={show} onClose={onClose}>
@@ -332,7 +333,7 @@ const SummaryCards = ({ returns = [] }) => {
     );
 };
 
-export default function List({ returns = [], meta = {}, filters = {}, accounts = [], errors = {} }) {
+export default function List({ returns = [], meta = {}, filters = {}, accounts = [], errors = {}, customers = [] }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
     const [selectedSalesReturns, setSelectedSalesReturns] = useState([]);
@@ -341,6 +342,10 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
     const [perPage, setPerPage] = useState(meta.per_page || 10);
     const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
     const [bulkAction, setBulkAction] = useState("");
+    const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
+    const [selectedCustomer, setSelectedCustomer] = useState(filters.customer_id || "");
+    const [dateRange, setDateRange] = useState(filters.date_range || null);
+    const [selectedStatus, setSelectedStatus] = useState(filters.status || "");
 
     // Delete confirmation modal states
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -356,8 +361,6 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
     const [refundDate, setRefundDate] = useState(format(new Date(), "yyyy-MM-dd"));
     const [refundAmount, setRefundAmount] = useState("");
     const [paymentAccount, setPaymentAccount] = useState("");
-
-    const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
 
     useEffect(() => {
         if (flash && flash.success) {
@@ -544,6 +547,57 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
         );
     };
 
+    const handleCustomerChange = (value) => {
+        setSelectedCustomer(value);
+        router.get(
+            route("sales_returns.index"),
+            { 
+                search, 
+                page: 1, 
+                per_page: perPage, 
+                sorting,
+                customer_id: value,
+                date_range: dateRange,
+                status: selectedStatus
+            },
+            { preserveState: true }
+        );
+    };
+
+    const handleDateRangeChange = (dates) => {
+        setDateRange(dates);
+        router.get(
+            route("sales_returns.index"),
+            { 
+                search, 
+                page: 1, 
+                per_page: perPage, 
+                sorting,
+                customer_id: selectedCustomer,
+                date_range: dates,
+                status: selectedStatus
+            },
+            { preserveState: true }
+        );
+    };
+
+    const handleStatusChange = (value) => {
+        setSelectedStatus(value);
+        router.get(
+            route("sales_returns.index"),
+            { 
+                search, 
+                page: 1, 
+                per_page: perPage, 
+                sorting,
+                customer_id: selectedCustomer,
+                date_range: dateRange,
+                status: value
+            },
+            { preserveState: true }
+        );
+    };
+
     const renderSortIcon = (column) => {
         const isActive = sorting.column === column;
         return (
@@ -652,6 +706,35 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                                 <Button onClick={handleBulkAction} variant="outline">
                                     Apply
                                 </Button>
+                                <SearchableCombobox
+                                    options={customers.map(customer => ({
+                                        id: customer.id,
+                                        name: customer.name
+                                    }))}
+                                    value={selectedCustomer}
+                                    onChange={handleCustomerChange}
+                                    placeholder="Select customer"
+                                    className="w-[200px]"
+                                />
+                                <DateTimePicker
+                                    value={dateRange}
+                                    onChange={handleDateRangeChange}
+                                    isRange={true}
+                                    className="w-[200px]"
+                                    placeholder="Select date range"
+                                />
+                                <SearchableCombobox
+                                    options={[
+                                        { id: "", name: "All Status" },
+                                        { id: "0", name: "Active" },
+                                        { id: "1", name: "Refunded" },
+                                        { id: "2", name: "Partially Refunded" }
+                                    ]}
+                                    value={selectedStatus}
+                                    onChange={handleStatusChange}
+                                    placeholder="Select status"
+                                    className="w-[150px]"
+                                />
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-sm text-gray-500">Show</span>
