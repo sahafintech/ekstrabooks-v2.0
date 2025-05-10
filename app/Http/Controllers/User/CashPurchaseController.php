@@ -18,7 +18,6 @@ use App\Models\Tax;
 use App\Models\Transaction;
 use App\Models\Vendor;
 use App\Notifications\SendCashPurchase;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -595,7 +594,7 @@ class CashPurchaseController extends Controller
 		]);
 	}
 
-	public function show_public_cash_purchase($short_code, $export = 'preview')
+	public function show_public_cash_purchase($short_code)
 	{
 		$purchase   = Purchase::withoutGlobalScopes()->with(['vendor', 'business', 'items', 'taxes'])
 			->where('short_code', $short_code)
@@ -605,12 +604,9 @@ class CashPurchaseController extends Controller
 		// add activeBusiness object to request
 		$request->merge(['activeBusiness' => $purchase->business]);
 
-		if ($export == 'pdf') {
-			$pdf = Pdf::loadView('backend.user.cash_purchase.pdf', compact('purchase'));
-			return $pdf->download('cash_purchase#-' . $purchase->bill_no . '.pdf');
-		}
-
-		return Inertia::render('Backend/User/CashPurchase/GuestView', compact('purchase'));
+		return Inertia::render('Backend/User/CashPurchase/PublicView', [
+			'purchase' => $purchase,
+		]);
 	}
 
 	/**

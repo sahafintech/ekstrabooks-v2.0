@@ -133,6 +133,20 @@ class PurchaseReturnController extends Controller
         ]);
     }
 
+    public function show_public_purchase_return($short_code)
+	{
+		$purchase_return   = PurchaseReturn::where('short_code', $short_code)->with('vendor', 'business', 'items', 'taxes')->first();
+
+		$request = request();
+		// add activeBusiness object to request
+		$request->merge(['activeBusiness' => $purchase_return->business]);
+
+		return Inertia::render('Backend/User/PurchaseReturn/PublicView', [
+			'purchase_return' => $purchase_return,
+			'request' => $request,
+		]);
+	}
+
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [

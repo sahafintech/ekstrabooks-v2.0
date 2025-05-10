@@ -405,6 +405,21 @@ class SalesReturnController extends Controller
         ]);
     }
 
+    public function show_public_sales_return($short_code)
+    {
+        $sales_return = SalesReturn::withoutGlobalScopes()->with('customer', 'business', 'items', 'taxes')
+            ->where('short_code', $short_code)
+            ->first();
+
+        $request = request();
+        // add activeBusiness object to request
+        $request->merge(['activeBusiness' => $sales_return->business]);
+
+        return Inertia::render('Backend/User/SalesReturn/PublicView', [
+            'sales_return' => $sales_return,
+        ]);
+    }
+
     public function refund_store(Request $request, $id)
     {
         $request->validate(

@@ -1046,7 +1046,7 @@ class DefferedInvoiceController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show_public_deffered_invoice($short_code, $export = 'preview')
+    public function show_public_deffered_invoice($short_code)
     {
         $defferedInvoice   = Invoice::withoutGlobalScopes()->with(['customer', 'business', 'items', 'taxes'])
             ->where('short_code', $short_code)
@@ -1056,12 +1056,7 @@ class DefferedInvoiceController extends Controller
         // add activeBusiness object to request
         $request->merge(['activeBusiness' => $defferedInvoice->business]);
 
-        if ($export == 'pdf') {
-            $pdf = Pdf::loadView('backend.user.invoice.pdf', compact('defferedInvoice'));
-            return $pdf->download('deffered_invoice#-' . $defferedInvoice->invoice_number . '.pdf');
-        }
-
-        return Inertia::render('Backend/User/Invoice/Deffered/GuestView', [
+        return Inertia::render('Backend/User/Invoice/Deffered/PublicView', [
             'defferedInvoice' => $defferedInvoice,
         ]);
     }

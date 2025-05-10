@@ -100,7 +100,7 @@ class ReceivePaymentsController extends Controller
         ]);
 
         if ($validator->fails()) {
-           return redirect()->back()->withErrors($validator)->withInput();
+            return redirect()->back()->withErrors($validator)->withInput();
         }
 
         $default_accounts = ['Accounts Receivable', 'Sales Tax Payable', 'Sales Discount Allowed', 'Inventory'];
@@ -508,6 +508,19 @@ class ReceivePaymentsController extends Controller
         return Inertia::render('Backend/User/ReceivePayment/View', [
             'payment' => $payment,
             'decimalPlace' => $decimalPlace
+        ]);
+    }
+
+    public function show_public_receive_payment($id)
+    {
+        $payment = ReceivePayment::where('id', $id)->with('invoices', 'customer', 'business')->first();
+
+        $request = request();
+        // add activeBusiness object to request
+        $request->merge(['activeBusiness' => $payment->business]);
+
+        return Inertia::render('Backend/User/ReceivePayment/PublicView', [
+            'payment' => $payment,
         ]);
     }
 }

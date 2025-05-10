@@ -317,14 +317,15 @@ class QuotationController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show_public_quotation($short_code, $export = 'preview')
+    public function show_public_quotation($short_code)
     {
-        $alert_col = 'col-lg-8 offset-lg-2';
         $quotation = Quotation::withoutGlobalScopes()->with(['customer', 'business', 'items', 'taxes'])
             ->where('short_code', $short_code)
             ->first();
 
-        return view('backend.guest.quotation.view', compact('quotation', 'alert_col'));
+        return Inertia::render('Backend/User/Quotation/PublicView', [
+            'quotation' => $quotation
+        ]);
     }
 
     /**

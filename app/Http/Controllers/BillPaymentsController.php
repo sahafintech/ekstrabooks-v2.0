@@ -504,4 +504,17 @@ class BillPaymentsController extends Controller
             'decimalPlace' => $decimalPlace
         ]);
     }
+
+    public function show_public_bill_payment($id)
+	{
+		$payment = BillPayment::where('id', $id)->with('purchases', 'vendor', 'business')->first();
+
+		$request = request();
+		// add activeBusiness object to request
+		$request->merge(['activeBusiness' => $payment->business]);
+
+		return Inertia::render('Backend/User/BillPayment/PublicView', [
+			'payment' => $payment,
+		]);
+	}
 }

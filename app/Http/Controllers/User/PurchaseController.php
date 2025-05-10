@@ -906,22 +906,19 @@ class PurchaseController extends Controller
 		]);
 	}
 
-	public function show_public_bill_invoice($short_code, $export = 'preview')
+	public function show_public_bill_invoice($short_code)
 	{
-		$purchase   = Purchase::withoutGlobalScopes()->with(['vendor', 'business', 'items', 'taxes'])
+		$bill   = Purchase::withoutGlobalScopes()->with(['vendor', 'business', 'items', 'taxes'])
 			->where('short_code', $short_code)
 			->first();
 
 		$request = request();
 		// add activeBusiness object to request
-		$request->merge(['activeBusiness' => $purchase->business]);
+		$request->merge(['activeBusiness' => $bill->business]);
 
-		if ($export == 'pdf') {
-			$pdf = Pdf::loadView('backend.user.purchase.pdf', compact('purchase'));
-			return $pdf->download('bill_invoice#-' . $purchase->bill_no . '.pdf');
-		}
-
-		return Inertia::render('Backend/User/Bill/GuestView', compact('purchase'));
+		return Inertia::render('Backend/User/Bill/PublicView', [
+			'bill' => $bill,
+		]);
 	}
 
 	public function send_email(Request $request, $id)

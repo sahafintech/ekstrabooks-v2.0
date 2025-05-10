@@ -149,6 +149,21 @@ class ReceiptController extends Controller
         ]);
     }
 
+    public function show_public_cash_invoice($short_code)
+    {
+        $receipt   = Receipt::withoutGlobalScopes()->with(['customer', 'business', 'items', 'taxes'])
+            ->where('short_code', $short_code)
+            ->first();
+
+        $request = request();
+        // add activeBusiness object to request
+        $request->merge(['activeBusiness' => $receipt->business]);
+
+        return Inertia::render('Backend/User/CashInvoice/PublicView', [
+            'receipt' => $receipt,
+        ]);
+    }
+
     public function edit($id)
     {
         $receipt = Receipt::with(['items.taxes', 'customer'])

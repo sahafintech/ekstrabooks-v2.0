@@ -518,7 +518,7 @@ class InvoiceController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show_public_invoice($short_code, $export = 'preview')
+    public function show_public_invoice($short_code)
     {
         $invoice   = Invoice::withoutGlobalScopes()->with(['customer', 'business', 'items', 'taxes'])
             ->where('short_code', $short_code)
@@ -528,7 +528,9 @@ class InvoiceController extends Controller
         // add activeBusiness object to request
         $request->merge(['activeBusiness' => $invoice->business]);
 
-        return view('backend.guest.invoice.view', compact('invoice'));
+        return Inertia::render('Backend/User/Invoice/PublicView', [
+            'invoice' => $invoice,
+        ]);
     }
 
     /**

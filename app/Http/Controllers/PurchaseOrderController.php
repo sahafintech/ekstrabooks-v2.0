@@ -16,7 +16,6 @@ use App\Models\Tax;
 use App\Models\Transaction;
 use App\Models\Vendor;
 use App\Notifications\SendPurchaseOrder;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
@@ -921,7 +920,7 @@ class PurchaseOrderController extends Controller
 		}
 	}
 
-	public function show_public_purchase_order($short_code, $export = 'preview')
+	public function show_public_purchase_order($short_code)
 	{
 		$purchase_order   = PurchaseOrder::withoutGlobalScopes()->with(['vendor', 'business', 'items', 'taxes'])
 			->where('short_code', $short_code)
@@ -931,12 +930,10 @@ class PurchaseOrderController extends Controller
 		// add activeBusiness object to request
 		$request->merge(['activeBusiness' => $purchase_order->business]);
 
-		if ($export == 'pdf') {
-			$pdf = Pdf::loadView('backend.user.purchase_order.pdf', compact('purchase_order'));
-			return $pdf->download('purchase_order#-' . $purchase_order->order_number . '.pdf');
-		}
-
-		return Inertia::render('Backend/User/PurchaseOrder/GuestView', compact('purchase_order'));
+		return Inertia::render('Backend/User/PurchaseOrder/PublicView', [
+			'purchase_order' => $purchase_order,
+			'request' => $request,
+		]);
 	}
 
 	public function convert_to_cash_purchase($id)

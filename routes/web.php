@@ -353,6 +353,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('pos/store', [ReceiptController::class, 'pos_store'])->name('receipts.pos_store');
 		Route::post('receipts/bulk_destroy', [ReceiptController::class, 'bulk_destroy'])->name('receipts.bulk_destroy');
 		Route::get('export_receipts', [ReceiptController::class, 'export_receipts'])->name('receipts.export');
+		Route::get('receipts/{id}/public', [ReceiptController::class, 'show_public_receipt'])->name('receipts.show_public_receipt');
 
 		// hold pos invoices
 		Route::resource('hold_pos_invoices', HoldPosInvoiceController::class);
@@ -403,7 +404,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('bill_invoices/bulk_approve', [PurchaseController::class, 'bulk_approve'])->name('bill_invoices.bulk_approve');
 		Route::post('bill_invoices/bulk_reject', [PurchaseController::class, 'bulk_reject'])->name('bill_invoices.bulk_reject');
 		Route::post('bill_invoices/bulk_destroy', [PurchaseController::class, 'bulk_destroy'])->name('bill_invoices.bulk_destroy');
-		Route::get('bill_invoices/{id}/', [PurchaseController::class, 'show_public_bill_invoice'])->name('bill_invoices.show_public_bill_invoice');
 		Route::post('bill_invoices/send_email/{id}', [PurchaseController::class, 'send_email'])->name('bill_invoices.send_email');
 
 		//Cash Purchases
@@ -417,8 +417,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('cash_purchases/bulk_reject', [CashPurchaseController::class, 'bulk_reject'])->name('cash_purchases.bulk_reject');
 		Route::post('cash_purchases/bulk_destroy', [CashPurchaseController::class, 'bulk_destroy'])->name('cash_purchases.bulk_destroy');
 		Route::post('cash_purchases/{id}/send_email', [CashPurchaseController::class, 'send_email'])->name('cash_purchases.send_email');
-		Route::get('cash_purchases/{id}/', [CashPurchaseController::class, 'show_public_cash_purchase'])->name('cash_purchases.show_public_cash_purchase');
-
 		// purchase orders
 		Route::get('purchase_orders/{id}/duplicate', [PurchaseOrderController::class, 'duplicate'])->name('purchase_orders.duplicate');
 		Route::resource('purchase_orders', PurchaseOrderController::class);
@@ -429,7 +427,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('purchase_orders/{id}/convert_to_bill', [PurchaseOrderController::class, 'convert_to_bill'])->name('purchase_orders.convert_to_bill');
 		Route::post('purchase_orders/{id}/convert_to_cash', [PurchaseOrderController::class, 'convert_to_cash_purchase'])->name('purchase_orders.convert_to_cash_purchase');
 		Route::post('purchase_orders/{id}/send_email', [PurchaseOrderController::class, 'send_email'])->name('purchase_orders.send_email');
-		Route::get('purchase_orders/{id}/', [PurchaseOrderController::class, 'show_public_purchase_order'])->name('purchase_orders.show_public_purchase_order');
 
 		// medical records
 		Route::resource('medical_records', MedicalRecordController::class);
@@ -658,16 +655,20 @@ Route::post('membership/choose_package', [MembershipController::class, 'choose_p
 Route::get('membership/payment_gateways', [MembershipController::class, 'payment_gateways'])->name('membership.payment_gateways')->middleware('auth');
 Route::get('membership/make_payment/{gateway}', [MembershipController::class, 'make_payment'])->name('membership.make_payment')->middleware('auth');
 
-//Public Invoice VIew
+//Public Invoices VIew
 Route::get('invoice/make_payment/{short_code}/{gateway}', [OnlinePaymentController::class, 'make_payment'])->name('invoices.make_payment');
 Route::get('invoice/payment_methods/{short_code}', [OnlinePaymentController::class, 'payment_methods'])->name('invoices.payment_methods');
-Route::get('invoice/{short_code}/{export?}', [InvoiceController::class, 'show_public_invoice'])->name('invoices.show_public_invoice');
-
-//Public Purchase Order VIew
-Route::get('purchase_order/{short_code}/{export?}', [PurchaseOrderController::class, 'show_public_purchase_order'])->name('purchase_orders.show_public_purchase_order');
-
-//Public Quotation VIew
-Route::get('quotations/{short_code}/{export?}', [QuotationController::class, 'show_public_quotation'])->name('quotations.show_public_quotation');
+Route::get('invoice/{short_code}', [InvoiceController::class, 'show_public_invoice'])->name('invoices.show_public_invoice');
+Route::get('cash_purchase/{short_code}', [CashPurchaseController::class, 'show_public_cash_purchase'])->name('cash_purchases.show_public_cash_purchase');
+Route::get('purchase_order/{short_code}', [PurchaseOrderController::class, 'show_public_purchase_order'])->name('purchase_orders.show_public_purchase_order');
+Route::get('quotation/{short_code}', [QuotationController::class, 'show_public_quotation'])->name('quotations.show_public_quotation');
+Route::get('bill_invoice/{short_code}', [PurchaseController::class, 'show_public_bill_invoice'])->name('bill_invoices.show_public_bill_invoice');
+Route::get('bill_payment/{id}', [BillPaymentsController::class, 'show_public_bill_payment'])->name('bill_payments.show_public_bill_payment');
+Route::get('purchase_return/{short_code}', [PurchaseReturnController::class, 'show_public_purchase_return'])->name('purchase_returns.show_public_purchase_return');
+Route::get('cash_invoice/{short_code}', [ReceiptController::class, 'show_public_cash_invoice'])->name('cash_purchases.show_public_cash_invoice');
+Route::get('deffered_invoice/{short_code}', [DefferedInvoiceController::class, 'show_public_deffered_invoice'])->name('deffered_invoices.show_public_deffered_invoice');
+Route::get('receive_payment/{id}', [ReceivePaymentsController::class, 'show_public_receive_payment'])->name('receive_payments.show_public_receive_payment');
+Route::get('sales_return/{short_code}', [SalesReturnController::class, 'show_public_sales_return'])->name('sales_returns.show_public_sales_return');
 
 Route::get('dashboard/json_income_by_category', 'DashboardController@json_income_by_category')->middleware('auth');
 Route::get('dashboard/json_expense_by_category', 'DashboardController@json_expense_by_category')->middleware('auth');
