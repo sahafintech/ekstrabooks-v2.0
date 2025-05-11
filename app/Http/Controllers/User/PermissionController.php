@@ -7,12 +7,13 @@ use Illuminate\Http\Request;
 use App\Models\AccessControl;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Models\Role;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 class PermissionController extends Controller {
     
     public function show($role_id = '') {
-        $alert_col = 'col-lg-8 offset-lg-2';
         $permission_list = array();
 
         if ($role_id != '') {
@@ -96,7 +97,12 @@ class PermissionController extends Controller {
             }
         }
 
-        return view('backend.user.system_user.permission.create', compact('permission', 'permission_list', 'role_id', 'alert_col'));
+        return Inertia::render('Backend/User/Business/SystemUser/Permission/Create', [
+            'permissions' => $permission,
+            'permission_list' => $permission_list,
+            'role_id' => $role_id,
+            'roles' => Role::all(),
+        ]);
 
     }
 
