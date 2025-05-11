@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import InputError from "@/Components/InputError";
 import { toast } from "sonner";
-import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
+import { SidebarInset } from "@/components/ui/sidebar";
 import {
     Select,
     SelectContent,
@@ -59,220 +59,194 @@ export default function UpdateContactPage({ pageData, languages }) {
 
     return (
         <AuthenticatedLayout>
-            <Sidebar>
-                <SidebarContent>
-                    <PageHeader
-                        page="Website"
-                        subpage="Default Pages"
-                        url="pages.index"
-                    />
-                    <div className="flex flex-col p-4 gap-4">
-                        <form
-                            onSubmit={submit}
-                            encType="multipart/form-data"
-                            autoComplete="off"
-                            className="validate"
-                        >
-                            {/* Title */}
-                            <div className="grid grid-cols-12 mt-2">
-                                <Label
-                                    htmlFor="pageTitle"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Title
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
-                                    <Input
-                                        id="pageTitle"
-                                        type="text"
-                                        name="pageTitle"
-                                        value={data.pageTitle}
-                                        onChange={(e) =>
-                                            setData("pageTitle", e.target.value)
-                                        }
-                                        required
+            <SidebarInset>
+                <PageHeader
+                    page="Website"
+                    subpage="Default Pages"
+                    url="pages.index"
+                />
+                <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+                    <form
+                        onSubmit={submit}
+                        encType="multipart/form-data"
+                        autoComplete="off"
+                        className="validate"
+                    >
+                        {/* Title */}
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label
+                                htmlFor="pageTitle"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Title
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
+                                <Input
+                                    id="pageTitle"
+                                    type="text"
+                                    name="pageTitle"
+                                    value={data.pageTitle}
+                                    onChange={(e) =>
+                                        setData("pageTitle", e.target.value)
+                                    }
+                                    required
+                                />
+                                {errors.pageTitle && (
+                                    <InputError
+                                        message={errors.pageTitle}
+                                        className="text-sm"
                                     />
-                                    {errors.pageTitle && (
-                                        <InputError
-                                            message={errors.pageTitle}
-                                            className="text-sm"
-                                        />
-                                    )}
-                                </div>
+                                )}
                             </div>
+                        </div>
 
-                            {/* Language */}
-                            <div className="grid grid-cols-12 mt-2">
-                                <Label
-                                    htmlFor="language"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Language
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
-                                    <div className="md:w-1/2 w-full">
-                                        <Select
-                                            id="language"
-                                            name="language"
-                                            value={data.language}
-                                            onValueChange={(val) =>
-                                                setData("language", val)
+                        {/* Language */}
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label
+                                htmlFor="language"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Language
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
+                                <div className="md:w-1/2 w-full">
+                                    <Select
+                                        id="language"
+                                        name="language"
+                                        value={data.language}
+                                        onValueChange={(val) =>
+                                            setData("language", val)
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue>
+                                                {languages.find(
+                                                    (lang) =>
+                                                        lang.code ===
+                                                        data.language
+                                                )?.label || "Select One"}
+                                            </SelectValue>
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {languages.map((lang) => (
+                                                <SelectItem
+                                                    key={lang.code}
+                                                    value={lang.code}
+                                                >
+                                                    {lang.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                {errors.language && (
+                                    <InputError
+                                        message={errors.language}
+                                        className="text-sm"
+                                    />
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Contact Form Heading */}
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label
+                                htmlFor="contactFormHeading"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Contact Form Heading
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
+                                <Input
+                                    id="contactFormHeading"
+                                    type="text"
+                                    name="contactFormHeading"
+                                    value={data.contactFormHeading}
+                                    onChange={(e) =>
+                                        setData(
+                                            "contactFormHeading",
+                                            e.target.value
+                                        )
+                                    }
+                                    required
+                                />
+                                {errors.contactFormHeading && (
+                                    <InputError
+                                        message={errors.contactFormHeading}
+                                        className="text-sm"
+                                    />
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Contact Form Sub Heading */}
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label
+                                htmlFor="contactFormSubHeading"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Contact Form Sub Heading
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
+                                <Textarea
+                                    id="contactFormSubHeading"
+                                    name="contactFormSubHeading"
+                                    value={data.contactFormSubHeading}
+                                    className="h-36"
+                                    onChange={(e) =>
+                                        setData(
+                                            "contactFormSubHeading",
+                                            e.target.value
+                                        )
+                                    }
+                                    required
+                                />
+                                {errors.contactFormSubHeading && (
+                                    <InputError
+                                        message={errors.contactFormSubHeading}
+                                        className="text-sm"
+                                    />
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Contact Informations */}
+                        <div className="col-span-12 my-4 flex items-center justify-between">
+                            <h5>
+                                <b>Contact Informations</b>
+                            </h5>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={addContactInfoRow}
+                            >
+                                Add Row
+                            </Button>
+                        </div>
+
+                        {data.contactInfo.map((info, index) => (
+                            <div
+                                key={index}
+                                className="grid grid-cols-12 gap-4 mt-2"
+                            >
+                                <div className="col-span-12">
+                                    <div className="flex justify-between">
+                                        <Label>Heading</Label>
+                                        <Button
+                                            type="button"
+                                            variant="destructive"
+                                            onClick={() =>
+                                                removeContactInfoRow(index)
                                             }
                                         >
-                                            <SelectTrigger>
-                                                <SelectValue>
-                                                    {languages.find(
-                                                        (lang) =>
-                                                            lang.code ===
-                                                            data.language
-                                                    )?.label || "Select One"}
-                                                </SelectValue>
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {languages.map((lang) => (
-                                                    <SelectItem
-                                                        key={lang.code}
-                                                        value={lang.code}
-                                                    >
-                                                        {lang.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                            Remove
+                                        </Button>
                                     </div>
-                                    {errors.language && (
-                                        <InputError
-                                            message={errors.language}
-                                            className="text-sm"
-                                        />
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Contact Form Heading */}
-                            <div className="grid grid-cols-12 mt-2">
-                                <Label
-                                    htmlFor="contactFormHeading"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Contact Form Heading
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
-                                    <Input
-                                        id="contactFormHeading"
-                                        type="text"
-                                        name="contactFormHeading"
-                                        value={data.contactFormHeading}
-                                        onChange={(e) =>
-                                            setData(
-                                                "contactFormHeading",
-                                                e.target.value
-                                            )
-                                        }
-                                        required
-                                    />
-                                    {errors.contactFormHeading && (
-                                        <InputError
-                                            message={errors.contactFormHeading}
-                                            className="text-sm"
-                                        />
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Contact Form Sub Heading */}
-                            <div className="grid grid-cols-12 mt-2">
-                                <Label
-                                    htmlFor="contactFormSubHeading"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Contact Form Sub Heading
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
-                                    <Textarea
-                                        id="contactFormSubHeading"
-                                        name="contactFormSubHeading"
-                                        value={data.contactFormSubHeading}
-                                        className="h-36"
-                                        onChange={(e) =>
-                                            setData(
-                                                "contactFormSubHeading",
-                                                e.target.value
-                                            )
-                                        }
-                                        required
-                                    />
-                                    {errors.contactFormSubHeading && (
-                                        <InputError
-                                            message={errors.contactFormSubHeading}
-                                            className="text-sm"
-                                        />
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Contact Informations */}
-                            <div className="col-span-12 my-4 flex items-center justify-between">
-                                <h5>
-                                    <b>Contact Informations</b>
-                                </h5>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={addContactInfoRow}
-                                >
-                                    Add Row
-                                </Button>
-                            </div>
-
-                            {data.contactInfo.map((info, index) => (
-                                <div
-                                    key={index}
-                                    className="grid grid-cols-12 gap-4 mt-2"
-                                >
-                                    <div className="col-span-12">
-                                        <div className="flex justify-between">
-                                            <Label>Heading</Label>
-                                            <Button
-                                                type="button"
-                                                variant="destructive"
-                                                onClick={() =>
-                                                    removeContactInfoRow(index)
-                                                }
-                                            >
-                                                Remove
-                                            </Button>
-                                        </div>
-                                        <div className="md:w-1/2 w-full">
-                                            <Input
-                                                type="text"
-                                                name={`contactInfo[${index}].heading`}
-                                                value={info.heading}
-                                                onChange={(e) =>
-                                                    setData("contactInfo", [
-                                                        ...data.contactInfo.slice(
-                                                            0,
-                                                            index
-                                                        ),
-                                                        {
-                                                            ...info,
-                                                            heading: e.target.value,
-                                                        },
-                                                        ...data.contactInfo.slice(
-                                                            index + 1
-                                                        ),
-                                                    ])
-                                                }
-                                                required
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="col-span-12 mt-2">
-                                        <Label>Content</Label>
-                                        <Textarea
-                                            className="w-full, h-36"
-                                            name={`contactInfo[${index}].content`}
-                                            value={info.content}
+                                    <div className="md:w-1/2 w-full">
+                                        <Input
+                                            type="text"
+                                            name={`contactInfo[${index}].heading`}
+                                            value={info.heading}
                                             onChange={(e) =>
                                                 setData("contactInfo", [
                                                     ...data.contactInfo.slice(
@@ -281,7 +255,7 @@ export default function UpdateContactPage({ pageData, languages }) {
                                                     ),
                                                     {
                                                         ...info,
-                                                        content: e.target.value,
+                                                        heading: e.target.value,
                                                     },
                                                     ...data.contactInfo.slice(
                                                         index + 1
@@ -292,99 +266,123 @@ export default function UpdateContactPage({ pageData, languages }) {
                                         />
                                     </div>
                                 </div>
-                            ))}
-
-                            {/* Social Links */}
-                            <div className="grid grid-cols-12 mt-4">
-                                <Label
-                                    htmlFor="facebookLink"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Facebook Link
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
-                                    <Input
-                                        id="facebookLink"
-                                        type="text"
-                                        name="facebookLink"
-                                        value={data.facebookLink}
+                                <div className="col-span-12 mt-2">
+                                    <Label>Content</Label>
+                                    <Textarea
+                                        className="w-full, h-36"
+                                        name={`contactInfo[${index}].content`}
+                                        value={info.content}
                                         onChange={(e) =>
-                                            setData("facebookLink", e.target.value)
+                                            setData("contactInfo", [
+                                                ...data.contactInfo.slice(
+                                                    0,
+                                                    index
+                                                ),
+                                                {
+                                                    ...info,
+                                                    content: e.target.value,
+                                                },
+                                                ...data.contactInfo.slice(
+                                                    index + 1
+                                                ),
+                                            ])
                                         }
+                                        required
                                     />
                                 </div>
                             </div>
+                        ))}
 
-                            <div className="grid grid-cols-12 mt-4">
-                                <Label
-                                    htmlFor="linkedinLink"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Linkedin Link
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
-                                    <Input
-                                        id="linkedinLink"
-                                        type="text"
-                                        name="linkedinLink"
-                                        value={data.linkedinLink}
-                                        onChange={(e) =>
-                                            setData("linkedinLink", e.target.value)
-                                        }
-                                    />
-                                </div>
+                        {/* Social Links */}
+                        <div className="grid grid-cols-12 mt-4">
+                            <Label
+                                htmlFor="facebookLink"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Facebook Link
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
+                                <Input
+                                    id="facebookLink"
+                                    type="text"
+                                    name="facebookLink"
+                                    value={data.facebookLink}
+                                    onChange={(e) =>
+                                        setData("facebookLink", e.target.value)
+                                    }
+                                />
                             </div>
+                        </div>
 
-                            <div className="grid grid-cols-12 mt-4">
-                                <Label
-                                    htmlFor="twitterLink"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Twitter Link
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
-                                    <Input
-                                        id="twitterLink"
-                                        type="text"
-                                        name="twitterLink"
-                                        value={data.twitterLink}
-                                        onChange={(e) =>
-                                            setData("twitterLink", e.target.value)
-                                        }
-                                    />
-                                </div>
+                        <div className="grid grid-cols-12 mt-4">
+                            <Label
+                                htmlFor="linkedinLink"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Linkedin Link
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
+                                <Input
+                                    id="linkedinLink"
+                                    type="text"
+                                    name="linkedinLink"
+                                    value={data.linkedinLink}
+                                    onChange={(e) =>
+                                        setData("linkedinLink", e.target.value)
+                                    }
+                                />
                             </div>
+                        </div>
 
-                            <div className="grid grid-cols-12 mt-4">
-                                <Label
-                                    htmlFor="youtubeLink"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Youtube Link
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
-                                    <Input
-                                        id="youtubeLink"
-                                        type="text"
-                                        name="youtubeLink"
-                                        value={data.youtubeLink}
-                                        onChange={(e) =>
-                                            setData("youtubeLink", e.target.value)
-                                        }
-                                    />
-                                </div>
+                        <div className="grid grid-cols-12 mt-4">
+                            <Label
+                                htmlFor="twitterLink"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Twitter Link
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
+                                <Input
+                                    id="twitterLink"
+                                    type="text"
+                                    name="twitterLink"
+                                    value={data.twitterLink}
+                                    onChange={(e) =>
+                                        setData("twitterLink", e.target.value)
+                                    }
+                                />
                             </div>
+                        </div>
 
-                            {/* Submit */}
-                            <div className="col-span-12 mt-4">
-                                <Button type="submit" disabled={processing}>
-                                    Save Changes
-                                </Button>
+                        <div className="grid grid-cols-12 mt-4">
+                            <Label
+                                htmlFor="youtubeLink"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Youtube Link
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
+                                <Input
+                                    id="youtubeLink"
+                                    type="text"
+                                    name="youtubeLink"
+                                    value={data.youtubeLink}
+                                    onChange={(e) =>
+                                        setData("youtubeLink", e.target.value)
+                                    }
+                                />
                             </div>
-                        </form>
-                    </div>
-                </SidebarContent>
-            </Sidebar>
+                        </div>
+
+                        {/* Submit */}
+                        <div className="col-span-12 mt-4">
+                            <Button type="submit" disabled={processing}>
+                                Save Changes
+                            </Button>
+                        </div>
+                    </form>
+                </div>
+            </SidebarInset>
         </AuthenticatedLayout>
     );
 }

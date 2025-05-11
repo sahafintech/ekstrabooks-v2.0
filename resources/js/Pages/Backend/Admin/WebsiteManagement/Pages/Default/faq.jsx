@@ -36,43 +36,36 @@ return (
 	<AuthenticatedLayout>
 		<SidebarInset>
 			<PageHeader page="Website" subpage="Default Pages" url="pages.index" />
-			<div className="flex flex-col p-4 gap-4">
-				<form
-					onSubmit={submit}
-					encType="multipart/form-data"
-					autoComplete="off"
-					className="validate"
-				>
+
+			<div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+				<form onSubmit={submit}>
 					{/* Title */}
 					<div className="grid grid-cols-12 mt-2">
 						<Label htmlFor="title" className="md:col-span-2 col-span-12">
-							Title
+							Title *
 						</Label>
-						<div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
+						<div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
 							<Input
 								id="title"
 								type="text"
-								name="title"
 								value={data.title}
 								onChange={(e) => setData("title", e.target.value)}
+								className="md:w-1/2 w-full"
 								required
 							/>
-							{errors.title && (
-								<InputError message={errors.title} className="text-sm" />
-							)}
+							<InputError message={errors.title} className="text-sm" />
 						</div>
 					</div>
 
 					{/* Language */}
 					<div className="grid grid-cols-12 mt-2">
 						<Label htmlFor="language" className="md:col-span-2 col-span-12">
-							Language
+							Language *
 						</Label>
-						<div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
+						<div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
 							<div className="md:w-1/2 w-full">
 								<Select
 									id="language"
-									name="language"
 									value={data.language}
 									onValueChange={(val) => setData("language", val)}
 								>
@@ -91,65 +84,50 @@ return (
 									</SelectContent>
 								</Select>
 							</div>
-							{errors.language && (
-								<InputError message={errors.language} className="text-sm" />
-							)}
+							<InputError message={errors.language} className="text-sm" />
 						</div>
 					</div>
 
 					{/* FAQ Heading */}
 					<div className="grid grid-cols-12 mt-2">
-						<Label
-							htmlFor="faqHeading"
-							className="md:col-span-2 col-span-12"
-						>
-							FAQ Heading
+						<Label htmlFor="faqHeading" className="md:col-span-2 col-span-12">
+							FAQ Heading *
 						</Label>
-						<div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
+						<div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
 							<Input
 								id="faqHeading"
 								type="text"
-								name="faqHeading"
 								value={data.faqHeading}
 								onChange={(e) => setData("faqHeading", e.target.value)}
+								className="md:w-1/2 w-full"
 								required
 							/>
-							{errors.faqHeading && (
-								<InputError message={errors.faqHeading} className="text-sm" />
-							)}
+							<InputError message={errors.faqHeading} className="text-sm" />
 						</div>
 					</div>
 
 					{/* FAQ Sub Heading */}
 					<div className="grid grid-cols-12 mt-2">
-						<Label
-							htmlFor="faqSubHeading"
-							className="md:col-span-2 col-span-12"
-						>
-							FAQ Sub Heading
+						<Label htmlFor="faqSubHeading" className="md:col-span-2 col-span-12">
+							FAQ Sub Heading *
 						</Label>
-						<div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
+						<div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
 							<Input
 								id="faqSubHeading"
 								type="text"
-								name="faqSubHeading"
 								value={data.faqSubHeading}
 								onChange={(e) => setData("faqSubHeading", e.target.value)}
+								className="md:w-1/2 w-full"
 								required
 							/>
-							{errors.faqSubHeading && (
-								<InputError
-									message={errors.faqSubHeading}
-									className="text-sm"
-								/>
-							)}
+							<InputError message={errors.faqSubHeading} className="text-sm" />
 						</div>
 					</div>
 
-					{/* Submit */}
-					<div className="col-span-12 mt-4">
+					{/* Submit Button */}
+					<div className="mt-4">
 						<Button type="submit" disabled={processing}>
-							Save Changes
+							{processing ? "Saving..." : "Save Changes"}
 						</Button>
 					</div>
 				</form>

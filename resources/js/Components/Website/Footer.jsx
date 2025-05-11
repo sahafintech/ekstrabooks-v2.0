@@ -9,37 +9,25 @@ import {
     ArrowRight,
     CheckCircle2
 } from "lucide-react";
+import { usePage } from "@inertiajs/react";
 
 export default function Footer() {
+    const { props } = usePage();
     const productLinks = [
         { name: "Features", href: "/features" },
         { name: "Pricing", href: "/pricing" },
         { name: "Integrations", href: "/integrations" },
-        { name: "Enterprise", href: "/enterprise" },
         { name: "Security", href: "/security" },
     ];
 
     const companyLinks = [
         { name: "About", href: "/about" },
         { name: "Blog", href: "/blog" },
-        { name: "Careers", href: "/careers" },
-        { name: "Customers", href: "/customers" },
-        { name: "Partners", href: "/partners" },
-    ];
-
-    const resourceLinks = [
-        { name: "Documentation", href: "/docs" },
-        { name: "API Reference", href: "/api" },
-        { name: "Community", href: "/community" },
-        { name: "Help Center", href: "/help" },
-        { name: "Status", href: "/status" },
     ];
 
     const legalLinks = [
         { name: "Privacy", href: "/privacy" },
         { name: "Terms", href: "/terms" },
-        { name: "Cookie Policy", href: "/cookies" },
-        { name: "Licenses", href: "/licenses" },
     ];
 
     const socialLinks = [
@@ -70,12 +58,12 @@ export default function Footer() {
             <div>
                 {/* Main Footer */}
                 <div className="container px-4 py-12">
-                    <div className="grid grid-cols-2 md:grid-cols-12 gap-8">
+                    <div className="grid grid-cols-2 md:grid-cols-12">
                         {/* Brand Column */}
                         <div className="col-span-2 md:col-span-3">
                             <Link href="/">
                                 <img
-                                    src="/images/logo.svg"
+                                    src={`/uploads/media/${props.logo}`}
                                     alt="Ekstrabooks"
                                     className="h-8 w-auto"
                                 />
@@ -120,22 +108,6 @@ export default function Footer() {
                             <h3 className="font-semibold mb-3">Company</h3>
                             <ul className="space-y-2">
                                 {companyLinks.map((link) => (
-                                    <li key={link.name}>
-                                        <Link
-                                            href={link.href}
-                                            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                                        >
-                                            {link.name}
-                                        </Link>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-
-                        <div className="col-span-1 md:col-span-2">
-                            <h3 className="font-semibold mb-3">Resources</h3>
-                            <ul className="space-y-2">
-                                {resourceLinks.map((link) => (
                                     <li key={link.name}>
                                         <Link
                                             href={link.href}

@@ -53,7 +53,7 @@ export default function Hero({ heading, subHeading }) {
                             <div className="relative">
                                 <div className="mx-auto rounded-xl shadow-2xl overflow-hidden">
                                     <img
-                                        src="/images/dashboard-preview.png"
+                                        src="/uploads/media/new_ekstrabooks_dashboard.jpg"
                                         alt="Dashboard Preview"
                                         className="w-full"
                                     />

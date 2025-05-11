@@ -33,6 +33,8 @@ export default function WebsiteLayout({ children }) {
         { href: "/contact", label: "Contact" }
     ];
 
+    const logo = usePage().props.logo;
+
     return (
         <div className="min-h-screen flex flex-col">
             <header 
@@ -45,7 +47,7 @@ export default function WebsiteLayout({ children }) {
                         {/* Logo */}
                         <Link href="/" className="flex items-center space-x-2">
                             <img 
-                                src="/images/logo.svg" 
+                                src={`/uploads/media/${logo}`} 
                                 alt="Logo" 
                                 className="h-8 w-auto"
                             />

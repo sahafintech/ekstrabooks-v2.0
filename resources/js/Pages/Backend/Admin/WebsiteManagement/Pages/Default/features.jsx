@@ -19,8 +19,7 @@ import { SidebarInset } from "@/Components/ui/sidebar";
 export default function UpdateFeaturesPage({ pageData, languages }) {
     const { data, setData, post, processing, errors } = useForm({
         pageTitle: pageData?.title || "",
-        language:
-            pageData?.language || (languages.length ? languages[0].code : ""),
+        language: pageData?.language || (languages.length ? languages[0].code : ""),
         featuresHeading: pageData?.features_heading || "",
         featuresSubHeading: pageData?.features_sub_heading || "",
     });
@@ -29,8 +28,7 @@ export default function UpdateFeaturesPage({ pageData, languages }) {
         e.preventDefault();
         post(route("pages.default_pages.store", "home"), {
             preserveScroll: true,
-            onSuccess: () =>
-                toast.success("Features Page updated successfully"),
+            onSuccess: () => toast.success("Features Page updated successfully"),
         });
     };
 
@@ -42,157 +40,95 @@ export default function UpdateFeaturesPage({ pageData, languages }) {
                     subpage="Default Pages"
                     url="pages.index"
                 />
-                <div className="flex flex-col p-4 gap-4">
-                    <form
-                        onSubmit={submit}
-                        encType="multipart/form-data"
-                        autoComplete="off"
-                        className="validate"
-                    >
+                <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+                    <form onSubmit={submit}>
                         {/* Title */}
                         <div className="grid grid-cols-12 mt-2">
-                            <Label
-                                htmlFor="pageTitle"
-                                className="md:col-span-2 col-span-12"
-                            >
-                                Title
+                            <Label htmlFor="pageTitle" className="md:col-span-2 col-span-12">
+                                Title *
                             </Label>
-                            <div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                 <Input
                                     id="pageTitle"
                                     type="text"
-                                    name="pageTitle"
                                     value={data.pageTitle}
-                                    onChange={(e) =>
-                                        setData("pageTitle", e.target.value)
-                                    }
+                                    onChange={(e) => setData("pageTitle", e.target.value)}
+                                    className="md:w-1/2 w-full"
                                     required
                                 />
-                                {errors.pageTitle && (
-                                    <InputError
-                                        message={errors.pageTitle}
-                                        className="text-sm"
-                                    />
-                                )}
+                                <InputError message={errors.pageTitle} className="text-sm" />
                             </div>
                         </div>
 
                         {/* Language */}
                         <div className="grid grid-cols-12 mt-2">
-                            <Label
-                                htmlFor="language"
-                                className="md:col-span-2 col-span-12"
-                            >
-                                Language
+                            <Label htmlFor="language" className="md:col-span-2 col-span-12">
+                                Language *
                             </Label>
-                            <div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                 <div className="md:w-1/2 w-full">
                                     <Select
-                                        id="language"
-                                        name="language"
                                         value={data.language}
-                                        onValueChange={(val) =>
-                                            setData("language", val)
-                                        }
+                                        onValueChange={(val) => setData("language", val)}
                                     >
                                         <SelectTrigger>
                                             <SelectValue>
                                                 {languages.find(
-                                                    (lang) =>
-                                                        lang.code ===
-                                                        data.language
+                                                    (lang) => lang.code === data.language
                                                 )?.label || "Select One"}
                                             </SelectValue>
                                         </SelectTrigger>
                                         <SelectContent>
                                             {languages.map((lang) => (
-                                                <SelectItem
-                                                    key={lang.code}
-                                                    value={lang.code}
-                                                >
+                                                <SelectItem key={lang.code} value={lang.code}>
                                                     {lang.label}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                {errors.language && (
-                                    <InputError
-                                        message={errors.language}
-                                        className="text-sm"
-                                    />
-                                )}
+                                <InputError message={errors.language} className="text-sm" />
                             </div>
                         </div>
 
                         {/* Features Heading */}
                         <div className="grid grid-cols-12 mt-2">
-                            <Label
-                                htmlFor="featuresHeading"
-                                className="md:col-span-2 col-span-12"
-                            >
-                                Features Heading
+                            <Label htmlFor="featuresHeading" className="md:col-span-2 col-span-12">
+                                Features Heading *
                             </Label>
-                            <div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                 <Input
                                     id="featuresHeading"
                                     type="text"
-                                    name="featuresHeading"
                                     value={data.featuresHeading}
-                                    onChange={(e) =>
-                                        setData(
-                                            "featuresHeading",
-                                            e.target.value
-                                        )
-                                    }
+                                    onChange={(e) => setData("featuresHeading", e.target.value)}
+                                    className="md:w-1/2 w-full"
                                     required
                                 />
-                                {errors.featuresHeading && (
-                                    <InputError
-                                        message={errors.featuresHeading}
-                                        className="text-sm"
-                                    />
-                                )}
+                                <InputError message={errors.featuresHeading} className="text-sm" />
                             </div>
                         </div>
 
                         {/* Features Sub Heading */}
                         <div className="grid grid-cols-12 mt-2">
-                            <Label
-                                htmlFor="featuresSubHeading"
-                                className="md:col-span-2 col-span-12"
-                            >
-                                Features Sub Heading
+                            <Label htmlFor="featuresSubHeading" className="md:col-span-2 col-span-12">
+                                Features Sub Heading *
                             </Label>
-                            <div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                 <Textarea
                                     id="featuresSubHeading"
-                                    name="featuresSubHeading"
                                     value={data.featuresSubHeading}
-                                    className="h-32"
-                                    onChange={(e) =>
-                                        setData(
-                                            "featuresSubHeading",
-                                            e.target.value
-                                        )
-                                    }
+                                    onChange={(e) => setData("featuresSubHeading", e.target.value)}
+                                    className="md:w-1/2 w-full h-32"
                                     required
                                 />
-                                {errors.featuresSubHeading && (
-                                    <InputError
-                                        message={errors.featuresSubHeading}
-                                        className="text-sm"
-                                    />
-                                )}
+                                <InputError message={errors.featuresSubHeading} className="text-sm" />
                             </div>
                         </div>
 
-                        {/* Submit */}
-                        <div className="col-span-12 mt-4">
-                            <Button type="submit" disabled={processing}>
-                                Save Changes
-                            </Button>
-                        </div>
+                        <Button type="submit" disabled={processing} className="mt-4">
+                            {processing ? "Saving..." : "Save Changes"}
+                        </Button>
                     </form>
                 </div>
             </SidebarInset>

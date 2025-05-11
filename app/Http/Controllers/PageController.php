@@ -42,9 +42,17 @@ class PageController extends Controller
             $pageData  = json_decode(get_trans_option($slug . '_page'));
             $pageMedia = json_decode(get_trans_option($slug . '_page_media'));
 
-            return Inertia::render("Backend/Admin/WebsiteManagement/Pages/Default/$slug", compact('pageData','pageMedia', 'languages'));
+            return Inertia::render("Backend/Admin/WebsiteManagement/Pages/Default/$slug", [
+                'pageData' => $pageData,
+                'pageMedia' => $pageMedia,
+                'languages' => $languages,
+            ]);
         }
-        return Inertia::render('Backend/Admin/WebsiteManagement/Pages/DefaultList', compact('pageData', 'pageMedia', 'languages'));
+        return Inertia::render('Backend/Admin/WebsiteManagement/Pages/DefaultList', [
+            'pageData' => $pageData,
+            'pageMedia' => $pageMedia,
+            'languages' => $languages,
+        ]);
     }
 
     public function store_default_pages(Request $request)

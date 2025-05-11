@@ -1,12 +1,12 @@
 import React from "react";
 import { useForm } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { Label } from "@/components/ui/label";
-import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
+import { Label } from "@/Components/ui/label";
+import { SidebarInset, SidebarSeparator } from "@/Components/ui/sidebar";
 import PageHeader from "@/Components/PageHeader";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/Components/ui/input";
 import InputError from "@/Components/InputError";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import {
     Select,
@@ -14,7 +14,7 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select";
+} from "@/Components/ui/select";
 
 export default function Home({ pageData = {} }) {
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -46,8 +46,9 @@ export default function Home({ pageData = {} }) {
     const submit = (e) => {
         e.preventDefault();
         post(route("pages.default_pages.store", "home"), {
+            preserveScroll: true,
             onSuccess: () => {
-                toast.success("Home page updated.");
+                toast.success("Home page updated successfully");
                 reset();
             },
         });
@@ -55,47 +56,49 @@ export default function Home({ pageData = {} }) {
 
     return (
         <AuthenticatedLayout>
-            <Sidebar>
-                <SidebarContent>
-                    <PageHeader
-                        page="Website"
-                        subpage="Home"
-                        url="pages.default_pages"
-                    />
-                    <div className="flex flex-col p-4 gap-4">
-                        <form onSubmit={submit} encType="multipart/form-data">
-                            {/* Title */}
-                            <div className="grid grid-cols-12 mt-2">
-                                <Label
-                                    htmlFor="title"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Title
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
-                                    <Input
-                                        id="title"
-                                        type="text"
-                                        name="title"
-                                        value={data.title}
-                                        onChange={(e) =>
-                                            setData("title", e.target.value)
-                                        }
-                                        className="md:w-1/2 w-full"
-                                    />
-                                    <InputError message={errors.title} />
-                                </div>
-                            </div>
+            <SidebarInset>
+                <PageHeader
+                    page="Website"
+                    subpage="Home"
+                    url="pages.default_pages"
+                />
 
-                            {/* Language */}
-                            <div className="grid grid-cols-12 mt-2">
-                                <Label
-                                    htmlFor="model_language"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Language
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
+                <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+                    <form onSubmit={submit} encType="multipart/form-data">
+                        {/* Title */}
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label
+                                htmlFor="title"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Title *
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                <Input
+                                    id="title"
+                                    type="text"
+                                    name="title"
+                                    value={data.title}
+                                    onChange={(e) =>
+                                        setData("title", e.target.value)
+                                    }
+                                    className="md:w-1/2 w-full"
+                                    required
+                                />
+                                <InputError message={errors.title} className="text-sm" />
+                            </div>
+                        </div>
+
+                        {/* Language */}
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label
+                                htmlFor="model_language"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Language
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                <div className="md:w-1/2 w-full">
                                     <Select
                                         id="model_language"
                                         name="model_language"
@@ -108,158 +111,139 @@ export default function Home({ pageData = {} }) {
                                             <SelectValue placeholder="Select One" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {/* Example items (replace with real data) */}
                                             <SelectItem value="en">English</SelectItem>
                                             <SelectItem value="ar">Arabic</SelectItem>
                                         </SelectContent>
                                     </Select>
-                                    <InputError message={errors.model_language} />
                                 </div>
+                                <InputError message={errors.model_language} className="text-sm" />
                             </div>
+                        </div>
 
-                            {/* Hero Heading */}
-                            <div className="grid grid-cols-12 mt-2">
-                                <Label
-                                    htmlFor="hero_heading"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Hero Heading
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
-                                    <Input
-                                        id="hero_heading"
-                                        type="text"
-                                        name="hero_heading"
-                                        value={data.hero_heading}
-                                        onChange={(e) =>
-                                            setData("hero_heading", e.target.value)
-                                        }
-                                        className="md:w-1/2 w-full"
-                                    />
-                                    <InputError message={errors.hero_heading} />
-                                </div>
+                        <SidebarSeparator className="my-4" />
+
+                        {/* Hero Section */}
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label
+                                htmlFor="hero_heading"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Hero Heading
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                <Input
+                                    id="hero_heading"
+                                    type="text"
+                                    name="hero_heading"
+                                    value={data.hero_heading}
+                                    onChange={(e) =>
+                                        setData("hero_heading", e.target.value)
+                                    }
+                                    className="md:w-1/2 w-full"
+                                />
+                                <InputError message={errors.hero_heading} className="text-sm" />
                             </div>
+                        </div>
 
-                            {/* Hero Sub Heading */}
-                            <div className="grid grid-cols-12 mt-2">
-                                <Label
-                                    htmlFor="hero_sub_heading"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Hero Sub Heading
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
-                                    <Input
-                                        id="hero_sub_heading"
-                                        type="text"
-                                        name="hero_sub_heading"
-                                        value={data.hero_sub_heading}
-                                        onChange={(e) =>
-                                            setData(
-                                                "hero_sub_heading",
-                                                e.target.value
-                                            )
-                                        }
-                                        className="md:w-1/2 w-full"
-                                    />
-                                    <InputError
-                                        message={errors.hero_sub_heading}
-                                    />
-                                </div>
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label
+                                htmlFor="hero_sub_heading"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Hero Sub Heading
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                <Input
+                                    id="hero_sub_heading"
+                                    type="text"
+                                    name="hero_sub_heading"
+                                    value={data.hero_sub_heading}
+                                    onChange={(e) =>
+                                        setData("hero_sub_heading", e.target.value)
+                                    }
+                                    className="md:w-1/2 w-full"
+                                />
+                                <InputError message={errors.hero_sub_heading} className="text-sm" />
                             </div>
+                        </div>
 
-                            {/* Get Started Text */}
-                            <div className="grid grid-cols-12 mt-2">
-                                <Label
-                                    htmlFor="get_started_text"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Get Started Text
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
-                                    <Input
-                                        id="get_started_text"
-                                        type="text"
-                                        name="get_started_text"
-                                        value={data.get_started_text}
-                                        onChange={(e) =>
-                                            setData(
-                                                "get_started_text",
-                                                e.target.value
-                                            )
-                                        }
-                                        className="md:w-1/2 w-full"
-                                    />
-                                    <InputError
-                                        message={errors.get_started_text}
-                                    />
-                                </div>
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label
+                                htmlFor="get_started_text"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Get Started Text
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                <Input
+                                    id="get_started_text"
+                                    type="text"
+                                    name="get_started_text"
+                                    value={data.get_started_text}
+                                    onChange={(e) =>
+                                        setData("get_started_text", e.target.value)
+                                    }
+                                    className="md:w-1/2 w-full"
+                                />
+                                <InputError message={errors.get_started_text} className="text-sm" />
                             </div>
+                        </div>
 
-                            {/* Get Started Link */}
-                            <div className="grid grid-cols-12 mt-2">
-                                <Label
-                                    htmlFor="get_started_link"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Get Started Link
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
-                                    <Input
-                                        id="get_started_link"
-                                        type="text"
-                                        name="get_started_link"
-                                        value={data.get_started_link}
-                                        onChange={(e) =>
-                                            setData(
-                                                "get_started_link",
-                                                e.target.value
-                                            )
-                                        }
-                                        className="md:w-1/2 w-full"
-                                    />
-                                    <InputError
-                                        message={errors.get_started_link}
-                                    />
-                                </div>
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label
+                                htmlFor="get_started_link"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Get Started Link
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                <Input
+                                    id="get_started_link"
+                                    type="text"
+                                    name="get_started_link"
+                                    value={data.get_started_link}
+                                    onChange={(e) =>
+                                        setData("get_started_link", e.target.value)
+                                    }
+                                    className="md:w-1/2 w-full"
+                                />
+                                <InputError message={errors.get_started_link} className="text-sm" />
                             </div>
+                        </div>
 
-                            {/* Hero Image */}
-                            <div className="grid grid-cols-12 mt-2">
-                                <Label
-                                    htmlFor="hero_bg_image"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Hero Image
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
-                                    <Input
-                                        id="hero_bg_image"
-                                        type="file"
-                                        name="hero_bg_image"
-                                        onChange={(e) =>
-                                            setData(
-                                                "hero_bg_image",
-                                                e.target.files[0]
-                                            )
-                                        }
-                                        className="md:w-1/2 w-full"
-                                    />
-                                    <InputError
-                                        message={errors.hero_bg_image}
-                                    />
-                                </div>
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label
+                                htmlFor="hero_bg_image"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Hero Image
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                <Input
+                                    id="hero_bg_image"
+                                    type="file"
+                                    name="hero_bg_image"
+                                    onChange={(e) =>
+                                        setData("hero_bg_image", e.target.files[0])
+                                    }
+                                    className="md:w-1/2 w-full"
+                                />
+                                <InputError message={errors.hero_bg_image} className="text-sm" />
                             </div>
+                        </div>
 
-                            {/* Features Status */}
-                            <div className="grid grid-cols-12 mt-2">
-                                <Label
-                                    htmlFor="features_status"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Features Section
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
+                        <SidebarSeparator className="my-4" />
+
+                        {/* Features Section */}
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label
+                                htmlFor="features_status"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Features Section
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                <div className="md:w-1/2 w-full">
                                     <Select
                                         id="features_status"
                                         name="features_status"
@@ -276,83 +260,66 @@ export default function Home({ pageData = {} }) {
                                             <SelectItem value="0">Disabled</SelectItem>
                                         </SelectContent>
                                     </Select>
-                                    <InputError
-                                        message={errors.features_status}
-                                    />
                                 </div>
+                                <InputError message={errors.features_status} className="text-sm" />
                             </div>
+                        </div>
 
-                            {/* Features Heading */}
-                            <div className="grid grid-cols-12 mt-2">
-                                <Label
-                                    htmlFor="features_heading"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Features Heading
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
-                                    <Input
-                                        id="features_heading"
-                                        type="text"
-                                        name="features_heading"
-                                        value={data.features_heading}
-                                        onChange={(e) =>
-                                            setData(
-                                                "features_heading",
-                                                e.target.value
-                                            )
-                                        }
-                                        className="md:w-1/2 w-full"
-                                    />
-                                    <InputError
-                                        message={errors.features_heading}
-                                    />
-                                </div>
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label
+                                htmlFor="features_heading"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Features Heading
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                <Input
+                                    id="features_heading"
+                                    type="text"
+                                    name="features_heading"
+                                    value={data.features_heading}
+                                    onChange={(e) =>
+                                        setData("features_heading", e.target.value)
+                                    }
+                                    className="md:w-1/2 w-full"
+                                />
+                                <InputError message={errors.features_heading} className="text-sm" />
                             </div>
+                        </div>
 
-                            {/* Newsletter Image */}
-                            <div className="grid grid-cols-12 mt-2">
-                                <Label
-                                    htmlFor="newsletter_image"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Newsletter Image
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
-                                    <Input
-                                        id="newsletter_image"
-                                        type="file"
-                                        name="newsletter_image"
-                                        onChange={(e) =>
-                                            setData(
-                                                "newsletter_image",
-                                                e.target.files[0]
-                                            )
-                                        }
-                                        className="md:w-1/2 w-full"
-                                    />
-                                    <InputError
-                                        message={errors.newsletter_image}
-                                    />
-                                </div>
-                            </div>
+                        <SidebarSeparator className="my-4" />
 
-                            {/* Submit */}
-                            <div className="col-span-12 mt-4">
-                                <Button type="submit" disabled={processing}>
-                                    Save Changes
-                                </Button>
+                        {/* Newsletter Section */}
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label
+                                htmlFor="newsletter_image"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Newsletter Image
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                <Input
+                                    id="newsletter_image"
+                                    type="file"
+                                    name="newsletter_image"
+                                    onChange={(e) =>
+                                        setData("newsletter_image", e.target.files[0])
+                                    }
+                                    className="md:w-1/2 w-full"
+                                />
+                                <InputError message={errors.newsletter_image} className="text-sm" />
                             </div>
-                        </form>
-                    </div>
-                </SidebarContent>
-            </Sidebar>
+                        </div>
+
+                        {/* Submit Button */}
+                        <div className="col-span-12 mt-4">
+                            <Button type="submit" disabled={processing}>
+                                Save Changes
+                            </Button>
+                        </div>
+                    </form>
+                </div>
+            </SidebarInset>
         </AuthenticatedLayout>
     );
-}
-}
-}
-}
-}
-}
 }
