@@ -26,6 +26,7 @@ class JournalController extends Controller
     {
         $search = $request->input('search', '');
         $perPage = $request->input('per_page', 50);
+        $status = $request->input('status', '');
 
         $query = Journal::query()
             ->where('business_id', request()->activeBusiness->id)
@@ -36,6 +37,10 @@ class JournalController extends Controller
                 $q->where('journal_number', 'like', "%$search%")
                     ->orWhere('transaction_amount', 'like', "%$search%");
             });
+        }
+
+        if ($status) {
+            $query->where('status', $status);
         }
 
         // Handle sorting
@@ -59,7 +64,8 @@ class JournalController extends Controller
             ],
             'filters' => [
                 'search' => $search,
-                'sorting' => $sorting
+                'sorting' => $sorting,
+                'status' => $status
             ]
         ]);
     }

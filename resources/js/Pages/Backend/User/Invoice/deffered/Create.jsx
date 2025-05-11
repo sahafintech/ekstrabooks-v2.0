@@ -23,7 +23,7 @@ import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multip
 import DateTimePicker from "@/Components/DateTimePicker";
 import { Plus, Trash2, X } from "lucide-react";
 
-export default function Create({ customers = [], products = [], currencies = [], taxes = [], invoice_title, decimalPlace, familySizes = [], benefits = [], dateFormat, base_currency }) {
+export default function Create({ customers = [], products = [], currencies = [], taxes = [], invoice_title, decimalPlace, familySizes = [], benefits = [], base_currency }) {
     const [invoiceItems, setInvoiceItems] = useState([{
         product_id: "",
         product_name: "",

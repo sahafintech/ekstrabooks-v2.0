@@ -26,13 +26,14 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown } from "lucide-react";
+import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown, Receipt, DollarSign, CheckCircle, AlertCircle } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 import { formatCurrency } from "@/lib/utils";
+import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 
 const DeleteJournalModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
@@ -208,13 +209,72 @@ const RejectAllJournalsModal = ({ show, onClose, onConfirm, processing, count })
 const JournalStatusBadge = ({ status }) => {
   const statusMap = {
     1: { label: "Approved", className: "text-green-500" },
-    2: { label: "Pending", className: "text-yellow-500" },
+    0: { label: "Pending", className: "text-yellow-500" },
+    2: { label: "Rejected", className: "text-red-500" },
   };
 
   return (
     <span className={statusMap[status].className}>
       {statusMap[status].label}
     </span>
+  );
+};
+
+const SummaryCards = ({ journals = [] }) => {
+  const totalJournals = journals.length;
+  const totalApproved = journals.filter(journal => journal.status === 1).length;
+  const totalPending = journals.filter(journal => journal.status === 2).length;
+  const totalAmount = journals.reduce((sum, journal) => sum + parseFloat(journal.base_currency_amount), 0);
+
+  const cards = [
+    {
+      title: "Total Journals",
+      value: totalJournals,
+      description: "Total number of journals",
+      icon: Receipt,
+      iconColor: "text-blue-500"
+    },
+    {
+      title: "Total Amount",
+      value: formatCurrency({ amount: totalAmount }),
+      description: "Total amount in base currency",
+      icon: DollarSign,
+      iconColor: "text-green-500"
+    },
+    {
+      title: "Approved Journals",
+      value: totalApproved,
+      description: "Journals that have been approved",
+      icon: CheckCircle,
+      iconColor: "text-purple-500"
+    },
+    {
+      title: "Pending Journals",
+      value: totalPending,
+      description: "Journals pending approval",
+      icon: AlertCircle,
+      iconColor: "text-orange-500"
+    }
+  ];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {cards.map((card, index) => (
+        <div key={index} className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <h3 className="text-sm font-medium">
+              {card.title}
+            </h3>
+            <card.icon className={`h-4 w-4 ${card.iconColor}`} />
+          </div>
+          <div className="text-2xl font-bold">{card.value}
+            <p className="text-xs text-muted-foreground">
+              {card.description}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 };
 
@@ -228,6 +288,7 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
   const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
+  const [selectedStatus, setSelectedStatus] = useState(filters.status || "");
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -433,6 +494,20 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
     );
   };
 
+  const handleStatusChange = (value) => {
+    setSelectedStatus(value);
+    router.get(
+      route("journals.index"),
+      { 
+        search, 
+        page: 1, 
+        per_page: perPage,
+        status: value || null
+      },
+      { preserveState: true }
+    );
+  };
+
   const renderSortIcon = (column) => {
     const isActive = sorting.column === column;
     return (
@@ -489,6 +564,7 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
             url="journals.index"
           />
           <div className="p-4">
+            <SummaryCards journals={journals} />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div className="flex flex-col md:flex-row gap-4">
                 <Link href={route("journals.create")}>
@@ -538,6 +614,18 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
                 <Button onClick={handleBulkAction} variant="outline">
                   Apply
                 </Button>
+                <SearchableCombobox
+                  options={[
+                    { id: "", name: "All Status" },
+                    { id: "0", name: "Pending" },
+                    { id: "1", name: "Approved" },
+                    { id: "2", name: "Rejected" }
+                  ]}
+                  value={selectedStatus}
+                  onChange={handleStatusChange}
+                  placeholder="Select status"
+                  className="w-[150px]"
+                />
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Show</span>

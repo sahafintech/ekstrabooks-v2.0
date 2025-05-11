@@ -620,7 +620,7 @@ class DefferedInvoiceController extends Controller
     {
         $invoice = Invoice::where('id', $id)->with('deffered_earnings', 'items', 'taxes')->first();
 
-        $attachments = Attachment::where('ref_id', $id)->where('ref_type', 'invoice')->get();
+        $theAttachments = Attachment::where('ref_id', $id)->where('ref_type', 'invoice')->get();
         $customers = Customer::all();
         $currencies = Currency::all();
         $products = Product::all();
@@ -636,7 +636,7 @@ class DefferedInvoiceController extends Controller
 
         return Inertia::render('Backend/User/Invoice/Deffered/Edit', [
             'invoice' => $invoice,
-            'attachments' => $attachments,
+            'theAttachments' => $theAttachments,
             'customers' => $customers,
             'currencies' => $currencies,
             'products' => $products,
