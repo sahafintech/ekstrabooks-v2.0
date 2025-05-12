@@ -3,10 +3,12 @@ import { SidebarInset } from "@/Components/ui/sidebar";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Link } from "@inertiajs/react";
 import PageHeader from "@/Components/PageHeader";
-import { MoreVertical } from "lucide-react";
 import Modal from "@/Components/Modal";
 import { useState } from "react";
 import { useForm } from "@inertiajs/react";
+import { Eye, Pencil, Trash2 } from "lucide-react";
+import TableActions from "@/Components/shared/TableActions";
+import TableWrapper from "@/Components/shared/TableWrapper";
 import {
     Table,
     TableBody,
@@ -16,9 +18,6 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Eye, Pencil, Trash2 } from "lucide-react";
-import TableActions from "@/Components/shared/TableActions";
-import TableWrapper from "@/Components/shared/TableWrapper";
 
 export default function List({ packages }) {
     const [confirmingPackageDeletion, setConfirmingPackageDeletion] =
@@ -52,19 +51,19 @@ export default function List({ packages }) {
         {
             label: "View",
             icon: Eye,
-            onClick: () => window.location = route("packages.show", pkg.id)
+            onClick: () => (window.location = route("packages.show", pkg.id)),
         },
         {
             label: "Edit",
             icon: Pencil,
-            onClick: () => window.location = route("packages.edit", pkg.id)
+            onClick: () => (window.location = route("packages.edit", pkg.id)),
         },
         {
             label: "Delete",
             icon: Trash2,
             onClick: () => confirmPackageDeletion(pkg.id),
-            className: "text-destructive focus:text-destructive"
-        }
+            className: "text-destructive focus:text-destructive",
+        },
     ];
 
     return (
@@ -109,7 +108,9 @@ export default function List({ packages }) {
                                             <TableCell>
                                                 {pkg.package_type}
                                             </TableCell>
-                                            <TableCell>{pkg.discount}%</TableCell>
+                                            <TableCell>
+                                                {pkg.discount}%
+                                            </TableCell>
                                             <TableCell>
                                                 {pkg.status == 1 ? (
                                                     <span className="text-success">
@@ -133,7 +134,9 @@ export default function List({ packages }) {
                                                 )}
                                             </TableCell>
                                             <TableCell>
-                                                <TableActions actions={getRowActions(pkg)} />
+                                                <TableActions
+                                                    actions={getRowActions(pkg)}
+                                                />
                                             </TableCell>
                                         </TableRow>
                                     ))}
