@@ -18,7 +18,8 @@ import {
 export default function UpdateBlogsPage({ pageData, languages }) {
     const { data, setData, post, processing, errors } = useForm({
         pageTitle: pageData?.title || "",
-        language: pageData?.language || (languages.length ? languages[0].code : ""),
+        language:
+            pageData?.language || (languages.length ? languages[0].code : ""),
         blogsHeading: pageData?.blogs_heading || "",
         blogsSubHeading: pageData?.blogs_sub_heading || "",
     });
@@ -35,7 +36,11 @@ export default function UpdateBlogsPage({ pageData, languages }) {
         <AuthenticatedLayout>
             <Sidebar>
                 <SidebarContent>
-                    <PageHeader page="Website" subpage="Default Pages" url="pages.index" />
+                    <PageHeader
+                        page="Website"
+                        subpage="Default Pages"
+                        url="pages.index"
+                    />
                     <div className="flex flex-col p-4 gap-4">
                         <form
                             onSubmit={submit}
@@ -45,7 +50,10 @@ export default function UpdateBlogsPage({ pageData, languages }) {
                         >
                             {/* Title */}
                             <div className="grid grid-cols-12 mt-2">
-                                <Label htmlFor="pageTitle" className="md:col-span-2 col-span-12">
+                                <Label
+                                    htmlFor="pageTitle"
+                                    className="md:col-span-2 col-span-12"
+                                >
                                     Title
                                 </Label>
                                 <div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
@@ -54,18 +62,26 @@ export default function UpdateBlogsPage({ pageData, languages }) {
                                         type="text"
                                         name="pageTitle"
                                         value={data.pageTitle}
-                                        onChange={(e) => setData("pageTitle", e.target.value)}
+                                        onChange={(e) =>
+                                            setData("pageTitle", e.target.value)
+                                        }
                                         required
                                     />
                                     {errors.pageTitle && (
-                                        <InputError message={errors.pageTitle} className="text-sm" />
+                                        <InputError
+                                            message={errors.pageTitle}
+                                            className="text-sm"
+                                        />
                                     )}
                                 </div>
                             </div>
 
                             {/* Language */}
                             <div className="grid grid-cols-12 mt-2">
-                                <Label htmlFor="language" className="md:col-span-2 col-span-12">
+                                <Label
+                                    htmlFor="language"
+                                    className="md:col-span-2 col-span-12"
+                                >
                                     Language
                                 </Label>
                                 <div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
@@ -74,17 +90,25 @@ export default function UpdateBlogsPage({ pageData, languages }) {
                                             id="language"
                                             name="language"
                                             value={data.language}
-                                            onValueChange={(val) => setData("language", val)}
+                                            onValueChange={(val) =>
+                                                setData("language", val)
+                                            }
                                         >
                                             <SelectTrigger>
                                                 <SelectValue>
-                                                    {languages.find((lang) => lang.code === data.language)
-                                                        ?.label || "Select One"}
+                                                    {languages.find(
+                                                        (lang) =>
+                                                            lang.code ===
+                                                            data.language
+                                                    )?.label || "Select One"}
                                                 </SelectValue>
                                             </SelectTrigger>
                                             <SelectContent>
                                                 {languages.map((lang) => (
-                                                    <SelectItem key={lang.code} value={lang.code}>
+                                                    <SelectItem
+                                                        key={lang.code}
+                                                        value={lang.code}
+                                                    >
                                                         {lang.label}
                                                     </SelectItem>
                                                 ))}
@@ -92,7 +116,10 @@ export default function UpdateBlogsPage({ pageData, languages }) {
                                         </Select>
                                     </div>
                                     {errors.language && (
-                                        <InputError message={errors.language} className="text-sm" />
+                                        <InputError
+                                            message={errors.language}
+                                            className="text-sm"
+                                        />
                                     )}
                                 </div>
                             </div>
@@ -111,7 +138,12 @@ export default function UpdateBlogsPage({ pageData, languages }) {
                                         type="text"
                                         name="blogsHeading"
                                         value={data.blogsHeading}
-                                        onChange={(e) => setData("blogsHeading", e.target.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                "blogsHeading",
+                                                e.target.value
+                                            )
+                                        }
                                         required
                                     />
                                     {errors.blogsHeading && (
@@ -137,7 +169,12 @@ export default function UpdateBlogsPage({ pageData, languages }) {
                                         type="text"
                                         name="blogsSubHeading"
                                         value={data.blogsSubHeading}
-                                        onChange={(e) => setData("blogsSubHeading", e.target.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                "blogsSubHeading",
+                                                e.target.value
+                                            )
+                                        }
                                         required
                                     />
                                     {errors.blogsSubHeading && (
@@ -161,10 +198,4 @@ export default function UpdateBlogsPage({ pageData, languages }) {
             </Sidebar>
         </AuthenticatedLayout>
     );
-}
-}
-}
-}
-}
-}
 }
