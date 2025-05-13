@@ -298,12 +298,8 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('brands/bulk_destroy', [BrandsController::class, 'bulk_destroy'])->name('brands.bulk_destroy');
 
 		// Inventory Adjustment Import (MUST BE BEFORE RESOURCE ROUTE)
-		Route::get('inventory_adjustments/import', [InventoryAdjustmentController::class, 'import'])->name('inventory_adjustments.import');
-		Route::post('inventory_adjustments/import/store', [InventoryAdjustmentController::class, 'importStore'])->name('inventory_adjustments.import.store');
-		Route::get('inventory_adjustments/import/progress', [InventoryAdjustmentController::class, 'importProgress'])->name('inventory_adjustments.import.progress');
-		Route::get('inventory_adjustments/import/status', [InventoryAdjustmentController::class, 'importStatus'])->name('inventory_adjustments.import.status');
-		Route::post('inventory_adjustments/import/process', [InventoryAdjustmentController::class, 'importProcess'])->name('inventory_adjustments.import.process');
-		Route::get('inventory_adjustments/export', [InventoryAdjustmentController::class, 'export'])->name('inventory_adjustments.export');
+		Route::post('import_adjustments', [InventoryAdjustmentController::class, 'import_adjustments'])->name('inventory_adjustments.import');
+		Route::get('export_adjustments', [InventoryAdjustmentController::class, 'export_adjustments'])->name('inventory_adjustments.export');
 
 		// inventory adjustments resource route
 		Route::resource('inventory_adjustments', InventoryAdjustmentController::class);

@@ -545,7 +545,7 @@ export default function List({ adjustments = [], meta = {}, filters = {} }) {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={8} className="h-24 text-center">
+                      <TableCell colSpan={9} className="h-24 text-center">
                         No adjustments found.
                       </TableCell>
                     </TableRow>

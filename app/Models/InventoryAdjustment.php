@@ -19,6 +19,10 @@ class InventoryAdjustment extends Model
         return $this->belongsTo(Product::class);
     }
 
+    public function account() {
+        return $this->belongsTo(Account::class);
+    }
+
     protected function adjustmentDate(): Attribute {
         $date_format = get_date_format();
 
