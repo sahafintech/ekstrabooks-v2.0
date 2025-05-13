@@ -65,39 +65,76 @@ class CashPurchaseController extends Controller
 		}
 
 		// Filter by date range
-		if (!empty($dateRange) && count($dateRange) === 2) {
-			$startDate = Carbon::parse($dateRange[0])->startOfDay();
-			$endDate = Carbon::parse($dateRange[1])->endOfDay();
-			$query->whereBetween('purchase_date', [$startDate, $endDate]);
+		if (!empty($dateRange)) {
+			$query->whereBetween('purchase_date', $dateRange);
 		}
 
 		// Filter by status
-		if ($status !== '') {
+		if ($status) {
 			$query->where('approval_status', $status);
 		}
 
+		// Get paginated purchases
 		$purchases = $query->paginate($perPage)->withQueryString();
 
-		// Get all vendors for the filter dropdown
-		$vendors = Vendor::orderBy('name')->get();
+		// Get summary statistics for all purchases matching filters
+		$allPurchases = Purchase::where('cash', 1);
+		
+		if ($search) {
+			$allPurchases->where(function ($q) use ($search) {
+				$q->where('bill_no', 'like', "%$search%")
+					->orWhere('title', 'like', "%$search%")
+					->orWhereHas('vendor', function ($q) use ($search) {
+						$q->where('name', 'like', "%$search%");
+					});
+			});
+		}
+
+		if ($vendorId) {
+			$allPurchases->where('vendor_id', $vendorId);
+		}
+
+		if (!empty($dateRange)) {
+			$allPurchases->whereBetween('purchase_date', $dateRange);
+		}
+
+		if ($status) {
+			$allPurchases->where('approval_status', $status);
+		}
+
+		$allPurchases = $allPurchases->get();
+
+		$summary = [
+			'total_purchases' => $allPurchases->count(),
+			'total_approved' => $allPurchases->where('approval_status', 1)->count(),
+			'total_pending' => $allPurchases->where('approval_status', 0)->count(),
+			'grand_total' => $allPurchases->sum('grand_total'),
+		];
+
+		$vendors = Vendor::orderBy('name', 'asc')->get();
 
 		return Inertia::render('Backend/User/CashPurchase/List', [
 			'purchases' => $purchases->items(),
 			'meta' => [
 				'current_page' => $purchases->currentPage(),
-				'per_page' => $purchases->perPage(),
+				'from' => $purchases->firstItem(),
 				'last_page' => $purchases->lastPage(),
+				'links' => $purchases->linkCollection(),
+				'path' => $purchases->path(),
+				'per_page' => $purchases->perPage(),
+				'to' => $purchases->lastItem(),
 				'total' => $purchases->total(),
 			],
 			'filters' => [
 				'search' => $search,
-				'columnFilters' => $request->get('columnFilters', []),
+				'per_page' => $perPage,
 				'sorting' => $sorting,
 				'vendor_id' => $vendorId,
 				'date_range' => $dateRange,
 				'status' => $status,
 			],
 			'vendors' => $vendors,
+			'summary' => $summary,
 		]);
 	}
 

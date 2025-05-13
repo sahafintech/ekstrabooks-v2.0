@@ -607,7 +607,7 @@ class DashboardController extends Controller
 			$data['accounts'] = get_account_details();
 
 			$data['AccountsReceivable'] = floatval($AccountsReceivable?->dr_amount) - floatval($AccountsReceivable?->cr_amount);
-			$data['AccountsPayable'] = floatval($AccountsPayable?->dr_amount) - floatval($AccountsPayable?->cr_amount);
+			$data['AccountsPayable'] = floatval($AccountsPayable?->cr_amount) - floatval($AccountsPayable?->dr_amount);
 
 			$data['recentTransactions'] = Transaction::whereHas('account', function ($query) {
 				$query->where(function ($query) {

@@ -15,7 +15,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/Components/ui/table";
 import TableActions from "@/Components/shared/TableActions";
 import { Eye, Pencil, Trash2 } from "lucide-react";
 import TableWrapper from "@/Components/shared/TableWrapper";

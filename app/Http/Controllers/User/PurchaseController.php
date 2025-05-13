@@ -99,6 +99,14 @@ class PurchaseController extends Controller
 			$query->where('status', $status);
 		}
 
+		// Get summary data before pagination
+		$summaryQuery = clone $query;
+		$summary = [
+			'total_bills' => $summaryQuery->count(),
+			'total_amount' => $summaryQuery->sum('grand_total'),
+			'total_paid' => $summaryQuery->sum('paid'),
+		];
+
 		$bills = $query->with('vendor')->paginate($perPage)->withQueryString();
 		$vendors = Vendor::all();
 
@@ -119,6 +127,7 @@ class PurchaseController extends Controller
 				'sorting' => $sorting,
 			],
 			'vendors' => $vendors,
+			'summary' => $summary,
 		]);
 	}
 

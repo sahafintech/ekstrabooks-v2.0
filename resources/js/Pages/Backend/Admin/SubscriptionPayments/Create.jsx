@@ -13,7 +13,7 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select";
+} from "@/Components/ui/select";
 
 export default function Create({ users, user_packages, currency_symbol }) {
     const { data, setData, post, processing, errors, reset } = useForm({

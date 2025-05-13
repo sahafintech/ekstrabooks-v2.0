@@ -250,21 +250,11 @@ const PurchaseOrderStatusBadge = ({ status }) => {
     );
 };
 
-const SummaryCards = ({ orders = [] }) => {
-    const totalOrders = orders.length;
-    const totalConverted = orders.filter((order) => order.status === 1).length;
-    const grandTotal = orders.reduce(
-        (sum, order) => sum + parseFloat(order.grand_total),
-        0
-    );
-    const convertedGrandTotal = orders
-        .filter((order) => order.status === 1)
-        .reduce((sum, order) => sum + parseFloat(order.grand_total), 0);
-
+const SummaryCards = ({ summary = {} }) => {
     const cards = [
         {
             title: "Total Orders",
-            value: totalOrders,
+            value: summary.total_orders || 0,
             description: "Total purchase orders",
             icon: ShoppingCart,
             iconColor: "text-blue-500",
@@ -272,8 +262,8 @@ const SummaryCards = ({ orders = [] }) => {
         {
             title: "Grand Total",
             value: formatCurrency({
-                amount: grandTotal,
-                currency: orders[0]?.currency || "USD",
+                amount: summary.grand_total || 0,
+                currency: "USD", // This will be overridden by the actual currency in the component
             }),
             description: "Total amount of all orders",
             icon: DollarSign,
@@ -281,7 +271,7 @@ const SummaryCards = ({ orders = [] }) => {
         },
         {
             title: "Total Converted",
-            value: totalConverted,
+            value: summary.total_converted || 0,
             description: "Orders converted to bills",
             icon: FileText,
             iconColor: "text-purple-500",
@@ -289,8 +279,8 @@ const SummaryCards = ({ orders = [] }) => {
         {
             title: "Converted Grand Total",
             value: formatCurrency({
-                amount: convertedGrandTotal,
-                currency: orders[0]?.currency || "USD",
+                amount: summary.converted_grand_total || 0,
+                currency: "USD", // This will be overridden by the actual currency in the component
             }),
             description: "Total amount of converted orders",
             icon: CreditCard,
@@ -323,6 +313,7 @@ export default function List({
     meta = {},
     filters = {},
     vendors = [],
+    summary = {},
 }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
@@ -693,7 +684,7 @@ export default function List({
                         url="purchase_orders.index"
                     />
                     <div className="p-4">
-                        <SummaryCards orders={orders} />
+                        <SummaryCards summary={summary} />
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                             <div className="flex flex-col md:flex-row gap-4">
                                 <Link href={route("purchase_orders.create")}>

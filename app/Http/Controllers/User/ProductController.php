@@ -57,6 +57,26 @@ class ProductController extends Controller
         // Get vendors with pagination
         $products = $query->paginate($per_page)->withQueryString();
 
+        // Get summary statistics for all products
+        $allProducts = Product::query();
+        if (!empty($search)) {
+            $allProducts->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('selling_price', 'like', "%{$search}%")
+                    ->orWhere('purchase_cost', 'like', "%{$search}%");
+            });
+        }
+        $allProducts = $allProducts->get();
+
+        $summary = [
+            'total_products' => $allProducts->count(),
+            'active_products' => $allProducts->where('status', 1)->count(),
+            'total_stock' => $allProducts->sum('stock'),
+            'total_value' => $allProducts->sum(function ($product) {
+                return $product->stock * $product->purchase_cost;
+            }),
+        ];
+
         // Return Inertia view
         return Inertia::render('Backend/User/Product/List', [
             'products' => $products->items(),
@@ -75,6 +95,7 @@ class ProductController extends Controller
                 'columnFilters' => $request->get('columnFilters', []),
                 'sorting' => $sorting,
             ],
+            'summary' => $summary,
         ]);
     }
 

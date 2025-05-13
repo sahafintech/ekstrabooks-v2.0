@@ -14,7 +14,7 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select";
+} from "@/Components/ui/select";
 
 export default function Edit({ user }) {
     const { data, setData, patch, processing, errors, reset } = useForm({

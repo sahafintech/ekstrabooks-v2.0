@@ -6,8 +6,8 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
+} from "@/Components/ui/select";
+import { Button } from "@/Components/ui/button";
 import {
     Table,
     TableBody,
@@ -15,14 +15,14 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
+} from "@/Components/ui/table";
 import { DollarSign, Wallet, CreditCard, TrendingUp } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, XAxis, Area, AreaChart } from "recharts";
 import {
     ChartContainer,
     ChartTooltip,
     ChartTooltipContent,
-} from "@/components/ui/chart";
+} from "@/Components/ui/chart";
 import TableWrapper from "@/Components/shared/TableWrapper";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";

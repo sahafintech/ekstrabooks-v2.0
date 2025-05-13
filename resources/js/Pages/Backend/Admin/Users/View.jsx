@@ -6,7 +6,7 @@ import {
     TableBody,
     TableCell,
     TableRow,
-} from "@/components/ui/table";
+} from "@/Components/ui/table";
 import TableWrapper from "@/Components/shared/TableWrapper";
 
 export default function UserDetails({ user }) {

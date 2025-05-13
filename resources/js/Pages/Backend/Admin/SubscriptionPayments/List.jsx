@@ -3,7 +3,6 @@ import { SidebarInset } from "@/Components/ui/sidebar";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Link } from "@inertiajs/react";
 import PageHeader from "@/Components/PageHeader";
-import { MoreVertical } from "lucide-react";
 import Modal from "@/Components/Modal";
 import { useState } from "react";
 import { useForm } from "@inertiajs/react";
@@ -15,15 +14,7 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
-
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuGroup,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@/Components/ui/table";
 
 import TableWrapper from "@/Components/shared/TableWrapper";
 import TableActions from "@/Components/shared/TableActions";

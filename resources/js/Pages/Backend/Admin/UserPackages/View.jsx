@@ -8,7 +8,7 @@ TableBody,
 TableCaption,
 TableCell,
 TableRow,
-} from "@/components/ui/table";
+} from "@/Components/ui/table";
 
 export default function View({ packageData }) {
 return (

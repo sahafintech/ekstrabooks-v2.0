@@ -5,7 +5,7 @@ import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 import { useState } from "react";
 import { useForm } from "@inertiajs/react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/Components/ui/avatar";
 import { Settings } from "lucide-react";
 
 import {
@@ -15,7 +15,7 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
+} from "@/Components/ui/table";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import TableWrapper from "@/Components/shared/TableWrapper";
 import TableActions from "@/Components/shared/TableActions";

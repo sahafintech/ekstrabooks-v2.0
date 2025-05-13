@@ -14,7 +14,7 @@ SelectContent,
 SelectItem,
 SelectTrigger,
 SelectValue,
-} from "@/components/ui/select";
+} from "@/Components/ui/select";
 
 export default function Create() {
 const { data, setData, post, processing, errors, reset } = useForm({

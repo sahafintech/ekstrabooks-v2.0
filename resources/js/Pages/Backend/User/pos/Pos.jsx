@@ -3,10 +3,10 @@
 import React, { useEffect, useState } from "react";
 
 // shadcn/ui components (adjust import paths as needed)
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/Components/ui/button";
+import { Input } from "@/Components/ui/input";
 import Modal from "@/Components/Modal";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea } from "@/Components/ui/scroll-area";
 import { Link } from "@inertiajs/react";
 import { Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";

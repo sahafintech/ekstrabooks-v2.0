@@ -1,20 +1,20 @@
 import { useForm } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import PageHeader from "@/Components/PageHeader";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Label } from "@/Components/ui/label";
+import { Input } from "@/Components/ui/input";
+import { Button } from "@/Components/ui/button";
 import InputError from "@/Components/InputError";
 import { toast } from "sonner";
-import { SidebarInset } from "@/components/ui/sidebar";
+import { SidebarInset } from "@/Components/ui/sidebar";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/Components/ui/select";
+import { Textarea } from "@/Components/ui/textarea";
 import { Trash2 } from "lucide-react";
 
 export default function UpdateContactPage({ pageData, languages }) {

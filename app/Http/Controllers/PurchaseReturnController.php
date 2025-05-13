@@ -76,6 +76,41 @@ class PurchaseReturnController extends Controller
         $accounts = Account::all();
         $vendors = Vendor::all();
 
+        // Get summary statistics for all purchase returns
+        $allReturns = PurchaseReturn::query();
+        if ($search) {
+            $allReturns->where(function ($q) use ($search) {
+                $q->where('return_number', 'like', "%$search%")
+                    ->orWhereHas('vendor', function ($q) use ($search) {
+                        $q->where('name', 'like', "%$search%");
+                    });
+            });
+        }
+
+        if ($vendorId) {
+            $allReturns->where('vendor_id', $vendorId);
+        }
+
+        if ($dateRange) {
+            $allReturns->whereDate('return_date', '>=', Carbon::parse($dateRange[0])->format('Y-m-d'))
+                ->whereDate('return_date', '<=', Carbon::parse($dateRange[1])->format('Y-m-d'));
+        }
+
+        if ($status) {
+            $allReturns->where('status', $status);
+        }
+
+        $allReturns = $allReturns->get();
+
+        $summary = [
+            'total_returns' => $allReturns->count(),
+            'total_refunded' => $allReturns->where('status', 1)->count(),
+            'grand_total' => $allReturns->sum('grand_total'),
+            'total_due' => $allReturns->sum(function ($return) {
+                return $return->grand_total - $return->paid;
+            }),
+        ];
+
         return Inertia::render('Backend/User/PurchaseReturn/List', [
             'returns' => $returns->items(),
             'accounts' => $accounts,
@@ -95,6 +130,7 @@ class PurchaseReturnController extends Controller
                 'status' => $status,
                 'sorting' => $sorting,
             ],
+            'summary' => $summary,
         ]);
     }
 

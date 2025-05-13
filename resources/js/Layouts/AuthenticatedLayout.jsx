@@ -1,10 +1,10 @@
-import { AdminSidebar } from "@/components/admin-sidebar";
-import { UserSidebar } from "@/components/user-sidebar";
-import { StaffSidebar } from "@/components/staff-sidebar";
+import { AdminSidebar } from "@/Components/admin-sidebar";
+import { UserSidebar } from "@/Components/user-sidebar";
+import { StaffSidebar } from "@/Components/staff-sidebar";
 import { initSettings } from '@/lib/settings';
 import {
     SidebarProvider,
-} from "@/components/ui/sidebar";
+} from "@/Components/ui/sidebar";
 import { usePage } from "@inertiajs/react";
 
 export default function AuthenticatedLayout({ children }) {

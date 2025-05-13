@@ -11,7 +11,7 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
+} from "@/Components/ui/table";
 import TableActions from "@/Components/shared/TableActions";
 import { Pencil, ChevronUp, ChevronDown } from "lucide-react";
 import { Input } from "@/Components/ui/input";

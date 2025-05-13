@@ -11,18 +11,18 @@ import {
 } from "lucide-react";
 import { usePage } from "@inertiajs/react";
 
-import { NavOperations } from "@/components/nav-operations";
-import { NavManagement } from "@/components/nav-management";
-import { NavUser } from "@/components/nav-user";
-import { BusinessSwitcher } from "@/components/business-switcher";
-import { NavUserDashboard } from "@/components/nav-user-dashboard";
+import { NavOperations } from "@/Components/nav-operations";
+import { NavManagement } from "@/Components/nav-management";
+import { NavUser } from "@/Components/nav-user";
+import { BusinessSwitcher } from "@/Components/business-switcher";
+import { NavUserDashboard } from "@/Components/nav-user-dashboard";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
-} from "@/components/ui/sidebar";
+} from "@/Components/ui/sidebar";
 
 export function StaffSidebar(props) {
   const page = usePage();

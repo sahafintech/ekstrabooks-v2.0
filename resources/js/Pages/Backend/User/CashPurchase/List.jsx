@@ -222,37 +222,32 @@ const PurchaseApprovalStatusBadge = ({ status }) => {
   );
 };
 
-const SummaryCards = ({ purchases = [] }) => {
-  const totalPurchases = purchases.length;
-  const totalApproved = purchases.filter(purchase => purchase.approval_status === 1).length;
-  const totalPending = purchases.filter(purchase => purchase.approval_status === 0).length;
-  const grandTotal = purchases.reduce((sum, purchase) => sum + parseFloat(purchase.grand_total), 0);
-
+const SummaryCards = ({ summary = {} }) => {
   const cards = [
     {
       title: "Total Purchases",
-      value: totalPurchases,
+      value: summary.total_purchases || 0,
       description: "Total cash purchases",
       icon: ShoppingCart,
       iconColor: "text-blue-500"
     },
     {
       title: "Grand Total",
-      value: formatCurrency({ amount: grandTotal }),
+      value: formatCurrency({ amount: summary.grand_total || 0 }),
       description: "Total amount of all purchases",
       icon: DollarSign,
       iconColor: "text-green-500"
     },
     {
       title: "Total Approved",
-      value: totalApproved,
+      value: summary.total_approved || 0,
       description: "Approved cash purchases",
       icon: CheckCircle,
       iconColor: "text-purple-500"
     },
     {
       title: "Total Pending",
-      value: totalPending,
+      value: summary.total_pending || 0,
       description: "Pending cash purchases",
       icon: Clock,
       iconColor: "text-orange-500"
@@ -280,7 +275,7 @@ const SummaryCards = ({ purchases = [] }) => {
   );
 };
 
-export default function List({ purchases = [], meta = {}, filters = {}, vendors = [] }) {
+export default function List({ purchases = [], meta = {}, filters = {}, vendors = [], summary = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedPurchases, setSelectedPurchases] = useState([]);
@@ -579,7 +574,7 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
             url="cash_purchases.index"
           />
           <div className="p-4">
-            <SummaryCards purchases={purchases} />
+            <SummaryCards summary={summary} />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div className="flex flex-col md:flex-row gap-4">
                 <Link href={route("cash_purchases.create")}>

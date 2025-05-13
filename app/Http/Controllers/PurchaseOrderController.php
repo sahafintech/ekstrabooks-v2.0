@@ -79,6 +79,15 @@ class PurchaseOrderController extends Controller
 			$query->whereBetween('order_date', [$startDate, $endDate]);
 		}
 
+		// Get summary data before pagination
+		$summaryQuery = clone $query;
+		$summary = [
+			'total_orders' => $summaryQuery->count(),
+			'total_converted' => $summaryQuery->where('status', 1)->count(),
+			'grand_total' => $summaryQuery->sum('grand_total'),
+			'converted_grand_total' => $summaryQuery->where('status', 1)->sum('grand_total'),
+		];
+
 		$orders = $query->paginate($perPage)->withQueryString();
 
 		$vendors = Vendor::orderBy('name')->get();
@@ -99,6 +108,7 @@ class PurchaseOrderController extends Controller
 				'date_range' => $dateRange,
 			],
 			'vendors' => $vendors,
+			'summary' => $summary,
 		]);
 	}
 

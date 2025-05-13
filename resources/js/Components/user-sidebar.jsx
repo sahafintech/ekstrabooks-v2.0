@@ -12,10 +12,10 @@ import {
 
 import { usePage } from "@inertiajs/react";
 
-import { NavOperations } from "@/components/nav-operations";
-import { NavManagement } from "@/components/nav-management";
-import { NavUser } from "@/components/nav-user";
-import { BusinessSwitcher } from "@/components/business-switcher";
+import { NavOperations } from "@/Components/nav-operations";
+import { NavManagement } from "@/Components/nav-management";
+import { NavUser } from "@/Components/nav-user";
+import { BusinessSwitcher } from "@/Components/business-switcher";
 import { NavUserDashboard } from "@/Components/nav-user-dashboard";
 import {
     Sidebar,
@@ -23,7 +23,7 @@ import {
     SidebarFooter,
     SidebarHeader,
     SidebarRail,
-} from "@/components/ui/sidebar";
+} from "@/Components/ui/sidebar";
 
 export function UserSidebar({ ...props }) {
     const { url } = usePage(); // e.g. "/user/products/123/edit"

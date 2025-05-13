@@ -26,13 +26,67 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { Edit, EyeIcon, FileDown, FileUp, MoreVertical, Plus, Trash, ChevronUp, ChevronDown } from "lucide-react";
+import { Edit, EyeIcon, FileDown, FileUp, MoreVertical, Plus, Trash, ChevronUp, ChevronDown, Package, DollarSign, AlertCircle, TrendingUp } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 import { formatCurrency } from "@/lib/utils";
+
+// Summary Cards Component
+const SummaryCards = ({ summary = {} }) => {
+  const cards = [
+    {
+      title: "Total Products",
+      value: summary.total_products || 0,
+      description: "Total number of products",
+      icon: Package,
+      iconColor: "text-blue-500"
+    },
+    {
+      title: "Active Products",
+      value: summary.active_products || 0,
+      description: "Products that are active",
+      icon: TrendingUp,
+      iconColor: "text-green-500"
+    },
+    {
+      title: "Total Stock",
+      value: summary.total_stock || 0,
+      description: "Total items in stock",
+      icon: Package,
+      iconColor: "text-purple-500"
+    },
+    {
+      title: "Total Value",
+      value: formatCurrency({ amount: summary.total_value || 0 }),
+      description: "Total value of inventory",
+      icon: DollarSign,
+      iconColor: "text-orange-500"
+    }
+  ];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {cards.map((card, index) => (
+        <div key={index} className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <h3 className="text-sm font-medium">
+              {card.title}
+            </h3>
+            <card.icon className={`h-4 w-4 ${card.iconColor}`} />
+          </div>
+          <div className="text-2xl font-bold">{card.value}
+            <p className="text-xs text-muted-foreground">
+              {card.description}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 // Delete Confirmation Modal Component
 const DeleteProductModal = ({ show, onClose, onConfirm, processing }) => (
@@ -154,7 +208,7 @@ const ImportProductsModal = ({ show, onClose, onSubmit, processing }) => (
   </Modal>
 );
 
-export default function List({ products = [], meta = {}, filters = {} }) {
+export default function List({ products = [], meta = {}, filters = {}, summary = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedProducts, setSelectedProducts] = useState([]);
@@ -401,6 +455,7 @@ export default function List({ products = [], meta = {}, filters = {} }) {
             url="products.index"
           />
           <div className="p-4">
+            <SummaryCards summary={summary} />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div className="flex flex-col md:flex-row gap-4">
                 <Link href={route("products.create")}>

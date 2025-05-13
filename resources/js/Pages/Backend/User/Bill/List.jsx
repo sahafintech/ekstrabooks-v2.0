@@ -293,47 +293,36 @@ const BillStatusBadge = ({ status }) => {
     );
 };
 
-const SummaryCards = ({ bills = [] }) => {
-    const totalBills = bills.length;
-    const grandTotal = bills.reduce(
-        (sum, bill) => sum + parseFloat(bill.grand_total),
-        0
-    );
-    const totalPaid = bills.reduce(
-        (sum, bill) => sum + parseFloat(bill.paid),
-        0
-    );
-    const totalDue = grandTotal - totalPaid;
-
+const SummaryCards = ({ summary = {} }) => {
     const cards = [
         {
             title: "Total Bills",
-            value: totalBills,
+            value: summary.total_bills || 0,
             description: "Total number of bills",
             icon: Receipt,
-            iconColor: "text-blue-500",
+            iconColor: "text-blue-500"
         },
         {
             title: "Grand Total",
-            value: formatCurrency({ amount: grandTotal }),
+            value: formatCurrency({ amount: summary.total_amount || 0 }),
             description: "Total amount of all bills",
             icon: DollarSign,
-            iconColor: "text-green-500",
+            iconColor: "text-green-500"
         },
         {
             title: "Total Paid",
-            value: formatCurrency({ amount: totalPaid }),
+            value: formatCurrency({ amount: summary.total_paid || 0 }),
             description: "Total amount paid",
             icon: CreditCard,
-            iconColor: "text-purple-500",
+            iconColor: "text-purple-500"
         },
         {
             title: "Total Due",
-            value: formatCurrency({ amount: totalDue }),
+            value: formatCurrency({ amount: (summary.total_amount || 0) - (summary.total_paid || 0) }),
             description: "Total amount due",
             icon: AlertCircle,
-            iconColor: "text-orange-500",
-        },
+            iconColor: "text-orange-500"
+        }
     ];
 
     return (
@@ -344,8 +333,7 @@ const SummaryCards = ({ bills = [] }) => {
                         <h3 className="text-sm font-medium">{card.title}</h3>
                         <card.icon className={`h-4 w-4 ${card.iconColor}`} />
                     </div>
-                    <div className="text-2xl font-bold">
-                        {card.value}
+                    <div className="text-2xl font-bold">{card.value}
                         <p className="text-xs text-muted-foreground">
                             {card.description}
                         </p>
@@ -361,6 +349,7 @@ export default function List({
     meta = {},
     filters = {},
     vendors = [],
+    summary = {},
 }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
@@ -771,7 +760,7 @@ export default function List({
                         url="bill_invoices.index"
                     />
                     <div className="p-4">
-                        <SummaryCards bills={bills} />
+                        <SummaryCards summary={summary} />
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                             <div className="flex flex-col md:flex-row gap-4">
                                 <Link href={route("bill_invoices.create")}>

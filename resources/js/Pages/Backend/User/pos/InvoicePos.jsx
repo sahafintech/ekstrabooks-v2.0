@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "@inertiajs/react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/Components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import { QRCodeSVG } from 'qrcode.react';
 

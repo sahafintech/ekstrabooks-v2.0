@@ -8,7 +8,7 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select";
+} from "@/Components/ui/select";
 import {
     Table,
     TableBody,
@@ -16,7 +16,7 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
+} from "@/Components/ui/table";
 import { BoxIcon, AlertTriangle, ShoppingCart, Package, ArrowUp, ArrowDown, RefreshCw } from "lucide-react";
 import {
     Bar,
@@ -37,7 +37,7 @@ import {
     ChartContainer,
     ChartTooltip,
     ChartTooltipContent
-} from "@/components/ui/chart";
+} from "@/Components/ui/chart";
 import TableWrapper from "@/Components/shared/TableWrapper";
 import PageHeader from "@/Components/PageHeader";
 import { formatAmount, formatCurrency } from "@/lib/utils";

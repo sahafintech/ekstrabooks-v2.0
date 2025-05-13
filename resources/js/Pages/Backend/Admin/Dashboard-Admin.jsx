@@ -1,6 +1,6 @@
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import PageHeader from "@/Components/PageHeader";
-import { SidebarInset } from "@/components/ui/sidebar";
+import { SidebarInset } from "@/Components/ui/sidebar";
 import * as React from "react";
 import {
     Card,
@@ -9,7 +9,7 @@ import {
     CardFooter,
     CardHeader,
     CardTitle,
-} from "@/components/ui/card";
+} from "@/Components/ui/card";
 import { TrendingUp, MoreVertical } from "lucide-react";
 import { Link } from "@inertiajs/react";
 import {
@@ -25,7 +25,7 @@ import {
     ChartContainer,
     ChartTooltip,
     ChartTooltipContent,
-} from "@/components/ui/chart";
+} from "@/Components/ui/chart";
 import {
     Table,
     TableBody,
@@ -34,14 +34,14 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "@/components/ui/table";
+} from "@/Components/ui/table";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuGroup,
     DropdownMenuItem,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@/Components/ui/dropdown-menu";
 import { Button } from "@/Components/ui/button";
 import TableWrapper from "@/Components/shared/TableWrapper";
 import TableActions from "@/Components/shared/TableActions";
