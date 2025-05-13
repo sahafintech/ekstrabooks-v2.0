@@ -35,8 +35,9 @@ class HandleInertiaRequests extends Middleware
         $activeBusiness = null;
 
         if ($user && $user->user_type !== 'admin') {
-            $businesses = Business::where('user_id', $user->id)->get();
-            $activeBusiness = $user->business()
+            $business = $user->business();
+            $businesses = $business->withoutGlobalScopes()->get();
+            $activeBusiness = $business
                 ->withoutGlobalScopes()
                 ->wherePivot('is_active', 1)
                 ->first();
