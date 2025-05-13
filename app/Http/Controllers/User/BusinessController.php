@@ -414,8 +414,8 @@ class BusinessController extends Controller
      */
     public function destroy($id)
     {
-        $business = Business::owner()->find($id);
-        if ($business->default == 1 || Business::owner()->count() == 1) {
+        $business = Business::find($id);
+        if ($business->default == 1 || Business::count() == 1) {
             return redirect()->route('business.index')->with('error', _lang('Sorry, You will not be able to delete default business!'));
         }
 
@@ -433,8 +433,8 @@ class BusinessController extends Controller
     public function bulk_destroy(Request $request)
     {
         foreach ($request->ids as $id) {
-            $business = Business::owner()->find($id);
-            if ($business->default == 1 || Business::owner()->count() == 1) {
+            $business = Business::find($id);
+            if ($business->default == 1 || Business::count() == 1) {
                 return redirect()->route('business.index')->with('error', _lang('Sorry, You will not be able to delete default business!'));
             }
 
