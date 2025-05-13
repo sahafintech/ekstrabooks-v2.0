@@ -266,9 +266,9 @@ class BusinessController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit(Request $request, $id)
+    public function edit($id)
     {
-        $business  = Business::owner()->with('bank_accounts')->find($id);
+        $business  = Business::with('bank_accounts')->find($id);
 
         $currencies = Currency::all();
         $countriesJson = file_get_contents(app_path() . '/Helpers/country.json');
