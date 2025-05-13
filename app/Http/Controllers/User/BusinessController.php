@@ -336,7 +336,7 @@ class BusinessController extends Controller
 
         DB::beginTransaction();
 
-        $business = Business::owner()->find($id);
+        $business = Business::find($id);
 
         if ($request->hasfile('logo')) {
             $file = $request->file('logo');
