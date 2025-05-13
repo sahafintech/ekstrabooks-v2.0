@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function CreditInvoicePos({ business, invoice }) {
   const handlePrint = () => {
@@ -77,155 +78,110 @@ export default function CreditInvoicePos({ business, invoice }) {
           >
             Print
           </Button>
-          <Link href={route('receipts.pos')}>
-            <Button variant="default" className="col-span-6">
+          <Link href={route('receipts.pos')} className="col-span-6">
+            <Button variant="default" className="w-full">
               Back
             </Button>
           </Link>
         </div>
 
-        {/* Invoice content */}
-        <div id="invoice-pos">
-          <div className="text-[11px] leading-4">
-            <div className="relative">
-              <h2 className="font-semibold text-2xl uppercase underline">
-                {business.name}
-              </h2>
-
-              {business.package?.medical_record === 1 &&
-                business.package?.prescription === 1 &&
-                invoice.queue_number > 0 && (
-                  <h2 className="text-7xl absolute right-0 top-0">
-                    {invoice.queue_number}
-                  </h2>
-                )}
-            </div>
-
-            <p>
-              <span>Date: {invoice.invoice_date}<br/></span>
-              <span>Invoice Number: {invoice.invoice_number}<br/></span>
-              <span>Address: {business.address}<br/></span>
-              <span>Email: {business.email}<br/></span>
-              <span>Phone: {business.phone}<br/></span>
-            </p>
-
-            {/* Billing Details */}
-            <p className="font-semibold uppercase">Billing Details</p>
-            <div>
-              <span>Name: {invoice.customer?.name}</span><br/>
-              <span>Address: {invoice.customer?.email}</span><br/>
-              <span>
-                {invoice.customer?.city}, {invoice.customer?.country}
-              </span><br/>
-            </div>
-
-            {/* Optional Client Details */}
-            {invoice.client_id &&
-              invoice.client_id !== invoice.customer_id && (
-                <>
-                  <p className="font-semibold uppercase">Client Details</p>
-                  <div>
-                    <span>Client: {invoice.client?.name}</span><br/>
-                    <span>Address: {invoice.client?.email}</span><br/>
-                    <span>Contract NO: {invoice.client?.contract_no}</span><br/>
-                    <span>
-                      {invoice.client?.city}, {invoice.client?.country}
-                    </span><br/>
-                  </div>
-                </>
-              )}
+        {/* printable invoice */}
+        <div id="invoice-pos" style={{ width: 350, fontFamily: 'Arial, sans-serif', fontSize: 13 }}>
+          <div style={{ textAlign: 'center', marginBottom: 8 }}>
+            <h2 style={{ fontWeight: 700, fontSize: 22, margin: 0 }}>{business.name}</h2>
+            <div style={{ fontSize: 12, margin: '4px 0' }}>{business.address}</div>
+            <div style={{ fontSize: 12 }}>{business.email}</div>
+            <div style={{ fontSize: 12 }}>{business.phone}</div>
           </div>
-
-          {/* Line items, taxes, discounts, totals */}
-          <table className="ti-custom-table ti-custom-table-head whitespace-nowrap mt-3">
+          <div style={{ textAlign: 'center', fontWeight: 600, fontSize: 16, margin: '8px 0' }}>Credit Invoice</div>
+          <div style={{ fontSize: 12, marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Date:</span>
+              <span>{invoice.invoice_date}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Invoice No:</span>
+              <span>{invoice.invoice_number}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Customer Name:</span>
+              <span>{invoice.customer?.name || '-'}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Customer Phone:</span>
+              <span>{invoice.customer?.phone || '-'}</span>
+            </div>
+            {invoice.customer?.address && (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Customer Address:</span>
+                <span>{invoice.customer.address}</span>
+              </div>
+            )}
+            {invoice.client_id && invoice.client_id !== invoice.customer_id && (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Client:</span>
+                  <span>{invoice.client?.name || '-'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Contract No:</span>
+                  <span>{invoice.client?.contract_no || '-'}</span>
+                </div>
+              </>
+            )}
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 8 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #000' }}>
+                <th style={{ textAlign: 'left', padding: '4px 0' }}>Item</th>
+                <th style={{ textAlign: 'right', padding: '4px 0' }}>Qty</th>
+                <th style={{ textAlign: 'right', padding: '4px 0' }}>Price</th>
+                <th style={{ textAlign: 'right', padding: '4px 0' }}>Total</th>
+              </tr>
+            </thead>
             <tbody>
               {invoice.items.map((item, i) => (
                 <tr key={i}>
-                  <td colSpan={3} className="!text-[11px]">
-                    {item.product_name}
-                    <br/>
-                    <span>
-                      {item.quantity} ×{" "}
-                      {formatCurrency({
-                        amount: item.unit_cost,
-                        currency: business.currency,
-                      })}
-                    </span>
-                  </td>
-                  <td className="text-right !text-[11px]">
-                    <b>
-                      {formatCurrency({
-                        amount: item.sub_total,
-                        currency: business.currency,
-                      })}
-                    </b>
-                  </td>
+                  <td style={{ padding: '2px 0' }}>{item.product_name}</td>
+                  <td style={{ textAlign: 'right', padding: '2px 0' }}>{item.quantity}</td>
+                  <td style={{ textAlign: 'right', padding: '2px 0' }}>{formatCurrency({ amount: item.unit_cost, currency: business.currency })}</td>
+                  <td style={{ textAlign: 'right', padding: '2px 0' }}>{formatCurrency({ amount: item.sub_total, currency: business.currency })}</td>
                 </tr>
               ))}
-
-              {invoice.taxes.map((tax, i) => (
-                <tr key={`tax-${i}`} className="mt-10">
-                  <td colSpan={3} className="!text-[11px]">
-                    <b>{tax.name}</b>
-                  </td>
-                  <td className="text-right !text-[11px]">
-                    <b>
-                      {formatCurrency({
-                        amount: tax.amount,
-                        currency: business.currency,
-                      })}
-                    </b>
-                  </td>
-                </tr>
-              ))}
-
-              {invoice.discount > 0 && (
-                <tr className="mt-10">
-                  <td colSpan={3} className="!text-[11px]"><b>Discount</b></td>
-                  <td className="text-right !text-[11px]">
-                    <b>
-                      {formatCurrency({
-                        amount: invoice.discount,
-                        currency: business.currency,
-                      })}
-                    </b>
-                  </td>
-                </tr>
-              )}
-
-              <tr className="mt-10">
-                <td colSpan={3} className="!text-[11px]"><b>Grand Total</b></td>
-                <td className="text-right !text-[11px]">
-                  <b>
-                    {formatCurrency({
-                      amount: invoice.grand_total,
-                      currency: business.currency,
-                    })}
-                  </b>
-                </td>
-              </tr>
-
-              {invoice.grand_total !== invoice.converted_total && (
-                <tr className="mt-10">
-                  <td colSpan={3} className="!text-[11px]"><b>Converted Total</b></td>
-                  <td className="text-right !text-[11px]">
-                    <b>
-                      {formatCurrency({
-                        amount: invoice.converted_total,
-                        currency: invoice.currency,
-                      })}
-                    </b>
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
-
-          <p className="!text-[11px] mt-3">
+          <div style={{ fontSize: 12, marginBottom: 8 }}>
+            {invoice.taxes.map((tax, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>{tax.name}:</span>
+                <span>{formatCurrency({ amount: tax.amount, currency: business.currency })}</span>
+              </div>
+            ))}
+            {invoice.discount > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Discount:</span>
+                <span>{formatCurrency({ amount: invoice.discount, currency: business.currency })}</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, borderTop: '1px solid #000', marginTop: 4, paddingTop: 4 }}>
+              <span>Total:</span>
+              <span>{formatCurrency({ amount: invoice.grand_total, currency: business.currency })}</span>
+            </div>
+            {invoice.grand_total !== invoice.converted_total && (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Converted Total:</span>
+                <span>{formatCurrency({ amount: invoice.converted_total, currency: invoice.currency })}</span>
+              </div>
+            )}
+          </div>
+          <div style={{ textAlign: 'center', margin: '12px 0' }}>
+            <QRCodeSVG value={invoice.invoice_number} size={80} level="H" includeMargin={true} />
+          </div>
+          <div style={{ textAlign: 'center', fontSize: 12, marginTop: 8 }}>
             <strong>Thank You For Shopping With Us — Please Come Again</strong>
-          </p>
+          </div>
         </div>
       </div>
     </div>
   );
-};
+}
