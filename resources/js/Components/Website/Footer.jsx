@@ -6,8 +6,6 @@ import {
     Linkedin,
     Github,
     Youtube,
-    ArrowRight,
-    CheckCircle2
 } from "lucide-react";
 import { usePage } from "@inertiajs/react";
 
@@ -65,7 +63,7 @@ export default function Footer() {
                                 <img
                                     src={`/uploads/media/${props.logo}`}
                                     alt="Ekstrabooks"
-                                    className="h-8 w-auto"
+                                    className="h-16 w-auto"
                                 />
                             </Link>
                             <p className="mt-4 text-sm text-muted-foreground">
