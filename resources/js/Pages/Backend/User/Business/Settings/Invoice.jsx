@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import InputError from "@/Components/InputError";
 import { Textarea } from "@/Components/ui/textarea";
 
-export default function Invoice({ business, id, activeTab, invoiceColumns }) {
+export default function Invoice({ business, id, activeTab, invoiceColumn }) {
     const { data, setData, post, processing, errors } = useForm({
         // Credit Invoice Settings
         invoice_title: business?.system_settings?.find((setting) => setting.name === "invoice_title")?.value || "Credit Invoice",
@@ -20,16 +20,20 @@ export default function Invoice({ business, id, activeTab, invoiceColumns }) {
         invoice_footer: business?.system_settings?.find((setting) => setting.name === "invoice_footer")?.value || "",
         invoice_primary_color: business?.system_settings?.find((setting) => setting.name === "invoice_primary_color")?.value || "#FFFFFF",
         invoice_text_color: business?.system_settings?.find((setting) => setting.name === "invoice_text_color")?.value || "#000000",
-        invoice_columns: invoiceColumns,
+        invoice_column: invoiceColumn || {
+            name: { label: "Name", status: "1" },
+            description: { label: "Description", status: "1" },
+            quantity: { label: "Quantity", status: "1" },
+            price: { label: "Price", status: "1" },
+            amount: { label: "Amount", status: "1" }
+        },
     });
 
     const submitInvoiceSettings = (e) => {
         e.preventDefault();
+        
         post(route("business.store_invoice_settings", id), {
             preserveScroll: true,
-            onSuccess: () => {
-                toast.success("Credit Invoice settings updated successfully");
-            },
         });
     };
 
@@ -193,173 +197,51 @@ export default function Invoice({ business, id, activeTab, invoiceColumns }) {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    <tr className="border-b">
-                                                        <td className="px-4 py-2">Name</td>
-                                                        <td className="px-4 py-2">
-                                                            <Input
-                                                                name="name_label"
-                                                                className="w-full"
-                                                                value={data.invoice_columns.name.label}
-                                                                onChange={(e) => setData("invoice_columns.name.label", e.target.value)}
-                                                            />
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    value="1"
-                                                                    name="invoice_column[name][status]"
-                                                                    className="h-4 w-4"
-                                                                    checked={data.invoice_columns.name.status === "1"}
-                                                                    onChange={(e) => setData("invoice_columns.name.status", e.target.value)}
+                                                    {Object.entries(data.invoice_column).map(([key, column]) => (
+                                                        <tr key={key} className="border-b">
+                                                            <td className="px-4 py-2 capitalize">{key}</td>
+                                                            <td className="px-4 py-2">
+                                                                <Input
+                                                                    className="w-full"
+                                                                    value={column.label || ""}
+                                                                    onChange={(e) => setData("invoice_column", {
+                                                                        ...data.invoice_column,
+                                                                        [key]: { ...column, label: e.target.value }
+                                                                    })}
                                                                 />
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="invoice_column[name][status]"
-                                                                    value="0"
-                                                                    className="h-4 w-4"
-                                                                    checked={data.invoice_columns.name.status === "0"}
-                                                                    onChange={(e) => setData("invoice_columns.name.status", e.target.value)}
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                    <tr className="border-b">
-                                                        <td className="px-4 py-2">Description</td>
-                                                        <td className="px-4 py-2">
-                                                            <Input className="w-full"
-                                                                value={data.invoice_columns.description.label}
-                                                                onChange={(e) => setData("invoice_columns.description.label", e.target.value)}
-                                                            />
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="invoice_column[description][status]"
-                                                                    value="1"
-                                                                    className="h-4 w-4"
-                                                                    checked={data.invoice_columns.description.status === "1"}
-                                                                    onChange={(e) => setData("invoice_columns.description.status", e.target.value)}
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="invoice_column[description][status]"
-                                                                    value="0"
-                                                                    className="h-4 w-4"
-                                                                    checked={data.invoice_columns.description.status === "0"}
-                                                                    onChange={(e) => setData("invoice_columns.description.status", e.target.value)}
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                    <tr className="border-b">
-                                                        <td className="px-4 py-2">Quantity</td>
-                                                        <td className="px-4 py-2">
-                                                            <Input className="w-full"
-                                                                value={data.invoice_columns.quantity.label}
-                                                                onChange={(e) => setData("invoice_columns.quantity.label", e.target.value)}
-                                                            />
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="invoice_column[quantity][status]"
-                                                                    value="1"
-                                                                    className="h-4 w-4"
-                                                                    checked={data.invoice_columns.quantity.status === "1"}
-                                                                    onChange={(e) => setData("invoice_columns.quantity.status", e.target.value)}
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="invoice_column[quantity][status]"
-                                                                    value="0"
-                                                                    className="h-4 w-4"
-                                                                    checked={data.invoice_columns.quantity.status === "0"}
-                                                                    onChange={(e) => setData("invoice_columns.quantity.status", e.target.value)}
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                    <tr className="border-b">
-                                                        <td className="px-4 py-2">Price</td>
-                                                        <td className="px-4 py-2">
-                                                            <Input className="w-full" 
-                                                            value={data.invoice_columns.price.label} 
-                                                            onChange={(e) => setData("invoice_columns.price.label", e.target.value)}
-                                                            />
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="invoice_column[price][status]"
-                                                                    value="1"
-                                                                    className="h-4 w-4"
-                                                                    checked={data.invoice_columns.price.status === "1"}
-                                                                    onChange={(e) => setData("invoice_columns.price.status", e.target.value)}
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="invoice_column[price][status]"
-                                                                    value="0"
-                                                                    className="h-4 w-4"
-                                                                    checked={data.invoice_columns.price.status === "0"}
-                                                                    onChange={(e) => setData("invoice_columns.price.status", e.target.value)}
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td className="px-4 py-2">Amount</td>
-                                                        <td className="px-4 py-2">
-                                                            <Input className="w-full"
-                                                                value={data.invoice_columns.amount.label}
-                                                                onChange={(e) => setData("invoice_columns.amount.label", e.target.value)}
-                                                            />
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="invoice_column[amount][status]"
-                                                                    value="1"
-                                                                    className="h-4 w-4"
-                                                                    checked={data.invoice_columns.amount.status === "1"}
-                                                                    onChange={(e) => setData("invoice_columns.amount.status", e.target.value)}
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="invoice_column[amount][status]"
-                                                                    value="0"
-                                                                    className="h-4 w-4"
-                                                                    checked={data.invoice_columns.amount.status === "0"}
-                                                                    onChange={(e) => setData("invoice_columns.amount.status", e.target.value)}
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
+                                                            </td>
+                                                            <td className="px-4 py-2 text-center">
+                                                                <div className="flex justify-center">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name={`invoice_column[${key}][status]`}
+                                                                        value="1"
+                                                                        className="h-4 w-4"
+                                                                        checked={column.status === "1"}
+                                                                        onChange={(e) => setData("invoice_column", {
+                                                                            ...data.invoice_column,
+                                                                            [key]: { ...column, status: e.target.value }
+                                                                        })}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-2 text-center">
+                                                                <div className="flex justify-center">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name={`invoice_column[${key}][status]`}
+                                                                        value="0"
+                                                                        className="h-4 w-4"
+                                                                        checked={column.status === "0"}
+                                                                        onChange={(e) => setData("invoice_column", {
+                                                                            ...data.invoice_column,
+                                                                            [key]: { ...column, status: e.target.value }
+                                                                        })}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
                                                 </tbody>
                                             </table>
                                         </div>

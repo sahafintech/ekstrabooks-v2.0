@@ -76,7 +76,13 @@ class BusinessSettingsController extends Controller
             ['id' => 'December,November', 'value' => 'December - November'],
         ];
 
-        $invoiceColumns = json_decode(get_setting($business->systemSettings, 'invoice_column', null, $id));
+        $invoiceColumn = json_decode(get_setting($business->systemSettings, 'invoice_column', null, $id));
+        $receiptColumn = json_decode(get_setting($business->systemSettings, 'receipt_column', null, $id));
+        $quotationColumn = json_decode(get_setting($business->systemSettings, 'quotation_column', null, $id));
+        $salesReturnColumn = json_decode(get_setting($business->systemSettings, 'sales_return-column', null, $id));
+        $purchaseReturnColumn = json_decode(get_setting($business->systemSettings, 'purchase_return-column', null, $id));
+        $purchaseColumn = json_decode(get_setting($business->systemSettings, 'purchase_column', null, $id));
+
         $taxes = Tax::all();
         $currencies = Currency::all();
 
@@ -88,7 +94,12 @@ class BusinessSettingsController extends Controller
             'languages' => $languages,
             'financial_years' => $financial_years,
             'activeTab' => $tab,
-            'invoiceColumns' => $invoiceColumns,
+            'invoiceColumn' => $invoiceColumn,
+            'receiptColumn' => $receiptColumn,
+            'quotationColumn' => $quotationColumn,
+            'salesReturnColumn' => $salesReturnColumn,
+            'purchaseReturnColumn' => $purchaseReturnColumn,
+            'purchaseColumn' => $purchaseColumn,
             'currencies' => $currencies,
             'taxes' => $taxes
         ];

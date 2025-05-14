@@ -1,5 +1,5 @@
-import React from "react";
-import { Head, Link, useForm } from "@inertiajs/react";
+import React, { useEffect } from "react";
+import { Head, Link, useForm, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import PageHeader from "@/Components/PageHeader";
@@ -7,45 +7,125 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/Components/ui/button";
 import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
-import { toast } from "sonner";
+import { Toaster } from "@/Components/ui/toaster";
+import { useToast } from "@/hooks/use-toast";
 import InputError from "@/Components/InputError";
 import { Textarea } from "@/Components/ui/textarea";
 
-export default function SalesReturn({ business, id, activeTab }) {
+export default function SalesReturn({ business, id, activeTab, salesReturnColumn }) {
+    const { flash = {} } = usePage().props;
+    const { toast } = useToast();
     const { data, setData, post, processing, errors } = useForm({
         // Sales Return Settings
-        sales_return_title: business?.system_settings?.find((setting) => setting.name === "sales_return_title")?.value || "Sales Return",
-        sales_return_prefix: business?.system_settings?.find((setting) => setting.name === "sales_return_prefix")?.value || "SR",
-        sales_return_starting: business?.system_settings?.find((setting) => setting.name === "sales_return_number")?.value || "1000",
-        sales_return_footer: business?.system_settings?.find((setting) => setting.name === "sales_return_footer")?.value || "",
-        sales_return_columns: business?.system_settings?.find((setting) => setting.name === "sales_return_column")?.value || [],
+        sales_return_title:
+            business?.system_settings?.find(
+                (setting) => setting.name === "sales_return_title"
+            )?.value || "Sales Return",
+        sales_return_prefix:
+            business?.system_settings?.find(
+                (setting) => setting.name === "sales_return_prefix"
+            )?.value || "SR",
+        sales_return_number:
+            business?.system_settings?.find(
+                (setting) => setting.name === "sales_return_number"
+            )?.value || "1000",
+        sales_return_footer:
+            business?.system_settings?.find(
+                (setting) => setting.name === "sales_return_footer"
+            )?.value || "",
+        sales_return_columns:
+            business?.system_settings?.find(
+                (setting) => setting.name === "sales_return_column"
+            )?.value || [],
+
+        "sales_return-column": salesReturnColumn || {
+            name: { label: "Name", status: "1" },
+            description: { label: "Description", status: "1" },
+            quantity: { label: "Quantity", status: "1" },
+            price: { label: "Price", status: "1" },
+            amount: { label: "Amount", status: "1" },
+        },
     });
 
     const submitSalesReturnSettings = (e) => {
         e.preventDefault();
-        post(route("business.settings.sales_return", id), {
+        post(route("business.store_sales_return_settings", id), {
             preserveScroll: true,
-            onSuccess: () => {
-                toast.success("Sales Return settings updated successfully");
-            },
         });
     };
 
     // Define tabs for the settings pages
     const tabs = [
-        { id: "general", label: "General Settings", icon: "⚙️", url: route("business.settings", [business.id, "general"]) },
-        { id: "currency", label: "Currency", icon: "💰", url: route("business.settings", [business.id, "currency"]) },
-        { id: "invoice", label: "Invoice", icon: "📄", url: route("business.settings", [business.id, "invoice"]) },
-        { id: "cash_invoice", label: "Cash Invoice", icon: "💵", url: route("business.settings", [business.id, "cash_invoice"]) },
-        { id: "bill_invoice", label: "Bill", icon: "📑", url: route("business.settings", [business.id, "bill_invoice"]) },
-        { id: "sales_return", label: "Sales Return", icon: "🔄", url: route("business.settings", [business.id, "sales_return"]) },
-        { id: "purchase_return", label: "Purchase Return", icon: "⬅️", url: route("business.settings", [business.id, "purchase_return"]) },
-        { id: "pos_settings", label: "POS Settings", icon: "⬅️", url: route("business.settings", [business.id, "pos_settings"]) },
+        {
+            id: "general",
+            label: "General Settings",
+            icon: "⚙️",
+            url: route("business.settings", [business.id, "general"]),
+        },
+        {
+            id: "currency",
+            label: "Currency",
+            icon: "💰",
+            url: route("business.settings", [business.id, "currency"]),
+        },
+        {
+            id: "invoice",
+            label: "Invoice",
+            icon: "📄",
+            url: route("business.settings", [business.id, "invoice"]),
+        },
+        {
+            id: "cash_invoice",
+            label: "Cash Invoice",
+            icon: "💵",
+            url: route("business.settings", [business.id, "cash_invoice"]),
+        },
+        {
+            id: "bill_invoice",
+            label: "Bill",
+            icon: "📑",
+            url: route("business.settings", [business.id, "bill_invoice"]),
+        },
+        {
+            id: "sales_return",
+            label: "Sales Return",
+            icon: "🔄",
+            url: route("business.settings", [business.id, "sales_return"]),
+        },
+        {
+            id: "purchase_return",
+            label: "Purchase Return",
+            icon: "⬅️",
+            url: route("business.settings", [business.id, "purchase_return"]),
+        },
+        {
+            id: "pos_settings",
+            label: "POS Settings",
+            icon: "⬅️",
+            url: route("business.settings", [business.id, "pos_settings"]),
+        },
     ];
 
+    useEffect(() => {
+        if (flash && flash.success) {
+            toast({
+                title: "Success",
+                description: flash.success,
+            });
+        }
+
+        if (flash && flash.error) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: flash.error,
+            });
+        }
+    }, [flash, toast]);
     return (
         <AuthenticatedLayout>
             <Head title="Business Settings" />
+            <Toaster />
             <SidebarInset>
                 <PageHeader
                     page="Business"
@@ -68,7 +148,9 @@ export default function SalesReturn({ business, id, activeTab }) {
                                 )}
                             >
                                 <span className="mr-2">{tab.icon}</span>
-                                <span className="text-sm md:text-base">{tab.label}</span>
+                                <span className="text-sm md:text-base">
+                                    {tab.label}
+                                </span>
                             </Link>
                         ))}
                     </div>
@@ -77,9 +159,14 @@ export default function SalesReturn({ business, id, activeTab }) {
                     <div>
                         <div className="max-w-3xl mx-auto">
                             <form onSubmit={submitSalesReturnSettings}>
-                                <h2 className="text-xl font-semibold mb-6">Sales Return Settings</h2>
+                                <h2 className="text-xl font-semibold mb-6">
+                                    Sales Return Settings
+                                </h2>
                                 <div className="grid grid-cols-12 mb-4">
-                                    <Label htmlFor="sales_return_title" className="col-span-3 flex items-center">
+                                    <Label
+                                        htmlFor="sales_return_title"
+                                        className="col-span-3 flex items-center"
+                                    >
                                         Sales Return Title
                                     </Label>
                                     <div className="col-span-9">
@@ -87,15 +174,26 @@ export default function SalesReturn({ business, id, activeTab }) {
                                             id="sales_return_title"
                                             type="text"
                                             value={data.sales_return_title}
-                                            onChange={(e) => setData("sales_return_title", e.target.value)}
+                                            onChange={(e) =>
+                                                setData(
+                                                    "sales_return_title",
+                                                    e.target.value
+                                                )
+                                            }
                                             className="w-full"
                                         />
-                                        <InputError message={errors.sales_return_title} className="mt-1" />
+                                        <InputError
+                                            message={errors.sales_return_title}
+                                            className="mt-1"
+                                        />
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-12 mb-4">
-                                    <Label htmlFor="sales_return_prefix" className="col-span-3 flex items-center">
+                                    <Label
+                                        htmlFor="sales_return_prefix"
+                                        className="col-span-3 flex items-center"
+                                    >
                                         Sales Return Auto Increment
                                     </Label>
                                     <div className="col-span-9">
@@ -103,42 +201,74 @@ export default function SalesReturn({ business, id, activeTab }) {
                                             id="sales_return_prefix"
                                             type="text"
                                             value={data.sales_return_prefix}
-                                            onChange={(e) => setData("sales_return_prefix", e.target.value)}
+                                            onChange={(e) =>
+                                                setData(
+                                                    "sales_return_prefix",
+                                                    e.target.value
+                                                )
+                                            }
                                             className="w-full"
                                         />
-                                        <InputError message={errors.sales_return_prefix} className="mt-1" />
+                                        <InputError
+                                            message={errors.sales_return_prefix}
+                                            className="mt-1"
+                                        />
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-12 mb-4">
-                                    <Label htmlFor="sales_return_starting" className="col-span-3 flex items-center">
+                                    <Label
+                                        htmlFor="sales_return_number"
+                                        className="col-span-3 flex items-center"
+                                    >
                                         Starting Number
                                     </Label>
                                     <div className="col-span-9">
                                         <Input
-                                            id="sales_return_starting"
+                                            id="sales_return_number"
                                             type="text"
-                                            value={data.sales_return_starting}
-                                            onChange={(e) => setData("sales_return_starting", e.target.value)}
+                                            value={data.sales_return_number}
+                                            onChange={(e) =>
+                                                setData(
+                                                    "sales_return_number",
+                                                    e.target.value
+                                                )
+                                            }
                                             className="w-full"
                                         />
-                                        <InputError message={errors.sales_return_starting} className="mt-1" />
+                                        <InputError
+                                            message={
+                                                errors.sales_return_number
+                                            }
+                                            className="mt-1"
+                                        />
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-12 mb-4">
-                                    <Label htmlFor="sales_return_footer" className="col-span-3 flex items-center">
+                                    <Label
+                                        htmlFor="sales_return_footer"
+                                        className="col-span-3 flex items-center"
+                                    >
                                         Sales Return Footer (HTML Allowed)
                                     </Label>
                                     <div className="col-span-9">
                                         <Textarea
                                             id="sales_return_footer"
                                             value={data.sales_return_footer}
-                                            onChange={(e) => setData("sales_return_footer", e.target.value)}
+                                            onChange={(e) =>
+                                                setData(
+                                                    "sales_return_footer",
+                                                    e.target.value
+                                                )
+                                            }
                                             className="w-full"
                                             rows={4}
                                         />
-                                        <InputError message={errors.sales_return_footer} className="mt-1" />
+                                        <InputError
+                                            message={errors.sales_return_footer}
+                                            className="mt-1"
+                                        />
                                     </div>
                                 </div>
 
@@ -151,148 +281,126 @@ export default function SalesReturn({ business, id, activeTab }) {
                                             <table className="w-full">
                                                 <thead>
                                                     <tr className="border-b">
-                                                        <th className="text-left px-4 py-2 w-1/3">COLUMN NAME</th>
-                                                        <th className="text-left px-4 py-2 w-1/3">LABEL</th>
-                                                        <th className="text-center px-4 py-2 w-1/6">VISIBLE</th>
-                                                        <th className="text-center px-4 py-2 w-1/6">HIDDEN</th>
+                                                        <th className="text-left px-4 py-2 w-1/3">
+                                                            COLUMN NAME
+                                                        </th>
+                                                        <th className="text-left px-4 py-2 w-1/3">
+                                                            LABEL
+                                                        </th>
+                                                        <th className="text-center px-4 py-2 w-1/6">
+                                                            VISIBLE
+                                                        </th>
+                                                        <th className="text-center px-4 py-2 w-1/6">
+                                                            HIDDEN
+                                                        </th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    <tr className="border-b">
-                                                        <td className="px-4 py-2">Name</td>
-                                                        <td className="px-4 py-2">
-                                                            <Input className="w-full" value="Name" />
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="name_visibility"
-                                                                    value="visible"
-                                                                    className="h-4 w-4"
-                                                                    defaultChecked
+                                                    {Object.entries(
+                                                        data[
+                                                            "sales_return-column"
+                                                        ]
+                                                    ).map(([key, column]) => (
+                                                        <tr
+                                                            key={key}
+                                                            className="border-b"
+                                                        >
+                                                            <td className="px-4 py-2 capitalize">
+                                                                {key}
+                                                            </td>
+                                                            <td className="px-4 py-2">
+                                                                <Input
+                                                                    className="w-full"
+                                                                    value={
+                                                                        column.label ||
+                                                                        ""
+                                                                    }
+                                                                    onChange={(
+                                                                        e
+                                                                    ) =>
+                                                                        setData(
+                                                                            "sales_return-column",
+                                                                            {
+                                                                                ...data[
+                                                                                    "sales_return-column"
+                                                                                ],
+                                                                                [key]: {
+                                                                                    ...column,
+                                                                                    label: e
+                                                                                        .target
+                                                                                        .value,
+                                                                                },
+                                                                            }
+                                                                        )
+                                                                    }
                                                                 />
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="name_visibility"
-                                                                    value="hidden"
-                                                                    className="h-4 w-4"
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                    <tr className="border-b">
-                                                        <td className="px-4 py-2">Description</td>
-                                                        <td className="px-4 py-2">
-                                                            <Input className="w-full" value="Description" />
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="description_visibility"
-                                                                    value="visible"
-                                                                    className="h-4 w-4"
-                                                                    defaultChecked
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="description_visibility"
-                                                                    value="hidden"
-                                                                    className="h-4 w-4"
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                    <tr className="border-b">
-                                                        <td className="px-4 py-2">Quantity</td>
-                                                        <td className="px-4 py-2">
-                                                            <Input className="w-full" value="Quantity" />
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="quantity_visibility"
-                                                                    value="visible"
-                                                                    className="h-4 w-4"
-                                                                    defaultChecked
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="quantity_visibility"
-                                                                    value="hidden"
-                                                                    className="h-4 w-4"
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                    <tr className="border-b">
-                                                        <td className="px-4 py-2">Price</td>
-                                                        <td className="px-4 py-2">
-                                                            <Input className="w-full" value="Price" />
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="price_visibility"
-                                                                    value="visible"
-                                                                    className="h-4 w-4"
-                                                                    defaultChecked
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="price_visibility"
-                                                                    value="hidden"
-                                                                    className="h-4 w-4"
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td className="px-4 py-2">Amount</td>
-                                                        <td className="px-4 py-2">
-                                                            <Input className="w-full" value="Amount" />
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="amount_visibility"
-                                                                    value="visible"
-                                                                    className="h-4 w-4"
-                                                                    defaultChecked
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="amount_visibility"
-                                                                    value="hidden"
-                                                                    className="h-4 w-4"
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
+                                                            </td>
+                                                            <td className="px-4 py-2 text-center">
+                                                                <div className="flex justify-center">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name={`sales_return-column[${key}][status]`}
+                                                                        value="1"
+                                                                        className="h-4 w-4"
+                                                                        checked={
+                                                                            column.status ===
+                                                                            "1"
+                                                                        }
+                                                                        onChange={(
+                                                                            e
+                                                                        ) =>
+                                                                            setData(
+                                                                                "sales_return-column",
+                                                                                {
+                                                                                    ...data[
+                                                                                        "sales_return-column"
+                                                                                    ],
+                                                                                    [key]: {
+                                                                                        ...column,
+                                                                                        status: e
+                                                                                            .target
+                                                                                            .value,
+                                                                                    },
+                                                                                }
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-2 text-center">
+                                                                <div className="flex justify-center">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name={`sales_return-column[${key}][status]`}
+                                                                        value="0"
+                                                                        className="h-4 w-4"
+                                                                        checked={
+                                                                            column.status ===
+                                                                            "0"
+                                                                        }
+                                                                        onChange={(
+                                                                            e
+                                                                        ) =>
+                                                                            setData(
+                                                                                "sales_return-column",
+                                                                                {
+                                                                                    ...data[
+                                                                                        "sales_return-column"
+                                                                                    ],
+                                                                                    [key]: {
+                                                                                        ...column,
+                                                                                        status: e
+                                                                                            .target
+                                                                                            .value,
+                                                                                    },
+                                                                                }
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -301,7 +409,9 @@ export default function SalesReturn({ business, id, activeTab }) {
 
                                 <div className="flex justify-start mt-6">
                                     <Button type="submit" disabled={processing}>
-                                        {processing ? "Saving..." : "Save Settings"}
+                                        {processing
+                                            ? "Saving..."
+                                            : "Save Settings"}
                                     </Button>
                                 </div>
                             </form>

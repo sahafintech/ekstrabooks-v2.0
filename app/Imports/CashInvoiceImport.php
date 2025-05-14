@@ -2,10 +2,8 @@
 
 namespace App\Imports;
 
-use App\Http\Middleware\Business;
 use App\Models\Account;
 use App\Models\BusinessSetting;
-use App\Models\Currency;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Receipt;
@@ -78,7 +76,7 @@ class CashInvoiceImport implements ToCollection, WithHeadingRow, WithValidation,
         foreach ($rows as $row) {
             $summary = $this->calculateTotal($row);
 
-            $customer = Customer::where('name', 'like', '%' . $row['customer_name'] . '%')->first();
+            $customer = Customer::where('name', $row['customer_name'])->first();
 
             $receipt_date = Date::excelToDateTimeObject($row['invoice_date'])->format('Y-m-d');
 
@@ -109,7 +107,7 @@ class CashInvoiceImport implements ToCollection, WithHeadingRow, WithValidation,
             $receipt->grand_total     = $summary['grandTotal'];
             $receipt->currency        = $row['transaction_currency'];
             $receipt->converted_total = convert_currency(request()->activeBusiness->currency, $row['transaction_currency'], $summary['grandTotal']);
-            $receipt->exchange_rate   = Currency::where('name', 'like', '%' . $row['transaction_currency'] . '%')->first()->exchange_rate;
+            $receipt->exchange_rate   = $row['exchange_rate'];
             $receipt->discount        = $summary['discountAmount'];
             $receipt->discount_type   = $row['discount_type'] ?? 0;
             $receipt->discount_value  = $row['discount_value'];
@@ -147,9 +145,9 @@ class CashInvoiceImport implements ToCollection, WithHeadingRow, WithValidation,
                 $transaction->account_id  = $product->income_account_id;
                 $transaction->dr_cr       = 'cr';
                 $transaction->transaction_currency    = $row['transaction_currency'];
-                $transaction->currency_rate = $receipt->exchange_rate;
-                $transaction->base_currency_amount = convert_currency($row['transaction_currency'], request()->activeBusiness->currency, convert_currency(request()->activeBusiness->currency, $row['transaction_currency'], $receiptItem->sub_total));
-                $transaction->transaction_amount      = convert_currency(request()->activeBusiness->currency, $row['transaction_currency'], $receiptItem->sub_total);
+                $transaction->currency_rate = $row['exchange_rate'];
+                $transaction->base_currency_amount = convert_currency($row['transaction_currency'], request()->activeBusiness->currency, convert_currency(request()->activeBusiness->currency, $row['transaction_currency'], $receiptItem->sub_total / $row['exchange_rate']));
+                $transaction->transaction_amount      = convert_currency(request()->activeBusiness->currency, $row['transaction_currency'], $receiptItem->sub_total / $row['exchange_rate']);
                 $transaction->description = _lang('Cash Invoice Income') . ' #' . $receipt->receipt_number;
                 $transaction->ref_id      = $receipt->id;
                 $transaction->ref_type    = 'receipt';
@@ -160,10 +158,10 @@ class CashInvoiceImport implements ToCollection, WithHeadingRow, WithValidation,
                 $transaction->account_id  = get_account($row['debit_account'])->id;
                 $transaction->dr_cr       = 'dr';
                 $transaction->transaction_currency    = $row['transaction_currency'];
-                $transaction->currency_rate = $receipt->exchange_rate;
+                $transaction->currency_rate = $row['exchange_rate'];
                 $transaction->transaction_method = $row['payment_method'];
-                $transaction->base_currency_amount = convert_currency($row['transaction_currency'], request()->activeBusiness->currency, convert_currency(request()->activeBusiness->currency, $row['transaction_currency'], $receiptItem->sub_total));
-                $transaction->transaction_amount      = convert_currency(request()->activeBusiness->currency, $row['transaction_currency'], $receiptItem->sub_total);
+                $transaction->base_currency_amount = convert_currency($row['transaction_currency'], request()->activeBusiness->currency, convert_currency(request()->activeBusiness->currency, $row['transaction_currency'], $receiptItem->sub_total / $row['exchange_rate']));
+                $transaction->transaction_amount      = convert_currency(request()->activeBusiness->currency, $row['transaction_currency'], $receiptItem->sub_total / $row['exchange_rate']);
                 $transaction->description = _lang('Cash Invoice') . ' #' . $receipt->receipt_number;
                 $transaction->ref_id      = $receipt->id;
                 $transaction->ref_type    = 'receipt';
@@ -176,7 +174,7 @@ class CashInvoiceImport implements ToCollection, WithHeadingRow, WithValidation,
                 $transaction->account_id  = get_account('Inventory')->id;
                 $transaction->dr_cr       = 'cr';
                 $transaction->transaction_currency    = $row['transaction_currency'];
-                $transaction->currency_rate           = $receipt->exchange_rate;
+                $transaction->currency_rate           = $row['exchange_rate'];
                 $transaction->base_currency_amount    = convert_currency($row['transaction_currency'], request()->activeBusiness->currency, convert_currency(request()->activeBusiness->currency, $row['transaction_currency'], $product->purchase_cost * $receiptItem->quantity));
                 $transaction->transaction_amount      = convert_currency(request()->activeBusiness->currency, $row['transaction_currency'], $product->purchase_cost * $receiptItem->quantity);
                 $transaction->description = $receiptItem->product_name . ' Sales #' . $receiptItem->quantity;
@@ -190,7 +188,7 @@ class CashInvoiceImport implements ToCollection, WithHeadingRow, WithValidation,
                 $transaction->dr_cr       = 'dr';
                 $transaction->transaction_amount      = convert_currency(request()->activeBusiness->currency, $row['transaction_currency'], $product->purchase_cost * $receiptItem->quantity);
                 $transaction->transaction_currency    = $row['transaction_currency'];
-                $transaction->currency_rate = $receipt->exchange_rate;
+                $transaction->currency_rate = $row['exchange_rate'];
                 $transaction->base_currency_amount = convert_currency($row['transaction_currency'], request()->activeBusiness->currency, convert_currency(request()->activeBusiness->currency, $row['transaction_currency'], $product->purchase_cost * $receiptItem->quantity));
                 $transaction->ref_type    = 'receipt';
                 $transaction->ref_id      = $receipt->id;
@@ -214,9 +212,9 @@ class CashInvoiceImport implements ToCollection, WithHeadingRow, WithValidation,
                 $transaction->account_id  = $tax->account_id;
                 $transaction->dr_cr       = 'cr';
                 $transaction->transaction_currency    = $row['transaction_currency'];
-                $transaction->currency_rate = $receipt->exchange_rate;
-                $transaction->base_currency_amount = convert_currency($row['transaction_currency'], request()->activeBusiness->currency, convert_currency(request()->activeBusiness->currency, $row['transaction_currency'], ($receiptItem->sub_total / 100) * $tax->rate));
-                $transaction->transaction_amount      = convert_currency(request()->activeBusiness->currency, $row['transaction_currency'], ($receiptItem->sub_total / 100) * $tax->rate);
+                $transaction->currency_rate = $row['exchange_rate'];
+                $transaction->base_currency_amount = convert_currency($row['transaction_currency'], request()->activeBusiness->currency, convert_currency(request()->activeBusiness->currency, $row['transaction_currency'], (($receiptItem->sub_total / $row['exchange_rate']) / 100) * $tax->rate));
+                $transaction->transaction_amount      = convert_currency(request()->activeBusiness->currency, $row['transaction_currency'], (($receiptItem->sub_total / $row['exchange_rate']) / 100) * $tax->rate);
                 $transaction->description = _lang('Cash Invoice Tax') . ' #' . $receipt->receipt_number;
                 $transaction->ref_id      = $receipt->id;
                 $transaction->ref_type    = 'receipt';
@@ -242,7 +240,7 @@ class CashInvoiceImport implements ToCollection, WithHeadingRow, WithValidation,
                 $transaction->dr_cr       = 'dr';
                 $transaction->transaction_amount      = convert_currency(request()->activeBusiness->currency, $row['transaction_currency'], $summary['discountAmount']);
                 $transaction->transaction_currency    = $row['transaction_currency'];
-                $transaction->currency_rate           = $receipt->exchange_rate;
+                $transaction->currency_rate           = $row['exchange_rate'];
                 $transaction->base_currency_amount    = convert_currency($row['transaction_currency'], request()->activeBusiness->currency, convert_currency(request()->activeBusiness->currency, $row['transaction_currency'], $summary['discountAmount']));
                 $transaction->description = _lang('Cash Invoice Discount') . ' #' . $receipt->receipt_number;
                 $transaction->ref_id      = $receipt->id;
@@ -286,17 +284,17 @@ class CashInvoiceImport implements ToCollection, WithHeadingRow, WithValidation,
         $grandTotal = ($subTotal + $taxAmount) - $discountAmount;
 
         return array(
-            'subTotal'       => $subTotal,
-            'taxAmount'      => $taxAmount,
-            'discountAmount' => $discountAmount,
-            'grandTotal'     => $grandTotal,
+            'subTotal'       => $subTotal / $row['exchange_rate'],
+            'taxAmount'      => $taxAmount / $row['exchange_rate'],
+            'discountAmount' => $discountAmount / $row['exchange_rate'],
+            'grandTotal'     => $grandTotal / $row['exchange_rate'],
         );
     }
 
     public function rules(): array
     {
         return [
-            '*.customer_name' => 'required|exists:customers,name',
+            '*.customer_name' => 'nullable|exists:customers,name',
             '*.product_name' => 'required|exists:products,name',
             '*.quantity' => 'required|numeric',
             '*.unit_cost' => 'required|numeric',

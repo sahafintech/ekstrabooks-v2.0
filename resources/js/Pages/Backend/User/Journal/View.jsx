@@ -30,13 +30,73 @@ export default function View({ journal, transactions, pending_transactions }) {
 
   // Handle print functionality
   const handlePrint = () => {
-    const printContent = printRef.current;
-    const originalContents = document.body.innerHTML;
-
-    document.body.innerHTML = printContent.innerHTML;
-    window.print();
-    document.body.innerHTML = originalContents;
-    window.location.reload();
+    const printWindow = window.open('', '_blank');
+    const printContent = printRef.current.innerHTML;
+    
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Journal Entry - ${journal.journal_number}</title>
+          <style>
+            body { font-family: Arial, sans-serif; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+            th { background-color: #f8f9fa; }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            .font-bold { font-weight: bold; }
+            .mb-8 { margin-bottom: 2rem; }
+            .mb-4 { margin-bottom: 1rem; }
+            .mb-1 { margin-bottom: 0.25rem; }
+            .text-sm { font-size: 0.875rem; }
+            .text-lg { font-size: 1.125rem; }
+            .text-2xl { font-size: 1.5rem; }
+            .text-gray-600 { color: #4b5563; }
+            .text-gray-700 { color: #374151; }
+            .text-gray-500 { color: #6b7280; }
+            .border-b { border-bottom: 1px solid #e5e7eb; }
+            .border-t { border-top: 1px solid #e5e7eb; }
+            .grid { display: grid; }
+            .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .gap-6 { gap: 1.5rem; }
+            .pb-6 { padding-bottom: 1.5rem; }
+            .pt-6 { padding-top: 1.5rem; }
+            .watermark {
+              position: fixed;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%) rotate(-45deg);
+              font-size: 6rem;
+              color: #e5e7eb;
+              opacity: 0.1;
+              pointer-events: none;
+              z-index: 1000;
+            }
+            @media print {
+              .watermark { display: block; }
+            }
+          </style>
+        </head>
+        <body>
+          ${printContent}
+          <div class="watermark">
+            ${journal.status === 1 ? "APPROVED" : journal.status === 2 ? "REJECTED" : "PENDING"}
+          </div>
+        </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+    printWindow.focus();
+    
+    // Wait for images and styles to load
+    printWindow.onload = function() {
+      printWindow.print();
+      // Close the window after printing
+      printWindow.onafterprint = function() {
+        printWindow.close();
+      };
+    };
   };
 
   return (
@@ -60,10 +120,10 @@ export default function View({ journal, transactions, pending_transactions }) {
                   Print
                 </Button>
                 <Button asChild variant="outline">
-                  <Link href={route("journals.export", journal.id)} method="get">
+                  <a href={route("journals.export", journal.id)} download>
                     <Download className="w-4 h-4 mr-2" />
                     Export
-                  </Link>
+                  </a>
                 </Button>
               </div>
 
@@ -234,17 +294,10 @@ export default function View({ journal, transactions, pending_transactions }) {
                 )}
               </div>
 
-              {/* Watermark for printing */}
-              <div className="hidden print:block absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-gray-200 text-8xl opacity-10 font-bold rotate-45 pointer-events-none">
-                {journal.status === 1 ? "APPROVED" :
-                  journal.status === 2 ? "REJECTED" :
-                    "PENDING"}
+              {/* Print Instructions - Hidden in print view */}
+              <div className="print:hidden mt-6 text-sm text-gray-500 text-center max-w-4xl mx-auto">
+                <p>This journal entry document is designed for printing. Click the Print button above to print a clean version.</p>
               </div>
-            </div>
-
-            {/* Print Instructions - Hidden in print view */}
-            <div className="print:hidden mt-6 text-sm text-gray-500 text-center max-w-4xl mx-auto">
-              <p>This journal entry document is designed for printing. Click the Print button above to print a clean version.</p>
             </div>
           </div>
         </div>

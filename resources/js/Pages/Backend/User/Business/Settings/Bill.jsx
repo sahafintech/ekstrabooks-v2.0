@@ -10,23 +10,26 @@ import { toast } from "sonner";
 import InputError from "@/Components/InputError";
 import { Textarea } from "@/Components/ui/textarea";
 
-export default function Bill({ business, id, activeTab }) {
+export default function Bill({ business, id, activeTab, purchaseColumn }) {
     const { data, setData, post, processing, errors } = useForm({
         // Bill Invoice Settings
         purchase_title: business?.system_settings?.find((setting) => setting.name === "purchase_title")?.value || "Bill Invoice",
         purchase_prefix: business?.system_settings?.find((setting) => setting.name === "purchase_prefix")?.value || "BILL",
-        purchase_starting: business?.system_settings?.find((setting) => setting.name === "purchase_number")?.value || "1000",
+        purchase_number: business?.system_settings?.find((setting) => setting.name === "purchase_number")?.value || "1000",
         purchase_footer: business?.system_settings?.find((setting) => setting.name === "purchase_footer")?.value || "",
-        purchase_columns: business?.system_settings?.find((setting) => setting.name === "purchase_column")?.value || [],
+        purchase_column: purchaseColumn || {
+            name: { label: "Name", status: "1" },
+            description: { label: "Description", status: "1" },
+            quantity: { label: "Quantity", status: "1" },
+            price: { label: "Price", status: "1" },
+            amount: { label: "Amount", status: "1" },
+        },
     });
 
     const submitBillInvoiceSettings = (e) => {
         e.preventDefault();
-        post(route("business.settings.bill_invoice", id), {
+        post(route("business.store_purchase_settings", id), {
             preserveScroll: true,
-            onSuccess: () => {
-                toast.success("Bill Invoice settings updated successfully");
-            },
         });
     };
 
@@ -111,18 +114,18 @@ export default function Bill({ business, id, activeTab }) {
                                 </div>
 
                                 <div className="grid grid-cols-12 mb-4">
-                                    <Label htmlFor="purchase_starting" className="col-span-3 flex items-center">
+                                    <Label htmlFor="purchase_number" className="col-span-3 flex items-center">
                                         Starting Number
                                     </Label>
                                     <div className="col-span-9">
                                         <Input
-                                            id="purchase_starting"
+                                            id="purchase_number"
                                             type="text"
-                                            value={data.purchase_starting}
-                                            onChange={(e) => setData("purchase_starting", e.target.value)}
+                                            value={data.purchase_number}
+                                            onChange={(e) => setData("purchase_number", e.target.value)}
                                             className="w-full"
                                         />
-                                        <InputError message={errors.purchase_starting} className="mt-1" />
+                                        <InputError message={errors.purchase_number} className="mt-1" />
                                     </div>
                                 </div>
 
@@ -158,141 +161,51 @@ export default function Bill({ business, id, activeTab }) {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    <tr className="border-b">
-                                                        <td className="px-4 py-2">Name</td>
-                                                        <td className="px-4 py-2">
-                                                            <Input className="w-full" value="Name" />
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="name_visibility"
-                                                                    value="visible"
-                                                                    className="h-4 w-4"
-                                                                    defaultChecked
+                                                    {Object.entries(data.purchase_column).map(([key, column]) => (
+                                                        <tr key={key} className="border-b">
+                                                            <td className="px-4 py-2 capitalize">{key}</td>
+                                                            <td className="px-4 py-2">
+                                                                <Input
+                                                                    className="w-full"
+                                                                    value={column.label || ""}
+                                                                    onChange={(e) => setData("purchase_column", {
+                                                                        ...data.purchase_column,
+                                                                        [key]: { ...column, label: e.target.value }
+                                                                    })}
                                                                 />
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="name_visibility"
-                                                                    value="hidden"
-                                                                    className="h-4 w-4"
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                    <tr className="border-b">
-                                                        <td className="px-4 py-2">Description</td>
-                                                        <td className="px-4 py-2">
-                                                            <Input className="w-full" value="Description" />
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="description_visibility"
-                                                                    value="visible"
-                                                                    className="h-4 w-4"
-                                                                    defaultChecked
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="description_visibility"
-                                                                    value="hidden"
-                                                                    className="h-4 w-4"
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                    <tr className="border-b">
-                                                        <td className="px-4 py-2">Quantity</td>
-                                                        <td className="px-4 py-2">
-                                                            <Input className="w-full" value="Quantity" />
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="quantity_visibility"
-                                                                    value="visible"
-                                                                    className="h-4 w-4"
-                                                                    defaultChecked
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="quantity_visibility"
-                                                                    value="hidden"
-                                                                    className="h-4 w-4"
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                    <tr className="border-b">
-                                                        <td className="px-4 py-2">Price</td>
-                                                        <td className="px-4 py-2">
-                                                            <Input className="w-full" value="Price" />
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="price_visibility"
-                                                                    value="visible"
-                                                                    className="h-4 w-4"
-                                                                    defaultChecked
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="price_visibility"
-                                                                    value="hidden"
-                                                                    className="h-4 w-4"
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td className="px-4 py-2">Amount</td>
-                                                        <td className="px-4 py-2">
-                                                            <Input className="w-full" value="Amount" />
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="amount_visibility"
-                                                                    value="visible"
-                                                                    className="h-4 w-4"
-                                                                    defaultChecked
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-4 py-2 text-center">
-                                                            <div className="flex justify-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="amount_visibility"
-                                                                    value="hidden"
-                                                                    className="h-4 w-4"
-                                                                />
-                                                            </div>
-                                                        </td>
-                                                    </tr>
+                                                            </td>
+                                                            <td className="px-4 py-2 text-center">
+                                                                <div className="flex justify-center">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name={`purchase_column[${key}][status]`}
+                                                                        value="1"
+                                                                        className="h-4 w-4"
+                                                                        checked={column.status === "1"}
+                                                                        onChange={(e) => setData("purchase_column", {
+                                                                            ...data.purchase_column,
+                                                                            [key]: { ...column, status: e.target.value }
+                                                                        })}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-2 text-center">
+                                                                <div className="flex justify-center">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name={`purchase_column[${key}][status]`}
+                                                                        value="0"
+                                                                        className="h-4 w-4"
+                                                                        checked={column.status === "0"}
+                                                                        onChange={(e) => setData("purchase_column", {
+                                                                            ...data.purchase_column,
+                                                                            [key]: { ...column, status: e.target.value }
+                                                                        })}
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
                                                 </tbody>
                                             </table>
                                         </div>
