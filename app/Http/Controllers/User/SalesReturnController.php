@@ -78,6 +78,43 @@ class SalesReturnController extends Controller
         $accounts = Account::all();
         $customers = Customer::all();
 
+        // Get summary statistics for all returns matching filters
+        $allReturns = SalesReturn::query();
+        
+        if ($request->search) {
+            $allReturns->where(function ($q) use ($request) {
+                $q->where('return_number', 'like', "%$request->search%")
+                    ->orWhere('title', 'like', "%$request->search%")
+                    ->orWhereHas('customer', function ($q) use ($request) {
+                        $q->where('name', 'like', "%$request->search%");
+                    });
+            });
+        }
+
+        if ($request->customer_id) {
+            $allReturns->where('customer_id', $request->customer_id);
+        }
+
+        if (!empty($request->date_range)) {
+            $allReturns->whereDate('return_date', '>=', $request->date_range[0])
+                ->whereDate('return_date', '<=', $request->date_range[1]);
+        }
+
+        if ($request->status) {
+            $allReturns->where('status', $request->status);
+        }
+
+        $allReturns = $allReturns->get();
+
+        $summary = [
+            'total_returns' => $allReturns->count(),
+            'total_refunded' => $allReturns->where('status', 1)->count(),
+            'grand_total' => $allReturns->sum('grand_total'),
+            'total_due' => $allReturns->sum(function ($return) {
+                return $return->grand_total - $return->paid;
+            }),
+        ];
+
         return Inertia::render('Backend/User/SalesReturn/List', [
             'returns' => $returns->items(),
             'accounts' => $accounts,
@@ -97,6 +134,7 @@ class SalesReturnController extends Controller
                 'status' => $request->status,
                 'sorting' => $sorting,
             ],
+            'summary' => $summary,
         ]);
     }
 

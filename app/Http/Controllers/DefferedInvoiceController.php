@@ -22,7 +22,6 @@ use App\Models\Product;
 use App\Models\Tax;
 use App\Models\Transaction;
 use App\Notifications\SendDefferedInvoice;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -78,7 +77,6 @@ class DefferedInvoiceController extends Controller
 
         // Apply date range filter
         if (!empty($dateRange)) {
-
             $query->whereDate('invoice_date', '>=', Carbon::parse($dateRange[0]))
                 ->whereDate('invoice_date', '<=', Carbon::parse($dateRange[1]));
         }
@@ -88,46 +86,44 @@ class DefferedInvoiceController extends Controller
             $query->where('status', $status);
         }
 
-        // Apply sorting
-        $sortColumn = $sorting['column'];
-        $sortDirection = $sorting['direction'];
+        // Calculate summary from all records
+        $summary = $this->calculateSummary($query->clone());
 
-        if ($sortColumn === 'customer.name') {
-            $query->join('customers', 'invoices.customer_id', '=', 'customers.id')
-                ->orderBy('customers.name', $sortDirection)
-                ->select('invoices.*');
-        } else {
-            $query->orderBy('invoices.' . $sortColumn, $sortDirection);
-        }
-
-        // Get invoices with pagination
-        $invoices = $query->paginate($per_page)->withQueryString();
+        // Get paginated results
+        $invoices = $query->orderBy($sorting['column'], $sorting['direction'])
+            ->paginate($per_page);
 
         // Get all customers for the filter dropdown
         $customers = Customer::all();
 
-        // Return Inertia view
         return Inertia::render('Backend/User/Invoice/Deffered/List', [
             'invoices' => $invoices->items(),
             'meta' => [
                 'current_page' => $invoices->currentPage(),
-                'from' => $invoices->firstItem(),
-                'last_page' => $invoices->lastPage(),
-                'links' => $invoices->linkCollection(),
-                'path' => $invoices->path(),
                 'per_page' => $invoices->perPage(),
+                'from' => $invoices->firstItem(),
                 'to' => $invoices->lastItem(),
                 'total' => $invoices->total(),
+                'last_page' => $invoices->lastPage(),
             ],
-            'filters' => [
-                'search' => $search,
-                'customer_id' => $customer_id,
-                'date_range' => $dateRange,
-                'status' => $status,
-                'sorting' => $sorting,
-            ],
-            'customers' => $customers,
+            'filters' => request()->only(['search', 'per_page', 'customer_id', 'date_range', 'status']),
+            'customers' => Customer::select('id', 'name')->orderBy('id')->get(),
+            'summary' => $summary
         ]);
+    }
+
+    private function calculateSummary($query)
+    {
+        $summary = [
+            'total_invoices' => $query->count(),
+            'grand_total' => $query->sum('grand_total'),
+            'total_paid' => $query->sum('paid'),
+            'currency' => get_business_option('currency')
+        ];
+        
+        $summary['total_due'] = $summary['grand_total'] - $summary['total_paid'];
+        
+        return $summary;
     }
 
     public function create()

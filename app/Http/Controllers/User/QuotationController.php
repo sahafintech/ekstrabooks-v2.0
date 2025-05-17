@@ -104,6 +104,49 @@ class QuotationController extends Controller
             }
         }
 
+        // Get summary statistics for all quotations matching filters
+        $allQuotations = Quotation::query();
+        
+        if ($request->has('search')) {
+            $allQuotations->where(function($q) use ($search) {
+                $q->where('quotation_number', 'like', "%{$search}%")
+                  ->orWhere('title', 'like', "%{$search}%")
+                  ->orWhereHas('customer', function($q) use ($search) {
+                      $q->where('name', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        if ($request->has('customer_id') && $request->customer_id !== '') {
+            $allQuotations->where('customer_id', $request->customer_id);
+        }
+
+        if ($request->has('date_range') && $request->date_range) {
+            $allQuotations->where('quotation_date', '>=', $request->date_range[0])
+                ->orWhere('quotation_date', '<=', $request->date_range[1]);
+        }
+
+        if ($request->status) {
+            if ($request->status === '0') {
+                $allQuotations->where('expired_date', '>', now());
+            } else if ($request->status === '1') {
+                $allQuotations->where('expired_date', '<=', now());
+            }
+        }
+
+        $allQuotations = $allQuotations->get();
+
+        $summary = [
+            'total_quotations' => $allQuotations->count(),
+            'grand_total' => $allQuotations->sum('grand_total'),
+            'active_quotations' => $allQuotations->filter(function ($quotation) {
+                return Carbon::createFromFormat(get_date_format(), $quotation->expired_date)->isFuture();
+            })->count(),
+            'expired_quotations' => $allQuotations->filter(function ($quotation) {
+                return Carbon::createFromFormat(get_date_format(), $quotation->expired_date)->isPast();
+            })->count(),
+        ];
+
         // Handle sorting
         $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
         $sortColumn = $sorting['column'];
@@ -138,6 +181,7 @@ class QuotationController extends Controller
                 'sorting' => $sorting,
             ]),
             'customers' => $customers,
+            'summary' => $summary,
         ]);
     }
 

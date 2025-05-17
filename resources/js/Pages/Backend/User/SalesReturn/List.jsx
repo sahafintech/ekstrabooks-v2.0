@@ -275,37 +275,32 @@ const SalesReturnStatusBadge = ({ status }) => {
     );
 };
 
-const SummaryCards = ({ returns = [] }) => {
-    const totalReturns = returns.length;
-    const totalRefunded = returns.filter(return_item => return_item.status === 1).length;
-    const grandTotal = returns.reduce((sum, return_item) => sum + parseFloat(return_item.grand_total), 0);
-    const totalDue = returns.reduce((sum, return_item) => sum + (parseFloat(return_item.grand_total) - parseFloat(return_item.paid)), 0);
-
+const SummaryCards = ({ summary = {} }) => {
     const cards = [
         {
-            title: "Total Invoices",
-            value: totalReturns,
+            title: "Total Returns",
+            value: summary.total_returns || 0,
             description: "Total sales returns",
             icon: Receipt,
             iconColor: "text-blue-500"
         },
         {
             title: "Grand Total",
-            value: formatCurrency(grandTotal),
+            value: formatCurrency(summary.grand_total || 0),
             description: "Total amount of all returns",
             icon: DollarSign,
             iconColor: "text-green-500"
         },
         {
             title: "Total Refunded",
-            value: totalRefunded,
+            value: summary.total_refunded || 0,
             description: "Returns that have been refunded",
             icon: CreditCard,
             iconColor: "text-purple-500"
         },
         {
             title: "Total Due",
-            value: formatCurrency(totalDue),
+            value: formatCurrency(summary.total_due || 0),
             description: "Total amount due",
             icon: Wallet,
             iconColor: "text-orange-500"
@@ -333,7 +328,7 @@ const SummaryCards = ({ returns = [] }) => {
     );
 };
 
-export default function List({ returns = [], meta = {}, filters = {}, accounts = [], errors = {}, customers = [] }) {
+export default function List({ returns = [], meta = {}, filters = {}, accounts = [], errors = {}, customers = [], summary = {} }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
     const [selectedSalesReturns, setSelectedSalesReturns] = useState([]);
@@ -658,7 +653,7 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                         url="sales_returns.index"
                     />
                     <div className="p-4">
-                        <SummaryCards returns={returns} />
+                        <SummaryCards summary={summary} />
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                             <div className="flex flex-col md:flex-row gap-4">
                                 <Link href={route("sales_returns.create")}>

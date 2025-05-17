@@ -97,6 +97,39 @@ class ReceiptController extends Controller
                 ->whereDate('receipt_date', '<=', $dateRange[1]);
         }
 
+        // Get summary statistics for all receipts matching filters
+        $allReceipts = Receipt::query();
+        
+        if ($search) {
+            $allReceipts->where(function ($q) use ($search) {
+                $q->where('receipt_number', 'like', "%$search%")
+                    ->orWhere('title', 'like', "%$search%")
+                    ->orWhereHas('customer', function ($q) use ($search) {
+                        $q->where('name', 'like', "%$search%");
+                    });
+            });
+        }
+
+        if ($customerId) {
+            $allReceipts->where('customer_id', $customerId);
+        }
+
+        if (!empty($dateRange)) {
+            $allReceipts->whereDate('receipt_date', '>=', $dateRange[0])
+                ->whereDate('receipt_date', '<=', $dateRange[1]);
+        }
+
+        $allReceipts = $allReceipts->get();
+
+        $summary = [
+            'total_invoices' => $allReceipts->count(),
+            'grand_total' => $allReceipts->sum('grand_total'),
+            'unique_customers' => $allReceipts->pluck('customer_id')->unique()->count(),
+            'today_invoices' => $allReceipts->filter(function ($receipt) {
+                return Carbon::createFromFormat(get_date_format(), $receipt->receipt_date)->isToday();
+            })->count(),
+        ];
+
         $receipts = $query->paginate($perPage);
 
         return Inertia::render('Backend/User/CashInvoice/List', [
@@ -111,6 +144,7 @@ class ReceiptController extends Controller
             ],
             'filters' => request()->only(['search', 'per_page', 'customer_id', 'date_range']),
             'customers' => Customer::select('id', 'name')->orderBy('id')->get(),
+            'summary' => $summary,
         ]);
     }
 

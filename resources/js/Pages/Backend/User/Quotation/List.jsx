@@ -166,37 +166,32 @@ const QuotationStatusBadge = ({ expired_date }) => {
   );
 };
 
-const SummaryCards = ({ quotations = [] }) => {
-  const totalQuotations = quotations.length;
-  const activeQuotations = quotations.filter(quotation => new Date(quotation.expired_date) > new Date()).length;
-  const expiredQuotations = quotations.filter(quotation => new Date(quotation.expired_date) <= new Date()).length;
-  const grandTotal = quotations.reduce((sum, quotation) => sum + parseFloat(quotation.grand_total), 0);
-
+const SummaryCards = ({ summary = {} }) => {
   const cards = [
     {
       title: "Total Quotations",
-      value: totalQuotations,
+      value: summary.total_quotations || 0,
       description: "Total number of quotations",
       icon: FileText,
       iconColor: "text-blue-500"
     },
     {
       title: "Grand Total",
-      value: formatCurrency({ amount: grandTotal, currency: quotations[0]?.currency || 'USD' }),
+      value: formatCurrency({ amount: summary.grand_total || 0, currency: 'USD' }),
       description: "Total amount of all quotations",
       icon: DollarSign,
       iconColor: "text-green-500"
     },
     {
       title: "Active Quotations",
-      value: activeQuotations,
+      value: summary.active_quotations || 0,
       description: "Quotations that are still valid",
       icon: CheckCircle,
       iconColor: "text-purple-500"
     },
     {
       title: "Expired Quotations",
-      value: expiredQuotations,
+      value: summary.expired_quotations || 0,
       description: "Quotations that have expired",
       icon: Clock,
       iconColor: "text-orange-500"
@@ -224,7 +219,7 @@ const SummaryCards = ({ quotations = [] }) => {
   );
 };
 
-export default function List({ quotations = [], meta = {}, filters = {}, customers = [] }) {
+export default function List({ quotations = [], meta = {}, filters = {}, customers = [], summary = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedQuotations, setSelectedQuotations] = useState([]);
@@ -536,7 +531,7 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
             url="quotations.index"
           />
           <div className="p-4">
-            <SummaryCards quotations={quotations} />
+            <SummaryCards summary={summary} />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div className="flex flex-col md:flex-row gap-4">
                 <Link href={route("quotations.create")}>

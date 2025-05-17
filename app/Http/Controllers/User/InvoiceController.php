@@ -107,6 +107,47 @@ class InvoiceController extends Controller
             $query->orderBy('invoices.' . $sortColumn, $sortDirection);
         }
 
+        // Get summary statistics for all invoices matching filters
+        $allInvoices = Invoice::query()
+            ->where('is_deffered', 0);
+
+        if ($request->has('search')) {
+            $search = $request->search;
+            $allInvoices->where(function ($q) use ($search) {
+                $q->whereHas('customer', function ($q2) use ($search) {
+                    $q2->where('name', 'like', "%{$search}%");
+                })
+                ->orWhere('invoice_number', 'like', "%{$search}%")
+                ->orWhere('order_number', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->customer_id) {
+            $allInvoices->where('customer_id', $request->customer_id);
+        }
+
+        if ($request->status) {
+            $allInvoices->where('status', $request->status);
+        }
+
+        if ($request->date_range) {
+            $dateRange = $request->date_range;
+            if (!empty($dateRange[0])) {
+                $allInvoices->whereDate('invoice_date', '>=', $dateRange[0]);
+            }
+            if (!empty($dateRange[1])) {
+                $allInvoices->whereDate('invoice_date', '<=', $dateRange[1]);
+            }
+        }
+
+        $allInvoices = $allInvoices->get();
+
+        $summary = [
+            'total_invoices' => $allInvoices->count(),
+            'grand_total' => $allInvoices->sum('grand_total'),
+            'total_paid' => $allInvoices->sum('paid'),
+            'total_due' => $allInvoices->sum('grand_total') - $allInvoices->sum('paid'),
+        ];
         // Handle pagination
         $perPage = $request->get('per_page', 50);
         $invoices = $query->paginate($perPage);
@@ -125,6 +166,7 @@ class InvoiceController extends Controller
                 'sorting' => $sorting,
             ]),
             'customers' => Customer::select('id', 'name')->orderBy('id')->get(),
+            'summary' => $summary,
         ]);
     }
 

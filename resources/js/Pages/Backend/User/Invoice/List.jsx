@@ -169,37 +169,32 @@ const InvoiceStatusBadge = ({ status }) => {
   );
 };
 
-const SummaryCards = ({ invoices = [] }) => {
-  const totalInvoices = invoices.length;
-  const grandTotal = invoices.reduce((sum, invoice) => sum + parseFloat(invoice.grand_total), 0);
-  const totalPaid = invoices.reduce((sum, invoice) => sum + parseFloat(invoice.paid), 0);
-  const totalDue = grandTotal - totalPaid;
-
+const SummaryCards = ({ summary = {} }) => {
   const cards = [
     {
       title: "Total Invoices",
-      value: totalInvoices,
+      value: summary.total_invoices || 0,
       description: "Total number of invoices",
       icon: Receipt,
       iconColor: "text-blue-500"
     },
     {
       title: "Grand Total",
-      value: formatCurrency({ amount: grandTotal, currency: invoices[0]?.currency || 'USD' }),
+      value: formatCurrency({ amount: summary.grand_total || 0, currency: 'USD' }),
       description: "Total amount of all invoices",
       icon: DollarSign,
       iconColor: "text-green-500"
     },
     {
       title: "Total Paid",
-      value: formatCurrency({ amount: totalPaid, currency: invoices[0]?.currency || 'USD' }),
+      value: formatCurrency({ amount: summary.total_paid || 0, currency: 'USD' }),
       description: "Total amount paid",
       icon: CreditCard,
       iconColor: "text-purple-500"
     },
     {
       title: "Total Due",
-      value: formatCurrency({ amount: totalDue, currency: invoices[0]?.currency || 'USD' }),
+      value: formatCurrency({ amount: summary.total_due || 0, currency: 'USD' }),
       description: "Total amount due",
       icon: AlertCircle,
       iconColor: "text-orange-500"
@@ -227,7 +222,7 @@ const SummaryCards = ({ invoices = [] }) => {
   );
 };
 
-export default function List({ invoices = [], meta = {}, filters = {}, customers = [] }) {
+export default function List({ invoices = [], meta = {}, filters = {}, customers = [], summary = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedInvoices, setSelectedInvoices] = useState([]);
@@ -539,7 +534,7 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
             url="invoices.index"
           />
           <div className="p-4">
-            <SummaryCards invoices={invoices} />
+            <SummaryCards summary={summary} />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div className="flex flex-col md:flex-row gap-4">
                 <Link href={route("invoices.create")}>

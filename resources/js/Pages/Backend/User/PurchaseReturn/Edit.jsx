@@ -41,7 +41,6 @@ export default function Edit({ vendors = [], products = [], currencies = [], tax
         template: purchase_return.template || "",
         note: purchase_return.note || "",
         footer: purchase_return.footer || "",
-        attachment: null,
         product_id: [],
         product_name: [],
         description: [],
@@ -615,21 +614,6 @@ export default function Edit({ vendors = [], products = [], currencies = [], tax
                                     rows={4}
                                 />
                                 <InputError message={errors.footer} className="text-sm" />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-12 mt-2">
-                            <Label htmlFor="attachment" className="md:col-span-2 col-span-12">
-                                Attachment
-                            </Label>
-                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                                <Input
-                                    id="attachment"
-                                    type="file"
-                                    onChange={(e) => setData("attachment", e.target.files[0])}
-                                    className="md:w-1/2 w-full"
-                                />
-                                <InputError message={errors.attachment} className="text-sm" />
                             </div>
                         </div>
 
