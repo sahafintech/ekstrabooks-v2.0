@@ -224,7 +224,7 @@ class BusinessController extends Controller
         // Find the business first
         $business = Business::findOrFail($id);
 
-        $per_page = $request->get('per_page', 10);
+        $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
         // Get users related to this business with roles and pagination

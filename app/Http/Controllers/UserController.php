@@ -42,7 +42,7 @@ class UserController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create(Request $request)
+    public function create()
     {
         return Inertia::render('Backend/Admin/Users/Create');
     }

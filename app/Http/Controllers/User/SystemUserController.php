@@ -93,9 +93,11 @@ class SystemUserController extends Controller
 	 */
 	public function invite($businessId)
 	{
+		$businesses = Business::all();
 		return Inertia::render('Backend/User/Business/SystemUser/Create', [
 			'businessId' => $businessId,
 			'roles' => Role::all(),
+			'businesses' => $businesses,
 		]);
 	}
 
