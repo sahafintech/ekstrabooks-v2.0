@@ -81,7 +81,6 @@ class PrescriptionController extends Controller
 
     public function store(Request $request)
     {
-        return $request->all();
         $request->validate([
             'customer_id' => 'required',
             'date' => 'required',
@@ -187,8 +186,8 @@ class PrescriptionController extends Controller
 
         $prescription = Prescription::find($id);
         $prescription->customer_id = $request->customer_id;
-        $prescription->date = Carbon::parse($request->date)->format('Y-m-d');
-        $prescription->result_date = Carbon::parse($request->result_date)->format('Y-m-d');
+        $prescription->date = Carbon::createFromFormat(get_date_format(), $request->date)->format('Y-m-d');
+        $prescription->result_date = Carbon::createFromFormat(get_date_format(), $request->result_date)->format('Y-m-d');
         $prescription->dist_sph_re = $request->dist_sph_re;
         $prescription->dist_cyl_re = $request->dist_cyl_re;
         $prescription->dist_axis_re = $request->dist_axis_re;

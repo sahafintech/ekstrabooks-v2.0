@@ -9,6 +9,7 @@ import { Label } from "@/Components/ui/label";
 import { Checkbox } from "@/Components/ui/checkbox";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import DateTimePicker from "@/Components/DateTimePicker";
+import { RadioGroup, RadioGroupItem } from "@/Components/ui/radio-group";
 
 export default function Create({ customers = [] }) {
     const { data, setData, post, processing, errors } = useForm({
@@ -242,29 +243,29 @@ export default function Create({ customers = [] }) {
                                     <div className="py-2">VA unaided</div>
                                     <div>
                                         <Input
-                                            value={data.va_unaided_re}
-                                            onChange={(e) => setData("va_unaided_re", e.target.value)}
+                                            value={data.rf_unaided_d_re}
+                                            onChange={(e) => setData("rf_unaided_d_re", e.target.value)}
                                             className="w-full"
                                         />
                                     </div>
                                     <div>
                                         <Input
-                                            value={data.va_unaided_re_n}
-                                            onChange={(e) => setData("va_unaided_re_n", e.target.value)}
+                                            value={data.rf_unaided_n_re}
+                                            onChange={(e) => setData("rf_unaided_n_re", e.target.value)}
                                             className="w-full"
                                         />
                                     </div>
                                     <div>
                                         <Input
-                                            value={data.va_unaided_le}
-                                            onChange={(e) => setData("va_unaided_le", e.target.value)}
+                                            value={data.rf_unaided_d_le}
+                                            onChange={(e) => setData("rf_unaided_d_le", e.target.value)}
                                             className="w-full"
                                         />
                                     </div>
                                     <div>
                                         <Input
-                                            value={data.va_unaided_le_n}
-                                            onChange={(e) => setData("va_unaided_le_n", e.target.value)}
+                                            value={data.rf_unaided_n_le}
+                                            onChange={(e) => setData("rf_unaided_n_le", e.target.value)}
                                             className="w-full"
                                         />
                                     </div>
@@ -274,29 +275,29 @@ export default function Create({ customers = [] }) {
                                     <div className="py-2">VA aided (glasses)</div>
                                     <div>
                                         <Input
-                                            value={data.va_aided_re}
-                                            onChange={(e) => setData("va_aided_re", e.target.value)}
+                                            value={data.rf_aided_d_re}
+                                            onChange={(e) => setData("rf_aided_d_re", e.target.value)}
                                             className="w-full"
                                         />
                                     </div>
                                     <div>
                                         <Input
-                                            value={data.va_aided_re_n}
-                                            onChange={(e) => setData("va_aided_re_n", e.target.value)}
+                                            value={data.rf_aided_n_re}
+                                            onChange={(e) => setData("rf_aided_n_re", e.target.value)}
                                             className="w-full"
                                         />
                                     </div>
                                     <div>
                                         <Input
-                                            value={data.va_aided_le}
-                                            onChange={(e) => setData("va_aided_le", e.target.value)}
+                                            value={data.rf_aided_d_le}
+                                            onChange={(e) => setData("rf_aided_d_le", e.target.value)}
                                             className="w-full"
                                         />
                                     </div>
                                     <div>
                                         <Input
-                                            value={data.va_aided_le_n}
-                                            onChange={(e) => setData("va_aided_le_n", e.target.value)}
+                                            value={data.rf_aided_n_le}
+                                            onChange={(e) => setData("rf_aided_n_le", e.target.value)}
                                             className="w-full"
                                         />
                                     </div>
@@ -331,15 +332,15 @@ export default function Create({ customers = [] }) {
                                     <div className="py-2">VA Test Type Used</div>
                                     <div>
                                         <Input
-                                            value={data.va_test_used_re}
-                                            onChange={(e) => setData("va_test_used_re", e.target.value)}
+                                            value={data.rf_test_type_used_re}
+                                            onChange={(e) => setData("rf_test_type_used_re", e.target.value)}
                                             className="w-full"
                                         />
                                     </div>
                                     <div>
                                         <Input
-                                            value={data.va_test_used_le}
-                                            onChange={(e) => setData("va_test_used_le", e.target.value)}
+                                            value={data.rf_test_type_used_le}
+                                            onChange={(e) => setData("rf_test_type_used_le", e.target.value)}
                                             className="w-full"
                                         />
                                     </div>
@@ -358,24 +359,6 @@ export default function Create({ customers = [] }) {
                                         <Input
                                             value={data.rf_lensometer_le}
                                             onChange={(e) => setData("rf_lensometer_le", e.target.value)}
-                                            className="w-full"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-3 gap-2 mb-3">
-                                    <div className="py-2">Keratometry</div>
-                                    <div>
-                                        <Input
-                                            value={data.keratometry_re}
-                                            onChange={(e) => setData("keratometry_re", e.target.value)}
-                                            className="w-full"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Input
-                                            value={data.keratometry_le}
-                                            onChange={(e) => setData("keratometry_le", e.target.value)}
                                             className="w-full"
                                         />
                                     </div>
@@ -603,57 +586,41 @@ export default function Create({ customers = [] }) {
                                     {/* Tropia row */}
                                     <div className="grid grid-cols-3 mb-3">
                                         <div className="py-2">Tropia</div>
-                                        <div className="col-span-2 p-2 grid grid-cols-2">
-                                            <div className="flex items-center justify-center">
-                                                <input
-                                                    type="radio"
-                                                    id="tropia-yes"
-                                                    name="tropia"
-                                                    className="mr-2"
-                                                    checked={data.tropia === 1}
-                                                    onChange={() => setData("tropia", 1)}
-                                                />
-                                                <label htmlFor="tropia-yes">Yes</label>
-                                            </div>
-                                            <div className="flex items-center justify-center">
-                                                <input
-                                                    type="radio"
-                                                    id="tropia-no"
-                                                    name="tropia"
-                                                    className="mr-2"
-                                                    checked={data.tropia === 0}
-                                                    onChange={() => setData("tropia", 0)}
-                                                />
-                                                <label htmlFor="tropia-no">No</label>
-                                            </div>
+                                        <div className="col-span-2 p-2">
+                                            <RadioGroup
+                                                value={data.tropia.toString()}
+                                                onValueChange={(value) => setData("tropia", parseInt(value))}
+                                                className="flex justify-center gap-4"
+                                            >
+                                                <div className="flex items-center space-x-2">
+                                                    <RadioGroupItem value="1" id="tropia-yes" />
+                                                    <Label htmlFor="tropia-yes">Yes</Label>
+                                                </div>
+                                                <div className="flex items-center space-x-2">
+                                                    <RadioGroupItem value="0" id="tropia-no" />
+                                                    <Label htmlFor="tropia-no">No</Label>
+                                                </div>
+                                            </RadioGroup>
                                         </div>
                                     </div>
                                     {/* Phoria row */}
                                     <div className="grid grid-cols-3 mb-3">
                                         <div className="py-2">Phoria</div>
-                                        <div className="col-span-2 p-2 grid grid-cols-2">
-                                            <div className="flex items-center justify-center">
-                                                <input
-                                                    type="radio"
-                                                    id="phoria-yes"
-                                                    name="phoria"
-                                                    className="mr-2"
-                                                    checked={data.phoria === 1}
-                                                    onChange={() => setData("phoria", 1)}
-                                                />
-                                                <label htmlFor="phoria-yes">Yes</label>
-                                            </div>
-                                            <div className="flex items-center justify-center">
-                                                <input
-                                                    type="radio"
-                                                    id="phoria-no"
-                                                    name="phoria"
-                                                    className="mr-2"
-                                                    checked={data.phoria === 0}
-                                                    onChange={() => setData("phoria", 0)}
-                                                />
-                                                <label htmlFor="phoria-no">No</label>
-                                            </div>
+                                        <div className="col-span-2 p-2">
+                                            <RadioGroup
+                                                value={data.phoria.toString()}
+                                                onValueChange={(value) => setData("phoria", parseInt(value))}
+                                                className="flex justify-center gap-4"
+                                            >
+                                                <div className="flex items-center space-x-2">
+                                                    <RadioGroupItem value="1" id="phoria-yes" />
+                                                    <Label htmlFor="phoria-yes">Yes</Label>
+                                                </div>
+                                                <div className="flex items-center space-x-2">
+                                                    <RadioGroupItem value="0" id="phoria-no" />
+                                                    <Label htmlFor="phoria-no">No</Label>
+                                                </div>
+                                            </RadioGroup>
                                         </div>
                                     </div>
                                 </div>
