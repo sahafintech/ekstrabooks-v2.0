@@ -20,7 +20,9 @@ return new class extends Migration
             $table->foreignId('project_manager_id')->constrained('employees')->nullable();
             $table->date('start_date')->nullable();
             $table->date('end_date')->nullable();
-            $table->enum('status', ['Planning', 'In Progress', 'Completed']);
+            $table->enum('status', ['Planning', 'In Progress', 'Completed', 'On Hold', 'Cancelled', 'Archived']);
+            $table->enum('priority', ['Low', 'Medium', 'High', 'Critical']);
+            $table->date('completion_date')->nullable();
             $table->string('project_currency')->nullable();
             $table->text('description')->nullable();
             $table->foreignId('business_id')->constrained('business');

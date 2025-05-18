@@ -474,8 +474,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('bulk_destroy_cost_codes', [CostCodeController::class, 'bulk_destroy'])->name('cost_codes.bulk_destroy');
 
 		Route::resource('projects', ProjectController::class);
-		
+			
 		Route::resource('project_groups', ProjectGroupController::class);
+		Route::post('import_project_groups', [ProjectGroupController::class, 'import_project_groups'])->name('project_groups.import');
+		Route::get('export_project_groups', [ProjectGroupController::class, 'export_project_groups'])->name('project_groups.export');
+		Route::post('bulk_destroy_project_groups', [ProjectGroupController::class, 'bulk_destroy'])->name('project_groups.bulk_destroy');
 		
 		//Staff Controller
 		Route::post('staffs/bulk_destroy', [StaffController::class, 'bulk_destroy'])->name('staffs.bulk_destroy');

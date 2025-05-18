@@ -341,7 +341,8 @@ export function UserSidebar({ ...props }) {
             icon: Building,
             isActive:
                 url.startsWith(projectsBase) ||
-                url.startsWith(costCodesBase),
+                url.startsWith(costCodesBase) ||
+                url.startsWith(projectGroupsBase),
             items: [
                 {
                     title: "Projects",

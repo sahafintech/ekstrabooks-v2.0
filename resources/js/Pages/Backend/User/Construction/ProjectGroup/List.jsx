@@ -34,11 +34,11 @@ import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 
 // Delete Confirmation Modal Component
-const DeleteCostCodeModal = ({ show, onClose, onConfirm, processing }) => (
+const DeleteProjectGroupModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to delete this cost code?
+        Are you sure you want to delete this project group?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -62,11 +62,11 @@ const DeleteCostCodeModal = ({ show, onClose, onConfirm, processing }) => (
 );
 
 // Bulk Delete Confirmation Modal Component
-const DeleteAllCostCodesModal = ({ show, onClose, onConfirm, processing, count }) => (
+const DeleteAllProjectGroupsModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to delete {count} selected cost code{count !== 1 ? 's' : ''}?
+        Are you sure you want to delete {count} selected project group{count !== 1 ? 's' : ''}?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -89,26 +89,26 @@ const DeleteAllCostCodesModal = ({ show, onClose, onConfirm, processing, count }
   </Modal>
 );
 
-// Import Cost Codes Modal Component
-const ImportCostCodesModal = ({ show, onClose, onSubmit, processing }) => (
+// Import Project Groups Modal Component
+const ImportProjectGroupsModal = ({ show, onClose, onSubmit, processing }) => (
   <Modal show={show} onClose={onClose} maxWidth="3xl">
     <form onSubmit={onSubmit}>
       <div className="ti-modal-header">
-        <h3 className="text-lg font-bold">Import Cost Codes</h3>
+        <h3 className="text-lg font-bold">Import Project Groups</h3>
       </div>
       <div className="ti-modal-body grid grid-cols-12">
         <div className="col-span-12">
           <div className="flex items-center justify-between">
             <label className="block font-medium text-sm text-gray-700">
-              Cost Codes File
+              Project Groups File
             </label>
-            <a href="/uploads/media/default/sample_cost_codes.xlsx" download>
+            <a href="/uploads/media/default/sample_project_groups.xlsx" download>
               <Button variant="secondary" size="sm" type="button">
                 Use This Sample File
               </Button>
             </a>
           </div>
-          <input type="file" className="w-full dropify" name="cost_codes_file" required />
+          <input type="file" className="w-full dropify" name="project_groups_file" required />
         </div>
         <div className="col-span-12 mt-4">
           <ul className="space-y-3 text-sm">
@@ -153,10 +153,10 @@ const ImportCostCodesModal = ({ show, onClose, onSubmit, processing }) => (
   </Modal>
 );
 
-export default function List({ cost_codes = [], meta = {}, filters = {} }) {
+export default function List({ project_groups = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
-  const [selectedCostCodes, setSelectedCostCodes] = useState([]);
+  const [selectedProjectGroups, setSelectedProjectGroups] = useState([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
   const [perPage, setPerPage] = useState(meta.per_page || 50);
@@ -168,7 +168,7 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
-  const [costCodeToDelete, setCostCodeToDelete] = useState(null);
+  const [projectGroupToDelete, setProjectGroupToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
@@ -190,20 +190,20 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
 
   const toggleSelectAll = () => {
     if (isAllSelected) {
-      setSelectedCostCodes([]);
+      setSelectedProjectGroups([]);
     } else {
-      setSelectedCostCodes(cost_codes.map((cost_code) => cost_code.id));
+      setSelectedProjectGroups(project_groups.map((project_group) => project_group.id));
     }
     setIsAllSelected(!isAllSelected);
   };
 
-  const toggleSelectCostCode = (id) => {
-    if (selectedCostCodes.includes(id)) {
-      setSelectedCostCodes(selectedCostCodes.filter((costCodeId) => costCodeId !== id));
+  const toggleSelectProjectGroup = (id) => {
+    if (selectedProjectGroups.includes(id)) {
+      setSelectedProjectGroups(selectedProjectGroups.filter((projectGroupId) => projectGroupId !== id));
       setIsAllSelected(false);
     } else {
-      setSelectedCostCodes([...selectedCostCodes, id]);
-      if (selectedCostCodes.length + 1 === cost_codes.length) {
+      setSelectedProjectGroups([...selectedProjectGroups, id]);
+      if (selectedProjectGroups.length + 1 === project_groups.length) {
         setIsAllSelected(true);
       }
     }
@@ -215,7 +215,7 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
     setSearch(value);
 
     router.get(
-      route("cost_codes.index"),
+      route("project_groups.index"),
       { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
@@ -224,7 +224,7 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
   const handlePerPageChange = (value) => {
     setPerPage(value);
     router.get(
-      route("cost_codes.index"),
+      route("project_groups.index"),
       { search, page: 1, per_page: value },
       { preserveState: true }
     );
@@ -233,7 +233,7 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
   const handlePageChange = (page) => {
     setCurrentPage(page);
     router.get(
-      route("cost_codes.index"),
+      route("project_groups.index"),
       { search, page, per_page: perPage },
       { preserveState: true }
     );
@@ -242,11 +242,11 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
   const handleBulkAction = () => {
     if (bulkAction === "") return;
 
-    if (selectedCostCodes.length === 0) {
+    if (selectedProjectGroups.length === 0) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Please select at least one cost code",
+        description: "Please select at least one project group",
       });
       return;
     }
@@ -257,7 +257,7 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
   };
 
   const handleDeleteConfirm = (id) => {
-    setCostCodeToDelete(id);
+    setProjectGroupToDelete(id);
     setShowDeleteModal(true);
   };
 
@@ -265,10 +265,10 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
     e.preventDefault();
     setProcessing(true);
 
-    router.delete(route('cost_codes.destroy', costCodeToDelete), {
+    router.delete(route('project_groups.destroy', projectGroupToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
-        setCostCodeToDelete(null);
+        setProjectGroupToDelete(null);
         setProcessing(false);
       },
       onError: () => {
@@ -281,14 +281,14 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
     e.preventDefault();
     setProcessing(true);
 
-    router.post(route('cost_codes.bulk_destroy'),
+    router.post(route('project_groups.bulk_destroy'),
       {
-        ids: selectedCostCodes
+        ids: selectedProjectGroups
       },
       {
         onSuccess: () => {
           setShowDeleteAllModal(false);
-          setSelectedCostCodes([]);
+          setSelectedProjectGroups([]);
           setIsAllSelected(false);
           setProcessing(false);
         },
@@ -304,7 +304,7 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
     const formData = new FormData(e.target);
     setProcessing(true);
 
-    router.post(route('cost_codes.import'), formData, {
+    router.post(route('project_groups.import'), formData, {
       onSuccess: () => {
         setShowImportModal(false);
         setProcessing(false);
@@ -322,7 +322,7 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
     }
     setSorting({ column, direction });
     router.get(
-      route("cost_codes.index"),
+      route("project_groups.index"),
       { ...filters, sorting: { column, direction } },
       { preserveState: true }
     );
@@ -372,28 +372,28 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
     return pages;
   };
 
-  const exportCostCodes = () => {
-    window.location.href = route("cost_codes.export")
+  const exportProjectGroups = () => {
+    window.location.href = route("project_groups.export")
   };
 
   return (
     <AuthenticatedLayout>
-      <Head title="Cost Codes" />
+      <Head title="Project Groups" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">
           <PageHeader
-            page="Cost Codes"
+            page="Project Groups"
             subpage="List"
-            url="cost_codes.index"
+            url="project_groups.index"
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div className="flex flex-col md:flex-row gap-4">
-                <Link href={route("cost_codes.create")}>
+                <Link href={route("project_groups.create")}>
                   <Button>
                     <Plus className="w-4 h-4 mr-2" />
-                    Add Cost Code
+                    Add Project Group
                   </Button>
                 </Link>
                 <DropdownMenu>
@@ -406,7 +406,7 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
                     <DropdownMenuItem onClick={() => setShowImportModal(true)}>
                       <FileUp className="mr-2 h-4 w-4" /> Import
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={exportCostCodes}>
+                    <DropdownMenuItem onClick={exportProjectGroups}>
                       <FileDown className="mr-2 h-4 w-4" /> Export
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -414,7 +414,7 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input
-                  placeholder="search cost codes..."
+                  placeholder="search project groups..."
                   value={search}
                   onChange={(e) => handleSearch(e)}
                   className="w-full md:w-80"
@@ -466,8 +466,8 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
                     <TableHead className="cursor-pointer" onClick={() => handleSort("id")}>
                       ID {renderSortIcon("id")}
                     </TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("code")}>
-                      Code {renderSortIcon("code")}
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("group_name")}>
+                      Name {renderSortIcon("group_name")}
                     </TableHead>
                     <TableHead className="cursor-pointer" onClick={() => handleSort("description")}>
                       Description {renderSortIcon("description")}
@@ -476,30 +476,30 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {cost_codes.length > 0 ? (
-                    cost_codes.map((cost_code) => (
-                      <TableRow key={cost_code.id}>
+                  {project_groups.length > 0 ? (
+                    project_groups.map((project_group) => (
+                      <TableRow key={project_group.id}>
                         <TableCell>
                           <Checkbox
-                            checked={selectedCostCodes.includes(cost_code.id)}
-                            onCheckedChange={() => toggleSelectCostCode(cost_code.id)}
+                            checked={selectedProjectGroups.includes(project_group.id)}
+                            onCheckedChange={() => toggleSelectProjectGroup(project_group.id)}
                           />
                         </TableCell>
-                        <TableCell>{cost_code.id}</TableCell>
-                        <TableCell>{cost_code.code}</TableCell>
-                        <TableCell>{cost_code.description || "-"}</TableCell>
+                        <TableCell>{project_group.id}</TableCell>
+                        <TableCell>{project_group.group_name}</TableCell>
+                        <TableCell>{project_group.description || "-"}</TableCell>
                         <TableCell className="text-right">
                           <TableActions
                             actions={[
                               {
                                 label: "Edit",
                                 icon: <Edit className="h-4 w-4" />,
-                                href: route("cost_codes.edit", cost_code.id),
+                                href: route("project_groups.edit", project_group.id),
                               },
                               {
                                 label: "Delete",
                                 icon: <Trash className="h-4 w-4" />,
-                                onClick: () => handleDeleteConfirm(cost_code.id),
+                                onClick: () => handleDeleteConfirm(project_group.id),
                                 destructive: true,
                               },
                             ]}
@@ -510,7 +510,7 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={5} className="h-24 text-center">
-                        No cost codes found.
+                        No project groups found.
                       </TableCell>
                     </TableRow>
                   )}
@@ -518,7 +518,7 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
               </Table>
             </div>
 
-            {cost_codes.length > 0 && meta.total > 0 && (
+            {project_groups.length > 0 && meta.total > 0 && (
               <div className="flex items-center justify-between mt-4">
                 <div className="text-sm text-gray-500">
                   Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, meta.total)} of {meta.total} entries
@@ -564,22 +564,22 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
         </div>
       </SidebarInset>
 
-      <DeleteCostCodeModal
+      <DeleteProjectGroupModal
         show={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleDelete}
         processing={processing}
       />
 
-      <DeleteAllCostCodesModal
+      <DeleteAllProjectGroupsModal
         show={showDeleteAllModal}
         onClose={() => setShowDeleteAllModal(false)}
         onConfirm={handleDeleteAll}
         processing={processing}
-        count={selectedCostCodes.length}
+        count={selectedProjectGroups.length}
       />
 
-      <ImportCostCodesModal
+      <ImportProjectGroupsModal
         show={showImportModal}
         onClose={() => setShowImportModal(false)}
         onSubmit={handleImport}
