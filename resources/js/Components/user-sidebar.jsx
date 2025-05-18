@@ -7,7 +7,8 @@ import {
     Package,
     GroupIcon,
     ChartPieIcon,
-    Building2Icon
+    Building2Icon,
+    Building
 } from "lucide-react";
 
 import { usePage } from "@inertiajs/react";
@@ -71,6 +72,11 @@ export function UserSidebar({ ...props }) {
     const leavesBase = "/user/leaves";
     const awardsBase = "/user/awards";
 
+    // Construction
+    const projectsBase = "/user/projects";
+    const costCodesBase = "/user/cost_codes";
+    const projectGroupsBase = "/user/project_groups";
+
     // Accounting
     const accountsBase = "/user/accounts";
     const journalsBase = "/user/journals";
@@ -103,8 +109,8 @@ export function UserSidebar({ ...props }) {
             id: auth.user.id,
             name: auth.user.name,
             email: auth.user.email,
-            avatar: '/uploads/media/' + auth.user.profile_picture,
-        }
+            avatar: "/uploads/media/" + auth.user.profile_picture,
+        },
     };
 
     // ——————————————————————————————————
@@ -326,6 +332,31 @@ export function UserSidebar({ ...props }) {
                     title: "Awards",
                     url: route("awards.index"),
                     isActive: url.startsWith(awardsBase),
+                },
+            ],
+        },
+        {
+            title: "Construction",
+            url: "#",
+            icon: Building,
+            isActive:
+                url.startsWith(projectsBase) ||
+                url.startsWith(costCodesBase),
+            items: [
+                {
+                    title: "Projects",
+                    url: route("projects.index"),
+                    isActive: url.startsWith(projectsBase),
+                },
+                {
+                    title: "Project Groups",
+                    url: route("project_groups.index"),
+                    isActive: url.startsWith(projectGroupsBase),
+                },
+                {
+                    title: "Cost Codes",
+                    url: route("cost_codes.index"),
+                    isActive: url.startsWith(costCodesBase),
                 },
             ],
         },

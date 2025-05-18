@@ -13,7 +13,6 @@ use App\Http\Controllers\EmailSubscriberController;
 use App\Http\Controllers\FaqController;
 use App\Http\Controllers\FeatureController;
 use App\Http\Controllers\HoldPosInvoiceController;
-use App\Http\Controllers\User\ImportController;
 use App\Http\Controllers\User\InventoryAdjustmentController;
 use App\Http\Controllers\InsuranceBenefitController;
 use App\Http\Controllers\InsuranceFamilySizeController;
@@ -29,6 +28,8 @@ use App\Http\Controllers\PaymentGatewayController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\PrescriptionController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectGroupController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\PurchaseReturnController;
 use App\Http\Controllers\ReceivePaymentsController;
@@ -44,6 +45,7 @@ use App\Http\Controllers\User\AwardController;
 use App\Http\Controllers\User\BusinessController;
 use App\Http\Controllers\User\BusinessSettingsController;
 use App\Http\Controllers\User\CashPurchaseController;
+use App\Http\Controllers\CostCodeController;
 use App\Http\Controllers\User\CustomerController;
 use App\Http\Controllers\User\CustomerDocumentController;
 use App\Http\Controllers\User\DepartmentController;
@@ -465,6 +467,16 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		// Route::resource('salary_scales', SalaryScaleController::class);
 		// Route::resource('benefits', BenefitController::class);
 
+		// construction
+		Route::resource('cost_codes', CostCodeController::class);
+		Route::post('import_cost_codes', [CostCodeController::class, 'import_cost_codes'])->name('cost_codes.import');
+		Route::get('export_cost_codes', [CostCodeController::class, 'export_cost_codes'])->name('cost_codes.export');
+		Route::post('bulk_destroy_cost_codes', [CostCodeController::class, 'bulk_destroy'])->name('cost_codes.bulk_destroy');
+
+		Route::resource('projects', ProjectController::class);
+		
+		Route::resource('project_groups', ProjectGroupController::class);
+		
 		//Staff Controller
 		Route::post('staffs/bulk_destroy', [StaffController::class, 'bulk_destroy'])->name('staffs.bulk_destroy');
 		Route::resource('staffs', StaffController::class);

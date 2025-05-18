@@ -3,15 +3,6 @@ import { Head, useForm } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
-import { toast } from "sonner";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/Components/ui/table";
 import PageHeader from "@/Components/PageHeader";
 import { format } from "date-fns";
 import { formatCurrency, parseDateObject } from "@/lib/utils";
@@ -89,9 +80,6 @@ export default function BalanceSheet({ report_data, date2, business_name }) {
             date2: data.date2,
             preserveScroll: true,
             preserveState: true,
-            onSuccess: () => {
-                toast.success("Report Generated successfully");
-            },
         });
     };
 
@@ -361,14 +349,14 @@ ${`
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2 print-buttons mt-6">
+                        <div className="flex items-center gap-2 print-buttons">
                             <Button variant="outline" onClick={handlePrint}>
                                 Print
                             </Button>
                             <Button variant="outline" onClick={handleExport}>Export</Button>
                         </div>
 
-                        <div className="rounded-md border printable-table mt-4 p-4">
+                        <div className="rounded-md border printable-table p-4 mt-4 w-full md:w-[210mm] min-h-[297mm] mx-auto bg-white">
                             {/* Simple 2-column grid layout */}
                             <div className="text-center p-4">
                                 <h1 className="text-lg">{business_name}</h1>
@@ -378,7 +366,7 @@ ${`
                                     <span>{format(new Date(data.date2), "dd/MM/yyyy")}</span>
                                 </h2>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="grid grid-cols-1 md:grid-cols-1 gap-8">
                                 {/* Left Column - All Assets */}
                                 <div>
                                     {/* FIXED ASSETS */}
