@@ -8,21 +8,31 @@ import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { Input } from "@/Components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/Components/ui/popover";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/Components/ui/popover";
 import { CalendarIcon, Plus, Trash2 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { Calendar } from "@/Components/ui/calendar";
 import { Textarea } from "@/Components/ui/textarea";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { format } from "date-fns";
+import DateTimePicker from "@/Components/DateTimePicker";
 
-export default function Edit({ payroll, employee_benefits, accounts, decimalPlace }) {
+export default function Edit({
+    payroll,
+    employee_benefits,
+    accounts,
+    decimalPlace,
+}) {
     const { data, setData, post, processing, errors, reset } = useForm({
-        advance: payroll.advance || 0,
-        advance_description: payroll.advance_description || '',
+        advance: payroll.advance || "",
+        advance_description: payroll.advance_description || "",
         deductions: [],
         allowances: [],
-        _method: 'PUT',
+        _method: "PUT",
     });
 
     const [allowanceItems, setAllowanceItems] = useState([]);
@@ -33,9 +43,9 @@ export default function Edit({ payroll, employee_benefits, accounts, decimalPlac
         const newItem = {
             date: "",
             description: "",
-            amount: 0
+            amount: 0,
         };
-        
+
         const updatedItems = [...allowanceItems, newItem];
         setAllowanceItems(updatedItems);
         setData("allowances", updatedItems);
@@ -46,9 +56,9 @@ export default function Edit({ payroll, employee_benefits, accounts, decimalPlac
             date: "",
             description: "",
             amount: 0,
-            account_id: ""
+            account_id: "",
         };
-        
+
         const updatedItems = [...deductionItems, newItem];
         setDeductionItems(updatedItems);
         setData("deductions", updatedItems);
@@ -78,70 +88,102 @@ export default function Edit({ payroll, employee_benefits, accounts, decimalPlac
     };
 
     useEffect(() => {
-        const allowances = employee_benefits?.salary_benefits?.filter(benefit => benefit.type === 'add') ?? [];
-        const deductions = employee_benefits?.salary_benefits?.filter(benefit => benefit.type === 'deduct') ?? [];
+        const allowances =
+            employee_benefits?.salary_benefits?.filter(
+                (benefit) => benefit.type === "add"
+            ) ?? [];
+        const deductions =
+            employee_benefits?.salary_benefits?.filter(
+                (benefit) => benefit.type === "deduct"
+            ) ?? [];
 
-        const formattedAllowances = allowances.map(allowance => ({
+        const formattedAllowances = allowances.map((allowance) => ({
             date: allowance.date,
             description: allowance.description,
             amount: parseFloat(allowance.amount) || 0,
             account_id: allowance.account_id,
         }));
-        
-        const formattedDeductions = deductions.map(deduction => ({
+
+        const formattedDeductions = deductions.map((deduction) => ({
             date: deduction.date,
             description: deduction.description,
             amount: parseFloat(deduction.amount) || 0,
             account_id: deduction.account_id,
         }));
-        
-        setAllowanceItems(formattedAllowances.length > 0 ? formattedAllowances : [{
-            date: "",
-            description: "",
-            amount: 0
-        }]);
-        
-        setDeductionItems(formattedDeductions.length > 0 ? formattedDeductions : [{
-            date: "",
-            description: "",
-            amount: 0,
-            account_id: ""
-        }]);
-        
-        setData(prev => ({
+
+        setAllowanceItems(
+            formattedAllowances.length > 0
+                ? formattedAllowances
+                : [
+                      {
+                          date: "",
+                          description: "",
+                          amount: 0,
+                      },
+                  ]
+        );
+
+        setDeductionItems(
+            formattedDeductions.length > 0
+                ? formattedDeductions
+                : [
+                      {
+                          date: "",
+                          description: "",
+                          amount: 0,
+                          account_id: "",
+                      },
+                  ]
+        );
+
+        setData((prev) => ({
             ...prev,
             deductions: formattedDeductions,
             allowances: formattedAllowances,
-            advance: payroll.advance || 0,
-            advance_description: payroll.advance_description || ''
+            advance: payroll.advance || "",
+            advance_description: payroll.advance_description || "",
         }));
-        
+
         setNetSalary(payroll.net_salary || 0);
     }, [payroll, employee_benefits]);
 
     useEffect(() => {
         const currentSalary = parseFloat(payroll.current_salary) || 0;
-        
-        const totalAllowances = Array.isArray(data.allowances) 
-            ? data.allowances.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
+
+        const totalAllowances = Array.isArray(data.allowances)
+            ? data.allowances.reduce(
+                  (sum, item) => sum + (parseFloat(item.amount) || 0),
+                  0
+              )
             : 0;
-            
+
         const totalDeductions = Array.isArray(data.deductions)
-            ? data.deductions.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
+            ? data.deductions.reduce(
+                  (sum, item) => sum + (parseFloat(item.amount) || 0),
+                  0
+              )
             : 0;
-            
+
         const advance = parseFloat(data.advance) || 0;
 
-        const calculatedNetSalary = currentSalary + totalAllowances - totalDeductions - advance;
+        const calculatedNetSalary =
+            currentSalary + totalAllowances - totalDeductions - advance;
         setNetSalary(calculatedNetSalary);
-    }, [data.allowances, data.deductions, data.advance, payroll.current_salary]);
+    }, [
+        data.allowances,
+        data.deductions,
+        data.advance,
+        payroll.current_salary,
+    ]);
 
     const updateAllowance = (index, field, value) => {
         const updatedItems = [...allowanceItems];
-        updatedItems[index][field] = value;
-        
+
         if (field === "amount") {
-            updatedItems[index][field] = parseFloat(value) || 0;
+            updatedItems[index][field] =
+                value === "" ? "" : parseFloat(value) || 0;
+        } else {
+            updatedItems[index][field] = value;
         }
 
         setAllowanceItems(updatedItems);
@@ -150,11 +192,11 @@ export default function Edit({ payroll, employee_benefits, accounts, decimalPlac
 
     const updateDeduction = (index, field, value) => {
         const updatedItems = [...deductionItems];
-        
+
         if (field === "amount") {
-            updatedItems[index][field] = parseFloat(value) || 0;
+            updatedItems[index][field] =
+                value === "" ? "" : parseFloat(value) || 0;
         } else {
-            // Simply update the field with the provided value
             updatedItems[index][field] = value;
         }
 
@@ -165,90 +207,131 @@ export default function Edit({ payroll, employee_benefits, accounts, decimalPlac
     return (
         <AuthenticatedLayout>
             <SidebarInset>
-                <PageHeader page="Payrolls" subpage="Edit" url="payslips.index" />
+                <PageHeader
+                    page="Payrolls"
+                    subpage="Edit"
+                    url="payslips.index"
+                />
 
                 <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
                     <div className="flex flex-col gap-1">
-                        <div className="text-sm font-medium text-muted-foreground">Employee Id: <span className="ml-2 text-primary">{payroll?.staff?.employee_id}</span></div>
-                        <div className="text-sm font-medium text-muted-foreground">Employee Name: <span className="ml-2 text-primary">{payroll?.staff?.name}</span></div>
-                        <div className="text-sm font-medium text-muted-foreground">Period: <span className="ml-2 text-primary">{payroll?.month}/{payroll?.year}</span></div>
-                        <div className="text-sm font-medium text-muted-foreground">Basic Salary: <span className="ml-2 text-primary">{formatCurrency({ amount: payroll?.current_salary })}</span></div>
-                        <div className="text-sm font-medium text-muted-foreground">Net Salary: <span className="ml-2 text-primary">{formatCurrency({ amount: netSalary })}</span></div>
+                        <div className="text-sm font-medium text-muted-foreground">
+                            Employee Id:{" "}
+                            <span className="ml-2 text-primary">
+                                {payroll?.staff?.employee_id}
+                            </span>
+                        </div>
+                        <div className="text-sm font-medium text-muted-foreground">
+                            Employee Name:{" "}
+                            <span className="ml-2 text-primary">
+                                {payroll?.staff?.name}
+                            </span>
+                        </div>
+                        <div className="text-sm font-medium text-muted-foreground">
+                            Period:{" "}
+                            <span className="ml-2 text-primary">
+                                {payroll?.month}/{payroll?.year}
+                            </span>
+                        </div>
+                        <div className="text-sm font-medium text-muted-foreground">
+                            Basic Salary:{" "}
+                            <span className="ml-2 text-primary">
+                                {formatCurrency({
+                                    amount: payroll?.current_salary,
+                                })}
+                            </span>
+                        </div>
+                        <div className="text-sm font-medium text-muted-foreground">
+                            Net Salary:{" "}
+                            <span className="ml-2 text-primary">
+                                {formatCurrency({ amount: netSalary })}
+                            </span>
+                        </div>
                     </div>
                     <form onSubmit={submit}>
                         <div className="grid grid-cols-12 mt-2">
-                            <Label htmlFor="advance" className="md:col-span-2 col-span-12">
+                            <Label
+                                htmlFor="advance"
+                                className="md:col-span-2 col-span-12"
+                            >
                                 Advance
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                 <Input
                                     type="number"
-                                    value={Number(data.advance).toFixed(decimalPlace)}
-                                    onChange={(e) => setData("advance", e.target.value)}
+                                    value={data.advance}
+                                    onChange={(e) =>
+                                        setData("advance", e.target.value)
+                                    }
                                     className="md:w-1/2 w-full"
                                 />
-                                <InputError message={errors.advance} className="text-sm" />
+                                <InputError
+                                    message={errors.advance}
+                                    className="text-sm"
+                                />
                             </div>
                         </div>
 
                         <div className="grid grid-cols-12 mt-2">
-                            <Label htmlFor="net_salary" className="md:col-span-2 col-span-12">
+                            <Label
+                                htmlFor="net_salary"
+                                className="md:col-span-2 col-span-12"
+                            >
                                 Advance Description
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                 <Textarea
                                     value={data.advance_description}
-                                    onChange={(e) => setData("advance_description", e.target.value)}
+                                    onChange={(e) =>
+                                        setData(
+                                            "advance_description",
+                                            e.target.value
+                                        )
+                                    }
                                     className="md:w-1/2 w-full"
                                 />
-                                <InputError message={errors.advance_description} className="text-sm" />
+                                <InputError
+                                    message={errors.advance_description}
+                                    className="text-sm"
+                                />
                             </div>
                         </div>
 
                         <div className="space-y-4 mt-5">
                             <div className="flex justify-between items-center">
-                                <h3 className="text-lg font-medium">Allowances</h3>
-                                <Button variant="secondary" type="button" onClick={addAllowance}>
+                                <h3 className="text-lg font-medium">
+                                    Allowances
+                                </h3>
+                                <Button
+                                    variant="secondary"
+                                    type="button"
+                                    onClick={addAllowance}
+                                >
                                     <Plus className="w-4 h-4 mr-2" />
                                     Add Item
                                 </Button>
                             </div>
 
                             {allowanceItems.map((item, index) => (
-                                <div key={index} className="border rounded-lg p-4 space-y-4 bg-gray-50">
+                                <div
+                                    key={index}
+                                    className="border rounded-lg p-4 space-y-4 bg-gray-50"
+                                >
                                     {/* First Row */}
                                     <div className="grid grid-cols-12 gap-2">
                                         <div className="col-span-12 sm:col-span-3">
                                             <Label>Date *</Label>
-                                            <div>
-                                                <Popover>
-                                                    <PopoverTrigger asChild>
-                                                        <Button variant={"outline"}
-                                                            className={cn(
-                                                                "w-full justify-start text-left font-normal",
-                                                                !item.date && "text-muted-foreground"
-                                                            )}
-                                                        >
-                                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                                            {item.date ? (
-                                                                format(new Date(item.date), "PPP")
-                                                            ) : (
-                                                                <span>Pick a date</span>
-                                                            )}
-                                                        </Button>
-                                                    </PopoverTrigger>
-                                                    <PopoverContent className="w-auto p-0" align="start">
-                                                        <Calendar
-                                                            mode="single"
-                                                            selected={item.date ? new Date(item.date) : undefined}
-                                                            onSelect={(date) =>
-                                                                updateAllowance(index, "date", date ? format(date, "yyyy-MM-dd") : "")
-                                                            }
-                                                            initialFocus
-                                                        />
-                                                    </PopoverContent>
-                                                </Popover>
-                                            </div>
+                                            <DateTimePicker
+                                                value={item.date}
+                                                onChange={(date) =>
+                                                    updateAllowance(
+                                                        index,
+                                                        "date",
+                                                        date
+                                                    )
+                                                }
+                                                required
+                                            />
                                         </div>
 
                                         <div className="col-span-12 sm:col-span-4">
@@ -256,7 +339,13 @@ export default function Edit({ payroll, employee_benefits, accounts, decimalPlac
                                             <Textarea
                                                 className="w-full"
                                                 value={item.description}
-                                                onChange={(e) => updateAllowance(index, "description", e.target.value)}
+                                                onChange={(e) =>
+                                                    updateAllowance(
+                                                        index,
+                                                        "description",
+                                                        e.target.value
+                                                    )
+                                                }
                                             />
                                         </div>
 
@@ -266,7 +355,13 @@ export default function Edit({ payroll, employee_benefits, accounts, decimalPlac
                                                 type="number"
                                                 step="0.01"
                                                 value={item.amount}
-                                                onChange={(e) => updateAllowance(index, "amount", parseFloat(e.target.value))}
+                                                onChange={(e) =>
+                                                    updateAllowance(
+                                                        index,
+                                                        "amount",
+                                                        e.target.value
+                                                    )
+                                                }
                                             />
                                         </div>
 
@@ -277,7 +372,11 @@ export default function Edit({ payroll, employee_benefits, accounts, decimalPlac
                                                     variant="ghost"
                                                     size="icon"
                                                     className="text-red-500"
-                                                    onClick={() => removeAllowanceItem(index)}
+                                                    onClick={() =>
+                                                        removeAllowanceItem(
+                                                            index
+                                                        )
+                                                    }
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </Button>
@@ -290,48 +389,39 @@ export default function Edit({ payroll, employee_benefits, accounts, decimalPlac
 
                         <div className="space-y-4 mt-5">
                             <div className="flex justify-between items-center">
-                                <h3 className="text-lg font-medium">Deductions</h3>
-                                <Button variant="secondary" type="button" onClick={addDeduction}>
+                                <h3 className="text-lg font-medium">
+                                    Deductions
+                                </h3>
+                                <Button
+                                    variant="secondary"
+                                    type="button"
+                                    onClick={addDeduction}
+                                >
                                     <Plus className="w-4 h-4 mr-2" />
                                     Add Item
                                 </Button>
                             </div>
 
                             {deductionItems.map((item, index) => (
-                                <div key={index} className="border rounded-lg p-4 space-y-4 bg-gray-50">
+                                <div
+                                    key={index}
+                                    className="border rounded-lg p-4 space-y-4 bg-gray-50"
+                                >
                                     {/* First Row */}
                                     <div className="grid grid-cols-12 gap-2">
                                         <div className="col-span-12 sm:col-span-2">
                                             <Label>Date *</Label>
-                                            <div>
-                                                <Popover>
-                                                    <PopoverTrigger asChild>
-                                                        <Button variant={"outline"}
-                                                            className={cn(
-                                                                "w-full justify-start text-left font-normal",
-                                                                !item.date && "text-muted-foreground"
-                                                            )}
-                                                        >
-                                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                                            {item.date ? (
-                                                                format(new Date(item.date), "PPP")
-                                                            ) : (
-                                                                <span>Pick a date</span>
-                                                            )}
-                                                        </Button>
-                                                    </PopoverTrigger>
-                                                    <PopoverContent className="w-auto p-0" align="start">
-                                                        <Calendar
-                                                            mode="single"
-                                                            selected={item.date ? new Date(item.date) : undefined}
-                                                            onSelect={(date) =>
-                                                                updateDeduction(index, "date", date ? format(date, "yyyy-MM-dd") : "")
-                                                            }
-                                                            initialFocus
-                                                        />
-                                                    </PopoverContent>
-                                                </Popover>
-                                            </div>
+                                            <DateTimePicker
+                                                value={item.date}
+                                                onChange={(date) =>
+                                                    updateDeduction(
+                                                        index,
+                                                        "date",
+                                                        date
+                                                    )
+                                                }
+                                                required
+                                            />
                                         </div>
 
                                         <div className="col-span-12 sm:col-span-3">
@@ -339,7 +429,13 @@ export default function Edit({ payroll, employee_benefits, accounts, decimalPlac
                                             <Textarea
                                                 className="w-full"
                                                 value={item.description}
-                                                onChange={(e) => updateDeduction(index, "description", e.target.value)}
+                                                onChange={(e) =>
+                                                    updateDeduction(
+                                                        index,
+                                                        "description",
+                                                        e.target.value
+                                                    )
+                                                }
                                             />
                                         </div>
 
@@ -349,7 +445,13 @@ export default function Edit({ payroll, employee_benefits, accounts, decimalPlac
                                                 type="number"
                                                 step="0.01"
                                                 value={item.amount}
-                                                onChange={(e) => updateDeduction(index, "amount", parseFloat(e.target.value))}
+                                                onChange={(e) =>
+                                                    updateDeduction(
+                                                        index,
+                                                        "amount",
+                                                        e.target.value
+                                                    )
+                                                }
                                             />
                                         </div>
 
@@ -357,12 +459,20 @@ export default function Edit({ payroll, employee_benefits, accounts, decimalPlac
                                         <div className="col-span-12 sm:col-span-3">
                                             <Label>Account *</Label>
                                             <SearchableCombobox
-                                                options={accounts.map(account => ({
-                                                    id: account.id,
-                                                    name: account.account_name
-                                                }))}
+                                                options={accounts.map(
+                                                    (account) => ({
+                                                        id: account.id,
+                                                        name: account.account_name,
+                                                    })
+                                                )}
                                                 value={item.account_id}
-                                                onChange={(value) => updateDeduction(index, "account_id", value)}
+                                                onChange={(value) =>
+                                                    updateDeduction(
+                                                        index,
+                                                        "account_id",
+                                                        value
+                                                    )
+                                                }
                                                 placeholder="Select Account"
                                             />
                                         </div>
@@ -374,7 +484,11 @@ export default function Edit({ payroll, employee_benefits, accounts, decimalPlac
                                                     variant="ghost"
                                                     size="icon"
                                                     className="text-red-500"
-                                                    onClick={() => removeDeductionItem(index)}
+                                                    onClick={() =>
+                                                        removeDeductionItem(
+                                                            index
+                                                        )
+                                                    }
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </Button>
@@ -385,7 +499,11 @@ export default function Edit({ payroll, employee_benefits, accounts, decimalPlac
                             ))}
                         </div>
 
-                        <Button type="submit" disabled={processing} className="mt-4">
+                        <Button
+                            type="submit"
+                            disabled={processing}
+                            className="mt-4"
+                        >
                             {processing ? "Updating..." : "Update Payroll"}
                         </Button>
                     </form>

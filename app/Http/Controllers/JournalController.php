@@ -50,6 +50,31 @@ class JournalController extends Controller
 
         $query->orderBy($sortColumn, $sortDirection);
 
+        // Get summary statistics for all journals matching filters
+        $allJournals = Journal::query()
+            ->where('business_id', request()->activeBusiness->id);
+
+        if (!empty($search)) {
+            $allJournals->where(function ($q) use ($search) {
+                $q->where('journal_number', 'like', "%$search%")
+                    ->orWhere('transaction_amount', 'like', "%$search%");
+            });
+        }
+
+        if ($status) {
+            $allJournals->where('status', $status);
+        }
+
+        $allJournals = $allJournals->get();
+
+        $summary = [
+            'total_journals' => $allJournals->count(),
+            'total_approved' => $allJournals->where('status', 1)->count(),
+            'total_pending' => $allJournals->where('status', 0)->count(),
+            'total_rejected' => $allJournals->where('status', 2)->count(),
+            'total_amount' => $allJournals->sum('base_currency_amount'),
+        ];
+
         $journals = $query->paginate($perPage);
 
         return Inertia::render('Backend/User/Journal/List', [
@@ -66,7 +91,8 @@ class JournalController extends Controller
                 'search' => $search,
                 'sorting' => $sorting,
                 'status' => $status
-            ]
+            ],
+            'summary' => $summary
         ]);
     }
 

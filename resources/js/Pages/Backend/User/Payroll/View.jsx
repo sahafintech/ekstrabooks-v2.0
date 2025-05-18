@@ -4,16 +4,18 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import PageHeader from "@/Components/PageHeader";
 import { Button } from "@/Components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/Components/ui/card";
 import { Separator } from "@/Components/ui/separator";
 import { formatCurrency } from "@/lib/utils";
-import { format } from "date-fns";
 import { Download, Edit, Printer } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/Components/ui/table";
 import { Badge } from "@/Components/ui/badge";
+import { toast } from "sonner";
 
 export default function View({ payroll, working_days, absence, allowances, deductions, advance }) {
-    const [isPrinting, setIsPrinting] = useState(false);
+    const [isLoading, setIsLoading] = useState({
+        print: false,
+        pdf: false
+    });
 
     const calculateTotalAllowances = () => {
         if (!allowances || !Array.isArray(allowances)) return 0;
@@ -35,194 +37,68 @@ export default function View({ payroll, working_days, absence, allowances, deduc
     };
 
     const handlePrint = () => {
-        setIsPrinting(true);
-        const printWindow = window.open('', '_blank');
-        
-        // Create print content
-        printWindow.document.write(`
-            <html>
-                <head>
-                    <title>Payslip: ${payroll?.staff?.name} - ${payroll?.month}/${payroll?.year}</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-                        .header { text-align: center; margin-bottom: 20px; }
-                        .payslip-title { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
-                        .payslip-period { font-size: 14px; margin-bottom: 20px; }
-                        .company-name { font-size: 18px; font-weight: bold; }
-                        .section { margin-bottom: 20px; }
-                        .section-title { font-size: 16px; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px; }
-                        .employee-info { display: flex; justify-content: space-between; margin-bottom: 20px; }
-                        .info-group { margin-bottom: 15px; }
-                        .info-label { font-weight: bold; font-size: 12px; color: #666; }
-                        .info-value { font-size: 14px; }
-                        table { width: 100%; border-collapse: collapse; }
-                        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
-                        th { background-color: #f5f5f5; }
-                        .amount { text-align: right; }
-                        .total-row { font-weight: bold; }
-                        .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #666; }
-                        .signature-section { margin-top: 50px; display: flex; justify-content: space-between; }
-                        .signature-box { width: 45%; text-align: center; }
-                        .signature-line { border-top: 1px solid #000; margin-top: 50px; }
-                    </style>
-                </head>
-                <body>
-                    <div class="header">
-                        <div class="company-name">Company Name</div>
-                        <div class="payslip-title">PAYSLIP</div>
-                        <div class="payslip-period">For the period: ${payroll?.month}/${payroll?.year}</div>
-                    </div>
-                    
-                    <div class="employee-info">
-                        <div>
-                            <div class="info-group">
-                                <div class="info-label">Employee ID</div>
-                                <div class="info-value">${payroll?.staff?.employee_id || ''}</div>
-                            </div>
-                            <div class="info-group">
-                                <div class="info-label">Employee Name</div>
-                                <div class="info-value">${payroll?.staff?.name || ''}</div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="info-group">
-                                <div class="info-label">Department</div>
-                                <div class="info-value">${payroll?.staff?.department || ''}</div>
-                            </div>
-                            <div class="info-group">
-                                <div class="info-label">Designation</div>
-                                <div class="info-value">${payroll?.staff?.designation || ''}</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="section">
-                        <div class="section-title">Earnings</div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Description</th>
-                                    <th class="amount">Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Basic Salary</td>
-                                    <td class="amount">${formatCurrency({ amount: payroll?.current_salary || 0 })}</td>
-                                </tr>
-                                ${allowances?.map(item => `
-                                <tr>
-                                    <td>${item.description || ''}</td>
-                                    <td class="amount">${formatCurrency({ amount: item.amount || 0 })}</td>
-                                </tr>
-                                `).join('') || ''}
-                                <tr class="total-row">
-                                    <td>Total Earnings</td>
-                                    <td class="amount">${formatCurrency({ amount: parseFloat(payroll?.current_salary || 0) + calculateTotalAllowances() })}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <div class="section">
-                        <div class="section-title">Deductions</div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Description</th>
-                                    <th class="amount">Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${deductions?.map(item => `
-                                <tr>
-                                    <td>${item.description || ''}</td>
-                                    <td class="amount">${formatCurrency({ amount: item.amount || 0 })}</td>
-                                </tr>
-                                `).join('') || ''}
-                                ${advance > 0 ? `
-                                <tr>
-                                    <td>Advance</td>
-                                    <td class="amount">${formatCurrency({ amount: advance || 0 })}</td>
-                                </tr>
-                                ` : ''}
-                                <tr class="total-row">
-                                    <td>Total Deductions</td>
-                                    <td class="amount">${formatCurrency({ amount: calculateTotalDeductions() + parseFloat(advance || 0) })}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <div class="section">
-                        <div class="section-title">Summary</div>
-                        <table>
-                            <tbody>
-                                <tr>
-                                    <td>Total Earnings</td>
-                                    <td class="amount">${formatCurrency({ amount: parseFloat(payroll?.current_salary || 0) + calculateTotalAllowances() })}</td>
-                                </tr>
-                                <tr>
-                                    <td>Total Deductions</td>
-                                    <td class="amount">${formatCurrency({ amount: calculateTotalDeductions() + parseFloat(advance || 0) })}</td>
-                                </tr>
-                                <tr class="total-row">
-                                    <td>Net Salary</td>
-                                    <td class="amount">${formatCurrency({ amount: calculateNetSalary() })}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <div class="section">
-                        <div class="section-title">Attendance Summary</div>
-                        <table>
-                            <tbody>
-                                <tr>
-                                    <td>Working Days</td>
-                                    <td class="amount">${working_days || 0}</td>
-                                </tr>
-                                <tr>
-                                    <td>Absent Days</td>
-                                    <td class="amount">${absence || 0}</td>
-                                </tr>
-                                <tr>
-                                    <td>Present Days</td>
-                                    <td class="amount">${(working_days || 0) - (absence || 0)}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <div class="signature-section">
-                        <div class="signature-box">
-                            <div class="signature-line"></div>
-                            <p>Employee Signature</p>
-                        </div>
-                        <div class="signature-box">
-                            <div class="signature-line"></div>
-                            <p>Employer Signature</p>
-                        </div>
-                    </div>
-                    
-                    <div class="footer">
-                        <p>This is a computer generated payslip and does not require a signature.</p>
-                    </div>
-                </body>
-            </html>
-        `);
-        
-        printWindow.document.close();
-        printWindow.focus();
-        
-        // Print after window loads
-        printWindow.onload = function() {
-            printWindow.print();
-            printWindow.onafterprint = function() {
-                printWindow.close();
-                setIsPrinting(false);
-            };
-        };
+        setIsLoading(prev => ({ ...prev, print: true }));
+        setTimeout(() => {
+            window.print();
+            setIsLoading(prev => ({ ...prev, print: false }));
+        }, 300);
+    };
+
+    const handleDownloadPDF = async () => {
+        setIsLoading(prev => ({ ...prev, pdf: true }));
+        try {
+            // Dynamically import the required libraries
+            const html2canvas = (await import('html2canvas')).default;
+            const { jsPDF } = await import('jspdf');
+
+            // Get the content element
+            const content = document.querySelector('.print-container');
+            if (!content) {
+                throw new Error("Content element not found");
+            }
+            
+            // Create a canvas from the content
+            const canvas = await html2canvas(content, {
+                scale: 4,
+                useCORS: true, // Enable CORS for images
+                logging: false,
+                windowWidth: content.scrollWidth,
+                windowHeight: content.scrollHeight,
+                allowTaint: true,
+                backgroundColor: '#ffffff'
+            });
+
+            // Calculate dimensions
+            const imgWidth = 210; // A4 width in mm
+            const pageHeight = 297; // A4 height in mm
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            
+            // Create PDF with higher quality
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            let heightLeft = imgHeight;
+            let position = 0;
+            let pageData = canvas.toDataURL('image/jpeg', 1.0);
+
+            // Add first page
+            pdf.addImage(pageData, 'JPEG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+
+            // Add subsequent pages if content is longer than one page
+            while (heightLeft >= 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(pageData, 'JPEG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+
+            // Save the PDF
+            pdf.save(`Payslip_${payroll?.staff?.name}_${payroll?.month}_${payroll?.year}.pdf`);
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            toast.error('Failed to generate PDF. Please try again.');
+        } finally {
+            setIsLoading(prev => ({ ...prev, pdf: false }));
+        }
     };
 
     return (
@@ -233,9 +109,9 @@ export default function View({ payroll, working_days, absence, allowances, deduc
                 <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
                     {/* Action Buttons */}
                     <div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={handlePrint} disabled={isPrinting}>
+                        <Button variant="outline" size="sm" onClick={handlePrint} disabled={isLoading.print}>
                             <Printer className="w-4 h-4 mr-2" />
-                            {isPrinting ? "Printing..." : "Print Payslip"}
+                            {isLoading.print ? "Printing..." : "Print Payslip"}
                         </Button>
                         <Link href={route("payslips.edit", payroll.id)}>
                             <Button variant="outline" size="sm">
@@ -243,17 +119,17 @@ export default function View({ payroll, working_days, absence, allowances, deduc
                                 Edit
                             </Button>
                         </Link>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={isLoading.pdf}>
                             <Download className="w-4 h-4 mr-2" />
-                            Download PDF
+                            {isLoading.pdf ? "Downloading..." : "Download PDF"}
                         </Button>
                     </div>
                     
                     {/* Payslip Card */}
-                    <Card className="shadow-sm">
-                        <CardHeader className="pb-2">
+                    <div className="shadow-sm p-3 print-container">
+                        <div className="pb-2">
                             <div className="flex justify-between items-center">
-                                <CardTitle>Payslip</CardTitle>
+                                <h3 className="text-sm font-medium">Payslip</h3>
                                 <Badge variant={payroll?.status === 2 ? "success" : "warning"}>
                                     {payroll?.status === 2 ? "Paid" : "Unpaid"}
                                 </Badge>
@@ -261,8 +137,8 @@ export default function View({ payroll, working_days, absence, allowances, deduc
                             <div className="text-sm text-muted-foreground">
                                 Period: {payroll?.month}/{payroll?.year}
                             </div>
-                        </CardHeader>
-                        <CardContent>
+                        </div>
+                        <div className="p-4">
                             {/* Employee Information */}
                             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-6">
                                 <div className="md:col-span-6 space-y-2">
@@ -429,8 +305,8 @@ export default function View({ payroll, working_days, absence, allowances, deduc
                             <div className="mt-6 text-xs text-center text-muted-foreground">
                                 This is a computer-generated payslip and does not require a signature.
                             </div>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
                 </div>
             </SidebarInset>
         </AuthenticatedLayout>

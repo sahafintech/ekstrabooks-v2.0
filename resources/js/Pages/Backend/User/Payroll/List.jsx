@@ -849,7 +849,11 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                                                     />
                                                 </TableCell>
                                                 <TableCell>{index + 1}</TableCell>
-                                                <TableCell>{payroll.employee_id}</TableCell>
+                                                <TableCell>
+                                                    <Link href={route("payslips.show", payroll.id)} className="text-blue-600 underline">
+                                                        {payroll.staff.employee_id}
+                                                    </Link>
+                                                </TableCell>
                                                 <TableCell>{payroll.staff.name}</TableCell>
                                                 <TableCell>{formatCurrency({ amount: payroll.current_salary })}</TableCell>
                                                 <TableCell>{formatCurrency({ amount: payroll.total_allowance })}</TableCell>

@@ -220,37 +220,32 @@ const JournalStatusBadge = ({ status }) => {
   );
 };
 
-const SummaryCards = ({ journals = [] }) => {
-  const totalJournals = journals.length;
-  const totalApproved = journals.filter(journal => journal.status === 1).length;
-  const totalPending = journals.filter(journal => journal.status === 2).length;
-  const totalAmount = journals.reduce((sum, journal) => sum + parseFloat(journal.base_currency_amount), 0);
-
+const SummaryCards = ({ summary = {} }) => {
   const cards = [
     {
       title: "Total Journals",
-      value: totalJournals,
+      value: summary.total_journals || 0,
       description: "Total number of journals",
       icon: Receipt,
       iconColor: "text-blue-500"
     },
     {
       title: "Total Amount",
-      value: formatCurrency({ amount: totalAmount }),
+      value: formatCurrency({ amount: summary.total_amount || 0 }),
       description: "Total amount in base currency",
       icon: DollarSign,
       iconColor: "text-green-500"
     },
     {
       title: "Approved Journals",
-      value: totalApproved,
+      value: summary.total_approved || 0,
       description: "Journals that have been approved",
       icon: CheckCircle,
       iconColor: "text-purple-500"
     },
     {
       title: "Pending Journals",
-      value: totalPending,
+      value: summary.total_pending || 0,
       description: "Journals pending approval",
       icon: AlertCircle,
       iconColor: "text-orange-500"
@@ -278,7 +273,7 @@ const SummaryCards = ({ journals = [] }) => {
   );
 };
 
-export default function List({ journals = [], meta = {}, filters = {} }) {
+export default function List({ journals = [], meta = {}, filters = {}, summary = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedJournals, setSelectedJournals] = useState([]);
@@ -564,7 +559,7 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
             url="journals.index"
           />
           <div className="p-4">
-            <SummaryCards journals={journals} />
+            <SummaryCards summary={summary} />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div className="flex flex-col md:flex-row gap-4">
                 <Link href={route("journals.create")}>
@@ -693,7 +688,7 @@ export default function List({ journals = [], meta = {}, filters = {} }) {
                         <TableCell>
                           <Link
                             href={route("journals.show", journal.id)}
-                            className="font-medium hover:underline text-primary"
+                            className="font-medium underline text-blue-500"
                           >
                             {journal.journal_number}
                           </Link>
