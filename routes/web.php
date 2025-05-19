@@ -46,6 +46,7 @@ use App\Http\Controllers\User\BusinessController;
 use App\Http\Controllers\User\BusinessSettingsController;
 use App\Http\Controllers\User\CashPurchaseController;
 use App\Http\Controllers\CostCodeController;
+use App\Http\Controllers\ProjectTaskController;
 use App\Http\Controllers\User\CustomerController;
 use App\Http\Controllers\User\CustomerDocumentController;
 use App\Http\Controllers\User\DepartmentController;
@@ -474,6 +475,14 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('bulk_destroy_cost_codes', [CostCodeController::class, 'bulk_destroy'])->name('cost_codes.bulk_destroy');
 
 		Route::resource('projects', ProjectController::class);
+		Route::post('import_projects', [ProjectController::class, 'import_projects'])->name('projects.import');
+		Route::get('export_projects', [ProjectController::class, 'export_projects'])->name('projects.export');
+		Route::post('bulk_destroy_projects', [ProjectController::class, 'bulk_destroy'])->name('projects.bulk_destroy');
+
+		Route::resource('project_tasks', ProjectTaskController::class);
+		Route::post('import_project_tasks', [ProjectTaskController::class, 'import_project_tasks'])->name('project_tasks.import');
+		Route::get('export_project_tasks', [ProjectTaskController::class, 'export_project_tasks'])->name('project_tasks.export');
+		Route::post('bulk_destroy_project_tasks', [ProjectTaskController::class, 'bulk_destroy'])->name('project_tasks.bulk_destroy');
 			
 		Route::resource('project_groups', ProjectGroupController::class);
 		Route::post('import_project_groups', [ProjectGroupController::class, 'import_project_groups'])->name('project_groups.import');
