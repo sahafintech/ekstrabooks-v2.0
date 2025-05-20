@@ -6,11 +6,13 @@ use App\Exports\ProjectExport;
 use App\Http\Controllers\Controller;
 use App\Imports\ProjectImport;
 use App\Models\AuditLog;
+use App\Models\CostCode;
 use App\Models\Currency;
 use App\Models\Customer;
 use App\Models\Employee;
 use App\Models\Project;
 use App\Models\ProjectGroup;
+use App\Models\ProjectTask;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
@@ -208,11 +210,14 @@ class ProjectController extends Controller
 
     public function show($id, Request $request)
     {
-        $project = Project::with('tasks')->findOrFail($id);
+        $project = Project::with('tasks', 'budgets', 'budgets.cost_codes', 'budgets.tasks')->findOrFail($id);
         $tab = $request->get('tab', 'tasks');
+        $cost_codes = CostCode::all();
+        
         return Inertia::render('Backend/User/Construction/Project/View', [
             'project' => $project,
             'activeTab' => $tab,
+            'cost_codes' => $cost_codes,
         ]);
     }
 

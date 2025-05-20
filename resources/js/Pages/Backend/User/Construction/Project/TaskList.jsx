@@ -446,21 +446,18 @@ const EditTaskDialog = ({
 );
 
 export default function TaskList({
-    tasks = [],
-    meta = {},
-    filters = {},
     project,
 }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
     const [selectedTasks, setSelectedTasks] = useState([]);
     const [isAllSelected, setIsAllSelected] = useState(false);
-    const [search, setSearch] = useState(filters.search || "");
-    const [perPage, setPerPage] = useState(meta.per_page || 50);
+    const [search, setSearch] = useState("");
+    const [perPage, setPerPage] = useState(50);
     const [currentPage, setCurrentPage] = useState(1);
     const [bulkAction, setBulkAction] = useState("");
     const [sorting, setSorting] = useState(
-        filters.sorting || { column: "id", direction: "desc" }
+        { column: "id", direction: "desc" }
     );
 
     // Form state for Create/Edit dialogs
@@ -487,7 +484,7 @@ export default function TaskList({
 
     // Client-side filtering, sorting and pagination
     const filteredAndSortedTasks = useMemo(() => {
-        let result = [...tasks];
+        let result = [...project.tasks];
 
         // Apply search filter
         if (search) {
@@ -517,7 +514,7 @@ export default function TaskList({
         });
 
         return result;
-    }, [tasks, search, sorting]);
+    }, [project.tasks, search, sorting]);
 
     // Calculate pagination
     const paginatedTasks = useMemo(() => {
@@ -975,8 +972,8 @@ export default function TaskList({
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {paginatedTasks.length > 0 ? (
-                                    paginatedTasks.map((task) => (
+                                {project.tasks.length > 0 ? (
+                                    project.tasks.map((task) => (
                                         <TableRow key={task.id}>
                                             <TableCell>
                                                 <Checkbox

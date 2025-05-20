@@ -26,6 +26,9 @@
             scrollbar-width: thin;
             font-size: 12px;
         }
+        main {
+            width: 100px;
+        }
     </style>
 </head>
 

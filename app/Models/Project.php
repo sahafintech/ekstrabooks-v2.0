@@ -23,6 +23,11 @@ class Project extends Model
         return $this->hasMany(ProjectTask::class);
     }
 
+    public function budgets()
+    {
+        return $this->hasMany(ProjectBudget::class);
+    }
+
     public function customer()
     {
         return $this->belongsTo(Customer::class);

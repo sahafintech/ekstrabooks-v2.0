@@ -18,8 +18,8 @@ import {
     Timer,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import TaskList from "./Task/TaskList";
-
+import TaskList from "./TaskList";
+import BudgetList from "./BudgetList";
 // Summary Cards Component
 const SummaryCards = ({ project = {} }) => {
     const cards = [
@@ -73,7 +73,7 @@ const SummaryCards = ({ project = {} }) => {
     );
 };
 
-export default function View({ project, activeTab }) {
+export default function View({ project, activeTab, cost_codes }) {
     const [currentTab, setCurrentTab] = useState(activeTab);
 
     const ProjectStatusBadge = ({ status }) => {
@@ -272,13 +272,6 @@ export default function View({ project, activeTab }) {
                                     Transactions
                                 </TabsTrigger>
                                 <TabsTrigger
-                                    value="subcontracts"
-                                    className="flex items-center gap-2"
-                                >
-                                    <Users className="h-4 w-4" />
-                                    Subcontracts
-                                </TabsTrigger>
-                                <TabsTrigger
                                     value="change-orders"
                                     className="flex items-center gap-2"
                                 >
@@ -302,20 +295,11 @@ export default function View({ project, activeTab }) {
                             </TabsList>
 
                             <TabsContent value="tasks">
-                                <TaskList tasks={project.tasks} project={project} />
+                                <TaskList project={project} />
                             </TabsContent>
 
                             <TabsContent value="budgets">
-                                <div>
-                                    <h1>Project Budgets</h1>
-                                </div>
-                                <div>
-                                    {/* Budgets content will go here */}
-                                    <p className="text-gray-500">
-                                        Budget tracking and management interface
-                                        will be implemented here.
-                                    </p>
-                                </div>
+                                <BudgetList project={project} cost_codes={cost_codes} />
                             </TabsContent>
 
                             <TabsContent value="transactions">
@@ -327,19 +311,6 @@ export default function View({ project, activeTab }) {
                                     <p className="text-gray-500">
                                         Transaction history and management
                                         interface will be implemented here.
-                                    </p>
-                                </div>
-                            </TabsContent>
-
-                            <TabsContent value="subcontracts">
-                                <div>
-                                    <h1>Subcontracts</h1>
-                                </div>
-                                <div>
-                                    {/* Subcontracts content will go here */}
-                                    <p className="text-gray-500">
-                                        Subcontract management interface will be
-                                        implemented here.
                                     </p>
                                 </div>
                             </TabsContent>
