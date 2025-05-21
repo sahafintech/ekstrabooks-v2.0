@@ -76,7 +76,7 @@ export function UserSidebar({ ...props }) {
     const projectsBase = "/user/projects";
     const costCodesBase = "/user/cost_codes";
     const projectGroupsBase = "/user/project_groups";
-
+    const projectSubcontractsBase = "/user/project_subcontracts";
     // Accounting
     const accountsBase = "/user/accounts";
     const journalsBase = "/user/journals";
@@ -342,7 +342,8 @@ export function UserSidebar({ ...props }) {
             isActive:
                 url.startsWith(projectsBase) ||
                 url.startsWith(costCodesBase) ||
-                url.startsWith(projectGroupsBase),
+                url.startsWith(projectGroupsBase) ||
+                url.startsWith(projectSubcontractsBase),
             items: [
                 {
                     title: "Projects",
@@ -358,6 +359,11 @@ export function UserSidebar({ ...props }) {
                     title: "Cost Codes",
                     url: route("cost_codes.index"),
                     isActive: url.startsWith(costCodesBase),
+                },
+                {
+                    title: "Subcontracts",
+                    url: route("project_subcontracts.index"),
+                    isActive: url.startsWith(projectSubcontractsBase),
                 },
             ],
         },

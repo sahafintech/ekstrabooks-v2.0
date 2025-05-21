@@ -282,7 +282,7 @@ export default function IncomeStatement({ report_data, date1, date2, business_na
                             </div>
 
                             <div className="flex items-center justify-center">
-                                <div className="rounded-md border printable-table mt-4 p-4 w-full md:w-[210mm] min-h-[297mm] mx-auto bg-white">
+                                <div className="rounded-md border printable-table mt-4 p-4 w-full lg:w-[210mm] min-h-[297mm] mx-auto bg-white">
                                     <div className="text-center p-4">
                                         <h1 className="text-lg">{business_name}</h1>
                                         <h2 className="font-bold">Income Statement</h2>

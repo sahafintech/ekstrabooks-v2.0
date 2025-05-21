@@ -356,7 +356,7 @@ ${`
                             <Button variant="outline" onClick={handleExport}>Export</Button>
                         </div>
 
-                        <div className="rounded-md border printable-table p-4 mt-4 w-full md:w-[210mm] min-h-[297mm] mx-auto bg-white">
+                        <div className="rounded-md border printable-table p-4 mt-4 w-full lg:w-[210mm] min-h-[297mm] mx-auto bg-white">
                             {/* Simple 2-column grid layout */}
                             <div className="text-center p-4">
                                 <h1 className="text-lg">{business_name}</h1>

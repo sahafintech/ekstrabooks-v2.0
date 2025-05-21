@@ -47,6 +47,8 @@ use App\Http\Controllers\User\BusinessSettingsController;
 use App\Http\Controllers\User\CashPurchaseController;
 use App\Http\Controllers\CostCodeController;
 use App\Http\Controllers\ProjectBudgetController;
+use App\Http\Controllers\ProjectSubcontractController;
+use App\Http\Controllers\ProjectSubcontractPaymentController;
 use App\Http\Controllers\ProjectTaskController;
 use App\Http\Controllers\User\CustomerController;
 use App\Http\Controllers\User\CustomerDocumentController;
@@ -494,6 +496,14 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('import_project_groups', [ProjectGroupController::class, 'import_project_groups'])->name('project_groups.import');
 		Route::get('export_project_groups', [ProjectGroupController::class, 'export_project_groups'])->name('project_groups.export');
 		Route::post('bulk_destroy_project_groups', [ProjectGroupController::class, 'bulk_destroy'])->name('project_groups.bulk_destroy');
+
+		Route::resource('project_subcontracts', ProjectSubcontractController::class);
+		Route::post('import_project_subcontracts', [ProjectSubcontractController::class, 'import_project_subcontracts'])->name('project_subcontracts.import');
+		Route::get('export_project_subcontracts', [ProjectSubcontractController::class, 'export_project_subcontracts'])->name('project_subcontracts.export');
+		Route::post('bulk_destroy_project_subcontracts', [ProjectSubcontractController::class, 'bulk_destroy'])->name('project_subcontracts.bulk_destroy');
+		Route::match(['get', 'post'], 'project_subcontracts/{id}/send_email', [ProjectSubcontractController::class, 'send_email'])->name('project_subcontracts.send_email');
+		Route::resource('project_subcontract_payments', ProjectSubcontractPaymentController::class)->except('edit', 'create');
+		Route::post('project_subcontract_payments/bulk_destroy', [ProjectSubcontractPaymentController::class, 'bulk_destroy'])->name('project_subcontract_payments.bulk_destroy');
 		
 		//Staff Controller
 		Route::post('staffs/bulk_destroy', [StaffController::class, 'bulk_destroy'])->name('staffs.bulk_destroy');
@@ -694,6 +704,7 @@ Route::get('cash_invoice/{short_code}', [ReceiptController::class, 'show_public_
 Route::get('deffered_invoice/{short_code}', [DefferedInvoiceController::class, 'show_public_deffered_invoice'])->name('deffered_invoices.show_public_deffered_invoice');
 Route::get('receive_payment/{id}', [ReceivePaymentsController::class, 'show_public_receive_payment'])->name('receive_payments.show_public_receive_payment');
 Route::get('sales_return/{short_code}', [SalesReturnController::class, 'show_public_sales_return'])->name('sales_returns.show_public_sales_return');
+Route::get('project_subcontract/{short_code}', [ProjectSubcontractController::class, 'show_public_project_subcontract'])->name('project_subcontracts.show_public_project_subcontract');
 
 Route::get('dashboard/json_income_by_category', 'DashboardController@json_income_by_category')->middleware('auth');
 Route::get('dashboard/json_expense_by_category', 'DashboardController@json_expense_by_category')->middleware('auth');
