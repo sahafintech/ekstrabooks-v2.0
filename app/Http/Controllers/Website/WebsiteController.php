@@ -10,7 +10,6 @@ use App\Models\Feature;
 use App\Models\Package;
 use App\Models\Page;
 use App\Models\Post;
-use App\Models\Team;
 use App\Models\Testimonial;
 use App\Utilities\Overrider;
 use Illuminate\Http\Request;
@@ -97,6 +96,12 @@ class WebsiteController extends Controller
 		return Inertia::render('Website/Pricing', $data);
 	}
 
+	public function terms()
+	{
+		$page = Page::where('slug', 'terms-condition')->with('translations')->first();
+		return Inertia::render('Website/Terms', compact('page'));
+	}
+
 	public function blogs($slug = '')
 	{
 		$data = array();
@@ -181,7 +186,8 @@ class WebsiteController extends Controller
 
 	public function privacy()
 	{
-		return Inertia::render('Website/Privacy');
+		$page = Page::where('slug', 'privacy-policy')->with('translations')->first();
+		return Inertia::render('Website/Privacy', compact('page'));
 	}
 
 	public function post_comment(Request $request)

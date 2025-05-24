@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Channels\SmsMessage;
+use App\Models\Business;
 use App\Models\EmailTemplate;
 use App\Utilities\Overrider;
 use Illuminate\Bus\Queueable;
@@ -26,7 +27,9 @@ class InviteUser extends Notification {
 		$this->template = EmailTemplate::where('slug', 'INVITE_USER')->first();
 		Overrider::loadBusinessSettings($this->invite->business_id);
 
-		$this->replace['businessName'] = $this->invite->business->name;
+		$businesses = Business::whereIn('id', $this->invite->business_id)->get();
+
+		$this->replace['businessName'] = $businesses->pluck('name')->implode(', ');
 		$this->replace['roleName'] = $this->invite->role->name;
 		$this->replace['message'] = $this->invite->message;
 		$this->replace['actionUrl'] = route('system_users.accept_invitation', encrypt($this->invite->id));

@@ -647,6 +647,8 @@ Route::get('/about', [WebsiteController::class, 'about']);
 Route::get('/features', [WebsiteController::class, 'features']);
 Route::get('/pricing', [WebsiteController::class, 'pricing']);
 Route::get('/faq', [WebsiteController::class, 'faq']);
+Route::get('/privacy-policy', [WebsiteController::class, 'privacy'])->name('privacy-policy');
+Route::get('/terms-condition', [WebsiteController::class, 'terms'])->name('terms-condition');
 Route::get('/blogs/{slug?}', [WebsiteController::class, 'blogs']);
 Route::get('/contact', [WebsiteController::class, 'contact']);
 Route::post('/send_message', 'Website\WebsiteController@send_message');

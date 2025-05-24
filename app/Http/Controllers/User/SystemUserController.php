@@ -111,7 +111,7 @@ class SystemUserController extends Controller
 	{
 		$validator = Validator::make($request->all(), [
 			'email' => 'required|email|max:191',
-			'business_id' => 'required',
+			'business_id' => 'required|array',
 			'role_id' => 'required',
 		]);
 
@@ -121,9 +121,11 @@ class SystemUserController extends Controller
 				->withInput();
 		}
 
-		$business = Business::find($request->business_id);
-		if ($business->users->where('email', $request->email)->first()) {
-			return redirect()->back()->with('error', _lang('User is already assigned to your business'));
+		$businesses = Business::whereIn('id', $request->business_id)->get();
+		foreach ($businesses as $business) {
+			if ($business->users->where('email', $request->email)->first()) {
+				return redirect()->back()->with('error', _lang('User is already assigned to your business'));
+			}
 		}
 
 		$template = EmailTemplate::where('slug', 'INVITE_USER')->where('email_status', 1)->first();
@@ -209,13 +211,15 @@ class SystemUserController extends Controller
 		$invite->save();
 
 		//Store Business User
-		$business = Business::withoutGlobalScopes()->find($invite->business_id);
-		$business->users()->detach($invite->user_id);
-		$business->users()->attach($invite->user_id, [
-			'owner_id' => $business->user_id,
-			'role_id' => $invite->role_id,
-			'is_active' => 1,
-		]);
+		foreach ($invite->business_id as $index => $businessId) {
+			$business = Business::withoutGlobalScopes()->find($businessId);
+			$business->users()->detach($invite->user_id);
+			$business->users()->attach($invite->user_id, [
+				'owner_id' => $invite->role_id == 'admin' ? $invite->user_id : $business->user_id,
+				'role_id' => $invite->role_id == 'admin' ? null : $invite->role_id,
+				'is_active' => $index === 0 ? 1 : 0,
+			]);
+		}
 
 		DB::commit();
 

@@ -23,19 +23,24 @@ class Invite extends Model {
 		'email', 'sender_id', 'business_id', 'role_id', 'user_id', 'status',
 	];
 
+	protected $casts = [
+		'business_id' => 'array'
+	];
+
 	public function scopeActive($query) {
 		return $query->where('status', 1);
 	}
 
 	public function sender() {
-		return $this->belongsTo('App\Models\User', 'sender_id');
+		return $this->belongsTo(User::class, 'sender_id');
 	}
 
-	public function business() {
-		return $this->belongsTo('App\Models\Business', 'business_id');
+	public function businesses() {
+		return $this->belongsToMany(Business::class, null, 'business_id', 'id')
+			->whereIn('business.id', $this->business_id ?? []);
 	}
 
 	public function role() {
-		return $this->belongsTo('App\Models\Role', 'role_id');
+		return $this->belongsTo(Role::class, 'role_id');
 	}
 }

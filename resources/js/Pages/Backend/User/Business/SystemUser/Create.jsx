@@ -10,8 +10,9 @@ import { Button } from "@/Components/ui/button";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import { Head } from "@inertiajs/react";
-import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 import { useEffect } from "react";
+import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 
 export default function Create({ roles, businesses, businessId }) {
     const { flash = {} } = usePage().props;
@@ -19,7 +20,7 @@ export default function Create({ roles, businesses, businessId }) {
     const { data, setData, post, processing, errors } = useForm({
         email: "",
         role_id: "",
-        business_id: "",
+        business_id: [],
         message: "",
     });
 
@@ -124,7 +125,7 @@ export default function Create({ roles, businesses, businessId }) {
                                 Business *
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                                <SearchableCombobox
+                                <SearchableMultiSelectCombobox
                                     id="business_id"
                                     label="Business"
                                     options={businesses.map((business) => ({

@@ -14,18 +14,16 @@ export default function Footer() {
     const productLinks = [
         { name: "Features", href: "/features" },
         { name: "Pricing", href: "/pricing" },
-        { name: "Integrations", href: "/integrations" },
-        { name: "Security", href: "/security" },
     ];
 
     const companyLinks = [
         { name: "About", href: "/about" },
-        { name: "Blog", href: "/blog" },
+        // { name: "Blog", href: "/blog" },
     ];
 
     const legalLinks = [
-        { name: "Privacy", href: "/privacy" },
-        { name: "Terms", href: "/terms" },
+        { name: "Privacy Policy", href: "/privacy-policy" },
+        { name: "Terms & Conditions", href: "/terms-condition" },
     ];
 
     const socialLinks = [
