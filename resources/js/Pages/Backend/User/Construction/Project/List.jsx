@@ -609,7 +609,7 @@ export default function List({ projects = [], meta = {}, filters = {} }) {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-24 text-center">
+                      <TableCell colSpan={11} className="h-24 text-center">
                         No projects found.
                       </TableCell>
                     </TableRow>

@@ -27,7 +27,7 @@ export default function Index({ pageData, pageMedia, features, packages }) {
                 <Pricing />
             )}
             
-            <HowItWorks />
+            {/* <HowItWorks /> */}
             
             {pageData?.newsletter_status && (
                 <Newsletter 
