@@ -31,6 +31,7 @@ return new class extends Migration
             $table->tinyInteger('status')->default(1);
             $table->tinyInteger('template_type')->default(0)->comment('0 = Predefined | 1 = Dynamic');
             $table->string('template', 50)->nullable();
+            $table->bigInteger('project_id')->nullable();
             $table->text('note')->nullable();
             $table->text('footer')->nullable();
             $table->integer('queue_number')->default(0);

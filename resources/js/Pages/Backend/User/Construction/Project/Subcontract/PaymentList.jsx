@@ -25,7 +25,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/Components/ui/dialog";
-import { Edit, Plus, Trash, ChevronUp, ChevronDown } from "lucide-react";
+import { Edit, Plus, Trash, ChevronUp, ChevronDown, Eye } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -880,6 +880,16 @@ export default function PaymentList({ projectSubcontract, methods, accounts }) {
                                                 <TableCell className="text-right">
                                                     <TableActions
                                                         actions={[
+                                                            {
+                                                                label: "View",
+                                                                icon: (
+                                                                    <Eye className="h-4 w-4" />
+                                                                ),
+                                                                href: route(
+                                                                    "project_subcontract_payments.show",
+                                                                    payment.id
+                                                                ),
+                                                            },
                                                             {
                                                                 label: "Edit",
                                                                 icon: (

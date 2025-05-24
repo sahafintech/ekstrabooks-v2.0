@@ -28,6 +28,7 @@ return new class extends Migration
             $table->decimal('discount_value', 10, 2)->nullable();
             $table->tinyInteger('template_type')->default(0)->comment('0 = Predefined | 1 = Dynamic');
             $table->string('template')->default('default');
+            $table->bigInteger('project_id')->nullable();
             $table->text('note')->nullable();
             $table->text('footer')->nullable();
             $table->integer('queue_number')->default(0);

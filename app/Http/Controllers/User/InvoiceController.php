@@ -17,6 +17,7 @@ use App\Models\InvoiceItem;
 use App\Models\InvoiceItemTax;
 use App\Models\InvoicePayment;
 use App\Models\Product;
+use App\Models\Project;
 use App\Models\ReceivePayment;
 use App\Models\Tax;
 use App\Models\Transaction;
@@ -182,6 +183,7 @@ class InvoiceController extends Controller
         $currencies = Currency::all();
         $products = Product::all();
         $taxes = Tax::all();
+        $projects = Project::all();
 
         return Inertia::render('Backend/User/Invoice/Create', [
             'customers' => $customers,
@@ -190,6 +192,7 @@ class InvoiceController extends Controller
             'taxes' => $taxes,
             'invoice_title' => $invoice_title,
             'base_currency' => get_business_option('currency'),
+            'projects' => $projects,
         ]);
     }
 
@@ -316,6 +319,7 @@ class InvoiceController extends Controller
         $invoice->discount_value  = $request->input('discount_value') ?? 0;
         $invoice->template_type   = is_numeric($request->template) ? 1 : 0;
         $invoice->template        = 'default';
+        $invoice->project_id      = $request->input('project_id');
         $invoice->note            = $request->input('note');
         $invoice->footer          = $request->input('footer');
         $invoice->short_code      = rand(100000, 9999999) . uniqid();
@@ -489,7 +493,8 @@ class InvoiceController extends Controller
             'business',
             'items',
             'customer',
-            'taxes'
+            'taxes',
+            'project'
         ])->find($id);
 
         $attachments = Attachment::where('ref_id', $id)
@@ -608,6 +613,7 @@ class InvoiceController extends Controller
         $currencies = Currency::all();
         $products = Product::all();
         $taxes = Tax::all();
+        $projects = Project::all();
         $taxIds = $invoice->taxes
             ->pluck('tax_id')
             ->map(fn($id) => (string) $id)
@@ -619,7 +625,8 @@ class InvoiceController extends Controller
             'currencies' => $currencies,
             'products' => $products,
             'taxes' => $taxes,
-            'taxIds' => $taxIds
+            'taxIds' => $taxIds,
+            'projects' => $projects
         ]);
     }
 
@@ -759,6 +766,7 @@ class InvoiceController extends Controller
         $invoice->discount_value  = $request->input('discount_value') ?? 0;
         $invoice->template_type   = $invoice->template_type   = is_numeric($request->template) ? 1 : 0;
         $invoice->template        = 'default';
+        $invoice->project_id      = $request->input('project_id');
         $invoice->note            = $request->input('note');
         $invoice->footer          = $request->input('footer');
         if ($attachment != '') {

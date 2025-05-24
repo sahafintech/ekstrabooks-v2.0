@@ -7,12 +7,12 @@ use App\Http\Controllers\Controller;
 use App\Imports\ProductImport;
 use App\Models\Account;
 use App\Models\AuditLog;
-use App\Models\Brand;
 use App\Models\Brands;
 use App\Models\Category;
 use App\Models\Currency;
 use App\Models\Product;
 use App\Models\ProductUnit;
+use App\Models\SubCategory;
 use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -50,7 +50,8 @@ class ProductController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('selling_price', 'like', "%{$search}%")
-                    ->orWhere('purchase_cost', 'like', "%{$search}%");
+                    ->orWhere('purchase_cost', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%");
             });
         }
 
@@ -63,7 +64,8 @@ class ProductController extends Controller
             $allProducts->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('selling_price', 'like', "%{$search}%")
-                    ->orWhere('purchase_cost', 'like', "%{$search}%");
+                    ->orWhere('purchase_cost', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%");
             });
         }
         $allProducts = $allProducts->get();
@@ -107,7 +109,7 @@ class ProductController extends Controller
     public function create(Request $request)
     {
         $productUnits = ProductUnit::select('id', 'unit')->get();
-        $categories = Category::select('id', 'name')->get();
+        $categories = SubCategory::select('id', 'name')->get();
         $brands = Brands::select('id', 'name')->get();
         $accounts = Account::select('id', 'account_name')->get();
 
@@ -246,8 +248,9 @@ class ProductController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show(Request $request, $id)
+    public function show($id)
     {
+        $activeTab = request()->get('tab', 'details');
         $product = Product::with('income_account')
             ->with('expense_account')
             ->with('product_unit')
@@ -268,7 +271,8 @@ class ProductController extends Controller
             'product' => $product,
             'id' => $id,
             'transactions' => $transactions,
-            'suppliers' => $suppliers
+            'suppliers' => $suppliers,
+            'activeTab' => $activeTab,
         ]);
     }
 
@@ -284,7 +288,7 @@ class ProductController extends Controller
             ->findOrFail($id);
 
         $productUnits = ProductUnit::select('id', 'unit')->get();
-        $categories = Category::select('id', 'name')->get();
+        $categories = SubCategory::select('id', 'name')->get();
         $brands = Brands::select('id', 'name')->get();
         $accounts = Account::select('id', 'account_name')->get();
 

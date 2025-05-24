@@ -457,7 +457,7 @@ export default function List({ products = [], meta = {}, filters = {}, summary =
           <div className="p-4">
             <SummaryCards summary={summary} />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex flex-col md:flex-row gap-2">
                 <Link href={route("products.create")}>
                   <Button>
                     <Plus className="w-4 h-4 mr-2" />
@@ -552,10 +552,12 @@ export default function List({ products = [], meta = {}, filters = {}, summary =
                           />
                         </TableCell>
                         <TableCell>{product.id}</TableCell>
-                        <TableCell>{product.name}</TableCell>
+                        <Link href={route("products.show", product.id)} className="underline text-blue-500">
+                          <TableCell>{product.name}</TableCell>
+                        </Link>
                         <TableCell>{product.type}</TableCell>
-                        <TableCell>{formatCurrency(product.purchase_cost) || "-"}</TableCell>
-                        <TableCell>{formatCurrency(product.selling_price) || "-"}</TableCell>
+                        <TableCell>{formatCurrency({ amount: product.purchase_cost }) || "-"}</TableCell>
+                        <TableCell>{formatCurrency({ amount: product.selling_price }) || "-"}</TableCell>
                         <TableCell>{product.stock || "-"}</TableCell>
                         <TableCell>
                           {<ProductStatusBadge status={product.status} /> || "-"}

@@ -19,6 +19,7 @@ use App\Models\Prescription;
 use App\Models\PrescriptionProduct;
 use App\Models\PrescriptionProductItem;
 use App\Models\Product;
+use App\Models\Project;
 use App\Models\Receipt;
 use App\Models\ReceiptItem;
 use App\Models\ReceiptItemTax;
@@ -151,6 +152,7 @@ class ReceiptController extends Controller
     public function create()
     {
         $customers = \App\Models\Customer::all();
+        $projects = \App\Models\Project::all();
         $products = Product::all();
         $currencies = Currency::all();
         $taxes = Tax::all();
@@ -174,12 +176,13 @@ class ReceiptController extends Controller
             'receipt_title' => $receipt_title,
             'accounts' => $accounts,
             'base_currency' => get_business_option('currency'),
+            'projects' => $projects,
         ]);
     }
 
     public function show($id)
     {
-        $receipt = Receipt::with(['business', 'items', 'taxes', 'customer'])
+        $receipt = Receipt::with(['business', 'items', 'taxes', 'customer', 'project'])
             ->where('id', $id)
             ->first();
 
@@ -221,7 +224,8 @@ class ReceiptController extends Controller
             ->with('account')
             ->first();
 
-        $customers = \App\Models\Customer::all();
+        $customers = Customer::all();
+        $projects = Project::all();
         $products = Product::all();
         $currencies = Currency::all();
         $taxes = Tax::all();
@@ -242,7 +246,8 @@ class ReceiptController extends Controller
             'currencies' => $currencies,
             'taxes' => $taxes,
             'accounts' => $accounts,
-            'taxIds' => $taxIds
+            'taxIds' => $taxIds,
+            'projects' => $projects,
         ]);
     }
 
@@ -351,6 +356,7 @@ class ReceiptController extends Controller
         $receipt->discount_value  = $request->input('discount_value') ?? 0;
         $receipt->note            = $request->input('note');
         $receipt->footer          = $request->input('footer');
+        $receipt->project_id      = $request->input('project_id');
         $receipt->user_id         = auth()->id();
         $receipt->business_id     = request()->activeBusiness->id;
         $receipt->short_code      = rand(100000, 9999999) . uniqid();
@@ -650,6 +656,7 @@ class ReceiptController extends Controller
         $receipt->discount_value  = $request->input('discount_value') ?? 0;
         $receipt->note            = $request->input('note');
         $receipt->footer          = $request->input('footer');
+        $receipt->project_id      = $request->input('project_id');
         $receipt->user_id         = auth()->id();
         $receipt->business_id     = request()->activeBusiness->id;
 

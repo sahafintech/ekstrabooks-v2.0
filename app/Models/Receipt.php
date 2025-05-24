@@ -30,6 +30,10 @@ class Receipt extends Model
             ->groupBy('tax_id');
     }
 
+    public function project() {
+        return $this->belongsTo(Project::class, 'project_id')->withDefault()->withoutGlobalScopes();
+    }
+
     public function customer() {
         return $this->belongsTo(Customer::class, 'customer_id')->withDefault()->withoutGlobalScopes();
     }

@@ -15,7 +15,7 @@ import { useState, useEffect } from "react";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 
-export default function Edit({ customers = [], products = [], currencies = [], taxes = [], receipt, accounts, transaction, taxIds }) {
+export default function Edit({ customers = [], products = [], currencies = [], taxes = [], receipt, accounts, transaction, taxIds, projects }) {
   const [receiptItems, setReceiptItems] = useState([{
     product_id: "",
     product_name: "",
@@ -30,6 +30,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
   const { data, setData, put, processing, errors, reset } = useForm({
     customer_id: receipt.customer_id || "",
     title: receipt.title || "",
+    project_id: receipt.project_id || "",
     receipt_number: receipt.receipt_number || "",
     order_number: receipt.order_number || "",
     receipt_date: parseDateObject(receipt.receipt_date) || "",
@@ -318,6 +319,26 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                   />
                 </div>
                 <InputError message={errors.customer_id} className="text-sm" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-12 mt-2">
+              <Label htmlFor="project_id" className="md:col-span-2 col-span-12">
+                Project
+              </Label>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                <div className="md:w-1/2 w-full">
+                  <SearchableCombobox
+                    options={projects.map(project => ({
+                      id: project.id,
+                      name: project.project_name
+                    }))}
+                    value={data.project_id}
+                    onChange={(value) => setData("project_id", value)}
+                    placeholder="Select project"
+                  />
+                </div>
+                <InputError message={errors.project_id} className="text-sm" />
               </div>
             </div>
 

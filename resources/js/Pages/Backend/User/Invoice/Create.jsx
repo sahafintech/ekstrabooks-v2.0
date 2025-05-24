@@ -15,7 +15,7 @@ import { useState, useEffect } from "react";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 
-export default function Create({ customers = [], products = [], currencies = [], taxes = [], invoice_title, base_currency }) {
+export default function Create({ customers = [], products = [], currencies = [], taxes = [], invoice_title, base_currency, projects = [] }) {
   const [invoiceItems, setInvoiceItems] = useState([{
     product_id: "",
     product_name: "",
@@ -34,6 +34,7 @@ export default function Create({ customers = [], products = [], currencies = [],
     order_number: "",
     invoice_date: new Date(),
     due_date: "",
+    project_id: "",
     currency: base_currency,
     exchange_rate: 1,
     converted_total: 0,
@@ -297,6 +298,26 @@ export default function Create({ customers = [], products = [], currencies = [],
                   />
                 </div>
                 <InputError message={errors.customer_id} className="text-sm" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-12 mt-2">
+              <Label htmlFor="project_id" className="md:col-span-2 col-span-12">
+                Project
+              </Label>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                <div className="md:w-1/2 w-full">
+                  <SearchableCombobox
+                    options={projects.map(project => ({
+                      id: project.id,
+                      name: project.project_name
+                    }))}
+                    value={data.project_id}
+                    onChange={(value) => setData("project_id", value)}
+                    placeholder="Select project"
+                  />
+                </div>
+                <InputError message={errors.project_id} className="text-sm" />
               </div>
             </div>
 

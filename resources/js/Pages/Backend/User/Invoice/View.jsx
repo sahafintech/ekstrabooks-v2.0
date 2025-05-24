@@ -9,7 +9,7 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuTrigger
+    DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import PageHeader from "@/Components/PageHeader";
 import {
@@ -21,29 +21,41 @@ import {
     Edit,
     Facebook,
     MessageCircle,
-    Copy
+    Copy,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Table, TableBody, TableHeader, TableRow, TableHead, TableCell } from "@/Components/ui/table";
+import {
+    Table,
+    TableBody,
+    TableHeader,
+    TableRow,
+    TableHead,
+    TableCell,
+} from "@/Components/ui/table";
 import Modal from "@/Components/Modal";
 import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import InputError from "@/Components/InputError";
 import RichTextEditor from "@/Components/RichTextEditor";
-import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeSVG } from "qrcode.react";
 
-export default function View({ invoice, attachments, decimalPlace, email_templates }) {
+export default function View({
+    invoice,
+    attachments,
+    decimalPlace,
+    email_templates,
+}) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState({
         print: false,
         email: false,
-        pdf: false
+        pdf: false,
     });
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-    const [shareLink, setShareLink] = useState('');
+    const [shareLink, setShareLink] = useState("");
 
     const { data, setData, post, processing, errors, reset } = useForm({
         email: invoice?.customer?.email || "",
@@ -70,10 +82,10 @@ export default function View({ invoice, attachments, decimalPlace, email_templat
     }, [flash, toast]);
 
     const handlePrint = () => {
-        setIsLoading(prev => ({ ...prev, print: true }));
+        setIsLoading((prev) => ({ ...prev, print: true }));
         setTimeout(() => {
             window.print();
-            setIsLoading(prev => ({ ...prev, print: false }));
+            setIsLoading((prev) => ({ ...prev, print: false }));
         }, 300);
     };
 
@@ -93,7 +105,7 @@ export default function View({ invoice, attachments, decimalPlace, email_templat
     };
 
     const handleTemplateChange = (templateSlug) => {
-        const template = email_templates.find(t => t.slug === templateSlug);
+        const template = email_templates.find((t) => t.slug === templateSlug);
         if (template) {
             setData("template", templateSlug);
             setData("subject", template.subject);
@@ -102,15 +114,15 @@ export default function View({ invoice, attachments, decimalPlace, email_templat
     };
 
     const handleDownloadPDF = async () => {
-        setIsLoading(prev => ({ ...prev, pdf: true }));
+        setIsLoading((prev) => ({ ...prev, pdf: true }));
         try {
             // Dynamically import the required libraries
-            const html2canvas = (await import('html2canvas')).default;
-            const { jsPDF } = await import('jspdf');
+            const html2canvas = (await import("html2canvas")).default;
+            const { jsPDF } = await import("jspdf");
 
             // Get the content element
-            const content = document.querySelector('.print-container');
-            
+            const content = document.querySelector(".print-container");
+
             // Create a canvas from the content
             const canvas = await html2canvas(content, {
                 scale: 4,
@@ -119,48 +131,55 @@ export default function View({ invoice, attachments, decimalPlace, email_templat
                 windowWidth: content.scrollWidth,
                 windowHeight: content.scrollHeight,
                 allowTaint: true,
-                backgroundColor: '#ffffff'
+                backgroundColor: "#ffffff",
             });
 
             // Calculate dimensions
             const imgWidth = 210; // A4 width in mm
             const pageHeight = 297; // A4 height in mm
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            
+
             // Create PDF with higher quality
-            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdf = new jsPDF("p", "mm", "a4");
             let heightLeft = imgHeight;
             let position = 0;
-            let pageData = canvas.toDataURL('image/jpeg', 1.0);
+            let pageData = canvas.toDataURL("image/jpeg", 1.0);
 
             // Add first page
-            pdf.addImage(pageData, 'JPEG', 0, position, imgWidth, imgHeight);
+            pdf.addImage(pageData, "JPEG", 0, position, imgWidth, imgHeight);
             heightLeft -= pageHeight;
 
             // Add subsequent pages if content is longer than one page
             while (heightLeft >= 0) {
                 position = heightLeft - imgHeight;
                 pdf.addPage();
-                pdf.addImage(pageData, 'JPEG', 0, position, imgWidth, imgHeight);
+                pdf.addImage(
+                    pageData,
+                    "JPEG",
+                    0,
+                    position,
+                    imgWidth,
+                    imgHeight
+                );
                 heightLeft -= pageHeight;
             }
 
             // Save the PDF
             pdf.save(`Invoice_${invoice.invoice_number}.pdf`);
         } catch (error) {
-            console.error('Error generating PDF:', error);
+            console.error("Error generating PDF:", error);
             toast({
                 variant: "destructive",
                 title: "Error",
                 description: "Failed to generate PDF. Please try again.",
             });
         } finally {
-            setIsLoading(prev => ({ ...prev, pdf: false }));
+            setIsLoading((prev) => ({ ...prev, pdf: false }));
         }
     };
 
     const handleShareLink = () => {
-        const link = route('invoices.show_public_invoice', invoice.short_code);
+        const link = route("invoices.show_public_invoice", invoice.short_code);
         setShareLink(link);
         setIsShareModalOpen(true);
     };
@@ -175,11 +194,19 @@ export default function View({ invoice, attachments, decimalPlace, email_templat
 
     const handleWhatsAppShare = () => {
         const text = `Check out this invoice: ${shareLink}`;
-        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+        window.open(
+            `https://wa.me/?text=${encodeURIComponent(text)}`,
+            "_blank"
+        );
     };
 
     const handleFacebookShare = () => {
-        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareLink)}`, '_blank');
+        window.open(
+            `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+                shareLink
+            )}`,
+            "_blank"
+        );
     };
 
     return (
@@ -239,7 +266,13 @@ export default function View({ invoice, attachments, decimalPlace, email_templat
                                     <span>Share Link</span>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem asChild>
-                                    <Link href={route("invoices.edit", invoice.id)} className="flex items-center">
+                                    <Link
+                                        href={route(
+                                            "invoices.edit",
+                                            invoice.id
+                                        )}
+                                        className="flex items-center"
+                                    >
                                         <Edit className="mr-2 h-4 w-4" />
                                         <span>Edit Invoice</span>
                                     </Link>
@@ -336,7 +369,9 @@ export default function View({ invoice, attachments, decimalPlace, email_templat
                                     <Label htmlFor="message">Message</Label>
                                     <RichTextEditor
                                         value={data.message}
-                                        onChange={(content) => setData("message", content)}
+                                        onChange={(content) =>
+                                            setData("message", content)
+                                        }
                                         height={250}
                                     />
                                     <InputError
@@ -445,18 +480,43 @@ export default function View({ invoice, attachments, decimalPlace, email_templat
                                     </div>
                                 </div>
                                 <div className="md:text-right">
-                                    <h1 className="text-2xl font-bold">{invoice.title}</h1>
+                                    <h1 className="text-2xl font-bold">
+                                        {invoice.title}
+                                    </h1>
                                     <div className="mt-2 text-sm">
-                                        <p><span className="font-medium">Invoice #:</span> {invoice.invoice_number}</p>
-                                        <p><span className="font-medium">Invoice Date:</span> {invoice.invoice_date}</p>
-                                        <p><span className="font-medium">Due Date:</span> {invoice.due_date}</p>
+                                        <p>
+                                            <span className="font-medium">
+                                                Invoice #:
+                                            </span>{" "}
+                                            {invoice.invoice_number}
+                                        </p>
+                                        <p>
+                                            <span className="font-medium">
+                                                Invoice Date:
+                                            </span>{" "}
+                                            {invoice.invoice_date}
+                                        </p>
+                                        <p>
+                                            <span className="font-medium">
+                                                Due Date:
+                                            </span>{" "}
+                                            {invoice.due_date}
+                                        </p>
                                         {invoice.order_number && (
-                                            <p><span className="font-medium">Order Number:</span> {invoice.order_number}</p>
+                                            <p>
+                                                <span className="font-medium">
+                                                    Order Number:
+                                                </span>{" "}
+                                                {invoice.order_number}
+                                            </p>
                                         )}
                                     </div>
                                     <div className="mt-4 md:flex md:justify-end">
-                                        <QRCodeSVG 
-                                            value={route('invoices.show_public_invoice', invoice.short_code)}
+                                        <QRCodeSVG
+                                            value={route(
+                                                "invoices.show_public_invoice",
+                                                invoice.short_code
+                                            )}
                                             size={100}
                                             level="H"
                                             includeMargin={true}
@@ -470,14 +530,46 @@ export default function View({ invoice, attachments, decimalPlace, email_templat
 
                             {/* Customer Information */}
                             <div className="mb-8">
-                                <h3 className="font-medium text-lg mb-2">Bill To:</h3>
+                                <h3 className="font-medium text-lg mb-2">
+                                    Bill To:
+                                </h3>
                                 <div className="text-sm">
-                                    <p className="font-medium">{invoice.customer?.name}</p>
-                                    {invoice.customer?.company_name && <p>{invoice.customer?.company_name}</p>}
+                                    <p className="font-medium">
+                                        {invoice.customer?.name}
+                                    </p>
+                                    {invoice.customer?.company_name && (
+                                        <p>{invoice.customer?.company_name}</p>
+                                    )}
                                     <p>{invoice.customer?.address}</p>
                                     <p>{invoice.customer?.email}</p>
                                     <p>{invoice.customer?.mobile}</p>
                                 </div>
+
+                                {invoice.project && (
+                                    <>
+                                        <h3 className="font-medium text-lg my-2">
+                                            Project:
+                                        </h3>
+                                        <div className="text-sm">
+                                            <p>
+                                                Project Name:{" "}
+                                                {invoice.project.project_name}
+                                            </p>
+                                            <p>
+                                                Project Code:{" "}
+                                                {invoice.project.project_code}
+                                            </p>
+                                            <p>
+                                                Start Date:{" "}
+                                                {invoice.project.start_date}
+                                            </p>
+                                            <p>
+                                                End Date:{" "}
+                                                {invoice.project.end_date}
+                                            </p>
+                                        </div>
+                                    </>
+                                )}
                             </div>
 
                             {/* Invoice Items */}
@@ -487,20 +579,43 @@ export default function View({ invoice, attachments, decimalPlace, email_templat
                                         <TableRow>
                                             <TableHead>Item</TableHead>
                                             <TableHead>Description</TableHead>
-                                            <TableHead className="text-right">Quantity</TableHead>
-                                            <TableHead className="text-right">Unit Cost</TableHead>
-                                            <TableHead className="text-right">Total</TableHead>
+                                            <TableHead className="text-right">
+                                                Quantity
+                                            </TableHead>
+                                            <TableHead className="text-right">
+                                                Unit Cost
+                                            </TableHead>
+                                            <TableHead className="text-right">
+                                                Total
+                                            </TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {invoice.items.map((item, index) => (
                                             <TableRow key={index}>
-                                                <TableCell className="font-medium">{item.product_name}</TableCell>
-                                                <TableCell>{item.description}</TableCell>
-                                                <TableCell className="text-right">{item.quantity}</TableCell>
-                                                <TableCell className="text-right">{formatCurrency(item.unit_cost, invoice.currency, decimalPlace)}</TableCell>
+                                                <TableCell className="font-medium">
+                                                    {item.product_name}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {item.description}
+                                                </TableCell>
                                                 <TableCell className="text-right">
-                                                    {formatCurrency(item.quantity * item.unit_cost, invoice.currency, decimalPlace)}
+                                                    {item.quantity}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {formatCurrency(
+                                                        item.unit_cost,
+                                                        invoice.currency,
+                                                        decimalPlace
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {formatCurrency(
+                                                        item.quantity *
+                                                            item.unit_cost,
+                                                        invoice.currency,
+                                                        decimalPlace
+                                                    )}
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -512,48 +627,81 @@ export default function View({ invoice, attachments, decimalPlace, email_templat
                             <div className="flex justify-end">
                                 <div className="w-full md:w-1/2 lg:w-1/3 space-y-2">
                                     <div className="flex justify-between py-2 border-t">
-                                        <span className="font-medium">Subtotal:</span>
-                                        <span>{formatCurrency(invoice.sub_total, invoice.business.currency, decimalPlace)}</span>
+                                        <span className="font-medium">
+                                            Subtotal:
+                                        </span>
+                                        <span>
+                                            {formatCurrency(
+                                                invoice.sub_total,
+                                                invoice.business.currency,
+                                                decimalPlace
+                                            )}
+                                        </span>
                                     </div>
 
                                     {/* Tax details */}
                                     {invoice.taxes.map((tax, index) => (
-                                        <div key={index} className="flex justify-between py-2">
+                                        <div
+                                            key={index}
+                                            className="flex justify-between py-2"
+                                        >
+                                            <span>{tax.name}:</span>
                                             <span>
-                                                {tax.name}:
+                                                {formatCurrency(
+                                                    tax.amount,
+                                                    invoice.business.currency,
+                                                    decimalPlace
+                                                )}
                                             </span>
-                                            <span>{formatCurrency(tax.amount, invoice.business.currency, decimalPlace)}</span>
                                         </div>
                                     ))}
 
                                     {/* Discount */}
                                     {invoice.discount > 0 && (
                                         <div className="flex justify-between py-2">
+                                            <span>Discount</span>
                                             <span>
-                                                Discount
+                                                -
+                                                {formatCurrency(
+                                                    invoice.discount,
+                                                    invoice.business.currency,
+                                                    decimalPlace
+                                                )}
                                             </span>
-                                            <span>-{formatCurrency(invoice.discount, invoice.business.currency, decimalPlace)}</span>
                                         </div>
                                     )}
 
                                     {/* Total */}
                                     <div className="flex justify-between py-3 border-t border-b font-bold text-lg">
                                         <span>Total:</span>
-                                        <span>{formatCurrency(invoice.grand_total, invoice.business.currency, decimalPlace)}</span>
+                                        <span>
+                                            {formatCurrency(
+                                                invoice.grand_total,
+                                                invoice.business.currency,
+                                                decimalPlace
+                                            )}
+                                        </span>
                                     </div>
 
                                     {/* Base currency equivalent if different currency */}
-                                    {invoice.currency !== invoice.business.currency && (
+                                    {invoice.currency !==
+                                        invoice.business.currency && (
                                         <div className="flex justify-between py-2 text-gray-500 text-sm">
                                             <span>Exchange Rate:</span>
                                             <span>
-                                                1 {invoice.business.currency} = {formatCurrency(invoice.exchange_rate, invoice.currency, decimalPlace)}
+                                                1 {invoice.business.currency} ={" "}
+                                                {formatCurrency(
+                                                    invoice.exchange_rate,
+                                                    invoice.currency,
+                                                    decimalPlace
+                                                )}
                                             </span>
                                         </div>
                                     )}
 
                                     {/* Base currency equivalent total */}
-                                    {invoice.currency !== invoice.business.currency && (
+                                    {invoice.currency !==
+                                        invoice.business.currency && (
                                         <div className="flex justify-between py-2 text-sm text-gray-600">
                                             <span>Equivalent to:</span>
                                             <span>
@@ -573,15 +721,23 @@ export default function View({ invoice, attachments, decimalPlace, email_templat
                                 <div className="mt-8 space-y-4">
                                     {invoice.note && (
                                         <div>
-                                            <h3 className="font-medium mb-1">Notes:</h3>
-                                            <p className="text-sm">{invoice.note}</p>
+                                            <h3 className="font-medium mb-1">
+                                                Notes:
+                                            </h3>
+                                            <p className="text-sm">
+                                                {invoice.note}
+                                            </p>
                                         </div>
                                     )}
 
                                     {invoice.footer && (
                                         <div>
-                                            <h3 className="font-medium mb-1">Terms & Conditions:</h3>
-                                            <p className="text-sm">{invoice.footer}</p>
+                                            <h3 className="font-medium mb-1">
+                                                Terms & Conditions:
+                                            </h3>
+                                            <p className="text-sm">
+                                                {invoice.footer}
+                                            </p>
                                         </div>
                                     )}
                                 </div>
@@ -590,19 +746,23 @@ export default function View({ invoice, attachments, decimalPlace, email_templat
                             {/* Attachments */}
                             {attachments && attachments.length > 0 && (
                                 <div className="mt-8">
-                                    <h3 className="font-medium mb-2">Attachments:</h3>
+                                    <h3 className="font-medium mb-2">
+                                        Attachments:
+                                    </h3>
                                     <ul className="list-disc pl-5">
-                                        {attachments.map((attachment, index) => (
-                                            <li key={index}>
-                                                <a
-                                                    href={`/storage/app/${attachment.file_path}`}
-                                                    target="_blank"
-                                                    className="text-blue-600 hover:underline"
-                                                >
-                                                    {attachment.file_name}
-                                                </a>
-                                            </li>
-                                        ))}
+                                        {attachments.map(
+                                            (attachment, index) => (
+                                                <li key={index}>
+                                                    <a
+                                                        href={`/storage/app/${attachment.file_path}`}
+                                                        target="_blank"
+                                                        className="text-blue-600 hover:underline"
+                                                    >
+                                                        {attachment.file_name}
+                                                    </a>
+                                                </li>
+                                            )
+                                        )}
                                     </ul>
                                 </div>
                             )}
@@ -613,29 +773,29 @@ export default function View({ invoice, attachments, decimalPlace, email_templat
 
             {/* Print Styles */}
             <style jsx global>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          .print-container,
-          .print-container * {
-            visibility: visible;
-          }
-          .print-container {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-          }
+                @media print {
+                    body * {
+                        visibility: hidden;
+                    }
+                    .print-container,
+                    .print-container * {
+                        visibility: visible;
+                    }
+                    .print-container {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                    }
 
-          /* Hide action buttons when printing */
-          button,
-          .dropdown,
-          .flex.space-x-2 {
-            display: none !important;
-          }
-        }
-      `}</style>
+                    /* Hide action buttons when printing */
+                    button,
+                    .dropdown,
+                    .flex.space-x-2 {
+                        display: none !important;
+                    }
+                }
+            `}</style>
         </AuthenticatedLayout>
     );
 }

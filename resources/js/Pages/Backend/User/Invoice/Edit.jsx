@@ -15,7 +15,7 @@ import DateTimePicker from "@/Components/DateTimePicker";
 import { Plus, Trash2 } from "lucide-react";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 
-export default function Edit({ customers = [], products = [], currencies = [], taxes = [], invoice, taxIds }) {
+export default function Edit({ customers = [], products = [], currencies = [], taxes = [], invoice, taxIds, projects = [] }) {
   const [invoiceItems, setInvoiceItems] = useState([{
     product_id: "",
     product_name: "",
@@ -34,6 +34,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     order_number: invoice.order_number || "",
     invoice_date: parseDateObject(invoice.invoice_date),
     due_date: parseDateObject(invoice.due_date),
+    project_id: invoice.project_id || "",
     currency: invoice.currency || "",
     exchange_rate: invoice.exchange_rate || 1,
     converted_total: invoice.converted_total || 0,
@@ -326,6 +327,26 @@ export default function Edit({ customers = [], products = [], currencies = [], t
             </div>
 
             <div className="grid grid-cols-12 mt-2">
+              <Label htmlFor="project_id" className="md:col-span-2 col-span-12">
+                Project
+              </Label>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                <div className="md:w-1/2 w-full">
+                  <SearchableCombobox
+                    options={projects.map(project => ({
+                      id: project.id,
+                      name: project.project_name
+                    }))}
+                    value={data.project_id}
+                    onChange={(value) => setData("project_id", value)}
+                    placeholder="Select project"
+                  />
+                </div>
+                <InputError message={errors.project_id} className="text-sm" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-12 mt-2">
               <Label htmlFor="title" className="md:col-span-2 col-span-12">
                 Title *
               </Label>
@@ -609,9 +630,9 @@ export default function Edit({ customers = [], products = [], currencies = [], t
 
             <div className="mt-6 space-y-2">
               <div className="space-y-2">
-                <div className="text-sm">Subtotal: {calculateSubtotal().toFixed(2)}</div>
-                <div className="text-sm">Taxes: {calculateTaxes().toFixed(2)}</div>
-                <div className="text-sm">Discount: {calculateDiscount().toFixed(2)}</div>
+                <div className="text-sm">Subtotal: {Number(calculateSubtotal()).toFixed(2)}</div>
+                <div className="text-sm">Taxes: {Number(calculateTaxes()).toFixed(2)}</div>
+                <div className="text-sm">Discount: {Number(calculateDiscount()).toFixed(2)}</div>
                 {renderTotal()}
               </div>
 

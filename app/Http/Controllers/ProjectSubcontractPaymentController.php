@@ -33,7 +33,7 @@ class ProjectSubcontractPaymentController extends Controller
         $payment = new ProjectSubcontractPayment();
         $contract = ProjectSubcontract::find($request->project_subcontract_id);
 
-        if ($request->amount > $contract->paid) {
+        if ($request->amount > ($contract->grand_total - $contract->paid)) {
             return redirect()->back()->withErrors(['payment_amount' => _lang('Payment amount cannot be greater than the paid amount')])->withInput();
         }
 
@@ -118,7 +118,7 @@ class ProjectSubcontractPaymentController extends Controller
         $contract = ProjectSubcontract::find($request->project_subcontract_id);
         $payment = ProjectSubcontractPayment::findOrFail($id);
 
-        if ($request->amount > $contract->paid) {
+        if ($request->amount > ($contract->grand_total - $contract->paid)) {
             return redirect()->back()->withErrors(['payment_amount' => _lang('Payment amount cannot be greater than the paid amount')])->withInput();
         }
 
@@ -262,7 +262,7 @@ class ProjectSubcontractPaymentController extends Controller
 
     public function show($id)
     {
-        $payment = ProjectSubcontractPayment::where('id', $id)->with('project_subcontract', 'account', 'vendor')->first();
+        $payment = ProjectSubcontractPayment::where('id', $id)->with('project_subcontract.project', 'account', 'vendor', 'business')->first();
 
         return Inertia::render('Backend/User/Construction/Project/Subcontract/PaymentVoucher', [
             'payment' => $payment,

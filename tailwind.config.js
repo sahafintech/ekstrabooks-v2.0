@@ -15,7 +15,7 @@ export default {
     	extend: {
     		fontFamily: {
     			sans: [
-    				'Inter',
+    				'Zoho Puvi',
                     ...defaultTheme.fontFamily.sans
                 ]
     		},

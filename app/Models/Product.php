@@ -100,7 +100,7 @@ class Product extends Model {
             )
             ->join('invoices', 'invoices.id', '=', 'invoice_items.invoice_id')
             ->join('customers', 'customers.id', '=', 'invoices.customer_id')
-            ->selectRaw("'sale' as type")
+            ->selectRaw("'Credit Invoice' as type")
             ->selectRaw('customers.name as party_name')
             ->selectRaw("CONCAT('/user/invoices/', invoices.id) as reference_url");
 
@@ -115,7 +115,7 @@ class Product extends Model {
             )
             ->join('receipts', 'receipts.id', '=', 'receipt_items.receipt_id')
             ->join('customers', 'customers.id', '=', 'receipts.customer_id')
-            ->selectRaw("'receipt' as type")
+            ->selectRaw("'Cash Invoice' as type")
             ->selectRaw('customers.name as party_name')
             ->selectRaw("CONCAT('/user/receipts/', receipts.id) as reference_url");
 
@@ -130,9 +130,9 @@ class Product extends Model {
             )
             ->join('purchases', 'purchases.id', '=', 'purchase_items.purchase_id')
             ->join('vendors', 'vendors.id', '=', 'purchases.vendor_id')
-            ->selectRaw("'purchase' as type")
+            ->selectRaw("CASE WHEN purchases.cash = 1 THEN 'Cash Purchase' ELSE 'Bill Invoice' END as type")
             ->selectRaw('vendors.name as party_name')
-            ->selectRaw("CONCAT('/user/purchases/', purchases.id) as reference_url");
+            ->selectRaw("CASE WHEN purchases.cash = 1 THEN CONCAT('/user/cash_purchases/', purchases.id) ELSE CONCAT('/user/bill_invoices/', purchases.id) END as reference_url");
 
         $sale_returns = $this->sales_return_items()
             ->with('sales_return')
@@ -145,7 +145,7 @@ class Product extends Model {
             )
             ->join('sales_returns', 'sales_returns.id', '=', 'sales_return_items.sales_return_id')
             ->join('customers', 'customers.id', '=', 'sales_returns.customer_id')
-            ->selectRaw("'sale_return' as type")
+            ->selectRaw("'Sales Return' as type")
             ->selectRaw('customers.name as party_name')
             ->selectRaw("CONCAT('/user/sales_returns/', sales_returns.id) as reference_url");
 
@@ -160,7 +160,7 @@ class Product extends Model {
             )
             ->join('purchase_returns', 'purchase_returns.id', '=', 'purchase_return_items.purchase_return_id')
             ->join('vendors', 'vendors.id', '=', 'purchase_returns.vendor_id')
-            ->selectRaw("'purchase_return' as type")
+            ->selectRaw("'Purchase Return' as type")
             ->selectRaw('vendors.name as party_name')
             ->selectRaw("CONCAT('/user/purchase_returns/', purchase_returns.id) as reference_url");
 

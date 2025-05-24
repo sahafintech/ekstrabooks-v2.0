@@ -43,6 +43,10 @@ class Invoice extends Model {
         return $this->hasMany(Transaction::class, 'ref_id')->where('ref_type', 'invoice')->withoutGlobalScopes();
     }
 
+    public function project() {
+        return $this->belongsTo(Project::class, 'project_id')->withDefault()->withoutGlobalScopes();
+    }
+
     public function receive_payments() {
         return $this->belongsToMany(ReceivePayment::class, 'invoice_payments', 'invoice_id', 'payment_id');
     }

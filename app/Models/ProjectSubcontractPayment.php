@@ -18,6 +18,21 @@ class ProjectSubcontractPayment extends Model
         return $this->belongsTo(Vendor::class);
     }
 
+    public function project_subcontract()
+    {
+        return $this->belongsTo(ProjectSubcontract::class);
+    }
+
+    public function account()
+    {
+        return $this->belongsTo(Account::class);
+    }
+
+    public function business()
+    {
+        return $this->belongsTo(Business::class);
+    }
+
     protected function date(): Attribute {
         $date_format = get_date_format();
 

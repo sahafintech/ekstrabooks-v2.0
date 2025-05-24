@@ -1,5 +1,5 @@
-import React from 'react';
-import { Head } from '@inertiajs/react';
+import React, { useState } from 'react';
+import { Head, router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { SidebarInset } from "@/Components/ui/sidebar";
 import PageHeader from "@/Components/PageHeader";
@@ -8,17 +8,36 @@ import { Badge } from "@/Components/ui/badge";
 import { Button } from "@/Components/ui/button";
 import { Link } from '@inertiajs/react';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/Components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/Components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/Components/ui/tabs";
+import { formatCurrency } from '@/lib/utils';
 
-const ProductView = ({ auth, product, transactions, suppliers, id }) => {
-  // Format currency with proper ISO 4217 code
-  const formatCurrency = (amount, currencyCode = 'USD') => {
-    return new Intl.NumberFormat('en-US', { 
-      style: 'currency', 
-      currency: currencyCode 
-    }).format(amount);
+const ProductView = ({ product, transactions, suppliers, id, activeTab }) => {
+
+  const [currentTab, setCurrentTab] = useState(activeTab);
+
+  const ProductStatusBadge = ({ status }) => {
+    const statusMap = {
+      1: { label: "Active", className: "text-green-600 bg-green-200 px-3 py-1 rounded text-sm" },
+      0: { label: "Disabled", className: "text-red-600 bg-red-200 px-3 py-1 rounded text-sm" },
+    };
+
+    return (
+      <span className={statusMap[status].className}>
+        {statusMap[status].label}
+      </span>
+    );
   };
+  
+
+  // Handle tab change
+  const handleTabChange = (value) => {
+    setCurrentTab(value);
+    router.get(
+        route("products.show", id),
+        { tab: value },
+        { preserveState: true }
+    );
+};
 
   return (
     <AuthenticatedLayout>
@@ -36,7 +55,7 @@ const ProductView = ({ auth, product, transactions, suppliers, id }) => {
             </Link>
           </div>
 
-          <Tabs defaultValue="details" className="w-full">
+          <Tabs defaultValue={currentTab} onValueChange={handleTabChange} className="w-full">
             <TabsList className="mb-4">
               <TabsTrigger value="details">Product Details</TabsTrigger>
               <TabsTrigger value="transactions">Transactions</TabsTrigger>
@@ -44,8 +63,8 @@ const ProductView = ({ auth, product, transactions, suppliers, id }) => {
             </TabsList>
 
             <TabsContent value="details" className="space-y-4">
-              <Card>
-                <CardContent className="pt-6">
+              <div>
+                <div className="pt-6">
                   <div className="grid grid-cols-12 mt-2">
                     <Label className="md:col-span-2 col-span-12">Image</Label>
                     <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
@@ -153,7 +172,7 @@ const ProductView = ({ auth, product, transactions, suppliers, id }) => {
                           {product.allow_for_selling ? 'Enabled' : 'Disabled'}
                         </Badge>
                         {product.allow_for_selling && (
-                          <p className="text-sm">Price: {formatCurrency(product.selling_price, product.currency || 'USD')}</p>
+                          <p className="text-sm">Price: {formatCurrency({ amount: product.selling_price })}</p>
                         )}
                       </div>
                     </div>
@@ -167,7 +186,7 @@ const ProductView = ({ auth, product, transactions, suppliers, id }) => {
                           {product.allow_for_purchasing ? 'Enabled' : 'Disabled'}
                         </Badge>
                         {product.allow_for_purchasing && (
-                          <p className="text-sm">Cost: {formatCurrency(product.purchase_cost, product.currency || 'USD')}</p>
+                          <p className="text-sm">Cost: {formatCurrency({ amount: product.purchase_cost })}</p>
                         )}
                       </div>
                     </div>
@@ -190,9 +209,7 @@ const ProductView = ({ auth, product, transactions, suppliers, id }) => {
                   <div className="grid grid-cols-12 mt-2">
                     <Label className="md:col-span-2 col-span-12">Status</Label>
                     <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                      <Badge variant={product.status === 'active' ? 'success' : 'destructive'}>
-                        {product.status}
-                      </Badge>
+                      <ProductStatusBadge status={product.status} />
                     </div>
                   </div>
 
@@ -203,11 +220,11 @@ const ProductView = ({ auth, product, transactions, suppliers, id }) => {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="border rounded-md p-3">
                           <p className="text-xs text-gray-500">Units Sold</p>
-                          <p className="text-lg font-semibold">{product.invoice_items_sum_quantity || 0}</p>
+                          <p className="text-lg font-semibold">{Number(product.invoice_items_sum_quantity || 0) + Number(product.receipt_items_sum_quantity || 0)}</p>
                         </div>
                         <div className="border rounded-md p-3">
                           <p className="text-xs text-gray-500">Total Revenue</p>
-                          <p className="text-lg font-semibold">{formatCurrency(product.invoice_items_sum_sub_total || 0, product.currency || 'USD')}</p>
+                          <p className="text-lg font-semibold">{formatCurrency({ amount: Number(product.invoice_items_sum_sub_total || 0) + Number(product.receipt_items_sum_sub_total || 0) })}</p>
                         </div>
                       </div>
                     </div>
@@ -223,48 +240,44 @@ const ProductView = ({ auth, product, transactions, suppliers, id }) => {
                         </div>
                         <div className="border rounded-md p-3">
                           <p className="text-xs text-gray-500">Total Cost</p>
-                          <p className="text-lg font-semibold">{formatCurrency(product.purchase_items_sum_sub_total || 0, product.currency || 'USD')}</p>
+                          <p className="text-lg font-semibold">{formatCurrency({ amount: product.purchase_items_sum_sub_total || 0 })}</p>
                         </div>
                       </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </TabsContent>
 
             <TabsContent value="transactions">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Transaction History</CardTitle>
-                </CardHeader>
-                <CardContent>
+              <div>
+                <div className="pt-6">
                   {transactions && transactions.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Date</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Amount</TableHead>
+                          <TableHead>Reference</TableHead>
+                          <TableHead>Quantity</TableHead>
+                          <TableHead>Unit Price</TableHead>
+                          <TableHead>Total Price</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {transactions.map((transaction, index) => (
                           <TableRow key={index}>
-                            <TableCell>{transaction.trans_date}</TableCell>
-                            <TableCell>{transaction.description}</TableCell>
+                            <TableCell>{transaction.date}</TableCell>
+                            <Link href={transaction.reference_url} className="underline text-blue-500">
+                              <TableCell>{transaction.type} - {transaction.reference}</TableCell>
+                            </Link>
                             <TableCell>
-                              <Badge variant={transaction.dr_cr === 'dr' ? 'default' : 'outline'}>
-                                {transaction.dr_cr === 'dr' ? 'Debit' : 'Credit'}
-                              </Badge>
+                              {transaction.quantity}
                             </TableCell>
                             <TableCell>
-                              {formatCurrency(transaction.transaction_amount, transaction.transaction_currency)}
-                              {transaction.transaction_currency !== transaction.base_currency && (
-                                <div className="text-xs text-gray-500">
-                                  {formatCurrency(transaction.base_currency_amount, 'USD')} (Base)
-                                </div>
-                              )}
+                              {formatCurrency({ amount: transaction.unit_price })}
+                            </TableCell>
+                            <TableCell>
+                              {formatCurrency({ amount: transaction.total })}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -273,37 +286,34 @@ const ProductView = ({ auth, product, transactions, suppliers, id }) => {
                   ) : (
                     <p className="text-center py-4">No transactions found for this product.</p>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </TabsContent>
 
             <TabsContent value="suppliers">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Suppliers</CardTitle>
-                </CardHeader>
-                <CardContent>
+              <div>
+                <div className="pt-6">
                   {suppliers && suppliers.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Supplier Name</TableHead>
-                          <TableHead>Contact</TableHead>
+                          <TableHead>Purchase Count</TableHead>
+                          <TableHead>Total Quantity</TableHead>
+                          <TableHead>Average Price</TableHead>
                           <TableHead>Last Supply Date</TableHead>
-                          <TableHead>Quantity</TableHead>
-                          <TableHead>Price</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {suppliers.map((supplier, index) => (
                           <TableRow key={index}>
                             <TableCell>{supplier.name}</TableCell>
-                            <TableCell>{supplier.contact || 'N/A'}</TableCell>
-                            <TableCell>{supplier.last_supply_date || 'N/A'}</TableCell>
-                            <TableCell>{supplier.quantity || 0}</TableCell>
+                            <TableCell>{supplier.purchase_count || 0}</TableCell>
+                            <TableCell>{supplier.total_quantity || 0}</TableCell>
                             <TableCell>
-                              {formatCurrency(supplier.price || 0, supplier.currency || 'USD')}
+                              {formatCurrency({ amount: supplier.avg_unit_cost || 0 })}
                             </TableCell>
+                            <TableCell>{supplier.last_purchase_date || 'N/A'}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -311,8 +321,8 @@ const ProductView = ({ auth, product, transactions, suppliers, id }) => {
                   ) : (
                     <p className="text-center py-4">No suppliers found for this product.</p>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         </div>
