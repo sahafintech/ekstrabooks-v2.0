@@ -249,53 +249,53 @@ export default function DashboardUser({
 
                         {/* Dashboard Stats */}
                         <div className="grid auto-rows-min gap-2 md:grid-cols-2 lg:grid-cols-4">
-                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm">
-                                <div className="text-sm text-muted-foreground">
+                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-200 text-primary">
+                                <div className="text-sm">
                                     Total Income
                                 </div>
                                 <div className="text-xl font-semibold">
                                     {formatCurrency(current_month_income)}
                                 </div>
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-1 text-xs">
                                     <DollarSign className="h-4 w-4" />
                                     <span>Income</span>
                                 </div>
                             </div>
 
-                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm">
-                                <div className="text-sm text-muted-foreground">
+                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-200 text-primary">
+                                <div className="text-sm">
                                     Total Expense
                                 </div>
                                 <div className="text-xl font-semibold">
                                     {formatCurrency(current_month_expense)}
                                 </div>
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-1 text-xs">
                                     <Wallet className="h-4 w-4" />
                                     <span>Expense</span>
                                 </div>
                             </div>
 
-                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm">
-                                <div className="text-sm text-muted-foreground">
+                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-200 text-primary">
+                                <div className="text-sm">
                                     Receivable
                                 </div>
                                 <div className="text-xl font-semibold">
                                     {formatCurrency(AccountsReceivable)}
                                 </div>
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-1 text-xs">
                                     <CreditCard className="h-4 w-4" />
                                     <span>Receivable</span>
                                 </div>
                             </div>
 
-                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm">
-                                <div className="text-sm text-muted-foreground">
+                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-200 text-primary">
+                                <div className="text-sm">
                                     Payable
                                 </div>
                                 <div className="text-xl font-semibold">
                                     {formatCurrency(AccountsPayable)}
                                 </div>
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-1 text-xs">
                                     <CreditCard className="h-4 w-4" />
                                     <span>Payable</span>
                                 </div>

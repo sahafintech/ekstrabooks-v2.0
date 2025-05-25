@@ -26,6 +26,9 @@ import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
+import { Label } from "@/Components/ui/label";
+import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 
 // Delete Confirmation Modal Component
 const DeleteUserModal = ({ show, onClose, onConfirm, processing }) => (
@@ -91,32 +94,102 @@ const DeleteAllUsersModal = ({
 );
 
 // change role modal
-const ChangeRoleModal = ({ show, onClose, onConfirm, processing, user }) => (
-    <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
-            <h2 className="text-lg font-medium">Change Role for {user.name}</h2>
-            <div className="mt-6 flex justify-end">
-                <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={onClose}
-                    className="mr-3"
-                >
-                    Cancel
-                </Button>
-                <Button type="submit" variant="default" disabled={processing}>
-                    Change Role
-                </Button>
-            </div>
-        </form>
-    </Modal>
-);
+const ChangeRoleModal = ({ show, onClose, onConfirm, processing, user, roles, businesses }) => {
+    const [data, setData] = useState({
+        role_id: user?.pivot?.role_id,
+        business_id: [user?.pivot?.business_id],
+    });
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        onConfirm(data);
+    };
+
+    if (!user) return null;
+
+    return (
+        <Modal show={show} onClose={onClose}>
+            <form onSubmit={handleSubmit}>
+                <h2 className="text-lg font-medium">Change Role for {user.name}</h2>
+                
+                <div className="grid grid-cols-12 mt-6">
+                    <Label
+                        htmlFor="role_id"
+                        className="md:col-span-2 col-span-12"
+                    >
+                        Role *
+                    </Label>
+                    <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                        <SearchableCombobox
+                            id="role_id"
+                            label="Role"
+                            options={[
+                                { id: "admin", name: "Admin" },
+                                ...roles.map((role) => ({
+                                    id: role.id,
+                                    name: role.name,
+                                })),
+                            ]}
+                            value={data.role_id}
+                            onChange={(value) =>
+                                setData({ ...data, role_id: value })
+                            }
+                            required
+                            placeholder="Select Role"
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-12 mt-2">
+                    <Label
+                        htmlFor="business_id"
+                        className="md:col-span-2 col-span-12"
+                    >
+                        Business *
+                    </Label>
+                    <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                        <SearchableMultiSelectCombobox
+                            id="business_id"
+                            label="Business"
+                            options={businesses.map((business) => ({
+                                id: business.id,
+                                name: business.name,
+                            }))}
+                            value={data.business_id}
+                            onChange={(value) =>
+                                setData({ ...data, business_id: value })
+                            }
+                            required
+                            placeholder="Select Business"
+                        />
+                    </div>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={onClose}
+                        className="mr-3"
+                    >
+                        Cancel
+                    </Button>
+                    <Button type="submit" variant="default" disabled={processing}>
+                        Change Role
+                    </Button>
+                </div>
+            </form>
+        </Modal>
+    );
+};
 
 export default function List({
     business = {},
     users = {},
     meta = {},
     filters = {},
+    roles = [],
+    businesses = [],
 }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
@@ -132,6 +205,9 @@ export default function List({
     const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
     const [roleToDelete, setRoleToDelete] = useState(null);
     const [processing, setProcessing] = useState(false);
+
+    const [showChangeRoleModal, setShowChangeRoleModal] = useState(false);
+    const [selectedUser, setSelectedUser] = useState(null);
 
     useEffect(() => {
         if (flash && flash.success) {
@@ -149,9 +225,6 @@ export default function List({
             });
         }
     }, [flash, toast]);
-
-    const { auth } = usePage().props;
-    const userId = auth.user.id;
 
     const toggleSelectAll = () => {
         if (isAllSelected) {
@@ -253,6 +326,29 @@ export default function List({
                     setShowDeleteAllModal(false);
                     setSelectedUsers([]);
                     setIsAllSelected(false);
+                    setProcessing(false);
+                },
+                onError: () => {
+                    setProcessing(false);
+                },
+            }
+        );
+    };
+
+    const handleChangeRole = (user) => {
+        setSelectedUser(user);
+        setShowChangeRoleModal(true);
+    };
+
+    const handleRoleChange = (data) => {
+        setProcessing(true);
+        router.post(
+            route("system_users.change_role", [selectedUser.id, business.id]),
+            data,
+            {
+                onSuccess: () => {
+                    setShowChangeRoleModal(false);
+                    setSelectedUser(null);
                     setProcessing(false);
                 },
                 onError: () => {
@@ -448,13 +544,7 @@ export default function List({
                                                                     icon: (
                                                                         <Edit className="h-4 w-4" />
                                                                     ),
-                                                                    href: route(
-                                                                        "system_users.change_role",
-                                                                        [
-                                                                            user.id,
-                                                                            business.id,
-                                                                        ]
-                                                                    ),
+                                                                    onClick: () => handleChangeRole(user),
                                                                 },
                                                                 {
                                                                     label: "Delete",
@@ -564,13 +654,15 @@ export default function List({
                 count={selectedUsers.length}
             />
 
-            {/* <ChangeRoleModal
-        show={showChangeRoleModal}
-        onClose={() => setShowChangeRoleModal(false)}
-        onConfirm={handleChangeRole}
-        processing={processing}
-        user={selectedUser}
-      /> */}
+            <ChangeRoleModal
+                show={showChangeRoleModal}
+                onClose={() => setShowChangeRoleModal(false)}
+                onConfirm={handleRoleChange}
+                processing={processing}
+                user={selectedUser}
+                roles={roles}
+                businesses={businesses}
+            />
         </AuthenticatedLayout>
     );
 }

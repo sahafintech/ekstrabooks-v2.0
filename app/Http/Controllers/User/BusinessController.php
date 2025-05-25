@@ -9,6 +9,7 @@ use App\Models\BusinessBankAccount;
 use App\Models\BusinessSetting;
 use App\Models\BusinessType;
 use App\Models\Currency;
+use App\Models\Role;
 use Database\Seeders\BusinessSettingSeeder;
 use Database\Seeders\CurrencySeeder;
 use Illuminate\Http\Request;
@@ -244,6 +245,7 @@ class BusinessController extends Controller
         return Inertia::render('Backend/User/Business/SystemUser/List', [
             'business' => $business->only(['id', 'name']),
             'users' => $users->items(),
+            'roles' => Role::all(),
             'meta' => [
                 'current_page' => $users->currentPage(),
                 'from' => $users->firstItem(),

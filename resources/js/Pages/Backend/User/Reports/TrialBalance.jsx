@@ -24,22 +24,22 @@ import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn, formatCurrency } from "@/lib/utils";
 
-export default function TrialBalance({ report_data, date1, date2, meta = {}, base_currency, business_name }) {
+export default function TrialBalance({ report_data, date1, date2, business_name }) {
     // Function to render account tables by type
     const renderAccountTypeTable = (reportData, accountType, title, isDebitMinusCredit = true) => {
         if (!reportData[accountType] || reportData[accountType].length === 0) return null;
 
         return (
-            <>
-                <h1 className="text-lg font-bold p-3 underline">{title}</h1>
+            <div className="mb-8">
+                <h3 className="text-left underline font-bold mb-2">{title}</h3>
                 <Table>
                     <TableHeader>
                         <TableRow>
                             <TableHead>Account Code</TableHead>
                             <TableHead>Account Name</TableHead>
-                            <TableHead>Debit</TableHead>
-                            <TableHead>Credit</TableHead>
-                            <TableHead>Balance</TableHead>
+                            <TableHead className="text-right">Debit</TableHead>
+                            <TableHead className="text-right">Credit</TableHead>
+                            <TableHead className="text-right">Balance</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -53,17 +53,18 @@ export default function TrialBalance({ report_data, date1, date2, meta = {}, bas
                                 <TableRow key={account.id}>
                                     <TableCell>{account.account_code || 'N/A'}</TableCell>
                                     <TableCell>{account.account_name || 'N/A'}</TableCell>
-                                    <TableCell>{formatCurrency({ amount: account.dr_amount || 0 })}</TableCell>
-                                    <TableCell>{formatCurrency({ amount: account.cr_amount || 0 })}</TableCell>
-                                    <TableCell>{formatCurrency({ amount: balance || 0 })}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency({ amount: account.dr_amount || 0 })}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency({ amount: account.cr_amount || 0 })}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency({ amount: balance || 0 })}</TableCell>
                                 </TableRow>
                             );
                         })}
                     </TableBody>
                 </Table>
-            </>
+            </div>
         );
     };
+
     const { data, setData, post, processing } = useForm({
         date1: date1,
         date2: date2,
@@ -131,9 +132,9 @@ export default function TrialBalance({ report_data, date1, date2, meta = {}, bas
                             <tr>
                                 <th>Account Code</th>
                                 <th>Account Name</th>
-                                <th>Debit</th>
-                                <th>Credit</th>
-                                <th>Balance</th>
+                                <th class="text-right">Debit</th>
+                                <th class="text-right">Credit</th>
+                                <th class="text-right">Balance</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -318,7 +319,18 @@ export default function TrialBalance({ report_data, date1, date2, meta = {}, bas
                             <Button variant="outline" onClick={handleExport}>Export</Button>
                         </div>
 
-                        <div className="rounded-md border printable-table mt-4">
+                        <div className="rounded-md border printable-table p-4 mt-4 w-full lg:w-[210mm] min-h-[297mm] mx-auto bg-white">
+                            <div className="text-center p-4">
+                                <h1 className="text-lg">{business_name}</h1>
+                                <h2 className="font-bold">Trial Balance</h2>
+                                <h2 className="flex items-center justify-center space-x-2">
+                                    <span>From</span>
+                                    <span>{format(new Date(data.date1), "dd/MM/yyyy")}</span>
+                                    <span>To</span>
+                                    <span>{format(new Date(data.date2), "dd/MM/yyyy")}</span>
+                                </h2>
+                            </div>
+
                             {/* Reusable component for account type tables */}
                             {renderAccountTypeTable(report_data, 'fixed_asset', 'Fixed Asset', true)}
                             {renderAccountTypeTable(report_data, 'current_asset', 'Current Asset', true)}
@@ -335,9 +347,9 @@ export default function TrialBalance({ report_data, date1, date2, meta = {}, bas
                                 <TableBody>
                                     <TableRow className="font-bold bg-slate-100">
                                         <TableCell colSpan={2} className="text-right">Grand Total:</TableCell>
-                                        <TableCell>{formatCurrency({ amount: report_data.total_debit || 0 })}</TableCell>
-                                        <TableCell>{formatCurrency({ amount: report_data.total_credit || 0 })}</TableCell>
-                                        <TableCell>{formatCurrency({ amount: report_data.total_debit - report_data.total_credit || 0 })}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency({ amount: report_data.total_debit || 0 })}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency({ amount: report_data.total_credit || 0 })}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency({ amount: report_data.total_debit - report_data.total_credit || 0 })}</TableCell>
                                     </TableRow>
                                 </TableBody>
                             </Table>

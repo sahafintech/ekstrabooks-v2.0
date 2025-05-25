@@ -41,49 +41,45 @@ class SystemUserController extends Controller
 		});
 	}
 
-	public function change_role(Request $request, $userId, $businessId)
+	public function change_role(Request $request, $userId)
 	{
 		if (!$request->ajax()) {
 			return back();
 		}
 
-		if ($request->isMethod('get')) {
-			$business = Business::owner()->find($businessId);
-			$user = $business->users->find($userId);
-			return view('backend.user.system_user.modal.edit', compact('user', 'business'));
-		} else {
-			$validator = Validator::make($request->all(), [
-				'business_id' => 'required',
-				'role_id' => 'required',
-			]);
+		$validator = Validator::make($request->all(), [
+			'business_id' => 'required|array',
+			'role_id' => 'required',
+		]);
 
-			if ($validator->fails()) {
-				return response()->json(['result' => 'error', 'message' => $validator->errors()->all()]);
-			}
+		if ($validator->fails()) {
+			return redirect()->back()->withErrors($validator)->withInput();
+		}
 
-			$business = Business::owner()->find($request->business_id);
-			$role = Role::find($request->role_id);
+		$businesses = Business::whereIn('id', $request->business_id)->get();
+		$role = Role::find($request->role_id);
 
-			if (!$business) {
-				return response()->json(['result' => 'error', 'message' => _lang('No business found')]);
-			}
+		if (!$businesses) {
+			return redirect()->back()->with('error', _lang('No business found'));
+		}
 
+		foreach ($businesses as $index => $business) {
 			$business->users()->detach($userId);
 			$business->users()->attach($userId, [
-				'owner_id' => $business->user_id,
-				'role_id' => $role->id,
-				'is_active' => 1,
+				'owner_id' => $request->role_id == 'admin' ? $userId : $business->user_id,
+				'role_id' => $request->role_id == 'admin' ? null : $role->id,
+				'is_active' => $index === 0 ? 1 : 0,
 			]);
-
-			// audit log
-			$audit = new AuditLog();
-			$audit->date_changed = date('Y-m-d H:i:s');
-			$audit->changed_by = auth()->user()->id;
-			$audit->event = $business->users->find($userId)->name . ' ' . _lang('Role Changed to') . ' ' . $role->name;
-			$audit->save();
-
-			return response()->json(['result' => 'success', 'message' => _lang('Role Updated Successfully')]);
 		}
+
+		// audit log
+		$audit = new AuditLog();
+		$audit->date_changed = date('Y-m-d H:i:s');
+		$audit->changed_by = auth()->user()->id;
+		$audit->event = $business->users->find($userId)->name . ' ' . _lang('Role Changed to') . ' ' . $role->name;
+		$audit->save();
+
+		return redirect()->back()->with('success', _lang('Role Updated Successfully'));
 	}
 
 	/**

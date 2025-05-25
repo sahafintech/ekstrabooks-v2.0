@@ -25,8 +25,6 @@ import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { ChevronUp, ChevronDown } from "lucide-react";
-import { Input } from '@/Components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/Components/ui/card';
 import { format } from 'date-fns';
 
 export default function Payables({ auth, report_data, vendors, currency, grand_total, paid_amount, due_amount, business_name, date1, date2, vendor_id, meta, filters }) {
@@ -73,6 +71,34 @@ export default function Payables({ auth, report_data, vendors, currency, grand_t
         });
     };
 
+    const exportPayables = () => {
+        window.location.href = route('reports.payables_export');
+    };
+
+    const PayableStatusBadge = ({ status }) => {
+        const statusMap = {
+            0: {
+                label: "Active",
+                className: "text-blue-600 bg-blue-200 px-3 py-1 rounded text-xs",
+            },
+            1: {
+                label: "Partial Paid",
+                className:
+                    "text-yellow-600 bg-yellow-200 px-3 py-1 rounded text-xs",
+            },
+            2: {
+                label: "Paid",
+                className: "text-green-600 bg-green-200 px-3 py-1 rounded text-xs",
+            },
+        };
+    
+        return (
+            <span className={statusMap[status].className}>
+                {statusMap[status].label}
+            </span>
+        );
+    };
+
     const handleSort = (column) => {
         const newDirection = sorting.column === column && sorting.direction === 'asc' ? 'desc' : 'asc';
         setSorting({ column, direction: newDirection });
@@ -106,27 +132,6 @@ export default function Payables({ auth, report_data, vendors, currency, grand_t
             );
         }
         return pages;
-    };
-
-    const ItemStatusBadge = ({ status }) => {
-        const getStatusColor = (status) => {
-            switch (status) {
-                case 'Unpaid':
-                    return 'bg-red-100 text-red-800';
-                case 'Paid':
-                    return 'bg-green-100 text-green-800';
-                case 'Partial Paid':
-                    return 'bg-yellow-100 text-yellow-800';
-                default:
-                    return 'bg-gray-100 text-gray-800';
-            }
-        };
-
-        return (
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(status)}`}>
-                {status}
-            </span>
-        );
     };
 
     const handlePrint = () => {
@@ -264,9 +269,9 @@ export default function Payables({ auth, report_data, vendors, currency, grand_t
                                 <Button variant="outline" onClick={handlePrint}>
                                     Print
                                 </Button>
-                                <a download href="">
-                                    <Button variant="outline">Export</Button>
-                                </a>
+                                <Button variant="outline" onClick={exportPayables}>
+                                    Export
+                                </Button>
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-sm text-gray-500">Show</span>
@@ -327,7 +332,7 @@ export default function Payables({ auth, report_data, vendors, currency, grand_t
                                                     <TableCell className="text-right">{formatCurrency(item.paid_amount)}</TableCell>
                                                     <TableCell className="text-right">{formatCurrency(item.due_amount)}</TableCell>
                                                     <TableCell>{item.due_date}</TableCell>
-                                                    <TableCell>{<ItemStatusBadge status={item.status} />}</TableCell>
+                                                    <TableCell>{<PayableStatusBadge status={item.status} />}</TableCell>
                                                 </TableRow>
                                             ))}
                                             <TableRow className="bg-muted/50 font-medium">

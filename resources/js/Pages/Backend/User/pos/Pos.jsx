@@ -854,7 +854,6 @@ export default function POS({ products, categories, currencies, accounts, custom
                         <DateTimePicker
                           value={data.invoice_date}
                           onChange={(date) => setData("invoice_date", date)}
-                          className="md:w-1/2 w-full"
                           required
                         />
                       </div>
@@ -867,7 +866,6 @@ export default function POS({ products, categories, currencies, accounts, custom
                           <DateTimePicker
                             value={data.due_date}
                             onChange={(date) => setData("due_date", date)}
-                            className="md:w-1/2 w-full"
                             required
                           />
                         </div>
@@ -1248,7 +1246,6 @@ export default function POS({ products, categories, currencies, accounts, custom
                           <DateTimePicker
                             value={data.invoice_date}
                             onChange={(date) => setData("invoice_date", date)}
-                            className="md:w-1/2 w-full"
                             required
                           />
                         </div>
@@ -1261,7 +1258,6 @@ export default function POS({ products, categories, currencies, accounts, custom
                             <DateTimePicker
                               value={data.invoice_date}
                               onChange={(date) => setData("invoice_date", date)}
-                              className="md:w-1/2 w-full"
                               required
                             />
                           </div>
@@ -1445,7 +1441,7 @@ export default function POS({ products, categories, currencies, accounts, custom
 
             {/* Content area for products */}
             <div className="flex-1 mt-4">
-              <ScrollArea className="h-[calc(100vh-250px)] overflow-y-auto">
+              <ScrollArea className="h-[calc(100vh-130px)] overflow-y-auto">
                 {filteredProducts.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     No products found. Try a different search or category.
@@ -1455,7 +1451,7 @@ export default function POS({ products, categories, currencies, accounts, custom
                     {filteredProducts.map(product => (
                       <div
                         key={product.id}
-                        className="border rounded-md flex flex-col items-center justify-center text-center p-2 hover:bg-gray-50 cursor-pointer transition-colors"
+                        className="border rounded-md flex flex-col items-center justify-center text-center p-2 hover:bg-neutral-300 cursor-pointer transition-colors bg-neutral-200"
                         onClick={() => addToCart(product)}
                       >
                         {pos_product_image == 1 && (

@@ -574,6 +574,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::match(['get', 'post'], 'reports/profit_and_loss', [ReportController::class, 'profit_and_loss'])->name('reports.profit_and_loss');
 		Route::match(['get', 'post'], 'reports/transactions_report', [ReportController::class, 'transactions_report'])->name('reports.transactions_report');
 		Route::match(['get', 'post'], 'reports/income_by_customer', [ReportController::class, 'income_by_customer'])->name('reports.income_by_customer');
+		Route::get('reports/income_by_customer_export', [ReportController::class, 'income_by_customer_export'])->name('reports.income_by_customer_export');
 		Route::match(['get', 'post'], 'reports/ledger', [ReportController::class, 'ledger'])->name('reports.ledger');
 		Route::match(['get', 'post'], 'reports/journal', [ReportController::class, 'journal'])->name('reports.journal');
 		Route::match(['get', 'post'], 'reports/income_statement', [ReportController::class, 'income_statement'])->name('reports.income_statement');
@@ -592,8 +593,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::match(['get', 'post'], 'reports/receivables', [ReportController::class, 'receivables'])->name('reports.receivables');
 		Route::get('reports/receivables_export', [ReportController::class, 'receivables_export'])->name('reports.receivables_export');
 		Route::match(['get', 'post'], 'reports/payables', [ReportController::class, 'payables'])->name('reports.payables');
+		Route::get('reports/payables_export', [ReportController::class, 'payables_export'])->name('reports.payables_export');
 		Route::match(['get', 'post'], 'reports/payroll_summary', [ReportController::class, 'payroll_summary'])->name('reports.payroll_summary');
+		Route::get('reports/payroll_summary_export', [ReportController::class, 'payroll_summary_export'])->name('reports.payroll_summary_export');
 		Route::match(['get', 'post'], 'reports/payroll_cost', [ReportController::class, 'payroll_cost'])->name('reports.payroll_cost');
+		Route::get('reports/payroll_cost_export', [ReportController::class, 'payroll_cost_export'])->name('reports.payroll_cost_export');
 		Route::match(['get', 'post'], 'reports/inventory_details', [ReportController::class, 'inventory_details'])->name('reports.inventory_details');
 		Route::match(['get', 'post'], 'reports/inventory_summary', [ReportController::class, 'inventory_summary'])->name('reports.inventory_summary');
 		Route::match(['get', 'post'], 'reports/sales_by_product', [ReportController::class, 'sales_by_product'])->name('reports.sales_by_product');

@@ -226,6 +226,10 @@ export default function IncomeByCustomer({ report_data, date1, date2, meta = {},
         }, 300);
     };
 
+    const exportCustomerIncome = () => {
+        window.location.href = route('reports.income_by_customer_export');
+    };
+
     return (
         <AuthenticatedLayout>
             <Head title="Income by Customer Report" />
@@ -283,9 +287,9 @@ export default function IncomeByCustomer({ report_data, date1, date2, meta = {},
                                 <Button variant="outline" onClick={handlePrint}>
                                     Print
                                 </Button>
-                                <a download href="">
-                                    <Button variant="outline">Export</Button>
-                                </a>
+                                <Button variant="outline" onClick={exportCustomerIncome}>
+                                    Export
+                                </Button>
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-sm text-gray-500">Show</span>

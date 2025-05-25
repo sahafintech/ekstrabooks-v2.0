@@ -238,6 +238,10 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
         }, 300);
     };
 
+    const exportReceivables = () => {
+        window.location.href = route("reports.receivables_export")
+    };
+
     return (
         <AuthenticatedLayout>
             <Head title="Receivables Report" />
@@ -295,9 +299,9 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                                 <Button variant="outline" onClick={handlePrint}>
                                     Print
                                 </Button>
-                                <a download href="">
-                                    <Button variant="outline">Export</Button>
-                                </a>
+                                <Button variant="outline" onClick={exportReceivables}>
+                                    Export
+                                </Button>
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-sm text-gray-500">Show</span>

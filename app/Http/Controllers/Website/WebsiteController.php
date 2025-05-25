@@ -49,6 +49,7 @@ class WebsiteController extends Controller
 	 */
 	public function index($slug = '')
 	{
+		return redirect()->route('login');
 		$data = array();
 
 		if ($slug != '') {

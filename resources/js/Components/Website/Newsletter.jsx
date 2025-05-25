@@ -111,16 +111,16 @@ export default function Newsletter({ heading, subHeading }) {
                         </p>
                         <div className="flex flex-wrap justify-center gap-8 opacity-75 grayscale">
                             <img src="/website/assets/logos/amanah.png" alt="Amanah Insurance" className="h-8" />
-                            <img src="/website/assets/logos/geosol.png" alt="Geosol" className="h-8" />
-                            <img src="/website/assets/logos/amazon.jpeg" alt="Amazon" className="h-8" />
-                            <img src="/website/assets/logos/meta.png" alt="Meta" className="h-8" />
+                            <img src="/website/assets/logos/vision.png" alt="Vision Care" className="h-8" />
+                            <img src="/website/assets/logos/smart.jpg" alt="Smart Gradge" className="h-8" />
+                            <img src="/website/assets/logos/horn.png" alt="Horn Ridge" className="h-8" />
                         </div>
                     </div>
 
                     {/* Privacy Note */}
                     <p className="mt-8 text-xs text-muted-foreground">
                         By subscribing, you agree to our{" "}
-                        <a href="/privacy" className="underline underline-offset-2 hover:text-foreground">
+                        <a href="/privacy-policy" className="underline underline-offset-2 hover:text-foreground">
                             Privacy Policy
                         </a>
                         . We respect your privacy and will never share your information.

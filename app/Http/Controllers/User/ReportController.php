@@ -4,10 +4,14 @@ namespace App\Http\Controllers\User;
 
 use App\Exports\BalanceSheetExport;
 use App\Exports\GenJournalExport;
+use App\Exports\IncomeByCustomerExport;
 use App\Exports\IncomeStatementExport;
 use App\Exports\InventoryDetailsExport;
 use App\Exports\InventorySummaryExport;
 use App\Exports\LedgerExport;
+use App\Exports\PayablesExport;
+use App\Exports\PayrollCostExport;
+use App\Exports\PayrollSummaryExport;
 use App\Exports\ReceivablesExport;
 use App\Exports\SalesByProductExport;
 use App\Exports\TrialBalanceExport;
@@ -2172,6 +2176,16 @@ class ReportController extends Controller
 		return Excel::download(new ReceivablesExport(session('start_date'), session('end_date'), session('customer_id')), 'receivables ' . now()->format('d m Y') . '.xlsx');
 	}
 
+	public function payables_export()
+	{
+		return Excel::download(new PayablesExport(session('start_date'), session('end_date'), session('vendor_id')), 'payables ' . now()->format('d m Y') . '.xlsx');
+	}
+
+	public function income_by_customer_export()
+	{
+		return Excel::download(new IncomeByCustomerExport(session('start_date'), session('end_date'), session('customer_id')), 'income_by_customer ' . now()->format('d m Y') . '.xlsx');
+	}
+
 	public function trial_balance_export()
 	{
 		return Excel::download(new TrialBalanceExport(session('start_date'), session('end_date')), 'trial_balance ' . now()->format('d m Y') . '.xlsx');
@@ -2195,6 +2209,16 @@ class ReportController extends Controller
 	public function inventory_summary_export()
 	{
 		return Excel::download(new InventorySummaryExport(session('start_date'), session('end_date')), 'inventory summary ' . now()->format('d m Y') . '.xlsx');
+	}
+
+	public function payroll_summary_export()
+	{
+		return Excel::download(new PayrollSummaryExport, 'payroll summary ' . now()->format('d m Y') . '.xlsx');
+	}
+
+	public function payroll_cost_export()
+	{
+		return Excel::download(new PayrollCostExport, 'payroll cost ' . now()->format('d m Y') . '.xlsx');
 	}
 
 	public function income_statement(Request $request)
@@ -2564,6 +2588,9 @@ class ReportController extends Controller
 			$month = now()->month;
 			$year = now()->year;
 
+			session(['month' => $month]);
+			session(['year' => $year]);
+
 			$current_salary = Payroll::where('month', $month)
 				->where('year', $year)
 				->sum('current_salary');
@@ -2605,6 +2632,9 @@ class ReportController extends Controller
 			$report_data = array();
 			$month = $request->month;
 			$year = $request->year;
+
+			session(['month' => $month]);
+			session(['year' => $year]);
 
 			$current_salary = Payroll::where('month', $month)
 				->where('year', $year)
@@ -2661,6 +2691,9 @@ class ReportController extends Controller
 			$month = now()->month;
 			$year = now()->year;
 
+			session(['month' => $month]);
+			session(['year' => $year]);
+
 			$report_data['payroll'] = Payroll::with('staff')
 				->select('payslips.*')
 				->where('month', $month)
@@ -2690,6 +2723,9 @@ class ReportController extends Controller
 			$report_data = array();
 			$month = $request->month;
 			$year = $request->year;
+
+			session(['month' => $month]);
+			session(['year' => $year]);
 
 			$report_data['payroll'] = Payroll::with('staff')
 				->select('payslips.*')
