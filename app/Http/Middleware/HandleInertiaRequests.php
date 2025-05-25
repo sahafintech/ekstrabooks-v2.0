@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use App\Models\Business;
+use App\Models\User;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -52,6 +53,8 @@ class HandleInertiaRequests extends Middleware
             ->where('users.id', $user->id)
             ->get();
 
+        $userPackage = $activeBusiness ? $activeBusiness->user->package : $user->package;
+
         return [
             ...parent::share($request),
             'auth' => [
@@ -72,7 +75,7 @@ class HandleInertiaRequests extends Middleware
                 'error' => fn() => $request->session()->get('error'),
             ],
             'logo' => get_option('logo'),
-            'userPackage' => $user?->package,
+            'userPackage' => $userPackage,
         ];
     }
 }
