@@ -28,10 +28,9 @@ import {
 
 export function UserSidebar({ ...props }) {
     const { url } = usePage(); // e.g. "/user/products/123/edit"
-    const { auth, activeBusiness } = usePage().props;
-
+    const { auth, activeBusiness, userPackage } = usePage().props;
     // ———————————————————————————————
-    // Define all your “startsWith” base-paths here:
+    // Define all your "startsWith" base-paths here:
     // ———————————————————————————————
     const dashboardBase = "/dashboard";
 
@@ -77,6 +76,7 @@ export function UserSidebar({ ...props }) {
     const costCodesBase = "/user/cost_codes";
     const projectGroupsBase = "/user/project_groups";
     const projectSubcontractsBase = "/user/project_subcontracts";
+    
     // Accounting
     const accountsBase = "/user/accounts";
     const journalsBase = "/user/journals";
@@ -88,7 +88,7 @@ export function UserSidebar({ ...props }) {
     const taxesBase = "/user/taxes";
     const currencyBase = "/user/currency";
     const auditLogsBase = "/user/audit_logs";
-    const businessSettingsFragment = "/business/settings/"; // we’ll use `.includes`
+    const businessSettingsFragment = "/business/settings/"; // we'll use `.includes`
 
     // Reports
     const reportsJournalBase = "/user/reports/journal";
@@ -244,16 +244,16 @@ export function UserSidebar({ ...props }) {
                     url: route("invoices.index"),
                     isActive: url.startsWith(creditInvoicesBase),
                 },
-                {
+                ...(userPackage.medical_record === 1 ? [{
                     title: "Medical Records",
                     url: route("medical_records.index"),
                     isActive: url.startsWith(medicalRecordsBase),
-                },
-                {
+                }] : []),
+                ...(userPackage.prescription === 1 ? [{
                     title: "Prescriptions",
                     url: route("prescriptions.index"),
                     isActive: url.startsWith(prescriptionsBase),
-                },
+                }] : []),
                 {
                     title: "Deferred Invoice",
                     url: route("deffered_invoices.index"),
@@ -279,7 +279,7 @@ export function UserSidebar({ ...props }) {
     ];
 
     const navManagementItems = [
-        {
+        ...(userPackage.payroll_module === 1 ? [{
             title: "HR & Payroll",
             url: "#",
             icon: GroupIcon,
@@ -334,8 +334,8 @@ export function UserSidebar({ ...props }) {
                     isActive: url.startsWith(awardsBase),
                 },
             ],
-        },
-        {
+        }] : []),
+        ...(userPackage.construction_module === 1 ? [{
             title: "Construction",
             url: "#",
             icon: Building,
@@ -366,7 +366,7 @@ export function UserSidebar({ ...props }) {
                     isActive: url.startsWith(projectSubcontractsBase),
                 },
             ],
-        },
+        }] : []),
         {
             title: "Accounting",
             url: "#",

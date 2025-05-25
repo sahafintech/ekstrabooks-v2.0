@@ -8,45 +8,41 @@ import { Input } from "@/Components/ui/input";
 import InputError from "@/Components/InputError";
 import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
+import { Checkbox } from "@/Components/ui/checkbox";
 import {
-
-Select,
-SelectContent,
-SelectItem,
-SelectTrigger,
-SelectValue,
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
 } from "@/Components/ui/select";
 
 export default function Edit({ id, users, packageData }) {
-const {
-	data,
-	setData,
-	put,
-	processing,
-	errors,
-} = useForm({
-	user_id: String(packageData.user_id ?? ""),
-	name: packageData.name ?? "",
-	package_type: packageData.package_type ?? "",
-	cost: String(packageData.cost ?? ""),
-	discount: packageData.discount ?? 0,
-	trial_days: packageData.trial_days ?? 0,
-	status: packageData.status ?? 1,
-	is_popular: packageData.is_popular ?? 0,
-	user_limit: packageData.user_limit !== "-1" ? packageData.user_limit : "",
-	invoice_limit: packageData.invoice_limit !== "-1" ? packageData.invoice_limit : "",
-	quotation_limit: packageData.quotation_limit !== "-1" ? packageData.quotation_limit : "",
-	recurring_invoice: packageData.recurring_invoice ?? 0,
-	deffered_invoice: packageData.deffered_invoice ?? 0,
-	customer_limit: packageData.customer_limit !== "-1" ? packageData.customer_limit : "",
-	business_limit: packageData.business_limit !== "-1" ? packageData.business_limit : "",
-	invoice_builder: packageData.invoice_builder ?? 0,
-	online_invoice_payment: packageData.online_invoice_payment ?? 0,
-	pos: packageData.pos ?? 0,
-	payroll_module: packageData.payroll_module ?? 0,
-	storage_limit: packageData.storage_limit !== "-1" ? packageData.storage_limit : "",
-	medical_record: packageData.medical_record ?? 0,
-	prescription: packageData.prescription ?? 0,
+const { data, setData, put, processing, errors } = useForm({
+	user_id: packageData.user_id,
+	name: packageData.name,
+	package_type: packageData.package_type,
+	cost: packageData.cost,
+	discount: packageData.discount,
+	trial_days: packageData.trial_days,
+	status: packageData.status,
+	is_popular: packageData.is_popular,
+	user_limit: packageData.user_limit,
+	invoice_limit: packageData.invoice_limit,
+	quotation_limit: packageData.quotation_limit,
+	recurring_invoice: packageData.recurring_invoice,
+	deffered_invoice: packageData.deffered_invoice,
+	customer_limit: packageData.customer_limit,
+	business_limit: packageData.business_limit,
+	invoice_builder: packageData.invoice_builder,
+	online_invoice_payment: packageData.online_invoice_payment,
+	pos: packageData.pos,
+	payroll_module: packageData.payroll_module,
+	storage_limit: packageData.storage_limit,
+	medical_record: packageData.medical_record,
+	prescription: packageData.prescription,
+	construction_module: packageData.construction_module,
+	time_sheet_module: packageData.time_sheet_module,
 });
 
 const submit = (e) => {
@@ -252,7 +248,7 @@ return (
 					<Label htmlFor="user_limit" className="md:col-span-2 col-span-12">
 						System User Limit
 					</Label>
-					<div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
+					<div className="md:col-span-10 col-span-12 mt-2 md:mt-0 flex items-center gap-4">
 						<Input
 							id="user_limit"
 							type="number"
@@ -260,7 +256,18 @@ return (
 							onChange={(e) => setData("user_limit", e.target.value)}
 							placeholder="5"
 							className="md:w-1/2 w-full"
+							disabled={data.user_limit === "-1"}
 						/>
+						<div className="flex items-center gap-2">
+							<Checkbox
+								id="unlimited_users"
+								checked={data.user_limit === "-1"}
+								onCheckedChange={(checked) => {
+									setData("user_limit", checked ? "-1" : "")
+								}}
+							/>
+							<Label htmlFor="unlimited_users" className="text-sm">Unlimited</Label>
+						</div>
 						<InputError message={errors.user_limit} className="text-sm" />
 					</div>
 				</div>
@@ -270,7 +277,7 @@ return (
 					<Label htmlFor="invoice_limit" className="md:col-span-2 col-span-12">
 						Invoice Limit
 					</Label>
-					<div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
+					<div className="md:col-span-10 col-span-12 mt-2 md:mt-0 flex items-center gap-4">
 						<Input
 							id="invoice_limit"
 							type="number"
@@ -278,7 +285,18 @@ return (
 							onChange={(e) => setData("invoice_limit", e.target.value)}
 							placeholder="100"
 							className="md:w-1/2 w-full"
+							disabled={data.invoice_limit === "-1"}
 						/>
+						<div className="flex items-center gap-2">
+							<Checkbox
+								id="unlimited_invoices"
+								checked={data.invoice_limit === "-1"}
+								onCheckedChange={(checked) => {
+									setData("invoice_limit", checked ? "-1" : "")
+								}}
+							/>
+							<Label htmlFor="unlimited_invoices" className="text-sm">Unlimited</Label>
+						</div>
 						<InputError message={errors.invoice_limit} className="text-sm" />
 					</div>
 				</div>
@@ -288,7 +306,7 @@ return (
 					<Label htmlFor="quotation_limit" className="md:col-span-2 col-span-12">
 						Quotation Limit
 					</Label>
-					<div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
+					<div className="md:col-span-10 col-span-12 mt-2 md:mt-0 flex items-center gap-4">
 						<Input
 							id="quotation_limit"
 							type="number"
@@ -296,7 +314,18 @@ return (
 							onChange={(e) => setData("quotation_limit", e.target.value)}
 							placeholder="150"
 							className="md:w-1/2 w-full"
+							disabled={data.quotation_limit === "-1"}
 						/>
+						<div className="flex items-center gap-2">
+							<Checkbox
+								id="unlimited_quotations"
+								checked={data.quotation_limit === "-1"}
+								onCheckedChange={(checked) => {
+									setData("quotation_limit", checked ? "-1" : "")
+								}}
+							/>
+							<Label htmlFor="unlimited_quotations" className="text-sm">Unlimited</Label>
+						</div>
 						<InputError message={errors.quotation_limit} className="text-sm" />
 					</div>
 				</div>
@@ -354,7 +383,7 @@ return (
 					<Label htmlFor="customer_limit" className="md:col-span-2 col-span-12">
 						Customer Limit
 					</Label>
-					<div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
+					<div className="md:col-span-10 col-span-12 mt-2 md:mt-0 flex items-center gap-4">
 						<Input
 							id="customer_limit"
 							type="number"
@@ -362,7 +391,18 @@ return (
 							onChange={(e) => setData("customer_limit", e.target.value)}
 							placeholder="100"
 							className="md:w-1/2 w-full"
+							disabled={data.customer_limit === "-1"}
 						/>
+						<div className="flex items-center gap-2">
+							<Checkbox
+								id="unlimited_customers"
+								checked={data.customer_limit === "-1"}
+								onCheckedChange={(checked) => {
+									setData("customer_limit", checked ? "-1" : "")
+								}}
+							/>
+							<Label htmlFor="unlimited_customers" className="text-sm">Unlimited</Label>
+						</div>
 						<InputError message={errors.customer_limit} className="text-sm" />
 					</div>
 				</div>
@@ -372,7 +412,7 @@ return (
 					<Label htmlFor="business_limit" className="md:col-span-2 col-span-12">
 						Business Limit
 					</Label>
-					<div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
+					<div className="md:col-span-10 col-span-12 mt-2 md:mt-0 flex items-center gap-4">
 						<Input
 							id="business_limit"
 							type="number"
@@ -380,7 +420,18 @@ return (
 							onChange={(e) => setData("business_limit", e.target.value)}
 							placeholder="10"
 							className="md:w-1/2 w-full"
+							disabled={data.business_limit === "-1"}
 						/>
+						<div className="flex items-center gap-2">
+							<Checkbox
+								id="unlimited_businesses"
+								checked={data.business_limit === "-1"}
+								onCheckedChange={(checked) => {
+									setData("business_limit", checked ? "-1" : "")
+								}}
+							/>
+							<Label htmlFor="unlimited_businesses" className="text-sm">Unlimited</Label>
+						</div>
 						<InputError message={errors.business_limit} className="text-sm" />
 					</div>
 				</div>
@@ -405,10 +456,7 @@ return (
 								<SelectItem value="1">Yes</SelectItem>
 							</SelectContent>
 						</Select>
-						<InputError
-							message={errors.invoice_builder}
-							className="text-sm"
-						/>
+						<InputError message={errors.invoice_builder} className="text-sm" />
 					</div>
 				</div>
 
@@ -432,10 +480,7 @@ return (
 								<SelectItem value="1">Yes</SelectItem>
 							</SelectContent>
 						</Select>
-						<InputError
-							message={errors.online_invoice_payment}
-							className="text-sm"
-						/>
+						<InputError message={errors.online_invoice_payment} className="text-sm" />
 					</div>
 				</div>
 
@@ -494,7 +539,7 @@ return (
 					<Label htmlFor="storage_limit" className="md:col-span-2 col-span-12">
 						Storage Limit
 					</Label>
-					<div className="md:col-span-10 col-span-12 mt-2 md:mt-0">
+					<div className="md:col-span-10 col-span-12 mt-2 md:mt-0 flex items-center gap-4">
 						<Input
 							id="storage_limit"
 							type="number"
@@ -502,7 +547,18 @@ return (
 							onChange={(e) => setData("storage_limit", e.target.value)}
 							placeholder="100"
 							className="md:w-1/2 w-full"
+							disabled={data.storage_limit === "-1"}
 						/>
+						<div className="flex items-center gap-2">
+							<Checkbox
+								id="unlimited_storage"
+								checked={data.storage_limit === "-1"}
+								onCheckedChange={(checked) => {
+									setData("storage_limit", checked ? "-1" : "")
+								}}
+							/>
+							<Label htmlFor="unlimited_storage" className="text-sm">Unlimited</Label>
+						</div>
 						<InputError message={errors.storage_limit} className="text-sm" />
 					</div>
 				</div>
@@ -552,6 +608,54 @@ return (
 							</SelectContent>
 						</Select>
 						<InputError message={errors.prescription} className="text-sm" />
+					</div>
+				</div>
+
+				{/* Construction Module */}
+				<div className="grid grid-cols-12 mt-2">
+					<Label htmlFor="construction_module" className="md:col-span-2 col-span-12">
+						Construction Module
+					</Label>
+					<div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
+						<Select
+							value={String(data.construction_module)}
+							onValueChange={(val) => setData("construction_module", parseInt(val))}
+						>
+							<SelectTrigger>
+								<SelectValue>
+									{data.construction_module === 1 ? "Yes" : "No"}
+								</SelectValue>
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="0">No</SelectItem>
+								<SelectItem value="1">Yes</SelectItem>
+							</SelectContent>
+						</Select>
+						<InputError message={errors.construction_module} className="text-sm" />
+					</div>
+				</div>
+
+				{/* Time Sheet Module */}
+				<div className="grid grid-cols-12 mt-2">
+					<Label htmlFor="time_sheet_module" className="md:col-span-2 col-span-12">
+						Time Sheet Module
+					</Label>
+					<div className="md:col-span-10 col-span-12 mt-2 md:mt-0 md:w-1/2 w-full">
+						<Select
+							value={String(data.time_sheet_module)}
+							onValueChange={(val) => setData("time_sheet_module", parseInt(val))}
+						>
+							<SelectTrigger>
+								<SelectValue>
+									{data.time_sheet_module === 1 ? "Yes" : "No"}
+								</SelectValue>
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="0">No</SelectItem>
+								<SelectItem value="1">Yes</SelectItem>
+							</SelectContent>
+						</Select>
+						<InputError message={errors.time_sheet_module} className="text-sm" />
 					</div>
 				</div>
 

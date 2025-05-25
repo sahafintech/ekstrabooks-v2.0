@@ -70,8 +70,8 @@ class InvoiceController extends Controller
                 $q->whereHas('customer', function ($q2) use ($search) {
                     $q2->where('name', 'like', "%{$search}%");
                 })
-                ->orWhere('invoice_number', 'like', "%{$search}%")
-                ->orWhere('order_number', 'like', "%{$search}%");
+                    ->orWhere('invoice_number', 'like', "%{$search}%")
+                    ->orWhere('order_number', 'like', "%{$search}%");
             });
         }
 
@@ -118,8 +118,8 @@ class InvoiceController extends Controller
                 $q->whereHas('customer', function ($q2) use ($search) {
                     $q2->where('name', 'like', "%{$search}%");
                 })
-                ->orWhere('invoice_number', 'like', "%{$search}%")
-                ->orWhere('order_number', 'like', "%{$search}%");
+                    ->orWhere('invoice_number', 'like', "%{$search}%")
+                    ->orWhere('order_number', 'like', "%{$search}%");
             });
         }
 
@@ -193,6 +193,7 @@ class InvoiceController extends Controller
             'invoice_title' => $invoice_title,
             'base_currency' => get_business_option('currency'),
             'projects' => $projects,
+            'construction_module' => package()->construction_module
         ]);
     }
 
@@ -289,14 +290,6 @@ class InvoiceController extends Controller
             }
         }
 
-        // if attachments then upload
-        $attachment = '';
-        if ($request->hasfile('attachment')) {
-            $file       = $request->file('attachment');
-            $attachment = rand() . time() . $file->getClientOriginalName();
-            $file->move(public_path() . "/uploads/media/", $attachment);
-        }
-
         DB::beginTransaction();
 
         $summary = $this->calculateTotal($request);
@@ -323,9 +316,29 @@ class InvoiceController extends Controller
         $invoice->note            = $request->input('note');
         $invoice->footer          = $request->input('footer');
         $invoice->short_code      = rand(100000, 9999999) . uniqid();
-        $invoice->attachments     = $attachment;
 
         $invoice->save();
+
+        // if attachments then upload
+        if (isset($request->attachments)) {
+            if ($request->attachments != null) {
+                for ($i = 0; $i < count($request->attachments); $i++) {
+                    $theFile = $request->file("attachments.$i.file");
+                    if ($theFile == null) {
+                        continue;
+                    }
+                    $theAttachment = rand() . time() . $theFile->getClientOriginalName();
+                    $theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
+
+                    $attachment = new Attachment();
+                    $attachment->file_name = $request->attachments[$i]['file_name'];
+                    $attachment->path = "/uploads/media/attachments/" . $theAttachment;
+                    $attachment->ref_type = 'invoice';
+                    $attachment->ref_id = $invoice->id;
+                    $attachment->save();
+                }
+            }
+        }
 
         $currentTime = Carbon::now();
 
@@ -497,9 +510,7 @@ class InvoiceController extends Controller
             'project'
         ])->find($id);
 
-        $attachments = Attachment::where('ref_id', $id)
-            ->where('ref_type', 'invoice')
-            ->get();
+        $attachments = Attachment::where('ref_type', 'invoice')->where('ref_id', $id)->get();
 
         $decimalPlaces = get_business_option('decimal_places', 2);
         $email_templates = EmailTemplate::whereIn('slug', ['NEW_INVOICE_CREATED', 'INVOICE_PAYMENT_REMINDER'])
@@ -618,6 +629,7 @@ class InvoiceController extends Controller
             ->pluck('tax_id')
             ->map(fn($id) => (string) $id)
             ->toArray();
+        $theAttachments = Attachment::where('ref_type', 'invoice')->where('ref_id', $id)->get();
 
         return Inertia::render('Backend/User/Invoice/Edit', [
             'invoice' => $invoice,
@@ -626,7 +638,9 @@ class InvoiceController extends Controller
             'products' => $products,
             'taxes' => $taxes,
             'taxIds' => $taxIds,
-            'projects' => $projects
+            'projects' => $projects,
+            'construction_module' => package()->construction_module,
+            'theAttachments' => $theAttachments
         ]);
     }
 
@@ -639,6 +653,7 @@ class InvoiceController extends Controller
      */
     public function update(Request $request, $id)
     {
+        return $request->all();
         $validator = Validator::make($request->all(), [
             'customer_id'    => 'required',
             'title'          => 'required',
@@ -735,14 +750,6 @@ class InvoiceController extends Controller
             }
         }
 
-        // if attachments then upload		
-        $attachment = '';
-        if ($request->hasfile('attachment') && $request->file('attachment')->isValid()) {
-            $file       = $request->file('attachment');
-            $attachment = rand() . time() . $file->getClientOriginalName();
-            $file->move(public_path() . "/uploads/media/", $attachment);
-        }
-
         DB::beginTransaction();
 
         $summary = $this->calculateTotal($request);
@@ -769,11 +776,46 @@ class InvoiceController extends Controller
         $invoice->project_id      = $request->input('project_id');
         $invoice->note            = $request->input('note');
         $invoice->footer          = $request->input('footer');
-        if ($attachment != '') {
-            $invoice->attachments     = $attachment;
-        }
 
         $invoice->save();
+
+        // delete old attachments
+        $attachments = Attachment::where('ref_id', $invoice->id)->where('ref_type', 'invoice')->get(); // Get attachments from the database
+
+        if (isset($request->attachments)) {
+            $incomingFiles = collect($request->attachments)->pluck('file')->toArray();
+
+            foreach ($attachments as $attachment) {
+                if (!in_array($attachment->path, $incomingFiles)) {
+                    $filePath = public_path($attachment->path);
+                    if (file_exists($filePath)) {
+                        unlink($filePath); // Delete the file
+                    }
+                    $attachment->delete(); // Delete the database record
+                }
+            }
+        }
+
+        // if attachments then upload
+        if (isset($request->attachments)) {
+            if ($request->attachments != null) {
+                for ($i = 0; $i < count($request->attachments); $i++) {
+                    $theFile = $request->file("attachments.$i.file");
+                    if ($theFile == null) {
+                        continue;
+                    }
+                    $theAttachment = rand() . time() . $theFile->getClientOriginalName();
+                    $theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
+
+                    $attachment = new Attachment();
+                    $attachment->file_name = $request->attachments[$i]['file_name'];
+                    $attachment->path = "/uploads/media/attachments/" . $theAttachment;
+                    $attachment->ref_type = 'invoice';
+                    $attachment->ref_id = $invoice->id;
+                    $attachment->save();
+                }
+            }
+        }
 
         //Update Invoice item
         foreach ($invoice->items as $invoice_item) {
@@ -1093,6 +1135,16 @@ class InvoiceController extends Controller
             }
         }
 
+        // delete attachments
+        $attachments = Attachment::where('ref_id', $invoice->id)->where('ref_type', 'invoice')->get();
+        foreach ($attachments as $attachment) {
+            $filePath = public_path($attachment->path);
+            if (file_exists($filePath)) {
+                unlink($filePath);
+            }
+            $attachment->delete();
+        }
+
         $invoice->delete();
         return redirect()->route('invoices.index')->with('success', _lang('Deleted Successfully'));
     }
@@ -1148,6 +1200,16 @@ class InvoiceController extends Controller
                 if ($receive_payment->invoices == null) {
                     $receive_payment->delete();
                 }
+            }
+
+            // delete attachments
+            $attachments = Attachment::where('ref_id', $invoice->id)->where('ref_type', 'invoice')->get();
+            foreach ($attachments as $attachment) {
+                $filePath = public_path($attachment->path);
+                if (file_exists($filePath)) {
+                    unlink($filePath);
+                }
+                $attachment->delete();
             }
 
             $invoice->delete();

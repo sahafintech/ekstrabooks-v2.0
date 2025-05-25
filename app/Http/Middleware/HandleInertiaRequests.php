@@ -72,6 +72,7 @@ class HandleInertiaRequests extends Middleware
                 'error' => fn() => $request->session()->get('error'),
             ],
             'logo' => get_option('logo'),
+            'userPackage' => $user->package,
         ];
     }
 }

@@ -15,7 +15,7 @@ import DateTimePicker from "@/Components/DateTimePicker";
 import { Plus, Trash2 } from "lucide-react";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 
-export default function Edit({ customers = [], products = [], currencies = [], taxes = [], invoice, taxIds, projects = [] }) {
+export default function Edit({ customers = [], products = [], currencies = [], taxes = [], invoice, taxIds, projects = [], construction_module }) {
   const [invoiceItems, setInvoiceItems] = useState([{
     product_id: "",
     product_name: "",
@@ -43,7 +43,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     template: invoice.template || "",
     note: invoice.note || "",
     footer: invoice.footer || "",
-    attachment: null,
     product_id: [],
     product_name: [],
     description: [],
@@ -78,8 +77,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
       description: invoice.items.map(item => item.description),
       quantity: invoice.items.map(item => item.quantity),
       unit_cost: invoice.items.map(item => item.unit_cost),
-    })
-
+    });
   }, [invoice]);
 
   const addInvoiceItem = () => {
@@ -284,9 +282,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
       unit_cost: invoiceItems.map(item => item.unit_cost),
     };
 
-    // Log the data being sent to help debug
-    console.log("Submitting form with data:", formData);
-
     // Put the form data instead of post for updating
     put(route("invoices.update", invoice.id), formData, {
       preserveScroll: true,
@@ -326,9 +321,10 @@ export default function Edit({ customers = [], products = [], currencies = [], t
               </div>
             </div>
 
-            <div className="grid grid-cols-12 mt-2">
-              <Label htmlFor="project_id" className="md:col-span-2 col-span-12">
-                Project
+            {construction_module == 1 && (
+              <div className="grid grid-cols-12 mt-2">
+                <Label htmlFor="project_id" className="md:col-span-2 col-span-12">
+                  Project
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <div className="md:w-1/2 w-full">
@@ -342,9 +338,10 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                     placeholder="Select project"
                   />
                 </div>
-                <InputError message={errors.project_id} className="text-sm" />
+                  <InputError message={errors.project_id} className="text-sm" />
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="grid grid-cols-12 mt-2">
               <Label htmlFor="title" className="md:col-span-2 col-span-12">
@@ -610,21 +607,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                   rows={4}
                 />
                 <InputError message={errors.footer} className="text-sm" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-12 mt-2">
-              <Label htmlFor="attachment" className="md:col-span-2 col-span-12">
-                Attachment
-              </Label>
-              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Input
-                  id="attachment"
-                  type="file"
-                  onChange={(e) => setData("attachment", e.target.files[0])}
-                  className="md:w-1/2 w-full"
-                />
-                <InputError message={errors.attachment} className="text-sm" />
               </div>
             </div>
 

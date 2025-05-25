@@ -30,11 +30,66 @@ class UserController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::where('user_type', 'user')
-            ->with('package')->get();
-        return Inertia::render('Backend/Admin/Users/List', compact('users'));
+        $per_page = $request->get('per_page', 50);
+        $search = $request->get('search', '');
+
+        $query = User::where('user_type', 'user')
+            ->with('package');
+
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhereHas('package', function($q) use ($search) {
+                        $q->where('membership_type', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        // Handle relationship sorting
+        if ($sortColumn === 'membership_type') {
+            $query->join('user_packages', 'users.id', '=', 'user_packages.user_id')
+                  ->orderBy('user_packages.membership_type', $sortDirection)
+                  ->select('users.*');
+        } elseif ($sortColumn === 'valid_to') {
+            $query->join('user_packages', 'users.id', '=', 'user_packages.user_id')
+                  ->orderBy('user_packages.valid_to', $sortDirection)
+                  ->select('users.*');
+        } else {
+            $query->orderBy($sortColumn, $sortDirection);
+        }
+
+        // Get users with pagination
+        $users = $query->paginate($per_page)->withQueryString();
+
+        // Return Inertia view
+        return Inertia::render('Backend/Admin/Users/List', [
+            'users' => $users->items(),
+            'meta' => [
+                'current_page' => $users->currentPage(),
+                'from' => $users->firstItem(),
+                'last_page' => $users->lastPage(),
+                'links' => $users->linkCollection(),
+                'path' => $users->path(),
+                'per_page' => $users->perPage(),
+                'to' => $users->lastItem(),
+                'total' => $users->total(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $sorting,
+            ],
+        ]);
     }
 
     /**
@@ -206,5 +261,39 @@ class UserController extends Controller
 
         DB::commit();
         return redirect()->route('users.index')->with('success', _lang('Deleted Sucessfully'));
+    }
+
+    /**
+     * Bulk destroy users
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_destroy(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'ids' => 'required|array',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()->with('error', _lang('Please select at least one user'));
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $users = User::whereIn('id', $request->ids)->get();
+            
+            foreach ($users as $user) {
+                Product::where('user_id', $user->id)->delete();
+                $user->delete();
+            }
+
+            DB::commit();
+            return redirect()->back()->with('success', _lang('Users deleted successfully'));
+        } catch (\Exception $e) {
+            DB::rollback();
+            return redirect()->back()->with('error', _lang('Error deleting users'));
+        }
     }
 }

@@ -31,12 +31,8 @@ class ProjectController extends Controller
     {
         $this->middleware(function ($request, $next) {
 
-            if (package()->payroll_module != 1) {
-                if (!$request->ajax()) {
-                    return back()->with('error', _lang('Sorry, This module is not available in your current package !'));
-                } else {
-                    return response()->json(['result' => 'error', 'message' => _lang('Sorry, This module is not available in your current package !')]);
-                }
+            if (package()->construction_module != 1) {
+                return back()->with('error', _lang('Sorry, This module is not available in your current package !'));
             }
 
             return $next($request);
@@ -65,7 +61,7 @@ class ProjectController extends Controller
                     ->orWhere('status', 'like', "%{$search}%")
                     ->orWhere('priority', 'like', "%{$search}%")
                     ->orWhere('description', 'like', "%{$search}%")
-                    
+
                     ->orWhereHas('project_group', function ($q) use ($search) {
                         $q->where('group_name', 'like', "%{$search}%");
                     })
@@ -124,7 +120,7 @@ class ProjectController extends Controller
         $customers = Customer::all();
         $employees = Employee::all();
         $currencies = Currency::all();
-        
+
         return Inertia::render('Backend/User/Construction/Project/Create', [
             'project_groups' => $project_groups,
             'customers' => $customers,
@@ -213,7 +209,7 @@ class ProjectController extends Controller
         $project = Project::with('tasks', 'budgets', 'budgets.cost_codes', 'budgets.tasks')->findOrFail($id);
         $tab = $request->get('tab', 'tasks');
         $cost_codes = CostCode::all();
-        
+
         return Inertia::render('Backend/User/Construction/Project/View', [
             'project' => $project,
             'activeTab' => $tab,

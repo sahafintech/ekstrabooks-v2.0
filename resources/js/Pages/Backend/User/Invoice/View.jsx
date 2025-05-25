@@ -545,7 +545,7 @@ export default function View({
                                     <p>{invoice.customer?.mobile}</p>
                                 </div>
 
-                                {invoice.project && (
+                                {invoice.project_id !== null && (
                                     <>
                                         <h3 className="font-medium text-lg my-2">
                                             Project:
@@ -743,27 +743,46 @@ export default function View({
                                 </div>
                             )}
 
-                            {/* Attachments */}
+                            {/* Attachments - hidden when printing */}
                             {attachments && attachments.length > 0 && (
-                                <div className="mt-8">
-                                    <h3 className="font-medium mb-2">
-                                        Attachments:
-                                    </h3>
-                                    <ul className="list-disc pl-5">
-                                        {attachments.map(
-                                            (attachment, index) => (
-                                                <li key={index}>
-                                                    <a
-                                                        href={`/storage/app/${attachment.file_path}`}
-                                                        target="_blank"
-                                                        className="text-blue-600 hover:underline"
-                                                    >
-                                                        {attachment.file_name}
-                                                    </a>
-                                                </li>
-                                            )
-                                        )}
-                                    </ul>
+                                <div className="mt-8 print:hidden">
+                                    <h3 className="font-medium mb-4">Attachments:</h3>
+                                    <div className="overflow-hidden border rounded-md">
+                                        <table className="min-w-full divide-y divide-gray-200">
+                                            <thead className="bg-gray-50">
+                                                <tr>
+                                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        File Name
+                                                    </th>
+                                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                        File
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-white divide-y divide-gray-200">
+                                                {attachments.map((attachment, index) => (
+                                                    <tr key={index} className={index % 2 === 0 ? '' : 'bg-gray-50'}>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                            {attachment.file_name}
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                            <a
+                                                                href={`${attachment.path}`}
+                                                                target="_blank"
+                                                                className="text-blue-600 hover:text-blue-800 hover:underline flex items-center"
+                                                                download
+                                                            >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                                </svg>
+                                                                Download
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             )}
                         </div>

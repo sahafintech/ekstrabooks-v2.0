@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { router, useForm } from "@inertiajs/react";
 import {
     Select,
@@ -29,9 +29,10 @@ import { SidebarInset } from "@/Components/ui/sidebar";
 import PageHeader from "@/Components/PageHeader";
 import { formatCurrency, parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
-import { Card, CardContent, CardHeader, CardTitle } from "@/Components/ui/card";
 import { Link } from "@inertiajs/react";
 import { usePage } from "@inertiajs/react";
+import { Toaster } from "@/Components/ui/toaster";
+import { useToast } from "@/hooks/use-toast";
 
 export default function DashboardStaff({
     dashboard_type = "accounting",
@@ -53,6 +54,26 @@ export default function DashboardStaff({
     const [isCustom, setIsCustom] = useState(false);
     const [dashboardType, setDashboardType] = useState(dashboard_type);
     const { permissionList, auth } = usePage().props;
+
+    const { flash = {} } = usePage().props;
+    const { toast } = useToast();
+
+    useEffect(() => {
+        if (flash && flash.success) {
+          toast({
+            title: "Success",
+            description: flash.success,
+          });
+        }
+    
+        if (flash && flash.error) {
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: flash.error,
+          });
+        }
+      }, [flash, toast]);
 
     // Transform data for charts
     const monthlyData = Array.from({ length: 12 }, (_, i) => ({
@@ -161,6 +182,7 @@ export default function DashboardStaff({
     return (
         <AuthenticatedLayout>
             <SidebarInset>
+                <Toaster />
                 <PageHeader
                     page="Dashboard"
                     subpage="Dashboard"

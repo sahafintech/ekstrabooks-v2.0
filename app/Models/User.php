@@ -89,14 +89,6 @@ class User extends Authenticatable implements MustVerifyEmail {
         );
     }
 
-    protected function validTo(): Attribute {
-        $date_format = get_date_format();
-
-        return Attribute::make(
-            get:fn($value) => $value != null ? \Carbon\Carbon::parse($value)->format("$date_format") : null,
-        );
-    }
-
     public function sendEmailVerificationNotification()
     {
         if(get_option('email_verification') == 0) {

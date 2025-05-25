@@ -39,7 +39,14 @@ class ProjectSubcontractController extends Controller
      *
      * @return void
      */
-    public function __construct() {}
+    public function __construct() {
+        $this->middleware(function ($request, $next) {
+            if (package()->construction_module != 1) {
+                return back()->with('error', _lang('Sorry, This module is not available in your current package !'));
+            }
+            return $next($request);
+        });
+    }
 
     /**
      * Display a listing of the resource.

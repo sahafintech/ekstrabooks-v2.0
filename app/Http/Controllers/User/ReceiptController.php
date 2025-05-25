@@ -177,6 +177,7 @@ class ReceiptController extends Controller
             'accounts' => $accounts,
             'base_currency' => get_business_option('currency'),
             'projects' => $projects,
+            'construction_module' => package()->construction_module,
         ]);
     }
 
@@ -248,6 +249,7 @@ class ReceiptController extends Controller
             'accounts' => $accounts,
             'taxIds' => $taxIds,
             'projects' => $projects,
+            'construction_module' => package()->construction_module,
         ]);
     }
 

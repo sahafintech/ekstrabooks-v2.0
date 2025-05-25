@@ -15,7 +15,7 @@ import { useState, useEffect } from "react";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 
-export default function Create({ customers = [], products = [], currencies = [], taxes = [], receipt_title, accounts, base_currency, projects }) {
+export default function Create({ customers = [], products = [], currencies = [], taxes = [], receipt_title, accounts, base_currency, projects, construction_module }) {
   const [receiptItems, setReceiptItems] = useState([{
     product_id: "",
     product_name: "",
@@ -41,7 +41,6 @@ export default function Create({ customers = [], products = [], currencies = [],
     template: "",
     note: "",
     footer: "",
-    attachment: null,
     project_id: "",
     product_id: [],
     product_name: [],
@@ -292,6 +291,7 @@ export default function Create({ customers = [], products = [], currencies = [],
               </div>
             </div>
 
+            {construction_module == 1 && (
             <div className="grid grid-cols-12 mt-2">
               <Label htmlFor="project_id" className="md:col-span-2 col-span-12">
                 Project
@@ -308,9 +308,10 @@ export default function Create({ customers = [], products = [], currencies = [],
                     placeholder="Select project"
                   />
                 </div>
-                <InputError message={errors.project_id} className="text-sm" />
+                  <InputError message={errors.project_id} className="text-sm" />
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="grid grid-cols-12 mt-2">
               <Label htmlFor="title" className="md:col-span-2 col-span-12">
@@ -582,21 +583,6 @@ export default function Create({ customers = [], products = [], currencies = [],
                   rows={4}
                 />
                 <InputError message={errors.footer} className="text-sm" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-12 mt-2">
-              <Label htmlFor="attachment" className="md:col-span-2 col-span-12">
-                Attachment
-              </Label>
-              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Input
-                  id="attachment"
-                  type="file"
-                  onChange={(e) => setData("attachment", e.target.files[0])}
-                  className="md:w-1/2 w-full"
-                />
-                <InputError message={errors.attachment} className="text-sm" />
               </div>
             </div>
 

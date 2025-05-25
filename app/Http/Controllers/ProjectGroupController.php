@@ -25,12 +25,8 @@ class ProjectGroupController extends Controller
     {
         $this->middleware(function ($request, $next) {
 
-            if (package()->payroll_module != 1) {
-                if (!$request->ajax()) {
-                    return back()->with('error', _lang('Sorry, This module is not available in your current package !'));
-                } else {
-                    return response()->json(['result' => 'error', 'message' => _lang('Sorry, This module is not available in your current package !')]);
-                }
+            if (package()->construction_module != 1) {
+                return back()->with('error', _lang('Sorry, This module is not available in your current package !'));
             }
 
             return $next($request);

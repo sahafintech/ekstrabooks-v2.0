@@ -15,7 +15,7 @@ import { useState, useEffect } from "react";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 
-export default function Create({ customers = [], products = [], currencies = [], taxes = [], invoice_title, base_currency, projects = [] }) {
+export default function Create({ customers = [], products = [], currencies = [], taxes = [], invoice_title, base_currency, projects = [], construction_module }) {
   const [invoiceItems, setInvoiceItems] = useState([{
     product_id: "",
     product_name: "",
@@ -43,7 +43,6 @@ export default function Create({ customers = [], products = [], currencies = [],
     template: "",
     note: "",
     footer: "",
-    attachment: null,
     product_id: [],
     product_name: [],
     description: [],
@@ -254,9 +253,6 @@ export default function Create({ customers = [], products = [], currencies = [],
       unit_cost: invoiceItems.map(item => item.unit_cost),
     };
 
-    // Log the data being sent to help debug
-    console.log("Submitting form with data:", formData);
-
     // Post the form data directly instead of using setData first
     post(route("invoices.store"), formData, {
       preserveScroll: true,
@@ -301,9 +297,10 @@ export default function Create({ customers = [], products = [], currencies = [],
               </div>
             </div>
 
-            <div className="grid grid-cols-12 mt-2">
-              <Label htmlFor="project_id" className="md:col-span-2 col-span-12">
-                Project
+            {construction_module == 1 && (
+              <div className="grid grid-cols-12 mt-2">
+                <Label htmlFor="project_id" className="md:col-span-2 col-span-12">
+                  Project
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <div className="md:w-1/2 w-full">
@@ -320,6 +317,7 @@ export default function Create({ customers = [], products = [], currencies = [],
                 <InputError message={errors.project_id} className="text-sm" />
               </div>
             </div>
+            )}
 
             <div className="grid grid-cols-12 mt-2">
               <Label htmlFor="title" className="md:col-span-2 col-span-12">
@@ -585,21 +583,6 @@ export default function Create({ customers = [], products = [], currencies = [],
                   rows={4}
                 />
                 <InputError message={errors.footer} className="text-sm" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-12 mt-2">
-              <Label htmlFor="attachment" className="md:col-span-2 col-span-12">
-                Attachment
-              </Label>
-              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <Input
-                  id="attachment"
-                  type="file"
-                  onChange={(e) => setData("attachment", e.target.files[0])}
-                  className="md:w-1/2 w-full"
-                />
-                <InputError message={errors.attachment} className="text-sm" />
               </div>
             </div>
 

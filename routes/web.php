@@ -142,6 +142,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 			// user packages
 			Route::resource('user_packages', UserPackageController::class);
+			Route::post('user_packages/bulk_destroy', [UserPackageController::class, 'bulkDestroy'])->name('user_packages.bulk_destroy');
 
 			//Payment Gateways
 			Route::resource('payment_gateways', PaymentGatewayController::class)->except([

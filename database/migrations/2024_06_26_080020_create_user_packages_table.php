@@ -39,6 +39,8 @@ return new class extends Migration
             $table->integer('storage_limit')->default(0);
             $table->tinyInteger('medical_record')->default(0)->comment('1 = Yes | 0 = No');
             $table->tinyInteger('prescription')->default(0)->comment('1 = Yes | 0 = No');
+            $table->tinyInteger('construction_module')->default(0)->comment('1 = Yes | 0 = No');
+            $table->tinyInteger('time_sheet_module')->default(0)->comment('1 = Yes | 0 = No');
             $table->timestamps();
 
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');

@@ -9,10 +9,51 @@ use Inertia\Inertia;
 
 class UserPackageController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $packages = UserPackage::all();
-        return Inertia::render('Backend/Admin/UserPackages/List', compact('packages'));
+        $per_page = $request->get('per_page', 50);
+        $search = $request->get('search', '');
+
+        $query = UserPackage::query();
+
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('package_type', 'like', "%{$search}%")
+                    ->orWhere('cost', 'like', "%{$search}%");
+            });
+        }
+
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        $query->orderBy($sortColumn, $sortDirection);
+
+        // Get packages with pagination
+        $packages = $query->paginate($per_page)->withQueryString();
+
+        // Return Inertia view
+        return Inertia::render('Backend/Admin/UserPackages/List', [
+            'packages' => $packages->items(),
+            'meta' => [
+                'current_page' => $packages->currentPage(),
+                'from' => $packages->firstItem(),
+                'last_page' => $packages->lastPage(),
+                'links' => $packages->linkCollection(),
+                'path' => $packages->path(),
+                'per_page' => $packages->perPage(),
+                'to' => $packages->lastItem(),
+                'total' => $packages->total(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $sorting,
+            ],
+        ]);
     }
 
     public function create(Request $request)
@@ -57,6 +98,8 @@ class UserPackageController extends Controller
         $user_package->storage_limit            = $request->input('storage_limit');
         $user_package->medical_record           = $request->input('medical_record');
         $user_package->prescription             = $request->input('prescription');
+        $user_package->construction_module      = $request->input('construction_module');
+        $user_package->time_sheet_module        = $request->input('time_sheet_module');
         $user_package->membership_type          = null;
         $user_package->subscription_date        = null;
         $user_package->valid_to                 = null;
@@ -105,6 +148,8 @@ class UserPackageController extends Controller
         $user_package->storage_limit            = $request->input('storage_limit');
         $user_package->medical_record           = $request->input('medical_record');
         $user_package->prescription             = $request->input('prescription');
+        $user_package->construction_module      = $request->input('construction_module');
+        $user_package->time_sheet_module        = $request->input('time_sheet_module');
         $user_package->save();
 
         return redirect()->route('user_packages.index')->with('success', 'Package updated successfully');
@@ -115,5 +160,12 @@ class UserPackageController extends Controller
         $user_package = UserPackage::find($id);
         $user_package->delete();
         return redirect()->route('user_packages.index')->with('success', 'Package deleted successfully');
+    }
+
+    public function bulkDestroy(Request $request)
+    {
+        $ids = $request->input('ids');
+        UserPackage::whereIn('id', $ids)->delete();
+        return redirect()->route('user_packages.index')->with('success', 'Selected packages deleted successfully');
     }
 }
