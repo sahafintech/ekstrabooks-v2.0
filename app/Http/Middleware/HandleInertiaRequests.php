@@ -53,7 +53,7 @@ class HandleInertiaRequests extends Middleware
             ->where('users.id', $user->id)
             ->get();
 
-        $userPackage = $activeBusiness ? $activeBusiness->user->package : $user->package;
+        $userPackage = $activeBusiness ? $activeBusiness->user->package : $user?->package;
 
         return [
             ...parent::share($request),
