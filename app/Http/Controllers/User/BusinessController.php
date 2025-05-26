@@ -357,7 +357,6 @@ class BusinessController extends Controller
         $business->name             = $request->input('name');
         $business->reg_no           = $request->input('reg_no');
         $business->vat_id           = $request->input('vat_id');
-        $business->user_id          = auth()->id();
         $business->business_type_id = $request->input('business_type_id');
         $business->email            = $request->input('email');
         $business->phone            = $request->input('phone');

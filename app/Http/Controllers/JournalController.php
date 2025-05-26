@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Exports\JournalExport;
-use App\Http\Middleware\Business;
 use App\Imports\JournalImport;
 use App\Models\AuditLog;
 use App\Models\BusinessSetting;
@@ -79,6 +78,7 @@ class JournalController extends Controller
 
         return Inertia::render('Backend/User/Journal/List', [
             'journals' => $journals->items(),
+            'currencies' => Currency::all(),
             'meta' => [
                 'total' => $journals->total(),
                 'per_page' => $journals->perPage(),

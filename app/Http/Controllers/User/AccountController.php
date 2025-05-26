@@ -619,7 +619,7 @@ class AccountController extends Controller
         $audit->event = 'Imported Accounts';
         $audit->save();
 
-        return redirect()->route('chart_of_accounts.list_chart_of_accounts')->with('success', _lang('Accounts Imported'));
+        return redirect()->route('accounts.index')->with('success', _lang('Accounts Imported'));
     }
 
     public function export_accounts()
