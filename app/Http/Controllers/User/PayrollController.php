@@ -63,7 +63,7 @@ class PayrollController extends Controller
         $month = $request->month ?? date('m');
         $year = $request->year ?? date('Y');
         $search = $request->search;
-        $per_page = $request->per_page ?? 10;
+        $per_page = $request->per_page ?? 50;
 
         // Store month and year in session
         session(['month' => $month, 'year' => $year]);
@@ -77,10 +77,10 @@ class PayrollController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('employee_id', 'like', "%$search%")
-                  ->orWhereHas('employee', function ($q) use ($search) {
-                      $q->where('name', 'like', "%$search%");
-                  })
-                  ->orWhere('current_salary', 'like', "%$search%");
+                    ->orWhereHas('employee', function ($q) use ($search) {
+                        $q->where('name', 'like', "%$search%");
+                    })
+                    ->orWhere('current_salary', 'like', "%$search%");
             });
         }
 
@@ -95,9 +95,9 @@ class PayrollController extends Controller
             $relation = $parts[0];
             $column = $parts[1];
             $query->join('employees', 'payslips.employee_id', '=', 'employees.id')
-                  ->where('employees.business_id', $request->activeBusiness->id)
-                  ->orderBy('employees.' . $column, $sortDirection)
-                  ->select('payslips.*');
+                ->where('employees.business_id', $request->activeBusiness->id)
+                ->orderBy('employees.' . $column, $sortDirection)
+                ->select('payslips.*');
         } else {
             $query->orderBy('payslips.' . $sortColumn, $sortDirection);
         }
@@ -434,8 +434,8 @@ class PayrollController extends Controller
     public function bulk_payment(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'ids'      => 'required',
-            'method'          => 'required',
+            'payments'      => 'required',
+            'method'          => 'nullable',
             'credit_account_id'      => 'required',
             'debit_account_id' => 'required',
             'advance_account_id' => 'required',
@@ -450,25 +450,33 @@ class PayrollController extends Controller
 
         DB::beginTransaction();
         try {
-            $payslips = Payroll::whereIn('id', $request->ids)->get();
+            $payslips = Payroll::whereIn('id', array_column($request->payments, 'id'))->get();
 
-            foreach ($payslips as $payslip) {
-                if ($payslip->status == 3) {
+            foreach ($request->payments as $payment) {
+                $payslip = Payroll::find($payment['id']);
+                if ($payslip->status == 4) {
                     continue;
-                }
+                }                
+                $payslip->paid = $payslip->paid + $payment['amount'];
+                $payslip->save();
 
                 // Set payment status
-                $payslip->status = 3;
-                $payslip->save();
+                if ($payslip->paid >= $payslip->net_salary) {
+                    $payslip->status = 4;
+                    $payslip->save();
+                } else {
+                    $payslip->status = 3;
+                    $payslip->save();
+                }
 
                 $transaction                         = new Transaction();
                 $transaction->trans_date             = Carbon::parse($request->input('payment_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
                 $transaction->account_id             = $request->credit_account_id;
-                $transaction->dr_cr                  = 'dr';
-                $transaction->transaction_amount     = $payslip->net_salary;
+                $transaction->dr_cr                  = 'cr';
+                $transaction->transaction_amount     = $payment['amount'];
                 $transaction->currency_rate          = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                $transaction->base_currency_amount   = $payslip->net_salary;
-                $transaction->description            = _lang('Staff Salary Payment ' . $payslip->month . '/' . $payslips->first()->year) . ' - ' . $payslip->employee->name;
+                $transaction->base_currency_amount   = $payment['amount'];
+                $transaction->description            = _lang('Staff Salary Payment ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
                 $transaction->ref_id                 = $payslip->employee_id;
                 $transaction->ref_type               = 'payslip';
                 $transaction->employee_id            = $payslip->employee_id;
@@ -481,10 +489,10 @@ class PayrollController extends Controller
                 $transaction->trans_date              = Carbon::parse($request->input('payment_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
                 $transaction->account_id              = $request->debit_account_id;
                 $transaction->dr_cr                   = 'dr';
-                $transaction->transaction_amount      = $payslip->current_salary + $payslip->total_allowance;
+                $transaction->transaction_amount      = $payment['amount'];
                 $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                $transaction->base_currency_amount    = $payslip->employee->basic_salary + $payslip->total_allowance;
-                $transaction->description             = _lang('Staff Salary ' . $payslip->month . '/' . $payslips->first()->year) . ' - ' . $payslip->employee->name;
+                $transaction->base_currency_amount    = $payment['amount'];
+                $transaction->description             = _lang('Staff Salary ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
                 $transaction->ref_id                  = $payslip->employee_id;
                 $transaction->ref_type                = 'payslip';
                 $transaction->employee_id             = $payslip->employee_id;
@@ -499,34 +507,38 @@ class PayrollController extends Controller
                     ->whereNotNull('account_id')
                     ->get();
 
-                foreach ($deductions as $deduction) {
-                    $transaction = new Transaction();
-                    $transaction->trans_date = Carbon::parse($request->input('payment_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-                    $transaction->account_id = $deduction->account_id;
-                    $transaction->dr_cr = 'cr';
-                    $transaction->transaction_amount = $deduction->amount;
-                    $transaction->currency_rate = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                    $transaction->base_currency_amount = $deduction->amount;
-                    $transaction->description = _lang('Payroll Deduction: ' . $deduction->description . ' - ' . $payslip->month . '/' . $payslips->first()->year) . ' - ' . $payslip->employee->name;
-                    $transaction->ref_id = $payslip->employee_id;
-                    $transaction->ref_type = 'payslip_deduction';
-                    $transaction->employee_id = $payslip->employee_id;
-                    $transaction->save();
+                if ($payslip->status !== 3 && $payslip->status !== 4) {
+                    foreach ($deductions as $deduction) {
+                        $transaction = new Transaction();
+                        $transaction->trans_date = Carbon::parse($request->input('payment_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+                        $transaction->account_id = $deduction->account_id;
+                        $transaction->dr_cr = 'cr';
+                        $transaction->transaction_amount = $deduction->amount;
+                        $transaction->currency_rate = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
+                        $transaction->base_currency_amount = $deduction->amount;
+                        $transaction->description = _lang('Payroll Deduction: ' . $deduction->description . ' - ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
+                        $transaction->ref_id = $payslip->employee_id;
+                        $transaction->ref_type = 'payslip_deduction';
+                        $transaction->employee_id = $payslip->employee_id;
+                        $transaction->save();
+                    }
                 }
 
-                if ($payslip->advance > 0) {
-                    $transaction                          = new Transaction();
-                    $transaction->trans_date              = Carbon::parse($request->input('payment_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-                    $transaction->account_id              = $request->advance_account_id;
-                    $transaction->dr_cr                   = 'cr';
-                    $transaction->transaction_amount      = $payslip->advance;
-                    $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                    $transaction->base_currency_amount    = $payslip->advance;
-                    $transaction->description             = _lang('Staff Salary Advance ' . $payslip->month . '/' . $payslips->first()->year) . ' - ' . $payslip->employee->name;
-                    $transaction->ref_id                  = $payslip->employee_id;
-                    $transaction->ref_type                = 'payslip';
-                    $transaction->employee_id             = $payslip->employee_id;
-                    $transaction->save();
+                if ($payslip->status !== 3 && $payslip->status !== 4) {
+                    if ($payslip->advance > 0) {
+                        $transaction                          = new Transaction();
+                        $transaction->trans_date              = Carbon::parse($request->input('payment_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+                        $transaction->account_id              = $request->advance_account_id;
+                        $transaction->dr_cr                   = 'cr';
+                        $transaction->transaction_amount      = $payslip->advance;
+                        $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
+                        $transaction->base_currency_amount    = $payslip->advance;
+                        $transaction->description             = _lang('Staff Salary Advance ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
+                        $transaction->ref_id                  = $payslip->employee_id;
+                        $transaction->ref_type                = 'payslip';
+                        $transaction->employee_id             = $payslip->employee_id;
+                        $transaction->save();
+                    }
                 }
             }
 

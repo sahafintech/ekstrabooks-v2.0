@@ -762,7 +762,7 @@ export default function List({
                     <div className="p-4">
                         <SummaryCards summary={summary} />
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                            <div className="flex flex-col md:flex-row gap-4">
+                            <div className="flex flex-col md:flex-row gap-2">
                                 <Link href={route("bill_invoices.create")}>
                                     <Button>
                                         <Plus className="h-4 w-4 mr-2" />

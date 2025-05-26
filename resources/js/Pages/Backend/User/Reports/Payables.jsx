@@ -37,7 +37,8 @@ export default function Payables({ auth, report_data, vendors, currency, grand_t
         vendor_id: vendor_id,
     });
 
-    const handleGenerate = () => {
+    const handleGenerate = (e) => {
+        e.preventDefault();
         post(route('reports.payables'), {
             date1: data.date1,
             date2: data.date2,
@@ -45,6 +46,8 @@ export default function Payables({ auth, report_data, vendors, currency, grand_t
             search,
             sorting,
             per_page: meta.per_page,
+            preserveScroll: true,
+            preserveState: true,
         });
     };
 

@@ -283,7 +283,7 @@ export default function DashboardStaff({
                             {/* Dashboard Stats */}
                             <div className="grid auto-rows-min gap-2 md:grid-cols-2 lg:grid-cols-4">
                                 {permissionList?.some(p => p.permission === "dashboard.income_widget") && (
-                                    <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-primary">
+                                    <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-100">
                                         <div className="text-sm">
                                             Total Income
                                         </div>
@@ -298,7 +298,7 @@ export default function DashboardStaff({
                                 )}
 
                                 {permissionList?.some(p => p.permission === "dashboard.expense_widget") && (
-                                    <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-primary">
+                                    <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-100">
                                         <div className="text-sm">
                                             Total Expense
                                         </div>
@@ -313,7 +313,7 @@ export default function DashboardStaff({
                                 )}
 
                                 {permissionList?.some(p => p.permission === "dashboard.accounts_receivable_amount_widget") && (
-                                    <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-primary">
+                                    <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-100">
                                         <div className="text-sm">
                                             Receivable
                                         </div>
@@ -328,7 +328,7 @@ export default function DashboardStaff({
                                 )}
 
                                 {permissionList?.some(p => p.permission === "dashboard.accounts_payable_amount_widget") && (
-                                    <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-primary">
+                                    <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-100">
                                         <div className="text-sm">
                                             Payable
                                         </div>

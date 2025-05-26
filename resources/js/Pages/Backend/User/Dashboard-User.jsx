@@ -271,7 +271,7 @@ export default function DashboardUser({
 
                         {/* Dashboard Stats */}
                         <div className="grid auto-rows-min gap-2 md:grid-cols-2 lg:grid-cols-4">
-                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-200 text-primary">
+                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-100 text-primary">
                                 <div className="text-sm">
                                     Total Income
                                 </div>
@@ -284,7 +284,7 @@ export default function DashboardUser({
                                 </div>
                             </div>
 
-                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-200 text-primary">
+                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-100 text-primary">
                                 <div className="text-sm">
                                     Total Expense
                                 </div>
@@ -297,7 +297,7 @@ export default function DashboardUser({
                                 </div>
                             </div>
 
-                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-200 text-primary">
+                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-100 text-primary">
                                 <div className="text-sm">
                                     Receivable
                                 </div>
@@ -310,7 +310,7 @@ export default function DashboardUser({
                                 </div>
                             </div>
 
-                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-200 text-primary">
+                            <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-100 text-primary">
                                 <div className="text-sm">
                                     Payable
                                 </div>

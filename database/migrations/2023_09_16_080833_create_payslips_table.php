@@ -24,6 +24,7 @@ return new class extends Migration {
             $table->decimal('total_allowance', 28, 8)->default(0);
             $table->decimal('total_deduction', 28, 8)->default(0);
             $table->decimal('net_salary', 8, 2);
+            $table->decimal('paid', 8, 2)->default(0);
             $table->tinyInteger('status')->deafult(0);
 
             $table->bigInteger('user_id')->unsigned();

@@ -326,7 +326,7 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
     const [selectedPaylips, setSelectedPayslips] = useState([]);
     const [isAllSelected, setIsAllSelected] = useState(false);
     const [search, setSearch] = useState(filters.search || "");
-    const [perPage, setPerPage] = useState(meta.per_page || 10);
+    const [perPage, setPerPage] = useState(meta.per_page || 50);
     const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
     const [bulkAction, setBulkAction] = useState("");
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -347,6 +347,16 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
     const [paymentMethod, setPaymentMethod] = useState(null);
     const [paymentDate, setPaymentDate] = useState(null);
     const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
+    const [paymentAmounts, setPaymentAmounts] = useState({});
+
+    useEffect(() => {
+        // Initialize paymentAmounts with the correct due amounts
+        const initialPaymentAmounts = {};
+        payrolls.forEach(payroll => {
+            initialPaymentAmounts[payroll.id] = payroll.net_salary - payroll.paid;
+        });
+        setPaymentAmounts(initialPaymentAmounts);
+    }, [payrolls]);
 
     useEffect(() => {
         if (flash && flash.success) {
@@ -397,10 +407,10 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
     }, [selectedMonth, selectedYear, search, perPage]);
 
     const handleSearch = (e) => {
-        e.preventDefault();
+        setSearch(e.target.value);
         router.get(
-            route("payrolls.index"),
-            { search, page: 1, per_page: perPage },
+            route("payslips.index"),
+            { search: e.target.value, page: 1, per_page: perPage, month: selectedMonth, year: selectedYear },
             { preserveState: true }
         );
     };
@@ -409,7 +419,7 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
         setPerPage(value);
         router.get(
             route("payslips.index"),
-            { search, page: 1, per_page: value },
+            { search, page: 1, per_page: value, month: selectedMonth, year: selectedYear },
             { preserveState: true }
         );
     };
@@ -418,7 +428,7 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
         setCurrentPage(page);
         router.get(
             route("payslips.index"),
-            { search, page, per_page: perPage },
+            { search, page, per_page: perPage, month: selectedMonth, year: selectedYear },
             { preserveState: true }
         );
     };
@@ -580,18 +590,32 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
         );
     };
 
+    const handlePaymentAmountChange = (payrollId, amount) => {
+        setPaymentAmounts(prev => ({
+            ...prev,
+            [payrollId]: amount
+        }));
+    };
+
     const handleBulkPaymentConfirm = (e) => {
         e.preventDefault();
         setIsProcessing(true);
 
+        // Create an array of payment data including the payment amounts
+        const paymentData = selectedPaylips.map(id => ({
+            id,
+            amount: paymentAmounts[id] || payrolls.find(p => p.id === id)?.net_salary
+        }));
+
         router.post(
             route("payslips.bulk_payment"),
             {
-                ids: selectedPaylips,
+                payments: paymentData,
                 credit_account_id: creditAccountId,
                 debit_account_id: debitAccountId,
                 advance_account_id: advanceAccountId,
                 method: paymentMethod,
+                payment_date: paymentDate
             },
             {
                 preserveState: true,
@@ -601,6 +625,7 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                     setBulkAction("");
                     setShowBulkPaymentModal(false);
                     setIsProcessing(false);
+                    setPaymentAmounts({});
                 },
                 onError: () => {
                     setIsProcessing(false);
@@ -671,7 +696,8 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
             0: { label: "Draft", className: "text-gray-600" },
             1: { label: "Approved", className: "text-blue-600" },
             2: { label: "Accrued", className: "text-green-600" },
-            3: { label: "Paid", className: "text-green-600" },
+            3: { label: "Partially Paid", className: "text-yellow-600" },
+            4: { label: "Paid", className: "text-green-600" },
         };
 
         return (
@@ -698,7 +724,7 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                     />
                     <div className="p-4">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                            <div className="flex flex-col md:flex-row gap-4">
+                            <div className="flex flex-col md:flex-row gap-2">
                                 <Link href={route("payslips.create")}>
                                     <Button>
                                         <Plus className="w-4 h-4 mr-2" />
@@ -748,15 +774,12 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                                 />
                             </div>
                             <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                                <form onSubmit={handleSearch} className="flex gap-2">
-                                    <Input
-                                        placeholder="Search payrolls..."
-                                        value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
-                                        className="w-full md:w-80"
-                                    />
-                                    <Button type="submit">Search</Button>
-                                </form>
+                                <Input
+                                    placeholder="Search payrolls..."
+                                    value={search}
+                                    onChange={(e) => handleSearch(e)}
+                                    className="w-full md:w-80"
+                                />
                             </div>
                         </div>
 
@@ -832,6 +855,11 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                                         <TableHead className="cursor-pointer" onClick={() => handleSort("net_salary")}>
                                             Net Salary {renderSortIcon("net_salary")}
                                         </TableHead>
+                                        <TableHead className="cursor-pointer" onClick={() => handleSort("paid")}>
+                                            Paid {renderSortIcon("paid")}
+                                        </TableHead>
+                                        <TableHead>Due Amount</TableHead>
+                                        <TableHead>Amount</TableHead>
                                         <TableHead className="cursor-pointer" onClick={() => handleSort("status")}>
                                             Status {renderSortIcon("status")}
                                         </TableHead>
@@ -861,6 +889,20 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                                                 <TableCell>{formatCurrency({ amount: payroll.total_deduction })}</TableCell>
                                                 <TableCell>{formatCurrency({ amount: payroll.advance })}</TableCell>
                                                 <TableCell>{formatCurrency({ amount: payroll.net_salary })}</TableCell>
+                                                <TableCell>{formatCurrency({ amount: payroll.paid })}</TableCell>
+                                                <TableCell>{formatCurrency({ amount: payroll.net_salary - payroll.paid })}</TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        type="number"
+                                                        value={paymentAmounts[payroll.id] || payroll.net_salary - payroll.paid}
+                                                        onChange={(e) => handlePaymentAmountChange(payroll.id, parseFloat(e.target.value))}
+                                                        className="w-32"
+                                                        min="0"
+                                                        max={payroll.net_salary}
+                                                        step="0.01"
+                                                        disabled={payroll.status === 4}
+                                                    />
+                                                </TableCell>
                                                 <TableCell><PayrollStatusBadge status={payroll.status} /></TableCell>
                                                 <TableCell className="text-right">
                                                     <TableActions
