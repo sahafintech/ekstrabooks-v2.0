@@ -119,8 +119,6 @@ export default function Features() {
 
     return (
         <WebsiteLayout>
-            <Head title="Features" />
-
             {/* Hero Section */}
             <section className="relative overflow-hidden bg-muted/30">
                 <div className="absolute inset-0 bg-grid-pattern opacity-5" />

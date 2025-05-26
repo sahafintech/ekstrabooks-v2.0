@@ -106,7 +106,6 @@ export default function CashInvoice({
 
     return (
         <AuthenticatedLayout>
-            <Head title="Business Settings" />
             <SidebarInset>
                 <PageHeader
                     page="Business"

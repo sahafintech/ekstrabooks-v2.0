@@ -750,7 +750,6 @@ export default function List({
 
     return (
         <AuthenticatedLayout>
-            <Head title="Bill Invoices" />
             <Toaster />
             <SidebarInset>
                 <div className="main-content">

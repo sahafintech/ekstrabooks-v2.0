@@ -1,4 +1,3 @@
-import { Head } from "@inertiajs/react";
 import WebsiteLayout from "@/Layouts/WebsiteLayout";
 import { Button } from "@/Components/ui/button";
 import { ArrowRight } from "lucide-react";
@@ -25,9 +24,7 @@ export default function Pricing({ pageData }) {
     ];
 
     return (
-        <WebsiteLayout>
-            <Head title={pageData?.title || 'Pricing'} />
-            
+        <WebsiteLayout>            
             {/* Hero Section */}
             <section className="relative overflow-hidden">
                 <div className="absolute inset-0 bg-grid-pattern opacity-5" />

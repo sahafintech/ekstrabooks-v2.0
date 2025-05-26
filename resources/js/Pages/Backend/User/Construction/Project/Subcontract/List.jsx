@@ -640,7 +640,6 @@ export default function List({
 
     return (
         <AuthenticatedLayout>
-            <Head title="Project Subcontracts" />
             <Toaster />
             <SidebarInset>
                 <div className="main-content">

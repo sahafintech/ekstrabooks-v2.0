@@ -32,7 +32,6 @@ export default function View({ adjustment }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title="View Inventory Adjustment" />
             <SidebarInset>
                 <div className="main-content">
                     <PageHeader

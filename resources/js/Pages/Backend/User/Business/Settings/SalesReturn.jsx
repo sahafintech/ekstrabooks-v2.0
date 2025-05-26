@@ -124,7 +124,6 @@ export default function SalesReturn({ business, id, activeTab, salesReturnColumn
     }, [flash, toast]);
     return (
         <AuthenticatedLayout>
-            <Head title="Business Settings" />
             <Toaster />
             <SidebarInset>
                 <PageHeader

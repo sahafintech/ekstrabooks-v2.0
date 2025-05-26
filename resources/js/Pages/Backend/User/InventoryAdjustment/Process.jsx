@@ -192,7 +192,6 @@ export default function Process({ fileData, requiredFields }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Process Inventory Adjustments Import" />
       <SidebarInset>
         <div className="main-content">
           <PageHeader 

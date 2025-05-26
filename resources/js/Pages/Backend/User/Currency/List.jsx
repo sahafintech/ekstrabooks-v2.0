@@ -316,7 +316,6 @@ export default function List({ currencies = [], meta = {}, filters = {} }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Currency" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

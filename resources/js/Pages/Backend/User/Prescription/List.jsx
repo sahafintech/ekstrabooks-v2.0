@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Head, Link, router, usePage } from "@inertiajs/react";
+import { Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -288,7 +288,6 @@ export default function List({ prescriptions = [], meta = {}, filters = {} }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Prescriptions" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

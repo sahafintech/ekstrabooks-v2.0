@@ -110,7 +110,6 @@ export default function Create({
 
     return (
         <AuthenticatedLayout>
-            <Head title="Create Role & Permissions" />
             <Toaster />
             <SidebarInset>
                 <div className="flex flex-1 flex-col gap-4 p-4 pt-0">

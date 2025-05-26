@@ -300,7 +300,6 @@ export default function GeneralJournal({
 
     return (
         <AuthenticatedLayout>
-            <Head title="Reports" />
             <Toaster />
             <SidebarInset>
                 <div className="main-content">

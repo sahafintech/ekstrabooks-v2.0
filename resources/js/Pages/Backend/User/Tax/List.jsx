@@ -381,7 +381,6 @@ export default function List({ taxs = [], meta = {}, filters = {}, accounts = []
     };
     return (
         <AuthenticatedLayout>
-            <Head title="Tax" />
             <Toaster />
             <SidebarInset>
                 <div className="main-content">

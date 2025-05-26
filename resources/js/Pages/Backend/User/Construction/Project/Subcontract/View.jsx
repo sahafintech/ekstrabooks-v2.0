@@ -221,8 +221,6 @@ export default function View({
 
     return (
         <AuthenticatedLayout>
-            <Head title={`Subcontract #${projectSubcontract.subcontract_no}`} />
-
             <Toaster />
 
             <SidebarInset>

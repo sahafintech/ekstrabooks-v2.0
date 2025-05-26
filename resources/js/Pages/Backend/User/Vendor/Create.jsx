@@ -41,7 +41,6 @@ export default function Create() {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Add New Vendor" />
       <SidebarInset>
         <PageHeader page="Vendors" subpage="Add New" url="vendors.index" />
 

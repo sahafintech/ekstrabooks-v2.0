@@ -393,7 +393,6 @@ export default function List({
 
     return (
         <AuthenticatedLayout>
-            <Head title="Users" />
             <Toaster />
             <SidebarInset>
                 <div className="main-content">

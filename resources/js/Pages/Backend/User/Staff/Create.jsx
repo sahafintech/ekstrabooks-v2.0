@@ -88,7 +88,6 @@ export default function Create({ departments = [], designations = [] }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Create Staff" />
       <SidebarInset>
         <div className="main-content">
           <PageHeader

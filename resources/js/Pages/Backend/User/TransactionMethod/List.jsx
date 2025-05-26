@@ -388,7 +388,6 @@ export default function List({ transaction_methods = [], meta = {}, filters = {}
 
   return (
     <AuthenticatedLayout>
-      <Head title="Transaction Methods" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

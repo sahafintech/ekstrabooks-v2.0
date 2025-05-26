@@ -1,4 +1,4 @@
-import { Head, Link, router, useForm, usePage } from "@inertiajs/react";
+import { Link, router, useForm, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset, SidebarSeparator } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -214,7 +214,6 @@ export default function View({
 
     return (
         <AuthenticatedLayout>
-            <Head title={`Deffered Invoice #${invoice.id}`} />
             <Toaster />
 
             <SidebarInset>

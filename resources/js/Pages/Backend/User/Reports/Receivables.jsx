@@ -244,7 +244,6 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
 
     return (
         <AuthenticatedLayout>
-            <Head title="Receivables Report" />
             <Toaster />
             <SidebarInset>
                 <div className="main-content">

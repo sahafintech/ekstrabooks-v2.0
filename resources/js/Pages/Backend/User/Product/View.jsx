@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Head, router } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { SidebarInset } from "@/Components/ui/sidebar";
 import PageHeader from "@/Components/PageHeader";
@@ -41,7 +41,6 @@ const ProductView = ({ product, transactions, suppliers, id, activeTab }) => {
 
   return (
     <AuthenticatedLayout>
-      <Head title={`View Product - ${product.name}`} />
       <SidebarInset>
         <PageHeader page="Products" subpage="View" url="products.index" />
 

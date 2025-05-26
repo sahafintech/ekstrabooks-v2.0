@@ -82,8 +82,6 @@ export default function Contact({ pageData }) {
 
     return (
         <WebsiteLayout>
-            <Head title={pageData?.title || "Contact"} />
-
             <div className="relative">
                 {/* Background Pattern */}
                 <div className="absolute inset-0 grid grid-cols-2 -space-x-52 opacity-40 dark:opacity-20">

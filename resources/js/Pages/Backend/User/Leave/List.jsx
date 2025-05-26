@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Head, Link, router, usePage } from "@inertiajs/react";
+import { Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -13,15 +13,6 @@ import {
   TableRow,
 } from "@/Components/ui/table";
 import { Input } from "@/Components/ui/input";
-import { Label } from "@/Components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/Components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -29,26 +20,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/Components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/Components/ui/popover";
-import { Calendar } from "@/Components/ui/calendar";
-import { Plus, Edit, Trash, Search, CalendarIcon, EyeIcon, FileDown, FileUp, MoreVertical, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Edit, Trash, EyeIcon, ChevronUp, ChevronDown } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
-import {
-  DropdownMenu,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-} from "@/Components/ui/dropdown-menu";
+
 
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
@@ -361,7 +340,6 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Leave Management" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

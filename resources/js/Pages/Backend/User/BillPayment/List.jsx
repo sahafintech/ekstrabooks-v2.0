@@ -322,7 +322,6 @@ export default function List({ payments = [], meta = {}, filters = {}, vendors =
 
     return (
         <AuthenticatedLayout>
-            <Head title="Payments" />
             <Toaster />
             <SidebarInset>
                 <div className="main-content">

@@ -134,7 +134,6 @@ export default function List({ auditLogs = [], meta = {}, filters = {} }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Audit Log" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

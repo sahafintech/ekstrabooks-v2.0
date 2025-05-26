@@ -96,7 +96,6 @@ export default function Edit({ attendanceData = {}, employees = [], message = nu
 
   return (
     <AuthenticatedLayout>
-      <Head title="Edit Attendance" />
       <SidebarInset>
         <div className="main-content">
           <PageHeader

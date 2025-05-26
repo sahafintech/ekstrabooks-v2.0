@@ -125,7 +125,6 @@ export default function PurchaseReturn({
 
     return (
         <AuthenticatedLayout>
-            <Head title="Business Settings" />
             <Toaster />
             <SidebarInset>
                 <PageHeader

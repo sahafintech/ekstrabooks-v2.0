@@ -51,7 +51,6 @@ export default function Invoice({ business, id, activeTab, invoiceColumn }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title="Business Settings" />
             <SidebarInset>
                 <PageHeader
                     page="Business"

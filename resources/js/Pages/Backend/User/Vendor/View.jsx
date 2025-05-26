@@ -166,7 +166,6 @@ export default function View({ vendor, purchase, purchases, transactions, active
 
   return (
     <AuthenticatedLayout>
-      <Head title="View Vendor" />
       <SidebarInset>
         <PageHeader page="Vendors" subpage="View Vendor" url="vendors.index" />
 

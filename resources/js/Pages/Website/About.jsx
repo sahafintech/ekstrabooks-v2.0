@@ -84,9 +84,7 @@ export default function About({ pageData }) {
     ];
 
     return (
-        <WebsiteLayout>
-            <Head title={pageData?.title || 'About Us'} />
-            
+        <WebsiteLayout>            
             {/* Hero Section */}
             <section className="relative overflow-hidden">
                 <div className="absolute inset-0 bg-grid-pattern opacity-5" />

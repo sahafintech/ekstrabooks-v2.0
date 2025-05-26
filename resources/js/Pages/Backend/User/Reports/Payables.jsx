@@ -217,7 +217,6 @@ export default function Payables({ auth, report_data, vendors, currency, grand_t
             user={auth.user}
             header={<h2 className="font-semibold text-xl text-gray-800 leading-tight">Payables Report</h2>}
         >
-            <Head title="Payables Report" />
             <Toaster />
             <SidebarInset>
                 <div className="main-content">

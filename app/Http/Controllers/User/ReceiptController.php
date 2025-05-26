@@ -917,6 +917,9 @@ class ReceiptController extends Controller
 
     public function pos()
     {
+        if (package()->pos != 1) {
+            return back()->with('error', _lang('Sorry, This module is not available in your current package !'));
+        }
         $products = Product::all();
         $categories = SubCategory::all();
         $currencies = Currency::all();

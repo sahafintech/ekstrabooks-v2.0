@@ -157,7 +157,6 @@ export default function View({ project, activeTab, cost_codes }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title={`Project: ${project.project_name}`} />
             <SidebarInset>
                 <div className="main-content">
                     <PageHeader

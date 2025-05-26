@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Head, router, usePage } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -101,7 +101,6 @@ export default function Edit({ leave, staff = [] }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Edit Leave" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

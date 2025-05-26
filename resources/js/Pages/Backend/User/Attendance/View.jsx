@@ -33,7 +33,6 @@ export default function View({ date, attendanceRecords = [], stats = {} }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title={`Attendance for ${formattedDate}`} />
       <SidebarInset>
         <div className="main-content">
           <PageHeader

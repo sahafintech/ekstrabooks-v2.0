@@ -39,7 +39,6 @@ export default function Edit({ vendor }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Edit Vendor" />
       <SidebarInset>
         <PageHeader page="Vendors" subpage="Edit" url="vendors.index" />
 

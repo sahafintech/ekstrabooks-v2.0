@@ -8,6 +8,7 @@ use App\Models\UserPackage;
 use DataTables;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 use Validator;
 
 class SubscriptionPaymentController extends Controller
@@ -28,14 +29,66 @@ class SubscriptionPaymentController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        $subscription_payments = SubscriptionPayment::select('subscription_payments.*')
-            ->with('user', 'package', 'created_by')
-            ->orderBy("subscription_payments.id", "desc")
-            ->get();
+        $per_page = $request->get('per_page', 50);
+        $search = $request->get('search', '');
 
-        return view('backend.admin.subscription_payment.list', compact('subscription_payments'));
+        $query = SubscriptionPayment::query();
+
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('user', function ($q2) use ($search) {
+                    $q2->where('name', 'like', "%{$search}%");
+                })
+                    ->orWhere('order_id', 'like', "%{$search}%")
+                    ->orWhere('payment_method', 'like', "%{$search}%")
+                    ->orWhere('amount', 'like', "%{$search}%");
+            });
+        }
+
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        if ($sortColumn === 'user.name') {
+            $query->join('users', 'subscription_payments.user_id', '=', 'users.id')
+                ->orderBy('users.name', $sortDirection)
+                ->select('subscription_payments.*');
+        } else if ($sortColumn === 'package.name') {
+            $query->join('user_packages', 'subscription_payments.user_package_id', '=', 'user_packages.id')
+                ->orderBy('user_packages.name', $sortDirection)
+                ->select('subscription_payments.*');
+        } else {
+            $query->orderBy($sortColumn, $sortDirection);
+        }
+
+        // Get payments with pagination
+        $subscription_payments = $query->with('user', 'package', 'created_by')
+            ->paginate($per_page)
+            ->withQueryString();
+
+        // Return Inertia view
+        return Inertia::render('Backend/Admin/SubscriptionPayments/List', [
+            'subscription_payments' => $subscription_payments->items(),
+            'meta' => [
+                'current_page' => $subscription_payments->currentPage(),
+                'from' => $subscription_payments->firstItem(),
+                'last_page' => $subscription_payments->lastPage(),
+                'links' => $subscription_payments->linkCollection(),
+                'path' => $subscription_payments->path(),
+                'per_page' => $subscription_payments->perPage(),
+                'to' => $subscription_payments->lastItem(),
+                'total' => $subscription_payments->total(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $sorting,
+            ],
+        ]);
     }
 
     /**
@@ -47,7 +100,11 @@ class SubscriptionPaymentController extends Controller
     {
         $user_packages = UserPackage::all();
         $users = User::where('user_type', 'user')->get();
-        return view('backend.admin.subscription_payment.create', compact('users', 'user_packages'));
+        return Inertia::render('Backend/Admin/SubscriptionPayments/Create', [
+            'user_packages' => $user_packages,
+            'users' => $users,
+            'currency' => get_option('currency'),
+        ]);
     }
 
     public function membership_date($package_type, $subscription_date)
@@ -118,9 +175,16 @@ class SubscriptionPaymentController extends Controller
      */
     public function edit(Request $request, $id)
     {
-        $alert_col           = 'col-lg-8 offset-lg-2';
         $subscriptionpayment = SubscriptionPayment::find($id);
-        return view('backend.admin.subscription_payment.edit', compact('subscriptionpayment', 'id', 'alert_col'));
+        $user_packages = UserPackage::all();
+        $users = User::where('user_type', 'user')->get();
+
+        return Inertia::render('Backend/Admin/SubscriptionPayments/Edit', [
+            'subscriptionpayment' => $subscriptionpayment,
+            'user_packages' => $user_packages,
+            'users' => $users,
+            'currency' => get_option('currency'),
+        ]);
     }
 
     /**
@@ -133,7 +197,9 @@ class SubscriptionPaymentController extends Controller
     public function update(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            'package_id'     => 'required',
+            'user_id'        => 'required',
+            'order_id'       => 'required|unique:subscription_payments,order_id,' . $id,
+            'payment_method' => 'required',
             'amount'         => 'required|numeric',
             'status'         => 'required',
         ]);
@@ -149,16 +215,15 @@ class SubscriptionPaymentController extends Controller
         }
 
         $subscriptionpayment                 = SubscriptionPayment::find($id);
-        $subscriptionpayment->package_id     = $request->input('package_id');
+        $subscriptionpayment->user_id        = $request->input('user_id');
+        $subscriptionpayment->order_id       = $request->input('order_id');
+        $subscriptionpayment->payment_method = $request->input('payment_method');
+        $subscriptionpayment->user_package_id = $request->input('user_package_id');
         $subscriptionpayment->amount         = $request->input('amount');
         $subscriptionpayment->status         = $request->input('status');
 
         $subscriptionpayment->save();
 
-        if (!$request->ajax()) {
-            return redirect()->route('subscription_payments.index')->with('success', _lang('Updated Successfully'));
-        } else {
-            return response()->json(['result' => 'success', 'action' => 'update', 'message' => _lang('Updated Successfully'), 'data' => $subscriptionpayment, 'table' => '#subscription_payments_table']);
-        }
+        return redirect()->route('subscription_payments.index')->with('success', _lang('Updated Successfully'));
     }
 }

@@ -385,7 +385,6 @@ export default function List({ accounts = [], meta = {}, filters = {} }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Account" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

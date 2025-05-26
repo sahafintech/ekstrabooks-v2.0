@@ -378,7 +378,6 @@ export default function List({ customers = [], meta = {}, filters = {} }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Customers" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

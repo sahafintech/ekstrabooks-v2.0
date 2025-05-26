@@ -246,7 +246,6 @@ export default function TrialBalance({ report_data, date1, date2, business_name 
 
     return (
         <AuthenticatedLayout>
-            <Head title="Reports" />
             <Toaster />
             <SidebarInset>
                 <div className="main-content">

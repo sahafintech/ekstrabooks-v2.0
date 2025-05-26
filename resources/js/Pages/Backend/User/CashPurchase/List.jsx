@@ -567,7 +567,6 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
   };
   return (
     <AuthenticatedLayout>
-      <Head title="Cash Purchases" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

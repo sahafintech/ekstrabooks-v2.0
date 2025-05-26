@@ -50,7 +50,6 @@ export default function Import() {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Import Inventory Adjustments" />
       <SidebarInset>
         <div className="main-content">
           <PageHeader 

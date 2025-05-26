@@ -165,7 +165,6 @@ export default function DefaultList() {
 
     return (
         <AuthenticatedLayout>
-            <Head title="Pages" />
             <Toaster />
             <SidebarInset>
                 <PageHeader page="Website" subpage="List" url="pages.index" />

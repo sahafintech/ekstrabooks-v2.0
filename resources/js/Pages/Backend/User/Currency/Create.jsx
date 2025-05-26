@@ -32,7 +32,6 @@ export default function Create() {
 
     return (
         <AuthenticatedLayout>
-            <Head title="Add New Currency" />
             <SidebarInset>
                 <PageHeader page="Currency" subpage="Add New" url="currency.index" />
 

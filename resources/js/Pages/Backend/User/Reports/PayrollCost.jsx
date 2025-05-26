@@ -182,7 +182,6 @@ export default function PayrollCost({ report_data, month, year, currency }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title="Payroll Cost Report" />
             <Toaster />
             <SidebarInset>
                 <div className="main-content">

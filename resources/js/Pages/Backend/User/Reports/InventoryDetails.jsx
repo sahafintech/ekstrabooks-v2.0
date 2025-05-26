@@ -287,7 +287,6 @@ export default function InventoryDetails({ categories, date1, date2, business_na
 
     return (
         <AuthenticatedLayout>
-            <Head title="Inventory Details" />
             <SidebarInset>
                 <div className="main-content">
                     <PageHeader

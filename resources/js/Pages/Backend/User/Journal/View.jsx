@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { Head, Link } from "@inertiajs/react";
+import { Link } from "@inertiajs/react";
 import { Button } from "@/Components/ui/button";
 import PageHeader from "@/Components/PageHeader";
 import { SidebarInset } from "@/Components/ui/sidebar";
@@ -101,8 +101,6 @@ export default function View({ journal, transactions, pending_transactions }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="View Journal Entry" />
-
       <SidebarInset>
         <div className="main-content">
           <PageHeader

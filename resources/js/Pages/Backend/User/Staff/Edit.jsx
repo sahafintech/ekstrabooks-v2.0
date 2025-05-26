@@ -93,7 +93,6 @@ export default function Edit({ employee, departments = [], designations = [] }) 
 
   return (
     <AuthenticatedLayout>
-      <Head title="Edit Staff" />
       <SidebarInset>
         <div className="main-content">
           <PageHeader

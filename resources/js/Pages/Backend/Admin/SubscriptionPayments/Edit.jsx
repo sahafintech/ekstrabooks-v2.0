@@ -15,19 +15,20 @@ import {
 } from "@/Components/ui/select";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 
-export default function Create({ users, user_packages, currency }) {
+export default function Edit({ users, user_packages, currency, subscriptionpayment }) {
     const { data, setData, post, processing, errors, reset } = useForm({
-        user_id: "",
-        payment_method: "Cash",
-        user_package_id: "",
-        order_id: "",
-        amount: "",
-        status: "1",
+        user_id: subscriptionpayment.user_id,
+        payment_method: subscriptionpayment.payment_method,
+        user_package_id: subscriptionpayment.user_package_id,
+        order_id: subscriptionpayment.order_id,
+        amount: subscriptionpayment.amount,
+        status: subscriptionpayment.status,
+        _method: "PUT",
     });
 
     const submit = (e) => {
         e.preventDefault();
-        post(route("subscription_payments.store"), {
+        post(route("subscription_payments.update", subscriptionpayment.id), {
             preserveScroll: true,
             onSuccess: () => {
                 reset();
@@ -40,7 +41,7 @@ export default function Create({ users, user_packages, currency }) {
             <SidebarInset>
                 <PageHeader
                     page="Subscription"
-                    subpage="Create"
+                    subpage="Edit"
                     url="subscription_payments.index"
                 />
 

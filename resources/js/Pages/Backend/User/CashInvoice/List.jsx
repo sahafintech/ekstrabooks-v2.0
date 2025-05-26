@@ -465,7 +465,6 @@ export default function List({ receipts = [], meta = {}, filters = {}, customers
 
   return (
     <AuthenticatedLayout>
-      <Head title="Cash Invoices" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

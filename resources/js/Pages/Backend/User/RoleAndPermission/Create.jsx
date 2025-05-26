@@ -29,7 +29,6 @@ export default function Create() {
 
     return (
         <AuthenticatedLayout>
-            <Head title="Add New Role" />
             <SidebarInset>
                 <PageHeader page="Roles" subpage="Add New" url="roles.index" />
 

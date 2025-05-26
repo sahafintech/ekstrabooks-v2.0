@@ -144,8 +144,6 @@ export default function View({ receipt, attachments, decimalPlace }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title={`Cash Invoice #${receipt.receipt_number}`} />
-
             <SidebarInset>
                 <div className="space-y-4">
                     <PageHeader

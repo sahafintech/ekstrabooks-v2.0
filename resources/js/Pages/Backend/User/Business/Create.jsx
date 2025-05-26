@@ -56,7 +56,6 @@ export default function Create({ business_types = [], currencies = [], countries
 
     return (
         <AuthenticatedLayout>
-            <Head title="Add New Business" />
             <SidebarInset>
                 <PageHeader page="Business" subpage="Add New" url="business.index" />
 

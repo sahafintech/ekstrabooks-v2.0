@@ -104,8 +104,6 @@ export default function PublicView({ sales_return }) {
 
     return (
         <GuestLayout>
-            <Head title={`Sales Return - ${sales_return.return_number}`} />
-
             <div className="container mx-auto px-4 py-8">
                 {/* Action Buttons */}
                 <div className="flex justify-end gap-4 mb-6 w-full md:w-[210mm] mx-auto print:hidden">

@@ -303,7 +303,6 @@ export default function List({ businesses = [], meta = {}, filters = {} }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Business" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

@@ -8,9 +8,7 @@ import Newsletter from "@/Components/Website/Newsletter";
 
 export default function Index({ pageData, pageMedia, features, packages }) {
     return (
-        <WebsiteLayout>
-            <Head title={pageData?.title || 'Home'} />
-            
+        <WebsiteLayout>            
             <Hero 
                 heading={pageData?.hero_heading}
                 subHeading={pageData?.hero_sub_heading}

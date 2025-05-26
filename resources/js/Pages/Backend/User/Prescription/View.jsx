@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { Head, Link } from "@inertiajs/react";
+import { Link } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import PageHeader from "@/Components/PageHeader";
@@ -35,7 +35,6 @@ export default function View({ prescription, customer, prescriptionProduct }) {
     
     return (
         <AuthenticatedLayout>
-            <Head title={`Prescription - ${customer?.name || 'Patient'}`} />
             <SidebarInset>
                 <PageHeader 
                     page="Prescriptions" 

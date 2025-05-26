@@ -337,9 +337,7 @@ export default function List({ attendances = [], meta = {}, filters = {} }) {
   };
 
   return (
-    <AuthenticatedLayout>
-      <Head title="Attendance Management" />
-      
+    <AuthenticatedLayout>      
       <DeleteConfirmationModal
         show={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}

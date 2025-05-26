@@ -324,7 +324,6 @@ export default function List({ users = [], meta = {}, filters = {} }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title="Users" />
             <Toaster />
             <div className="flex flex-1 flex-col">
                 <PageHeader page="Users" subpage="List" url="users.index" />

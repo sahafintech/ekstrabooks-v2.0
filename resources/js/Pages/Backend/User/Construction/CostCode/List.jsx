@@ -378,7 +378,6 @@ export default function List({ cost_codes = [], meta = {}, filters = {} }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Cost Codes" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

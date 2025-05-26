@@ -378,7 +378,6 @@ export default function List({ vendors = [], meta = {}, filters = {} }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Vendors" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

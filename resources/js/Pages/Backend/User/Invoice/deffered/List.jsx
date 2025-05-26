@@ -500,7 +500,6 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
 
   return (
     <AuthenticatedLayout>
-      <Head title="Deffered Invoices" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

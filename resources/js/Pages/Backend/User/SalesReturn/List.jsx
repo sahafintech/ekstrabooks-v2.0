@@ -643,7 +643,6 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
 
     return (
         <AuthenticatedLayout>
-            <Head title="Sales Returns" />
             <Toaster />
             <SidebarInset>
                 <div className="main-content">

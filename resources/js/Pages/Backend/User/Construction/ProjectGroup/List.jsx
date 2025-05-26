@@ -378,7 +378,6 @@ export default function List({ project_groups = [], meta = {}, filters = {} }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Project Groups" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

@@ -570,7 +570,6 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title="Holiday List" />
             <Toaster />
             <SidebarInset>
                 <div className="main-content">

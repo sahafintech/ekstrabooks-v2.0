@@ -1,4 +1,4 @@
-import { Head, Link, router } from "@inertiajs/react";
+import { Link, router } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset, SidebarSeparator } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -74,8 +74,6 @@ export default function View({ payment, decimalPlace }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title={`Payment #${payment.id}`} />
-
             <SidebarInset>
                 <div className="space-y-4">
                     <PageHeader

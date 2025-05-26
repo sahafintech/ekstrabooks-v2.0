@@ -93,8 +93,6 @@ export default function PaymentVoucher({ payment }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title={`Subcontract Payment #${payment.id}`} />
-
             <SidebarInset>
                 <div className="space-y-4">
                     <PageHeader

@@ -390,7 +390,6 @@ export default function List({ employees = [], meta = {}, filters = {} }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Staff Management" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

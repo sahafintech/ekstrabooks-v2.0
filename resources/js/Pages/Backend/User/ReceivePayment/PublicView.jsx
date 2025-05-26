@@ -1,4 +1,4 @@
-import { Head, usePage } from "@inertiajs/react";
+import { usePage } from "@inertiajs/react";
 import GuestLayout from "@/Layouts/GuestLayout";
 import { Button } from "@/Components/ui/button";
 import { formatCurrency } from "@/lib/utils";
@@ -104,8 +104,6 @@ export default function PublicView({ payment }) {
 
     return (
         <GuestLayout>
-            <Head title={`Payment Voucher - ${payment.id}`} />
-
             <div className="container mx-auto px-4 py-8">
                 {/* Action Buttons */}
                 <div className="flex justify-end gap-4 mb-6 w-full md:w-[210mm] mx-auto print:hidden">

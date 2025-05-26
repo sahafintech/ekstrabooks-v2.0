@@ -30,7 +30,6 @@ export default function Edit({ role }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title="Edit Role" />
             <SidebarInset>
                 <PageHeader page="Roles" subpage="Edit" url="roles.index" />
 

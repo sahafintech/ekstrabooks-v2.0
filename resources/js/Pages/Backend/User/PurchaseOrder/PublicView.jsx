@@ -1,4 +1,4 @@
-import { Head, usePage } from "@inertiajs/react";
+import { usePage } from "@inertiajs/react";
 import GuestLayout from "@/Layouts/GuestLayout";
 import { Button } from "@/Components/ui/button";
 import { formatCurrency } from "@/lib/utils";
@@ -114,8 +114,6 @@ export default function PublicView({ purchase_order, attachments }) {
 
     return (
         <GuestLayout>
-            <Head title="Purchase Order" />
-
             <div className="container mx-auto py-6 px-4 md:px-6">
                 {/* Header with Actions */}
                 <div className="flex justify-end items-center mb-6 w-full md:w-[210mm] mx-auto print:hidden">

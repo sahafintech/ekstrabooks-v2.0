@@ -740,7 +740,6 @@ export default function PaymentList({ projectSubcontract, methods, accounts }) {
 
     return (
         <div>
-            <Head title="Payments" />
             <Toaster />
             <div className="main-content">
                 <div className="p-4">

@@ -391,7 +391,6 @@ export default function List({ adjustments = [], meta = {}, filters = {} }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Inventory Adjustments" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

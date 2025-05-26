@@ -431,7 +431,6 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
 
   return (
     <AuthenticatedLayout>
-      <Head title="Employee Awards" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

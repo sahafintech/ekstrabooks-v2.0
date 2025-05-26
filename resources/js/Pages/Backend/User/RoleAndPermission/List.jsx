@@ -290,7 +290,6 @@ export default function List({ roles = [], meta = {}, filters = {} }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Roles" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

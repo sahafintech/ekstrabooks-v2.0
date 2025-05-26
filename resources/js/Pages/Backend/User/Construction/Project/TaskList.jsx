@@ -836,7 +836,6 @@ export default function TaskList({
 
     return (
         <div>
-            <Head title="Tasks" />
             <Toaster />
             <div className="main-content">
                 <div className="p-4">

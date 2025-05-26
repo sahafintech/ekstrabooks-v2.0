@@ -159,7 +159,6 @@ export default function Register() {
 
     return (
         <AuthLayout>
-            <Head title="Register" />
             <div className="flex flex-col gap-6">
                 <div className="overflow-hidden bg-white">
                     <div className="grid p-0 md:grid-cols-2">

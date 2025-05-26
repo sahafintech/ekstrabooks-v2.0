@@ -232,7 +232,6 @@ export default function IncomeByCustomer({ report_data, date1, date2, meta = {},
 
     return (
         <AuthenticatedLayout>
-            <Head title="Income by Customer Report" />
             <Toaster />
             <SidebarInset>
                 <div className="main-content">

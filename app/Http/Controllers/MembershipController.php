@@ -79,7 +79,11 @@ class MembershipController extends Controller
         $businessList     = auth()->user()->business;
         $activeBusiness   = auth()->user()->business()->withoutGlobalScopes()->wherePivot('is_active', 1)->first();
         $payment_gateways = PaymentGateway::active()->get();
-        return view('backend.guest.membership.payment_gateways', compact('payment_gateways', 'businessList', 'activeBusiness'));
+        return Inertia::render('Backend/Guest/Membership/PaymentGateways', [
+            'payment_gateways' => $payment_gateways,
+            'businessList'     => $businessList,
+            'activeBusiness'   => $activeBusiness
+        ]);
     }
 
     public function make_payment(Request $request, $slug)

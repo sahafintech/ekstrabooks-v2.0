@@ -280,7 +280,6 @@ export default function Ledger({
 
     return (
         <AuthenticatedLayout>
-            <Head title="Ledger Report" />
             <Toaster />
             <SidebarInset>
                 <div className="main-content">

@@ -33,7 +33,6 @@ export default function Edit({ currency }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title="Edit Currency" />
             <SidebarInset>
                 <PageHeader page="Currency" subpage="Edit" url="currency.index" />
 

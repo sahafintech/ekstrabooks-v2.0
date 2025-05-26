@@ -118,8 +118,6 @@ export default function View({ bill, attachments, decimalPlace }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title={`Cash Purchase #${bill.bill_no}`} />
-
             <SidebarInset>
                 <div className="space-y-4">
                     <PageHeader

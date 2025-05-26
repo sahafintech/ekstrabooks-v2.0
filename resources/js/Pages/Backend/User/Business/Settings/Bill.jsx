@@ -47,7 +47,6 @@ export default function Bill({ business, id, activeTab, purchaseColumn }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title="Business Settings" />
             <SidebarInset>
                 <PageHeader
                     page="Business"

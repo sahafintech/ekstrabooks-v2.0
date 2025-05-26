@@ -264,7 +264,6 @@ export default function AccountStatement({
 
     return (
         <AuthenticatedLayout>
-            <Head title="Account Statement" />
             <Toaster />
             <SidebarInset>
                 <div className="main-content">

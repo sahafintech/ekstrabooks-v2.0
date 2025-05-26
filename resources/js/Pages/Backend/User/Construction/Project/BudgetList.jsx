@@ -1610,7 +1610,6 @@ export default function BudgetList({ cost_codes = [], project }) {
 
     return (
         <div>
-            <Head title="Budgets" />
             <Toaster />
             <div className="p-4">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">

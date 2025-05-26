@@ -172,7 +172,6 @@ export default function ImportProgress({ errors }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Import Progress" />
       <SidebarInset>
         <div className="main-content">
           <PageHeader 

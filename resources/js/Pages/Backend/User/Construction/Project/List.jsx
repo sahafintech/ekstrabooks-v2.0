@@ -440,7 +440,6 @@ export default function List({ projects = [], meta = {}, filters = {} }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Projects" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

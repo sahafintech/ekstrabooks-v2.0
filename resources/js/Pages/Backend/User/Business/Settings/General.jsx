@@ -57,7 +57,6 @@ export default function General({ business, id, timezones = [], dateFormats = []
 
     return (
         <AuthenticatedLayout>
-            <Head title="Business Settings" />
             <SidebarInset>
                 <PageHeader
                     page="Business"

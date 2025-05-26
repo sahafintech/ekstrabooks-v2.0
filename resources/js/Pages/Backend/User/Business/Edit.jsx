@@ -55,7 +55,6 @@ export default function Edit({ business_types = [], currencies = [], countries =
 
     return (
         <AuthenticatedLayout>
-            <Head title="Edit Business" />
             <SidebarInset>
                 <PageHeader page="Business" subpage="Edit" url="business.index" />
 

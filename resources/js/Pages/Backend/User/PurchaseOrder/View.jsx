@@ -1,4 +1,4 @@
-import { Head, Link, router, useForm, usePage } from "@inertiajs/react";
+import { Link, router, useForm, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset, SidebarSeparator } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -191,8 +191,6 @@ export default function View({purchase_order,attachments,email_templates}) {
 
     return (
         <AuthenticatedLayout>
-            <Head title={`Purchase Order #${purchase_order.order_number}`} />
-
             <Toaster />
 
             <SidebarInset>

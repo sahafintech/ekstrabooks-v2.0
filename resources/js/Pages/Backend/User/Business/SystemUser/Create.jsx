@@ -50,7 +50,6 @@ export default function Create({ roles, businesses, businessId }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title="Invite New User" />
             <Toaster />
             <SidebarInset>
                 <PageHeader

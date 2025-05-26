@@ -45,7 +45,6 @@ export default function Currency({ business, id, activeTab }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title="Business Settings" />
             <SidebarInset>
                 <PageHeader
                     page="Business"

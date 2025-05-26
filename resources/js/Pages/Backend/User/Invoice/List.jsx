@@ -524,7 +524,6 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
 
   return (
     <AuthenticatedLayout>
-      <Head title="Invoices" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

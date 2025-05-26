@@ -184,8 +184,6 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
 
     return (
         <AuthenticatedLayout>
-            <Head title={`Bill Invoices #${bill.bill_no}`} />
-
             <Toaster />
 
             <SidebarInset>

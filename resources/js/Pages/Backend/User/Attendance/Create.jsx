@@ -118,7 +118,6 @@ export default function Create({ employees = [], date = null, message = null }) 
 
   return (
     <AuthenticatedLayout>
-      <Head title="Create Attendance" />
       <SidebarInset>
         <div className="main-content">
           <PageHeader

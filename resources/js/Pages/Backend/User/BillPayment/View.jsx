@@ -127,8 +127,6 @@ export default function View({ payment, decimalPlace }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title={`Bill Payment #${payment.id}`} />
-
             <SidebarInset>
                 <div className="space-y-4">
                     <PageHeader

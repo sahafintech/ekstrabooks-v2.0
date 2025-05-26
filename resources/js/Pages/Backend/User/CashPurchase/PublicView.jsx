@@ -104,7 +104,6 @@ export default function PublicView({ purchase }) {
 
     return (
         <GuestLayout>
-            <Head title={`Cash Purchase - ${purchase.bill_no}`} />
             <Toaster />
 
             <div className="container mx-auto px-4 py-8">

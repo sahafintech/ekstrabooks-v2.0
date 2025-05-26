@@ -1,5 +1,5 @@
 import React from "react";
-import { Head, useForm } from "@inertiajs/react";
+import { useForm } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -323,7 +323,6 @@ ${`
 
     return (
         <AuthenticatedLayout>
-            <Head title="Balance Sheet" />
             <SidebarInset>
                 <div className="main-content">
                     <PageHeader

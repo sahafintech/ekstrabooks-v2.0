@@ -211,8 +211,6 @@ export default function View({
 
     return (
         <AuthenticatedLayout>
-            <Head title={`Invoice #${invoice.id}`} />
-
             <Toaster />
 
             <SidebarInset>

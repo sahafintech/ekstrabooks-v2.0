@@ -144,7 +144,6 @@ export default function PayrollSummary({ report_data, month, year, currency }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title="Payroll Summary Report" />
             <Toaster />
             <SidebarInset>
                 <div className="main-content">

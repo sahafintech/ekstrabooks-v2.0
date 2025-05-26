@@ -127,8 +127,6 @@ export default function View({ sales_return, attachments, decimalPlace }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title={`Sales Return #${sales_return.id}`} />
-
             <SidebarInset>
                 <div className="space-y-4">
                     <PageHeader

@@ -432,7 +432,6 @@ export default function List({ categories = [], meta = {}, filters = {}, mainCat
 
   return (
     <AuthenticatedLayout>
-      <Head title="Sub Categories" />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

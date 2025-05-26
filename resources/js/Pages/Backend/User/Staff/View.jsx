@@ -32,7 +32,6 @@ export default function View({ employee }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title={`Staff: ${employee.name}`} />
       <Toaster />
       <SidebarInset>
         <div className="main-content">

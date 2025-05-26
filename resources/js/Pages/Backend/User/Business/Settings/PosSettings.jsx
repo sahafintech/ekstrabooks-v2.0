@@ -45,7 +45,6 @@ export default function PosSettings({ business, id, activeTab, taxes, currencies
 
     return (
         <AuthenticatedLayout>
-            <Head title="Business Settings" />
             <SidebarInset>
                 <PageHeader
                     page="Business"

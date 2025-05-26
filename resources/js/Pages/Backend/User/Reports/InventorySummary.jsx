@@ -264,7 +264,6 @@ export default function InventorySummary({ categories, date1, date2, business_na
 
     return (
         <AuthenticatedLayout>
-            <Head title="Inventory Summary" />
             <SidebarInset>
                 <div className="main-content">
                     <PageHeader

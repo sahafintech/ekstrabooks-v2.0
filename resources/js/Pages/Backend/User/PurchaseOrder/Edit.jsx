@@ -1,4 +1,4 @@
-import { Head, useForm, usePage } from "@inertiajs/react";
+import { useForm, usePage } from "@inertiajs/react";
 import { Label } from "@/Components/ui/label";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset, SidebarSeparator } from "@/Components/ui/sidebar";
@@ -358,7 +358,6 @@ export default function Edit({ vendors = [], products = [], purchase_order, curr
 
   return (
     <AuthenticatedLayout>
-      <Head title="Edit Purchase Orders" />
       <Toaster />
       <SidebarInset>
         <PageHeader page="Cash Purchases" subpage="Edit Cash Purchase" url="purchase_orders.index" />
