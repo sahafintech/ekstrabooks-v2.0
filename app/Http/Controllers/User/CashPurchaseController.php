@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\User;
 
+use App\Exports\CashPurchaseExport;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\Attachment;
@@ -23,6 +24,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 use Validator;
 
 class CashPurchaseController extends Controller
@@ -30,13 +32,18 @@ class CashPurchaseController extends Controller
 	public function index(Request $request)
 	{
 		$search = $request->get('search', '');
-		$perPage = $request->get('per_page', 10);
+		$perPage = $request->get('per_page', 50);
 		$sorting = $request->get('sorting', []);
 		$sortColumn = $sorting['column'] ?? 'id';
 		$sortDirection = $sorting['direction'] ?? 'desc';
 		$vendorId = $request->get('vendor_id', '');
 		$dateRange = $request->get('date_range', []);
 		$status = $request->get('status', '');
+
+		session(['cash_purchases_from' => $dateRange[0] ?? '']);
+		session(['cash_purchases_to' => $dateRange[1] ?? '']);
+		session(['cash_purchases_approval_status' => $status]);
+		session(['cash_purchases_vendor_id' => $vendorId]);
 
 		$query = Purchase::with('vendor')
 			->where('cash', 1);
@@ -1259,34 +1266,35 @@ class CashPurchaseController extends Controller
 		return redirect()->route('cash_purchases.show', $purchase->id)->with('success', _lang('Updated Successfully'));
 	}
 
-	public function cash_purchases_filter(Request $request)
+	public function export_cash_purchases()
 	{
-		$from =  explode('to', $request->date_range)[0] ?? '';
-		$to = explode('to', $request->date_range)[1] ?? '';
-
 		$query = Purchase::select('purchases.*')
-			->with('vendor');
+			->with('vendor')
+			->where('cash', 1);
 
-		if ($request->vendor_id != '') {
-			$query->where('vendor_id', $request->vendor_id);
+		if (session('cash_purchases_vendor_id') !== "") {
+			$query->where('vendor_id', session('cash_purchases_vendor_id'));
 		}
 
-		if ($from != '' && $to != '') {
-			$query->whereDate('purchase_date', '>=', Carbon::parse($from)->format('Y-m-d'))
-				->whereDate('purchase_date', '<=', Carbon::parse($to)->format('Y-m-d'));
+		if (session('cash_purchases_from') !== "" && session('cash_purchases_to') !== "") {
+			$query->whereDate('purchase_date', '>=', Carbon::parse(session('cash_purchases_from'))->format('Y-m-d'))
+				->whereDate('purchase_date', '<=', Carbon::parse(session('cash_purchases_to'))->format('Y-m-d'));
 		}
 
-		if ($request->approval_status != '') {
-			$query->where('approval_status', $request->approval_status);
+		if (session('cash_purchases_approval_status') !== "") {
+			$query->where('approval_status', session('cash_purchases_approval_status'));
 		}
 
 		$purchases = $query->get();
 
-		$approval_status = $request->approval_status;
-		$vendor_id = $request->vendor_id;
-		$date_range = $request->date_range;
+		// audit log
+		$audit = new AuditLog();
+		$audit->date_changed = date('Y-m-d H:i:s');
+		$audit->changed_by = auth()->user()->id;
+		$audit->event = 'Exported Cash Purchases';
+		$audit->save();
 
-		return view('backend.user.cash_purchase.list', compact('purchases', 'approval_status', 'vendor_id', 'date_range'));
+		return Excel::download(new CashPurchaseExport($purchases), 'cash_purchases_' . now()->format('d m Y') . '.xlsx');
 	}
 
 	public function voucher($id)

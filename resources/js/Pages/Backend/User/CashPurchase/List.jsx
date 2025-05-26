@@ -281,7 +281,7 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
   const [selectedPurchases, setSelectedPurchases] = useState([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
-  const [perPage, setPerPage] = useState(filters.per_page || 10);
+  const [perPage, setPerPage] = useState(filters.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
   const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
@@ -562,6 +562,9 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
     );
   };
 
+  const exportCashPurchases = () => {
+    window.location.href = route("cash_purchases.export");
+  };
   return (
     <AuthenticatedLayout>
       <Head title="Cash Purchases" />
@@ -576,7 +579,7 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
           <div className="p-4">
             <SummaryCards summary={summary} />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex flex-col md:flex-row gap-2">
                 <Link href={route("cash_purchases.create")}>
                   <Button>
                     <Plus className="h-4 w-4 mr-2" />
@@ -593,7 +596,7 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
                     <DropdownMenuItem onClick={() => setShowImportModal(true)}>
                       <FileUp className="mr-2 h-4 w-4" /> Import
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => window.location.href = route("cash_purchases.export")}>
+                    <DropdownMenuItem onClick={exportCashPurchases}>
                       <FileDown className="mr-2 h-4 w-4" /> Export
                     </DropdownMenuItem>
                   </DropdownMenuContent>

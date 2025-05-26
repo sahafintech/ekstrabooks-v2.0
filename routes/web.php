@@ -410,10 +410,9 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 		//Cash Purchases
 		Route::resource('cash_purchases', CashPurchaseController::class);
-		Route::post('cash_purchases/filter', [CashPurchaseController::class, 'cash_purchases_filter'])->name('cash_purchases.filter');
 		Route::post('import_cash_purchases', [CashPurchaseController::class, 'import_cash_purchases'])->name('cash_purchases.import');
 		Route::post('all_bills', [CashPurchaseController::class, 'bills_all'])->name('cash_purchases.all');
-		Route::get('export_bills', [CashPurchaseController::class, 'export_bills'])->name('cash_purchases.export');
+		Route::get('export_cash_purchases', [CashPurchaseController::class, 'export_cash_purchases'])->name('cash_purchases.export');
 		Route::get('cash_purchases/voucher/{id}', [CashPurchaseController::class, 'voucher'])->name('cash_purchases.voucher');
 		Route::post('cash_purchases/bulk_approve', [CashPurchaseController::class, 'bulk_approve'])->name('cash_purchases.bulk_approve');
 		Route::post('cash_purchases/bulk_reject', [CashPurchaseController::class, 'bulk_reject'])->name('cash_purchases.bulk_reject');

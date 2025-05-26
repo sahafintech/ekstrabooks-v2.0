@@ -59,7 +59,7 @@ class PurchaseController extends Controller
 		$status = $request->get('status', '');
 
 		$query = Purchase::query()
-			->where('bill_type', 0);
+			->where('cash', 0);
 
 		// Handle sorting
 		if ($sortColumn === 'vendor.name') {
