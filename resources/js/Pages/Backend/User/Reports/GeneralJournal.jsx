@@ -22,7 +22,7 @@ import {
 import { Input } from "@/Components/ui/input";
 import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
-import { formatAmount, parseDateObject } from "@/lib/utils";
+import { formatAmount, formatCurrency, parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { ChevronUp, ChevronDown } from "lucide-react";
 
@@ -514,6 +514,19 @@ export default function GeneralJournal({
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
+                                    <TableRow>
+                                        <TableCell colSpan={10}></TableCell>
+                                        <TableCell>
+                                            {formatCurrency(transactions.reduce((sum, transaction) => 
+                                                sum + (transaction.dr_cr === "dr" ? transaction.base_currency_amount : 0), 0
+                                            ))}
+                                        </TableCell>
+                                        <TableCell>
+                                            {formatCurrency(transactions.reduce((sum, transaction) => 
+                                                sum + (transaction.dr_cr === "cr" ? transaction.base_currency_amount : 0), 0
+                                            ))}
+                                        </TableCell>
+                                    </TableRow>
                                     {transactions.length > 0 ? (
                                         transactions.map((transaction) => (
                                             <TableRow key={transaction.id}>

@@ -50,7 +50,7 @@ class CustomerController extends Controller
      */
     public function index(Request $request)
     {
-        $per_page = $request->get('per_page', 10);
+        $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
         $query = Customer::query();

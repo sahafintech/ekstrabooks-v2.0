@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title inertia>{{ !isset($page_title) ? get_option('site_title', config('app.name')) : $page_title }}</title>
+    <title>{{ !isset($page_title) ? get_option('site_title', config('app.name')) : $page_title }}</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">

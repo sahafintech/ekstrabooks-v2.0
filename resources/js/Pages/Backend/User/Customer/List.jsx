@@ -159,7 +159,7 @@ export default function List({ customers = [], meta = {}, filters = {} }) {
   const [selectedCustomers, setSelectedCustomers] = useState([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
-  const [perPage, setPerPage] = useState(meta.per_page || 10);
+  const [perPage, setPerPage] = useState(meta.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
   const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });

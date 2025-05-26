@@ -13,13 +13,11 @@ use App\Models\AuditLog;
 use App\Models\Currency;
 use App\Models\Invoice;
 use App\Models\Transaction;
-use App\Models\Vendor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
-use Validator;
 
 class AccountController extends Controller
 {
@@ -38,7 +36,7 @@ class AccountController extends Controller
      */
     public function index(Request $request)
     {
-        $per_page = $request->get('per_page', 10);
+        $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
         $query = Account::query();

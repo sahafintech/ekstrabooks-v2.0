@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { Book, Edit, Eye, Plus, Settings, Trash, Users, ChevronUp, ChevronDown } from "lucide-react";
+import { Book, Edit, Eye, Plus, Trash, ChevronUp, ChevronDown } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -90,7 +90,7 @@ export default function List({ accounts = [], meta = {}, filters = {} }) {
   const [selectedAccounts, setSelectedAccounts] = useState([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
-  const [perPage, setPerPage] = useState(meta.per_page || 10);
+  const [perPage, setPerPage] = useState(meta.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
   const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
