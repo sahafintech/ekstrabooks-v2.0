@@ -427,6 +427,9 @@ class CashPurchaseController extends Controller
 							$transaction->ref_id      = $purchase->id;
 							$transaction->ref_type    = 'cash purchase tax';
 							$transaction->tax_id      = $tax->id;
+							$transaction->project_id = $purchaseItem->project_id;
+							$transaction->project_task_id = $purchaseItem->project_task_id;
+							$transaction->cost_code_id = $purchaseItem->cost_code_id;
 							$transaction->save();
 						} else {
 							$transaction              = new Transaction();
@@ -441,6 +444,9 @@ class CashPurchaseController extends Controller
 							$transaction->ref_id      = $purchase->id;
 							$transaction->ref_type    = 'cash purchase tax';
 							$transaction->tax_id      = $tax->id;
+							$transaction->project_id = $purchaseItem->project_id;
+							$transaction->project_task_id = $purchaseItem->project_task_id;
+							$transaction->cost_code_id = $purchaseItem->cost_code_id;
 							$transaction->save();
 						}
 					} else {
@@ -457,6 +463,9 @@ class CashPurchaseController extends Controller
 							$transaction->ref_id      = $purchase->id;
 							$transaction->ref_type    = 'cash purchase tax';
 							$transaction->tax_id      = $tax->id;
+							$transaction->project_id = $purchaseItem->project_id;
+							$transaction->project_task_id = $purchaseItem->project_task_id;
+							$transaction->cost_code_id = $purchaseItem->cost_code_id;
 							$transaction->save();
 						} else {
 							$transaction              = new PendingTransaction();
@@ -471,6 +480,9 @@ class CashPurchaseController extends Controller
 							$transaction->ref_id      = $purchase->id;
 							$transaction->ref_type    = 'cash purchase tax';
 							$transaction->tax_id      = $tax->id;
+							$transaction->project_id = $purchaseItem->project_id;
+							$transaction->project_task_id = $purchaseItem->project_task_id;
+							$transaction->cost_code_id = $purchaseItem->cost_code_id;
 							$transaction->save();
 						}
 					}
@@ -578,9 +590,7 @@ class CashPurchaseController extends Controller
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
 				$transaction->vendor_id   = $purchase->vendor_id;
-				$transaction->project_id = $purchaseItem->project_id;
-				$transaction->project_task_id = $purchaseItem->project_task_id;
-				$transaction->cost_code_id = $purchaseItem->cost_code_id;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			} else {
 				$transaction              = new Transaction();
@@ -595,9 +605,7 @@ class CashPurchaseController extends Controller
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
 				$transaction->vendor_id   = $purchase->vendor_id;
-				$transaction->project_id = $purchaseItem->project_id;
-				$transaction->project_task_id = $purchaseItem->project_task_id;
-				$transaction->cost_code_id = $purchaseItem->cost_code_id;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			}
 
@@ -614,9 +622,7 @@ class CashPurchaseController extends Controller
 				$transaction->ref_id      = $purchase->id;
 				$transaction->ref_type    = 'cash purchase';
 				$transaction->vendor_id   = $purchase->vendor_id;
-				$transaction->project_id = $purchaseItem->project_id;
-				$transaction->project_task_id = $purchaseItem->project_task_id;
-				$transaction->cost_code_id = $purchaseItem->cost_code_id;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			}
 		} else {
@@ -633,9 +639,7 @@ class CashPurchaseController extends Controller
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
 				$transaction->vendor_id   = $purchase->vendor_id;
-				$transaction->project_id = $purchaseItem->project_id;
-				$transaction->project_task_id = $purchaseItem->project_task_id;
-				$transaction->cost_code_id = $purchaseItem->cost_code_id;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			} else {
 				$transaction              = new PendingTransaction();
@@ -650,9 +654,7 @@ class CashPurchaseController extends Controller
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
 				$transaction->vendor_id   = $purchase->vendor_id;
-				$transaction->project_id = $purchaseItem->project_id;
-				$transaction->project_task_id = $purchaseItem->project_task_id;
-				$transaction->cost_code_id = $purchaseItem->cost_code_id;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			}
 
@@ -669,9 +671,7 @@ class CashPurchaseController extends Controller
 				$transaction->ref_id      = $purchase->id;
 				$transaction->ref_type    = 'cash purchase';
 				$transaction->vendor_id   = $purchase->vendor_id;
-				$transaction->project_id = $purchaseItem->project_id;
-				$transaction->project_task_id = $purchaseItem->project_task_id;
-				$transaction->cost_code_id = $purchaseItem->cost_code_id;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			}
 		}
@@ -1106,7 +1106,6 @@ class CashPurchaseController extends Controller
 							$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, ($purchaseItem->sub_total / 100) * $tax->rate));
 							$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, ($purchaseItem->sub_total / 100) * $tax->rate);
 							$transaction->description = _lang('Cash Purchase Tax') . ' #' . $purchase->bill_no;
-							$transaction->vendor_id   = $purchase->vendor_id;
 							$transaction->ref_id      = $purchase->id;
 							$transaction->ref_type    = 'cash purchase tax';
 							$transaction->tax_id      = $tax->id;
@@ -1124,7 +1123,6 @@ class CashPurchaseController extends Controller
 							$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, ($purchaseItem->sub_total / 100) * $tax->rate));
 							$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, ($purchaseItem->sub_total / 100) * $tax->rate);
 							$transaction->description = _lang('Cash Purchase Tax') . ' #' . $purchase->bill_no;
-							$transaction->vendor_id   = $purchase->vendor_id;
 							$transaction->ref_id      = $purchase->id;
 							$transaction->ref_type    = 'cash purchase tax';
 							$transaction->tax_id      = $tax->id;
@@ -1167,10 +1165,13 @@ class CashPurchaseController extends Controller
 							$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, ($purchaseItem->sub_total / 100) * $tax->rate));
 							$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, ($purchaseItem->sub_total / 100) * $tax->rate);
 							$transaction->description = _lang('Cash Purchase Tax') . ' #' . $purchase->bill_no;
-							$transaction->vendor_id   = $purchase->vendor_id;
 							$transaction->ref_id      = $purchase->id;
 							$transaction->ref_type    = 'cash purchase tax';
 							$transaction->tax_id      = $tax->id;
+							$transaction->vendor_id   = $purchase->vendor_id;
+							$transaction->project_id = $purchaseItem->project_id;
+							$transaction->project_task_id = $purchaseItem->project_task_id;
+							$transaction->cost_code_id = $purchaseItem->cost_code_id;
 							$transaction->save();
 						} else {
 							$transaction              = new PendingTransaction();
@@ -1182,7 +1183,6 @@ class CashPurchaseController extends Controller
 							$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, ($purchaseItem->sub_total / 100) * $tax->rate));
 							$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, ($purchaseItem->sub_total / 100) * $tax->rate);
 							$transaction->description = _lang('Cash Purchase Tax') . ' #' . $purchase->bill_no;
-							$transaction->vendor_id   = $purchase->vendor_id;
 							$transaction->ref_id      = $purchase->id;
 							$transaction->ref_type    = 'cash purchase tax';
 							$transaction->tax_id      = $tax->id;
@@ -1307,9 +1307,7 @@ class CashPurchaseController extends Controller
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
 				$transaction->vendor_id   = $purchase->vendor_id;
-				$transaction->project_id = $purchaseItem->project_id;
-				$transaction->project_task_id = $purchaseItem->project_task_id;
-				$transaction->cost_code_id = $purchaseItem->cost_code_id;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			} else {
 				$transaction              = new Transaction();
@@ -1324,9 +1322,7 @@ class CashPurchaseController extends Controller
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
 				$transaction->vendor_id   = $purchase->vendor_id;
-				$transaction->project_id = $purchaseItem->project_id;
-				$transaction->project_task_id = $purchaseItem->project_task_id;
-				$transaction->cost_code_id = $purchaseItem->cost_code_id;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			}
 
@@ -1357,9 +1353,7 @@ class CashPurchaseController extends Controller
 					$transaction->ref_id      = $purchase->id;
 					$transaction->ref_type    = 'cash purchase';
 					$transaction->vendor_id   = $purchase->vendor_id;
-					$transaction->project_id = $purchaseItem->project_id;
-					$transaction->project_task_id = $purchaseItem->project_task_id;
-					$transaction->cost_code_id = $purchaseItem->cost_code_id;
+					$transaction->project_id = $purchase->items->first()->project_id;
 					$transaction->save();
 				} else {
 					$transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
@@ -1390,9 +1384,7 @@ class CashPurchaseController extends Controller
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
 				$transaction->vendor_id   = $purchase->vendor_id;
-				$transaction->project_id = $purchaseItem->project_id;
-				$transaction->project_task_id = $purchaseItem->project_task_id;
-				$transaction->cost_code_id = $purchaseItem->cost_code_id;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			} else {
 				$transaction              = new PendingTransaction();
@@ -1407,9 +1399,7 @@ class CashPurchaseController extends Controller
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
 				$transaction->vendor_id   = $purchase->vendor_id;
-				$transaction->project_id = $purchaseItem->project_id;
-				$transaction->project_task_id = $purchaseItem->project_task_id;
-				$transaction->cost_code_id = $purchaseItem->cost_code_id;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			}
 
@@ -1440,9 +1430,7 @@ class CashPurchaseController extends Controller
 					$transaction->ref_id      = $purchase->id;
 					$transaction->ref_type    = 'cash purchase';
 					$transaction->vendor_id   = $purchase->vendor_id;
-					$transaction->project_id = $purchaseItem->project_id;
-					$transaction->project_task_id = $purchaseItem->project_task_id;
-					$transaction->cost_code_id = $purchaseItem->cost_code_id;
+					$transaction->project_id = $purchase->items->first()->project_id;
 					$transaction->save();
 				} else {
 					$transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);

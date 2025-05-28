@@ -10,10 +10,13 @@ use App\Models\Attachment;
 use App\Models\AuditLog;
 use App\Models\BillPayment;
 use App\Models\BusinessSetting;
+use App\Models\CostCode;
 use App\Models\Currency;
 use App\Models\EmailTemplate;
 use App\Models\PendingTransaction;
 use App\Models\Product;
+use App\Models\Project;
+use App\Models\ProjectBudget;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
 use App\Models\PurchaseItemTax;
@@ -140,23 +143,22 @@ class PurchaseController extends Controller
 		$vendors = Vendor::where('business_id', $request->activeBusiness->id)
 			->orderBy('id', 'desc')
 			->get();
-
 		$products = Product::where('business_id', $request->activeBusiness->id)
 			->orderBy('id', 'desc')
 			->get();
-
 		$currencies = Currency::orderBy('id', 'desc')
 			->get();
-
 		$taxes = Tax::orderBy('id', 'desc')
 			->get();
-
 		$accounts = Account::orderBy('id', 'desc')
 			->get();
-
 		$purchase_title = get_business_option('purchase_title', 'Bill Invoice');
-
 		$inventory = Account::where('account_name', 'Inventory')->first();
+		$projects = Project::orderBy('id', 'desc')
+			->with('tasks')
+			->get();
+		$cost_codes = CostCode::orderBy('id', 'desc')
+			->get();
 
 		return Inertia::render('Backend/User/Bill/Create', [
 			'vendors' => $vendors,
@@ -167,6 +169,9 @@ class PurchaseController extends Controller
 			'purchase_title' => $purchase_title,
 			'inventory' => $inventory,
 			'base_currency' => get_business_option('currency'),
+			'projects' => $projects,
+			'cost_codes' => $cost_codes,
+			'construction_module' => package()->construction_module,
 		]);
 	}
 
@@ -337,7 +342,19 @@ class PurchaseController extends Controller
 				'unit_cost' => $request->unit_cost[$i],
 				'sub_total' => ($request->unit_cost[$i] * $request->quantity[$i]),
 				'account_id' => $request->account_id[$i],
+				'project_id' => isset($request->project_id[$i]) ? $request->project_id[$i] : null,
+				'project_task_id' => isset($request->project_task_id[$i]) ? $request->project_task_id[$i] : null,
+				'cost_code_id' => isset($request->cost_code_id[$i]) ? $request->cost_code_id[$i] : null,
 			]));
+
+			if ($purchaseItem->project_id && $purchaseItem->project_task_id && $purchaseItem->cost_code_id) {
+				$projectBudget = ProjectBudget::where('project_id', $purchaseItem->project_id)->where('project_task_id', $purchaseItem->project_task_id)->where('cost_code_id', $purchaseItem->cost_code_id)->first();
+				if ($projectBudget) {
+					$projectBudget->actual_budget_quantity += $purchaseItem->quantity;
+					$projectBudget->actual_budget_amount += $purchaseItem->sub_total;
+					$projectBudget->save();
+				}
+			}
 
 			if (isset($request->taxes)) {
 				foreach ($request->taxes as $taxId) {
@@ -364,6 +381,9 @@ class PurchaseController extends Controller
 							$transaction->ref_id      = $purchase->id;
 							$transaction->ref_type    = 'bill invoice tax';
 							$transaction->tax_id      = $tax->id;
+							$transaction->project_id = $purchaseItem->project_id;
+							$transaction->project_task_id = $purchaseItem->project_task_id;
+							$transaction->cost_code_id = $purchaseItem->cost_code_id;
 							$transaction->save();
 						} else {
 							$transaction              = new Transaction();
@@ -378,6 +398,9 @@ class PurchaseController extends Controller
 							$transaction->ref_id      = $purchase->id;
 							$transaction->ref_type    = 'bill invoice tax';
 							$transaction->tax_id      = $tax->id;
+							$transaction->project_id = $purchaseItem->project_id;
+							$transaction->project_task_id = $purchaseItem->project_task_id;
+							$transaction->cost_code_id = $purchaseItem->cost_code_id;
 							$transaction->save();
 						}
 					} else {
@@ -394,6 +417,9 @@ class PurchaseController extends Controller
 							$transaction->ref_id      = $purchase->id;
 							$transaction->ref_type    = 'bill invoice tax';
 							$transaction->tax_id      = $tax->id;
+							$transaction->project_id = $purchaseItem->project_id;
+							$transaction->project_task_id = $purchaseItem->project_task_id;
+							$transaction->cost_code_id = $purchaseItem->cost_code_id;
 							$transaction->save();
 						} else {
 							$transaction              = new PendingTransaction();
@@ -408,6 +434,9 @@ class PurchaseController extends Controller
 							$transaction->ref_id      = $purchase->id;
 							$transaction->ref_type    = 'bill invoice tax';
 							$transaction->tax_id      = $tax->id;
+							$transaction->project_id = $purchaseItem->project_id;
+							$transaction->project_task_id = $purchaseItem->project_task_id;
+							$transaction->cost_code_id = $purchaseItem->cost_code_id;
 							$transaction->save();
 						}
 					}
@@ -429,6 +458,9 @@ class PurchaseController extends Controller
 					$transaction->vendor_id   = $purchase->vendor_id;
 					$transaction->ref_id      = $purchase->id;
 					$transaction->description = 'Bill Invoice #' . $purchase->bill_no;
+					$transaction->project_id = $purchaseItem->project_id;
+					$transaction->project_task_id = $purchaseItem->project_task_id;
+					$transaction->cost_code_id = $purchaseItem->cost_code_id;
 					$transaction->save();
 				} else {
 					$transaction              = new Transaction();
@@ -443,6 +475,9 @@ class PurchaseController extends Controller
 					$transaction->vendor_id   = $purchase->vendor_id;
 					$transaction->ref_id      = $purchase->id;
 					$transaction->description = 'Bill Invoice #' . $purchase->bill_no;
+					$transaction->project_id = $purchaseItem->project_id;
+					$transaction->project_task_id = $purchaseItem->project_task_id;
+					$transaction->cost_code_id = $purchaseItem->cost_code_id;
 					$transaction->save();
 				}
 			} else {
@@ -459,6 +494,9 @@ class PurchaseController extends Controller
 					$transaction->vendor_id   = $purchase->vendor_id;
 					$transaction->ref_id      = $purchase->id;
 					$transaction->description = 'Bill Invoice #' . $purchase->bill_no;
+					$transaction->project_id = $purchaseItem->project_id;
+					$transaction->project_task_id = $purchaseItem->project_task_id;
+					$transaction->cost_code_id = $purchaseItem->cost_code_id;
 					$transaction->save();
 				} else {
 					$transaction              = new PendingTransaction();
@@ -473,6 +511,9 @@ class PurchaseController extends Controller
 					$transaction->vendor_id   = $purchase->vendor_id;
 					$transaction->ref_id      = $purchase->id;
 					$transaction->description = 'Bill Invoice #' . $purchase->bill_no;
+					$transaction->project_id = $purchaseItem->project_id;
+					$transaction->project_task_id = $purchaseItem->project_task_id;
+					$transaction->cost_code_id = $purchaseItem->cost_code_id;
 					$transaction->save();
 				}
 			}
@@ -503,6 +544,9 @@ class PurchaseController extends Controller
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Bill Invoice Payable #' . $purchase->bill_no;
+				$transaction->project_id = $purchase->items->first()->project_id;
+				$transaction->project_task_id = $purchase->items->first()->project_task_id;
+				$transaction->cost_code_id = $purchase->items->first()->cost_code_id;
 				$transaction->save();
 			} else {
 				$transaction              = new Transaction();
@@ -517,6 +561,7 @@ class PurchaseController extends Controller
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Bill Invoice Payable #' . $purchase->bill_no;
+				$transaction->project_id = $purchaseItem->first()->project_id;
 				$transaction->save();
 			}
 
@@ -533,6 +578,7 @@ class PurchaseController extends Controller
 				$transaction->ref_id      = $purchase->id;
 				$transaction->ref_type    = 'bill invoice';
 				$transaction->vendor_id   = $purchase->vendor_id;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			}
 		} else {
@@ -549,6 +595,7 @@ class PurchaseController extends Controller
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Bill Invoice Payable #' . $purchase->bill_no;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			} else {
 				$transaction              = new PendingTransaction();
@@ -563,6 +610,7 @@ class PurchaseController extends Controller
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Bill Invoice Payable #' . $purchase->bill_no;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			}
 
@@ -579,6 +627,7 @@ class PurchaseController extends Controller
 				$transaction->ref_id      = $purchase->id;
 				$transaction->ref_type    = 'bill invoice';
 				$transaction->vendor_id   = $purchase->vendor_id;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			}
 		}
@@ -745,6 +794,15 @@ class PurchaseController extends Controller
 				$product->stock = $product->stock - $purchaseItem->quantity;
 				$product->save();
 			}
+
+			if ($purchaseItem->project_id && $purchaseItem->project_task_id && $purchaseItem->cost_code_id) {
+				$projectBudget = ProjectBudget::where('project_id', $purchaseItem->project_id)->where('project_task_id', $purchaseItem->project_task_id)->where('cost_code_id', $purchaseItem->cost_code_id)->first();
+				if ($projectBudget) {
+					$projectBudget->actual_budget_quantity -= $purchaseItem->quantity;
+					$projectBudget->actual_budget_amount -= $purchaseItem->sub_total;
+					$projectBudget->save();
+				}
+			}
 		}
 		// delete transactions
 		$transactions = Transaction::where('ref_id', $purchase->id)
@@ -815,6 +873,15 @@ class PurchaseController extends Controller
 				if ($product->type == 'product' && $product->stock_management == 1) {
 					$product->stock = $product->stock - $purchaseItem->quantity;
 					$product->save();
+				}
+
+				if ($purchaseItem->project_id && $purchaseItem->project_task_id && $purchaseItem->cost_code_id) {
+					$projectBudget = ProjectBudget::where('project_id', $purchaseItem->project_id)->where('project_task_id', $purchaseItem->project_task_id)->where('cost_code_id', $purchaseItem->cost_code_id)->first();
+					if ($projectBudget) {
+						$projectBudget->actual_budget_quantity -= $purchaseItem->quantity;
+						$projectBudget->actual_budget_amount -= $purchaseItem->sub_total;
+						$projectBudget->save();
+					}
 				}
 			}
 			// delete transactions
@@ -975,6 +1042,11 @@ class PurchaseController extends Controller
 			->pluck('tax_id')
 			->map(fn($id) => (string) $id)
 			->toArray();
+		$projects = Project::orderBy('id', 'desc')
+			->with('tasks')
+			->get();
+		$cost_codes = CostCode::orderBy('id', 'desc')
+			->get();
 
 		return Inertia::render('Backend/User/Bill/Edit', [
 			'bill' => $bill,
@@ -985,7 +1057,10 @@ class PurchaseController extends Controller
 			'products' => $products,
 			'taxes' => $taxes,
 			'inventory' => $inventory,
-			'taxIds' => $taxIds
+			'taxIds' => $taxIds,
+			'projects' => $projects,
+			'cost_codes' => $cost_codes,
+			'construction_module' => package()->construction_module,
 		]);
 	}
 
@@ -1153,6 +1228,15 @@ class PurchaseController extends Controller
 				$product->save();
 			}
 
+			if ($purchase_item->project_id && $purchase_item->project_task_id && $purchase_item->cost_code_id) {
+				$projectBudget = ProjectBudget::where('project_id', $purchase_item->project_id)->where('project_task_id', $purchase_item->project_task_id)->where('cost_code_id', $purchase_item->cost_code_id)->first();
+				if ($projectBudget) {
+					$projectBudget->actual_budget_quantity -= $purchase_item->quantity;
+					$projectBudget->actual_budget_amount -= $purchase_item->sub_total;
+					$projectBudget->save();
+				}
+			}
+
 			$purchase_item->delete();
 
 			// delete transaction
@@ -1186,7 +1270,19 @@ class PurchaseController extends Controller
 				'unit_cost' => $request->unit_cost[$i],
 				'sub_total' => ($request->unit_cost[$i] * $request->quantity[$i]),
 				'account_id' => $request->account_id[$i],
+				'project_id' => $request->project_id[$i],
+				'project_task_id' => $request->project_task_id[$i],
+				'cost_code_id' => $request->cost_code_id[$i],
 			]));
+
+			if ($purchaseItem->project_id && $purchaseItem->project_task_id && $purchaseItem->cost_code_id) {
+				$projectBudget = ProjectBudget::where('project_id', $purchaseItem->project_id)->where('project_task_id', $purchaseItem->project_task_id)->where('cost_code_id', $purchaseItem->cost_code_id)->first();
+				if ($projectBudget) {
+					$projectBudget->actual_budget_quantity += $purchaseItem->quantity;
+					$projectBudget->actual_budget_amount += $purchaseItem->sub_total;
+					$projectBudget->save();
+				}
+			}
 
 			if (isset($request->taxes)) {
 				foreach ($request->taxes as $taxId) {
@@ -1213,6 +1309,9 @@ class PurchaseController extends Controller
 							$transaction->ref_id      = $purchase->id;
 							$transaction->ref_type    = 'bill invoice tax';
 							$transaction->tax_id      = $tax->id;
+							$transaction->project_id = $purchaseItem->project_id;
+							$transaction->project_task_id = $purchaseItem->project_task_id;
+							$transaction->cost_code_id = $purchaseItem->cost_code_id;
 							$transaction->save();
 						} else {
 							$transaction              = new Transaction();
@@ -1227,6 +1326,9 @@ class PurchaseController extends Controller
 							$transaction->ref_id      = $purchase->id;
 							$transaction->ref_type    = 'bill invoice tax';
 							$transaction->tax_id      = $tax->id;
+							$transaction->project_id = $purchaseItem->project_id;
+							$transaction->project_task_id = $purchaseItem->project_task_id;
+							$transaction->cost_code_id = $purchaseItem->cost_code_id;
 							$transaction->save();
 						}
 					} else {
@@ -1243,6 +1345,9 @@ class PurchaseController extends Controller
 							$transaction->ref_id      = $purchase->id;
 							$transaction->ref_type    = 'bill invoice tax';
 							$transaction->tax_id      = $tax->id;
+							$transaction->project_id = $purchaseItem->project_id;
+							$transaction->project_task_id = $purchaseItem->project_task_id;
+							$transaction->cost_code_id = $purchaseItem->cost_code_id;
 							$transaction->save();
 						} else {
 							$transaction              = new PendingTransaction();
@@ -1257,6 +1362,9 @@ class PurchaseController extends Controller
 							$transaction->ref_id      = $purchase->id;
 							$transaction->ref_type    = 'bill invoice tax';
 							$transaction->tax_id      = $tax->id;
+							$transaction->project_id = $purchaseItem->project_id;
+							$transaction->project_task_id = $purchaseItem->project_task_id;
+							$transaction->cost_code_id = $purchaseItem->cost_code_id;
 							$transaction->save();
 						}
 					}
@@ -1264,7 +1372,6 @@ class PurchaseController extends Controller
 			}
 
 			if (has_permission('bill_invoices.approve') || request()->isOwner) {
-
 				if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
 					$transaction              = new Transaction();
 					$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
@@ -1278,6 +1385,9 @@ class PurchaseController extends Controller
 					$transaction->vendor_id   = $purchase->vendor_id;
 					$transaction->ref_id      = $purchase->id;
 					$transaction->description = 'Bill Invoice #' . $purchase->bill_no;
+					$transaction->project_id = $purchaseItem->project_id;
+					$transaction->project_task_id = $purchaseItem->project_task_id;
+					$transaction->cost_code_id = $purchaseItem->cost_code_id;
 					$transaction->save();
 				} else {
 					$transaction              = new Transaction();
@@ -1292,6 +1402,9 @@ class PurchaseController extends Controller
 					$transaction->vendor_id   = $purchase->vendor_id;
 					$transaction->ref_id      = $purchase->id;
 					$transaction->description = 'Bill Invoice #' . $purchase->bill_no;
+					$transaction->project_id = $purchaseItem->project_id;
+					$transaction->project_task_id = $purchaseItem->project_task_id;
+					$transaction->cost_code_id = $purchaseItem->cost_code_id;
 					$transaction->save();
 				}
 			} else {
@@ -1308,6 +1421,9 @@ class PurchaseController extends Controller
 					$transaction->vendor_id   = $purchase->vendor_id;
 					$transaction->ref_id      = $purchase->id;
 					$transaction->description = 'Bill Invoice #' . $purchase->bill_no;
+					$transaction->project_id = $purchaseItem->project_id;
+					$transaction->project_task_id = $purchaseItem->project_task_id;
+					$transaction->cost_code_id = $purchaseItem->cost_code_id;
 					$transaction->save();
 				} else {
 					$transaction              = new PendingTransaction();
@@ -1322,6 +1438,9 @@ class PurchaseController extends Controller
 					$transaction->vendor_id   = $purchase->vendor_id;
 					$transaction->ref_id      = $purchase->id;
 					$transaction->description = 'Bill Invoice #' . $purchase->bill_no;
+					$transaction->project_id = $purchaseItem->project_id;
+					$transaction->project_task_id = $purchaseItem->project_task_id;
+					$transaction->cost_code_id = $purchaseItem->cost_code_id;
 					$transaction->save();
 				}
 			}
@@ -1349,6 +1468,7 @@ class PurchaseController extends Controller
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Bill Invoice Payable #' . $purchase->bill_no;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			} else {
 				$transaction              = new Transaction();
@@ -1363,6 +1483,7 @@ class PurchaseController extends Controller
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Bill Invoice Payable #' . $purchase->bill_no;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			}
 
@@ -1379,6 +1500,7 @@ class PurchaseController extends Controller
 				$transaction->ref_id      = $purchase->id;
 				$transaction->ref_type    = 'bill invoice';
 				$transaction->vendor_id   = $purchase->vendor_id;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			}
 		} else {
@@ -1395,6 +1517,7 @@ class PurchaseController extends Controller
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Bill Invoice Payable #' . $purchase->bill_no;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			} else {
 				$transaction              = new PendingTransaction();
@@ -1409,6 +1532,7 @@ class PurchaseController extends Controller
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Bill Invoice Payable #' . $purchase->bill_no;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			}
 
@@ -1425,6 +1549,7 @@ class PurchaseController extends Controller
 				$transaction->ref_id      = $purchase->id;
 				$transaction->ref_type    = 'bill invoice';
 				$transaction->vendor_id   = $purchase->vendor_id;
+				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			}
 		}

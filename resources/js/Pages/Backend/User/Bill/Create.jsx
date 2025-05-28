@@ -15,14 +15,17 @@ import DateTimePicker from "@/Components/DateTimePicker";
 import { Plus, Trash2, X } from "lucide-react";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 
-export default function Create({ vendors = [], products = [], currencies = [], taxes = [], accounts = [], purchase_title, inventory, base_currency }) {
+export default function Create({ vendors = [], products = [], currencies = [], taxes = [], accounts = [], purchase_title, inventory, base_currency, projects = [], cost_codes = [], construction_module }) {
   const [billItems, setBillItems] = useState([{
     product_id: "",
     product_name: "",
     description: "",
     quantity: 1,
     unit_cost: 0,
-    account_id: inventory.id
+    account_id: inventory.id,
+    project_id: null,
+    project_task_id: null,
+    cost_code_id: null
   }]);
 
   const [billAccounts, setBillAccounts] = useState([]);
@@ -53,6 +56,9 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     unit_cost: [],
     taxes: [],
     account_id: [],
+    project_id: [],
+    project_task_id: [],
+    cost_code_id: [],
     benificiary: "",
   });
 
@@ -70,6 +76,12 @@ export default function Create({ vendors = [], products = [], currencies = [], t
       .concat(billAccounts.map(a => a.quantity || 1)));
     setData("unit_cost", billItems.map(i => i.unit_cost)
       .concat(billAccounts.map(a => a.unit_cost)));
+    setData("project_id", billItems.map(i => i.project_id)
+      .concat(billAccounts.map(a => a.project_id)));
+    setData("project_task_id", billItems.map(i => i.project_task_id)
+      .concat(billAccounts.map(a => a.project_task_id)));
+    setData("cost_code_id", billItems.map(i => i.cost_code_id)
+      .concat(billAccounts.map(a => a.cost_code_id)));
 
     setData("attachments", attachments);
   };
@@ -86,7 +98,10 @@ export default function Create({ vendors = [], products = [], currencies = [], t
       description: "",
       quantity: 1,
       unit_cost: 0,
-      account_id: inventory.id
+      account_id: inventory.id,
+      project_id: null,
+      project_task_id: null,
+      cost_code_id: null
     }]);
   };
 
@@ -96,7 +111,10 @@ export default function Create({ vendors = [], products = [], currencies = [], t
       unit_cost: 0,
       quantity: 1,
       description: "",
-      product_name: "" // Initialize product_name for account entries
+      product_name: "",
+      project_id: null,
+      project_task_id: null,
+      cost_code_id: null
     }]);
   };
 
@@ -120,7 +138,9 @@ export default function Create({ vendors = [], products = [], currencies = [], t
         updatedItems[index].product_name = product.name;
         updatedItems[index].unit_cost = product.selling_price;
         updatedItems[index].account_id = inventory.id;
-
+        updatedItems[index].project_id = null;
+        updatedItems[index].project_task_id = null;
+        updatedItems[index].cost_code_id = null;
         // Also update the description if it's empty
         if (!updatedItems[index].description) {
           updatedItems[index].description = product.description || "";
@@ -275,12 +295,24 @@ export default function Create({ vendors = [], products = [], currencies = [], t
       ),
       unit_cost: billItems.map(item => item.unit_cost),
       account_id: [
-        ...billItems.map(item => item.account_id),
+        ...billItems.map(item => item.account_id || "Inventory"),
         ...billAccounts.map(account => account.account_id)
       ],
       unit_cost: [
         ...billItems.map(item => item.unit_cost * item.quantity),
         ...billAccounts.map(account => account.unit_cost)
+      ],
+      project_id: [
+        ...billItems.map(item => item.project_id),
+        ...billAccounts.map(account => account.project_id)
+      ],
+      project_task_id: [
+        ...billItems.map(item => item.project_task_id),
+        ...billAccounts.map(account => account.project_task_id)
+      ],
+      cost_code_id: [
+        ...billItems.map(item => item.cost_code_id),
+        ...billAccounts.map(account => account.cost_code_id)
       ]
     };
 
@@ -296,7 +328,10 @@ export default function Create({ vendors = [], products = [], currencies = [], t
           description: "",
           quantity: 1,
           unit_cost: 0,
-          account_id: ""
+          account_id: inventory.id,
+          project_id: null,
+          project_task_id: null,
+          cost_code_id: null
         }]);
         setBillAccounts([]);
         setAttachments([]);
@@ -504,7 +539,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
 
                   {/* Second Row */}
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
-                    <div className="md:col-span-6">
+                    <div className={`${construction_module == 1 ? 'md:col-span-3' : 'md:col-span-5'}`}>
                       <Label>Description</Label>
                       <Textarea
                         value={item.description}
@@ -513,14 +548,55 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                       />
                     </div>
 
-                    <div className="md:col-span-2">
+                    {construction_module == 1 && (
+                      <>
+                        <div className="md:col-span-3">
+                          <Label>Project</Label>
+                            <SearchableCombobox
+                              options={projects.map(project => ({
+                                id: project.id,
+                                name: project.project_code + " - " + project.project_name
+                              }))}
+                              value={item.project_id}
+                              onChange={(value) => updateInvoiceItem(index, "project_id", value)}
+                              placeholder="Select project"
+                            />
+                        </div>
+                        <div className="md:col-span-3">
+                          <Label>Project Task</Label>
+                            <SearchableCombobox
+                              options={projects.find(p => p.id === Number(item.project_id))?.tasks?.map(task => ({
+                                id: task.id,
+                                name: task.task_code + " - " + task.description
+                              }))}
+                              value={item.project_task_id}
+                              onChange={(value) => updateInvoiceItem(index, "project_task_id", value)}
+                              placeholder="Select project task"
+                            />
+                        </div>
+                        <div className="md:col-span-3">
+                          <Label>Cost Code</Label>
+                            <SearchableCombobox
+                              options={cost_codes.map(cost_code => ({
+                                id: cost_code.id,
+                                name: cost_code.code + " - " + cost_code.description
+                              }))}
+                              value={item.cost_code_id}
+                              onChange={(value) => updateInvoiceItem(index, "cost_code_id", value)}
+                              placeholder="Select cost code"
+                            />
+                        </div>
+                      </>
+                    )}
+
+                    <div className="md:col-span-4">
                       <Label>Subtotal</Label>
-                      <div className="p-2 bg-white rounded text-right">
+                      <div className="p-2 bg-white rounded mt-2 text-right">
                         {(item.quantity * item.unit_cost).toFixed(2)}
                       </div>
                     </div>
 
-                    <div className="md:col-span-1 flex items-center justify-end">
+                    <div className={`md:col-span-1 flex items-center justify-center ${construction_module == 1 ? 'mt-8' : ''}`}>
                       <Button
                         type="button"
                         variant="ghost"
@@ -538,7 +614,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
               {billAccounts.map((accountItem, index) => (
                 <div key={`account-${index}`} className="border rounded-lg p-4 space-y-4 bg-gray-50">
                   {/* First Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                     <div>
                       <Label>Account *</Label>
                       <SearchableCombobox
@@ -590,16 +666,13 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                         }}
                       />
                     </div>
-                  </div>
 
-                  {/* Second Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
-                    <div className="md:col-span-3">
+                    <div>
                       <Label>Quantity *</Label>
                       <Input
                         type="number"
                         min="1"
-                        value={accountItem.quantity || 1}
+                        value={accountItem.quantity}
                         onChange={(e) => {
                           const updatedAccounts = [...billAccounts];
                           updatedAccounts[index].quantity = parseInt(e.target.value);
@@ -611,8 +684,11 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                         }}
                       />
                     </div>
+                  </div>
 
-                    <div className="md:col-span-5">
+                  {/* Second Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
+                    <div className={`${construction_module == 1 ? 'md:col-span-3' : 'md:col-span-5'}`}>
                       <Label>Description</Label>
                       <Textarea
                         value={accountItem.description || ""}
@@ -629,14 +705,80 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                       />
                     </div>
 
-                    <div className="md:col-span-3">
+                    {construction_module == 1 && (
+                      <>
+                        <div className="md:col-span-3">
+                          <Label>Project</Label>
+                            <SearchableCombobox
+                              options={projects.map(project => ({
+                                id: project.id,
+                                name: project.project_code + " - " + project.project_name
+                              }))}
+                              value={accountItem.project_id}
+                              onChange={(value) => {
+                                const updatedAccounts = [...billAccounts];
+                                updatedAccounts[index].project_id = value;
+                                setBillAccounts(updatedAccounts);
+                                setData("project_id", [
+                                  ...billItems.map(item => item.project_id),
+                                  ...updatedAccounts.map(account => account.project_id)
+                                ]);
+                              }}
+                              placeholder="Select project"
+                            />
+                        </div>
+
+                        <div className="md:col-span-3">
+                          <Label>Project Task</Label>
+                            <SearchableCombobox
+                              options={projects.find(p => p.id === Number(accountItem.project_id))?.tasks?.map(task => ({
+                                id: task.id,
+                                name: task.task_code + " - " + task.description
+                              }))}
+                              value={accountItem.project_task_id}
+                              onChange={(value) => {
+                                const updatedAccounts = [...billAccounts];
+                                updatedAccounts[index].project_task_id = value;
+                                setBillAccounts(updatedAccounts);
+                                setData("project_task_id", [
+                                  ...billItems.map(item => item.project_task_id),
+                                  ...updatedAccounts.map(account => account.project_task_id)
+                                ]);
+                              }}
+                              placeholder="Select project task"
+                            />
+                        </div>
+
+                        <div className="md:col-span-3">
+                          <Label>Cost Code</Label>
+                            <SearchableCombobox
+                              options={cost_codes.map(cost_code => ({
+                                id: cost_code.id,
+                                name: cost_code.code + " - " + cost_code.description
+                              }))}
+                              value={accountItem.cost_code_id}
+                              onChange={(value) => {
+                                const updatedAccounts = [...billAccounts];
+                                updatedAccounts[index].cost_code_id = value;
+                                setBillAccounts(updatedAccounts);
+                                setData("cost_code_id", [
+                                  ...billItems.map(item => item.cost_code_id),
+                                  ...updatedAccounts.map(account => account.cost_code_id)
+                                ]);
+                              }}
+                              placeholder="Select cost code"
+                            />
+                        </div>
+                      </>
+                    )}
+                    <div className="md:col-span-4">
                       <Label>Subtotal</Label>
                       <div className="p-2 bg-white rounded mt-1 text-right">
                         {(accountItem.quantity * accountItem.unit_cost).toFixed(2)}
                       </div>
                     </div>
 
-                    <div className="md:col-span-1 flex items-center justify-end">
+                    <div className={`md:col-span-1 flex items-center justify-center ${construction_module == 1 ? 'mt-8' : ''}`}>
                       <Button
                         type="button"
                         variant="ghost"
@@ -867,7 +1009,10 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                       description: "",
                       quantity: 1,
                       unit_cost: 0,
-                      account_id: ""
+                      account_id: inventory.id,
+                      project_id: null,
+                      project_task_id: null,
+                      cost_code_id: null
                     }]);
                     setBillAccounts([]);
                     setAttachments([]);
