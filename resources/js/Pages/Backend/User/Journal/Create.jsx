@@ -21,6 +21,9 @@ export default function Create({
     vendors = [],
     journal_number,
     base_currency,
+    projects = [],
+    cost_codes = [],
+    construction_module,
 }) {
     const { toast } = useToast();
 
@@ -37,6 +40,10 @@ export default function Create({
                 description: "",
                 customer_id: "",
                 vendor_id: "",
+                project_id: "",
+                project_task_id: "",
+                cost_code_id: "",
+                quantity: "",
             },
         ],
     });
@@ -53,6 +60,10 @@ export default function Create({
                 description: "",
                 customer_id: "",
                 vendor_id: "",
+                project_id: "",
+                project_task_id: "",
+                cost_code_id: "",
+                quantity: "",
             },
         ];
 
@@ -291,8 +302,22 @@ export default function Create({
                                 <div className="space-y-4">
                                     {/* Column Headers */}
                                     <div className="grid grid-cols-12 gap-4 text-sm font-medium text-gray-500 border-b pb-2">
-                                        <div className="col-span-2">Date</div>
-                                        <div className="col-span-3">
+                                        <div
+                                            className={`${
+                                                construction_module == 1
+                                                    ? "col-span-1"
+                                                    : "col-span-2"
+                                            }`}
+                                        >
+                                            Date
+                                        </div>
+                                        <div
+                                            className={`${
+                                                construction_module == 1
+                                                    ? "col-span-2"
+                                                    : "col-span-3"
+                                            }`}
+                                        >
                                             Account
                                         </div>
                                         <div className="col-span-2">
@@ -301,7 +326,23 @@ export default function Create({
                                         <div className="col-span-2">
                                             Customer/Vendor
                                         </div>
-                                        <div className="col-span-2 text-right">
+                                        {construction_module == 1 && (
+                                            <div className="col-span-2">
+                                                Project/Task/Cost Code
+                                            </div>
+                                        )}
+                                        {construction_module == 1 && (
+                                            <div className="col-span-1">
+                                                Quantity
+                                            </div>
+                                        )}
+                                        <div
+                                            className={`text-right ${
+                                                construction_module == 1
+                                                    ? "col-span-1"
+                                                    : "col-span-2"
+                                            }`}
+                                        >
                                             Amount
                                         </div>
                                         <div className="col-span-1"></div>
@@ -314,7 +355,13 @@ export default function Create({
                                                 key={index}
                                                 className="grid grid-cols-12 gap-2 items-start p-4 bg-gray-50 rounded-lg relative"
                                             >
-                                                <div className="col-span-2">
+                                                <div
+                                                    className={`${
+                                                        construction_module == 1
+                                                            ? "col-span-1"
+                                                            : "col-span-2"
+                                                    }`}
+                                                >
                                                     <DateTimePicker
                                                         value={entry.date}
                                                         onChange={(date) =>
@@ -337,7 +384,13 @@ export default function Create({
                                                     />
                                                 </div>
 
-                                                <div className="col-span-3">
+                                                <div
+                                                    className={`${
+                                                        construction_module == 1
+                                                            ? "col-span-2"
+                                                            : "col-span-3"
+                                                    }`}
+                                                >
                                                     <SearchableCombobox
                                                         value={entry.account_id}
                                                         onChange={(value) =>
@@ -465,7 +518,157 @@ export default function Create({
                                                     </div>
                                                 </div>
 
-                                                <div className="col-span-2">
+                                                {construction_module == 1 && (
+                                                    <div className="col-span-2">
+                                                        <div className="space-y-2">
+                                                            <SearchableCombobox
+                                                                value={
+                                                                    entry.project_id ||
+                                                                    ""
+                                                                }
+                                                                onChange={(
+                                                                    value
+                                                                ) => {
+                                                                    const updatedEntries =
+                                                                        [
+                                                                            ...data.journal_entries,
+                                                                        ];
+                                                                    updatedEntries[
+                                                                        index
+                                                                    ].project_id =
+                                                                        value;
+                                                                    setData(
+                                                                        "journal_entries",
+                                                                        updatedEntries
+                                                                    );
+                                                                }}
+                                                                placeholder="Project"
+                                                                options={projects.map(
+                                                                    (
+                                                                        project
+                                                                    ) => ({
+                                                                        id: project.id,
+                                                                        name:
+                                                                            project.project_code +
+                                                                            " - " +
+                                                                            project.project_name,
+                                                                    })
+                                                                )}
+                                                                className="w-full"
+                                                            />
+                                                            <SearchableCombobox
+                                                                value={
+                                                                    entry.project_task_id ||
+                                                                    ""
+                                                                }
+                                                                onChange={(
+                                                                    value
+                                                                ) => {
+                                                                    const updatedEntries =
+                                                                        [
+                                                                            ...data.journal_entries,
+                                                                        ];
+                                                                    updatedEntries[
+                                                                        index
+                                                                    ].project_task_id =
+                                                                        value;
+                                                                    setData(
+                                                                        "journal_entries",
+                                                                        updatedEntries
+                                                                    );
+                                                                }}
+                                                                placeholder="Project Task"
+                                                                options={projects
+                                                                    .find(
+                                                                        (p) =>
+                                                                            p.id ===
+                                                                            Number(
+                                                                                entry.project_id
+                                                                            )
+                                                                    )
+                                                                    ?.tasks?.map(
+                                                                        (
+                                                                            task
+                                                                        ) => ({
+                                                                            id: task.id,
+                                                                            name:
+                                                                                task.task_code +
+                                                                                " - " +
+                                                                                task.description,
+                                                                        })
+                                                                    )}
+                                                                className="w-full"
+                                                            />
+                                                            <SearchableCombobox
+                                                                value={
+                                                                    entry.cost_code_id ||
+                                                                    ""
+                                                                }
+                                                                onChange={(
+                                                                    value
+                                                                ) => {
+                                                                    const updatedEntries =
+                                                                        [
+                                                                            ...data.journal_entries,
+                                                                        ];
+                                                                    updatedEntries[
+                                                                        index
+                                                                    ].cost_code_id =
+                                                                        value;
+                                                                    setData(
+                                                                        "journal_entries",
+                                                                        updatedEntries
+                                                                    );
+                                                                }}
+                                                                placeholder="Cost Code"
+                                                                options={cost_codes.map(
+                                                                    (
+                                                                        cost_code
+                                                                    ) => ({
+                                                                        id: cost_code.id,
+                                                                        name:
+                                                                            cost_code.code +
+                                                                            " - " +
+                                                                            cost_code.description,
+                                                                    })
+                                                                )}
+                                                                className="w-full"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {construction_module == 1 && (
+                                                    <div className="col-span-1">
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            placeholder="Quantity"
+                                                            className="text-right w-full"
+                                                            value={
+                                                                entry.quantity ||
+                                                                ""
+                                                            }
+                                                            onChange={(e) =>
+                                                                handleFieldChange(
+                                                                    index,
+                                                                    "quantity",
+                                                                    e.target
+                                                                        .value
+                                                                )
+                                                            }
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                <div
+                                                    className={`${
+                                                        construction_module == 1
+                                                            ? "col-span-1"
+                                                            : "col-span-2"
+                                                    }`}
+                                                >
                                                     <div className="space-y-2">
                                                         <Input
                                                             type="number"

@@ -118,10 +118,10 @@ export default function View({ journal, transactions, pending_transactions }) {
                   Print
                 </Button>
                 <Button asChild variant="outline">
-                  <a href={route("journals.export", journal.id)} download>
+                  <button onClick={() => window.location.href = route("journals.export", journal.id)}>
                     <Download className="w-4 h-4 mr-2" />
                     Export
-                  </a>
+                  </button>
                 </Button>
               </div>
 
@@ -240,6 +240,15 @@ export default function View({ journal, transactions, pending_transactions }) {
                             )}
                             {transaction.vendor_id && (
                               <span className="text-green-600">Vendor: {transaction.vendor?.name}</span>
+                            )}
+                            {transaction.project_id && (
+                              <div className="text-purple-600">Project: {transaction.project?.project_name}</div>
+                            )}
+                            {transaction.project_task_id && (
+                              <div className="text-purple-600">Project Task: {transaction.project_task?.description}</div>
+                            )}
+                            {transaction.cost_code_id && (
+                              <div className="text-purple-600">Cost Code: {transaction.cost_code?.description}</div>
                             )}
                           </td>
                           <td className="px-4 py-3 text-sm text-right font-medium border-b">

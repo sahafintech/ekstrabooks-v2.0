@@ -10,6 +10,7 @@ use App\Models\CostCode;
 use App\Models\Currency;
 use App\Models\Customer;
 use App\Models\Employee;
+use App\Models\ProductUnit;
 use App\Models\Project;
 use App\Models\ProjectGroup;
 use App\Models\ProjectTask;
@@ -209,11 +210,13 @@ class ProjectController extends Controller
         $project = Project::with('tasks', 'budgets', 'budgets.cost_codes', 'budgets.tasks')->findOrFail($id);
         $tab = $request->get('tab', 'tasks');
         $cost_codes = CostCode::all();
+        $unit_of_measures = ProductUnit::all();
 
         return Inertia::render('Backend/User/Construction/Project/View', [
             'project' => $project,
             'activeTab' => $tab,
             'cost_codes' => $cost_codes,
+            'unit_of_measures' => $unit_of_measures,
         ]);
     }
 

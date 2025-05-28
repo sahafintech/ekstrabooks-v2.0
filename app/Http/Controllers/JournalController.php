@@ -16,7 +16,10 @@ use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 use Inertia\Inertia;
 use App\Models\Account;
+use App\Models\CostCode;
 use App\Models\Customer;
+use App\Models\Project;
+use App\Models\ProjectBudget;
 use App\Models\Vendor;
 
 class JournalController extends Controller
@@ -103,6 +106,11 @@ class JournalController extends Controller
         $customers = Customer::all();
         $vendors = Vendor::all();
         $journal_number = get_business_option('journal_number');
+        $projects = Project::orderBy('id', 'desc')
+            ->with('tasks')
+            ->get();
+        $cost_codes = CostCode::orderBy('id', 'desc')
+            ->get();
 
         return Inertia::render('Backend/User/Journal/Create', [
             'accounts' => $accounts,
@@ -110,7 +118,10 @@ class JournalController extends Controller
             'customers' => $customers,
             'vendors' => $vendors,
             'journal_number' => $journal_number,
-            'base_currency' => get_business_option('currency')
+            'base_currency' => get_business_option('currency'),
+            'projects' => $projects,
+            'cost_codes' => $cost_codes,
+            'construction_module' => package()->construction_module
         ]);
     }
 
@@ -198,6 +209,15 @@ class JournalController extends Controller
                     $transaction->dr_cr       = 'dr';
                     $transaction->transaction_amount      = $request->journal_entries[$i]['debit'];
                     $transaction->base_currency_amount    = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entries[$i]['debit']);
+
+                    if ($request->journal_entries[$i]['project_id'] && $request->journal_entries[$i]['project_task_id'] && $request->journal_entries[$i]['cost_code_id']) {
+                        $projectBudget = ProjectBudget::where('project_id', $request->journal_entries[$i]['project_id'])->where('project_task_id', $request->journal_entries[$i]['project_task_id'])->where('cost_code_id', $request->journal_entries[$i]['cost_code_id'])->first();
+                        if ($projectBudget) {
+                            $projectBudget->actual_budget_quantity += $request->journal_entries[$i]['quantity'];
+                            $projectBudget->actual_budget_amount += $request->journal_entries[$i]['debit'];
+                            $projectBudget->save();
+                        }
+                    }
                 } else {
                     $transaction->dr_cr       = 'cr';
                     $transaction->transaction_amount      = $request->journal_entries[$i]['credit'];
@@ -208,6 +228,10 @@ class JournalController extends Controller
                 $transaction->ref_type    = 'journal';
                 $transaction->customer_id = $request->journal_entries[$i]['customer_id'] ?? NULL;
                 $transaction->vendor_id = $request->journal_entries[$i]['vendor_id'] ?? NULL;
+                $transaction->project_id = $request->journal_entries[$i]['project_id'] ?? NULL;
+                $transaction->project_task_id = $request->journal_entries[$i]['project_task_id'] ?? NULL;
+                $transaction->cost_code_id = $request->journal_entries[$i]['cost_code_id'] ?? NULL;
+                $transaction->quantity = $request->journal_entries[$i]['quantity'] ?? 0;
                 $transaction->save();
             } else {
                 $transaction                              = new PendingTransaction();
@@ -230,6 +254,10 @@ class JournalController extends Controller
                 $transaction->ref_type    = 'journal';
                 $transaction->customer_id = $request->journal_entries[$i]['customer_id'] ?? NULL;
                 $transaction->vendor_id = $request->journal_entries[$i]['vendor_id'] ?? NULL;
+                $transaction->project_id = $request->journal_entries[$i]['project_id'] ?? NULL;
+                $transaction->project_task_id = $request->journal_entries[$i]['project_task_id'] ?? NULL;
+                $transaction->cost_code_id = $request->journal_entries[$i]['cost_code_id'] ?? NULL;
+                $transaction->quantity = $request->journal_entries[$i]['quantity'] ?? 0;
                 $transaction->save();
             }
 
@@ -246,7 +274,7 @@ class JournalController extends Controller
         return redirect()->route('journals.index')->with('success', _lang('Journal Entry Created'));
     }
 
-    public function edit(Request $request, $id)
+    public function edit($id)
     {
         $journal = Journal::find($id);
         if ($journal->status == 1) {
@@ -259,6 +287,11 @@ class JournalController extends Controller
         $currencies = Currency::all();
         $customers = Customer::all();
         $vendors = Vendor::all();
+        $projects = Project::orderBy('id', 'desc')
+            ->with('tasks')
+            ->get();
+        $cost_codes = CostCode::orderBy('id', 'desc')
+            ->get();
 
         return Inertia::render('Backend/User/Journal/Edit', [
             'journal' => $journal,
@@ -266,7 +299,10 @@ class JournalController extends Controller
             'accounts' => $accounts,
             'currencies' => $currencies,
             'customers' => $customers,
-            'vendors' => $vendors
+            'vendors' => $vendors,
+            'projects' => $projects,
+            'cost_codes' => $cost_codes,
+            'construction_module' => package()->construction_module
         ]);
     }
 
@@ -318,6 +354,14 @@ class JournalController extends Controller
         $pending_transaction = PendingTransaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->get();
 
         foreach ($transactions as $trans) {
+            if ($trans->project_id && $trans->project_task_id && $trans->cost_code_id && $trans->dr_cr == 'dr') {
+                $projectBudget = ProjectBudget::where('project_id', $trans->project_id)->where('project_task_id', $trans->project_task_id)->where('cost_code_id', $trans->cost_code_id)->first();
+                if ($projectBudget) {
+                    $projectBudget->actual_budget_quantity -= $trans->quantity;
+                    $projectBudget->actual_budget_amount -= $trans->transaction_amount;
+                    $projectBudget->save();
+                }
+            }
             $trans->delete();
         }
 
@@ -356,6 +400,15 @@ class JournalController extends Controller
                     $transaction->dr_cr       = 'dr';
                     $transaction->transaction_amount      = $request->journal_entries[$i]['debit'];
                     $transaction->base_currency_amount    = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entries[$i]['debit']);
+
+                    if ($request->journal_entries[$i]['project_id'] && $request->journal_entries[$i]['project_task_id'] && $request->journal_entries[$i]['cost_code_id']) {
+                        $projectBudget = ProjectBudget::where('project_id', $request->journal_entries[$i]['project_id'])->where('project_task_id', $request->journal_entries[$i]['project_task_id'])->where('cost_code_id', $request->journal_entries[$i]['cost_code_id'])->first();
+                        if ($projectBudget) {
+                            $projectBudget->actual_budget_quantity += $request->journal_entries[$i]['quantity'];
+                            $projectBudget->actual_budget_amount += $request->journal_entries[$i]['debit'];
+                            $projectBudget->save();
+                        }
+                    }
                 } else {
                     $transaction->dr_cr       = 'cr';
                     $transaction->transaction_amount      = $request->journal_entries[$i]['credit'];
@@ -366,6 +419,10 @@ class JournalController extends Controller
                 $transaction->ref_type    = 'journal';
                 $transaction->customer_id = $request->journal_entries[$i]['customer_id'] ?? NULL;
                 $transaction->vendor_id = $request->journal_entries[$i]['vendor_id'] ?? NULL;
+                $transaction->project_id = $request->journal_entries[$i]['project_id'] ?? NULL;
+                $transaction->project_task_id = $request->journal_entries[$i]['project_task_id'] ?? NULL;
+                $transaction->cost_code_id = $request->journal_entries[$i]['cost_code_id'] ?? NULL;
+                $transaction->quantity = $request->journal_entries[$i]['quantity'] ?? 0;
                 $transaction->save();
             } else {
                 $transaction                              = new PendingTransaction();
@@ -388,6 +445,10 @@ class JournalController extends Controller
                 $transaction->ref_type    = 'journal';
                 $transaction->customer_id = $request->journal_entries[$i]['customer_id'] ?? NULL;
                 $transaction->vendor_id = $request->journal_entries[$i]['vendor_id'] ?? NULL;
+                $transaction->project_id = $request->journal_entries[$i]['project_id'] ?? NULL;
+                $transaction->project_task_id = $request->journal_entries[$i]['project_task_id'] ?? NULL;
+                $transaction->cost_code_id = $request->journal_entries[$i]['cost_code_id'] ?? NULL;
+                $transaction->quantity = $request->journal_entries[$i]['quantity'] ?? 0;
                 $transaction->save();
             }
 
@@ -419,6 +480,15 @@ class JournalController extends Controller
 
         foreach ($transaction as $trans) {
             $trans->delete();
+
+            if ($trans->project_id && $trans->project_task_id && $trans->cost_code_id && $trans->dr_cr == 'dr') {
+                $projectBudget = ProjectBudget::where('project_id', $trans->project_id)->where('project_task_id', $trans->project_task_id)->where('cost_code_id', $trans->cost_code_id)->first();
+                if ($projectBudget) {
+                    $projectBudget->actual_budget_quantity -= $trans->quantity;
+                    $projectBudget->actual_budget_amount -= $trans->transaction_amount;
+                    $projectBudget->save();
+                }
+            }
         }
 
         $journal->delete();
@@ -442,6 +512,15 @@ class JournalController extends Controller
 
             foreach ($transaction as $trans) {
                 $trans->delete();
+
+                if ($trans->project_id && $trans->project_task_id && $trans->cost_code_id && $trans->dr_cr == 'dr') {
+                    $projectBudget = ProjectBudget::where('project_id', $trans->project_id)->where('project_task_id', $trans->project_task_id)->where('cost_code_id', $trans->cost_code_id)->first();
+                    if ($projectBudget) {
+                        $projectBudget->actual_budget_quantity -= $trans->quantity;
+                        $projectBudget->actual_budget_amount -= $trans->transaction_amount;
+                        $projectBudget->save();
+                    }
+                }
             }
 
             $journal->delete();
@@ -491,8 +570,8 @@ class JournalController extends Controller
             return redirect()->route('journals.index')->with('error', _lang('Journal not found!'));
         }
 
-        $transactions = Transaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->with('account', 'customer', 'vendor')->get();
-        $pending_transactions = PendingTransaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->get();
+        $transactions = Transaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->with('account', 'customer', 'vendor', 'project', 'project_task', 'cost_code')->get();
+        $pending_transactions = PendingTransaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->with('account', 'customer', 'vendor', 'project', 'project_task', 'cost_code')->get();
 
         return Inertia::render('Backend/User/Journal/View', [
             'journal' => $journal,
@@ -523,6 +602,15 @@ class JournalController extends Controller
                     $new_transaction = $transaction->replicate();
                     $new_transaction->setTable('transactions'); // Change the table to 'transactions'
                     $new_transaction->save();
+
+                    if ($new_transaction->project_id && $new_transaction->project_task_id && $new_transaction->cost_code_id && $new_transaction->dr_cr == 'dr') {
+                        $projectBudget = ProjectBudget::where('project_id', $new_transaction->project_id)->where('project_task_id', $new_transaction->project_task_id)->where('cost_code_id', $new_transaction->cost_code_id)->first();
+                        if ($projectBudget) {
+                            $projectBudget->actual_budget_quantity += $new_transaction->quantity;
+                            $projectBudget->actual_budget_amount += $new_transaction->transaction_amount;
+                            $projectBudget->save();
+                        }
+                    }
 
                     // Delete the pending transaction
                     $transaction->delete();
@@ -555,6 +643,15 @@ class JournalController extends Controller
                         $new_transaction = $transaction->replicate();
                         $new_transaction->setTable('pending_transactions'); // Change the table to 'pending_transactions'
                         $new_transaction->save();
+
+                        if ($transaction->project_id && $transaction->project_task_id && $transaction->cost_code_id && $transaction->dr_cr == 'dr') {
+                            $projectBudget = ProjectBudget::where('project_id', $transaction->project_id)->where('project_task_id', $transaction->project_task_id)->where('cost_code_id', $transaction->cost_code_id)->first();
+                            if ($projectBudget) {
+                                $projectBudget->actual_budget_quantity -= $transaction->quantity;
+                                $projectBudget->actual_budget_amount -= $transaction->transaction_amount;
+                                $projectBudget->save();
+                            }
+                        }
 
                         // Delete the transaction
                         $transaction->delete();

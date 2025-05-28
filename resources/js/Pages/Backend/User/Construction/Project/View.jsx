@@ -73,7 +73,7 @@ const SummaryCards = ({ project = {} }) => {
     );
 };
 
-export default function View({ project, activeTab, cost_codes }) {
+export default function View({ project, activeTab, cost_codes, unit_of_measures }) {
     const [currentTab, setCurrentTab] = useState(activeTab);
 
     const ProjectStatusBadge = ({ status }) => {
@@ -298,7 +298,7 @@ export default function View({ project, activeTab, cost_codes }) {
                             </TabsContent>
 
                             <TabsContent value="budgets">
-                                <BudgetList project={project} cost_codes={cost_codes} />
+                                <BudgetList project={project} cost_codes={cost_codes} unit_of_measures={unit_of_measures} />
                             </TabsContent>
 
                             <TabsContent value="transactions">

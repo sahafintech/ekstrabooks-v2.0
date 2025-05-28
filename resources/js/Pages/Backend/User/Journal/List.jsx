@@ -972,7 +972,7 @@ export default function List({
                                     ) : (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={7}
+                                                colSpan={8}
                                                 className="h-24 text-center"
                                             >
                                                 No journals found.

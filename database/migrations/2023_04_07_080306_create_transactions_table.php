@@ -34,6 +34,7 @@ return new class extends Migration {
             $table->bigInteger('project_id')->nullable();
             $table->bigInteger('project_task_id')->nullable();
             $table->bigInteger('cost_code_id')->nullable();
+            $table->decimal('quantity', 28, 8)->nullable();
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
             $table->bigInteger('created_user_id')->nullable();

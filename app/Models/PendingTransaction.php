@@ -22,13 +22,28 @@ class PendingTransaction extends Model
 
     protected $fillable = ['trans_date', 'account_id', 'dr_cr', 'type', 'transaction_amount', 'currency_rate', 'transaction_currency', 'base_currency_amount', 'transaction_method', 'reference', 'description', 'attachment', 'ref_id', 'ref_type', 'customer_id', 'vendor_id', 'user_id', 'business_id', 'created_user_id', 'updated_user_id'];
 
-    public function account()
+    public function account()   
     {
         return $this->belongsTo(Account::class, 'account_id')->withDefault([
             'account_name' => _lang('Not Specified'),
         ]);
     }
 
+    public function project()
+    {
+        return $this->belongsTo(Project::class, 'project_id')->withDefault();
+    }
+
+    public function project_task()
+    {
+        return $this->belongsTo(ProjectTask::class, 'project_task_id')->withDefault();
+    }
+
+    public function cost_code()
+    {
+        return $this->belongsTo(CostCode::class, 'cost_code_id')->withDefault();
+    }
+    
     protected function transDate(): Attribute{
         $date_format = get_date_format();
 

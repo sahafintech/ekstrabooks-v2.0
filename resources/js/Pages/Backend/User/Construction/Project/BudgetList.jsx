@@ -207,6 +207,7 @@ const CreateBudgetDialog = ({
     errors,
     project,
     cost_codes,
+    unit_of_measures,
 }) => (
     <Modal show={show} onClose={onClose} maxWidth="4xl">
         <form onSubmit={onSubmit}>
@@ -317,17 +318,19 @@ const CreateBudgetDialog = ({
                                 Unit of Measure
                             </Label>
                             <div className="md:col-span-8 col-span-12 md:mt-0 mt-2">
-                                <Input
-                                    id="uom"
-                                    name="uom"
+                                <SearchableCombobox
                                     value={form.uom}
-                                    onChange={(e) =>
+                                    onChange={(value) => {
                                         setForm({
                                             ...form,
-                                            uom: e.target.value,
-                                        })
-                                    }
-                                    placeholder="Enter unit of measure"
+                                            uom: value,
+                                        });
+                                    }}
+                                    placeholder="Unit of Measure"
+                                    options={unit_of_measures.map((uom) => ({
+                                        id: uom.unit,
+                                        name: uom.unit,
+                                    }))}
                                 />
                                 <InputError
                                     message={errors.uom}
@@ -672,6 +675,7 @@ const EditBudgetDialog = ({
     errors,
     project,
     cost_codes,
+    unit_of_measures,
 }) => (
     <Modal show={show} onClose={onClose} maxWidth="4xl">
         <form onSubmit={onSubmit}>
@@ -782,17 +786,19 @@ const EditBudgetDialog = ({
                                 Unit of Measure
                             </Label>
                             <div className="md:col-span-8 col-span-12 md:mt-0 mt-2">
-                                <Input
-                                    id="uom"
-                                    name="uom"
+                                <SearchableCombobox
                                     value={form.uom}
-                                    onChange={(e) =>
+                                    onChange={(value) => {
                                         setForm({
                                             ...form,
-                                            uom: e.target.value,
-                                        })
-                                    }
-                                    placeholder="Enter unit of measure"
+                                            uom: value,
+                                        });
+                                    }}
+                                    placeholder="Unit of Measure"
+                                    options={unit_of_measures.map((uom) => ({
+                                        id: uom.unit,
+                                        name: uom.unit,
+                                    }))}
                                 />
                                 <InputError
                                     message={errors.uom}
@@ -1126,7 +1132,11 @@ const EditBudgetDialog = ({
     </Modal>
 );
 
-export default function BudgetList({ cost_codes = [], project }) {
+export default function BudgetList({
+    cost_codes = [],
+    project,
+    unit_of_measures = [],
+}) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
     const [selectedBudgets, setSelectedBudgets] = useState([]);
@@ -1791,9 +1801,7 @@ export default function BudgetList({ cost_codes = [], project }) {
                                     }
                                 >
                                     Actual Budget Quantity{" "}
-                                    {renderSortIcon(
-                                        "actual_budget_quantity"
-                                    )}
+                                    {renderSortIcon("actual_budget_quantity")}
                                 </TableHead>
                                 <TableHead
                                     className="cursor-pointer text-nowrap"
@@ -2005,6 +2013,7 @@ export default function BudgetList({ cost_codes = [], project }) {
                 errors={errors}
                 project={project}
                 cost_codes={cost_codes}
+                unit_of_measures={unit_of_measures}
             />
 
             {/* Edit Dialog */}
@@ -2018,6 +2027,7 @@ export default function BudgetList({ cost_codes = [], project }) {
                 errors={errors}
                 project={project}
                 cost_codes={cost_codes}
+                unit_of_measures={unit_of_measures}
             />
         </div>
     );

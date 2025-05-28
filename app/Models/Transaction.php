@@ -97,6 +97,21 @@ class Transaction extends Model
         );
     }
 
+    public function project_task()
+    {
+        return $this->belongsTo(ProjectTask::class, 'project_task_id')->withDefault();
+    }
+
+    public function cost_code()
+    {
+        return $this->belongsTo(CostCode::class, 'cost_code_id')->withDefault();
+    }
+
+    public function project()
+    {
+        return $this->belongsTo(Project::class, 'project_id')->withDefault();
+    }
+
     public function created_by()
     {
         return $this->belongsTo(User::class, 'created_user_id')->withDefault();
