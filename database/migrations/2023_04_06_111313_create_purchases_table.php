@@ -29,6 +29,9 @@ return new class extends Migration {
             $table->tinyInteger('status')->default(0);
             $table->tinyInteger('cash')->default(0);
             $table->tinyInteger('order')->default(0);
+            $table->bigInteger('project_id')->nullable();
+            $table->bigInteger('project_task_id')->nullable();
+            $table->bigInteger('cost_code_id')->nullable();
             $table->tinyInteger('template_type')->default(0)->comment('0 = Predefined | 1 = Dynamic');
             $table->string('template', 50)->nullable();
             $table->text('note')->nullable();

@@ -18,9 +18,9 @@
         <tr>
             <td>{{ $project->project_code }}</td>
             <td>{{ $project->project_name }}</td>
-            <td>{{ $project->project_group->group_name }}</td>
-            <td>{{ $project->customer->name }}</td>
-            <td>{{ $project->manager->name }}</td>
+            <td>{{ $project->project_group?->group_name }}</td>
+            <td>{{ $project->customer?->name }}</td>
+            <td>{{ $project->manager?->name }}</td>
             <td>{{ $project->start_date }}</td>
             <td>{{ $project->end_date }}</td>
             <td>{{ $project->status }}</td>

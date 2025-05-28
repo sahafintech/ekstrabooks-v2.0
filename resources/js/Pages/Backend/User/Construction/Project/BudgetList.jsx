@@ -27,7 +27,6 @@ import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
 import {
     Edit,
-    EyeIcon,
     FileDown,
     FileUp,
     MoreVertical,
@@ -1696,25 +1695,25 @@ export default function BudgetList({ cost_codes = [], project }) {
                                     />
                                 </TableHead>
                                 <TableHead
-                                    className="cursor-pointer"
+                                    className="cursor-pointer text-nowrap"
                                     onClick={() => handleSort("task_code")}
                                 >
                                     Task Code {renderSortIcon("task_code")}
                                 </TableHead>
                                 <TableHead
-                                    className="cursor-pointer"
+                                    className="cursor-pointer text-nowrap"
                                     onClick={() => handleSort("cost_code")}
                                 >
                                     Cost Code {renderSortIcon("cost_code")}
                                 </TableHead>
                                 <TableHead
-                                    className="cursor-pointer"
+                                    className="cursor-pointer text-nowrap"
                                     onClick={() => handleSort("status")}
                                 >
                                     Description {renderSortIcon("description")}
                                 </TableHead>
                                 <TableHead
-                                    className="cursor-pointer"
+                                    className="cursor-pointer text-nowrap"
                                     onClick={() =>
                                         handleSort("completed_percent")
                                     }
@@ -1722,13 +1721,13 @@ export default function BudgetList({ cost_codes = [], project }) {
                                     UOM {renderSortIcon("uom")}
                                 </TableHead>
                                 <TableHead
-                                    className="cursor-pointer"
+                                    className="cursor-pointer text-nowrap"
                                     onClick={() => handleSort("unit_rate")}
                                 >
                                     Unit Rate {renderSortIcon("unit_rate")}
                                 </TableHead>
                                 <TableHead
-                                    className="cursor-pointer"
+                                    className="cursor-pointer text-nowrap"
                                     onClick={() =>
                                         handleSort("original_budgeted_quantity")
                                     }
@@ -1739,7 +1738,7 @@ export default function BudgetList({ cost_codes = [], project }) {
                                     )}
                                 </TableHead>
                                 <TableHead
-                                    className="cursor-pointer"
+                                    className="cursor-pointer text-nowrap"
                                     onClick={() =>
                                         handleSort("original_budgeted_amount")
                                     }
@@ -1748,124 +1747,62 @@ export default function BudgetList({ cost_codes = [], project }) {
                                     {renderSortIcon("original_budgeted_amount")}
                                 </TableHead>
                                 <TableHead
-                                    className="cursor-pointer"
+                                    className="cursor-pointer text-nowrap"
                                     onClick={() =>
-                                        handleSort("revised_budgeted_quantity")
+                                        handleSort("committed_budget_quantity")
                                     }
                                 >
-                                    Revised Budgeted Quantity{" "}
+                                    Committed Budget Quantity{" "}
                                     {renderSortIcon(
-                                        "revised_budgeted_quantity"
+                                        "committed_budget_quantity"
                                     )}
                                 </TableHead>
                                 <TableHead
-                                    className="cursor-pointer"
+                                    className="cursor-pointer text-nowrap"
                                     onClick={() =>
-                                        handleSort("revised_budgeted_amount")
+                                        handleSort("committed_budget_amount")
                                     }
                                 >
-                                    Revised Budgeted Amount{" "}
-                                    {renderSortIcon("revised_budgeted_amount")}
+                                    Committed Budget Amount{" "}
+                                    {renderSortIcon("committed_budget_amount")}
                                 </TableHead>
                                 <TableHead
-                                    className="cursor-pointer"
+                                    className="cursor-pointer text-nowrap"
                                     onClick={() =>
-                                        handleSort("revised_committed_quantity")
+                                        handleSort("received_budget_quantity")
                                     }
                                 >
-                                    Revised Committed Quantity{" "}
+                                    Received Budget Quantity{" "}
+                                    {renderSortIcon("received_budget_quantity")}
+                                </TableHead>
+                                <TableHead
+                                    className="cursor-pointer text-nowrap"
+                                    onClick={() =>
+                                        handleSort("received_budget_amount")
+                                    }
+                                >
+                                    Received Budget Amount{" "}
+                                    {renderSortIcon("received_budget_amount")}
+                                </TableHead>
+                                <TableHead
+                                    className="cursor-pointer text-nowrap"
+                                    onClick={() =>
+                                        handleSort("actual_budget_quantity")
+                                    }
+                                >
+                                    Actual Budget Quantity{" "}
                                     {renderSortIcon(
-                                        "revised_committed_quantity"
+                                        "actual_budget_quantity"
                                     )}
                                 </TableHead>
                                 <TableHead
-                                    className="cursor-pointer"
+                                    className="cursor-pointer text-nowrap"
                                     onClick={() =>
-                                        handleSort("revised_committed_amount")
+                                        handleSort("actual_budget_amount")
                                     }
                                 >
-                                    Revised Committed Amount{" "}
-                                    {renderSortIcon("revised_committed_amount")}
-                                </TableHead>
-                                <TableHead
-                                    className="cursor-pointer"
-                                    onClick={() =>
-                                        handleSort("committed_open_quantity")
-                                    }
-                                >
-                                    Committed Open Quantity{" "}
-                                    {renderSortIcon("committed_open_quantity")}
-                                </TableHead>
-                                <TableHead
-                                    className="cursor-pointer"
-                                    onClick={() =>
-                                        handleSort("committed_open_amount")
-                                    }
-                                >
-                                    Committed Open Amount{" "}
-                                    {renderSortIcon("committed_open_amount")}
-                                </TableHead>
-                                <TableHead
-                                    className="cursor-pointer"
-                                    onClick={() =>
-                                        handleSort(
-                                            "committed_received_quantity"
-                                        )
-                                    }
-                                >
-                                    Committed Received Quantity{" "}
-                                    {renderSortIcon(
-                                        "committed_received_quantity"
-                                    )}
-                                </TableHead>
-                                <TableHead
-                                    className="cursor-pointer"
-                                    onClick={() =>
-                                        handleSort("committed_received_amount")
-                                    }
-                                >
-                                    Committed Received Amount{" "}
-                                    {renderSortIcon(
-                                        "committed_received_amount"
-                                    )}
-                                </TableHead>
-                                <TableHead
-                                    className="cursor-pointer"
-                                    onClick={() =>
-                                        handleSort("committed_received_amount")
-                                    }
-                                >
-                                    Committed Invoiced Quantity{" "}
-                                    {renderSortIcon(
-                                        "committed_invoiced_quantity"
-                                    )}
-                                </TableHead>
-                                <TableHead
-                                    className="cursor-pointer"
-                                    onClick={() =>
-                                        handleSort("committed_invoiced_amount")
-                                    }
-                                >
-                                    Committed Invoiced Amount{" "}
-                                    {renderSortIcon(
-                                        "committed_invoiced_amount"
-                                    )}
-                                </TableHead>
-                                <TableHead
-                                    className="cursor-pointer"
-                                    onClick={() =>
-                                        handleSort("committed_invoiced_amount")
-                                    }
-                                >
-                                    Actual Quantity{" "}
-                                    {renderSortIcon("actual_quantity")}
-                                </TableHead>
-                                <TableHead
-                                    className="cursor-pointer"
-                                    onClick={() => handleSort("actual_amount")}
-                                >
-                                    Actual Amount{" "}
-                                    {renderSortIcon("actual_amount")}
+                                    Actual Budget Amount{" "}
+                                    {renderSortIcon("actual_budget_amount")}
                                 </TableHead>
                                 <TableHead>Actions</TableHead>
                             </TableRow>
@@ -1908,51 +1845,27 @@ export default function BudgetList({ cost_codes = [], project }) {
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            {budget.revised_budgeted_quantity}
+                                            {budget.committed_budget_quantity}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {formatCurrency(
-                                                budget.revised_budgeted_amount
+                                                budget.committed_budget_amount
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            {budget.revised_committed_quantity}
+                                            {budget.received_budget_quantity}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {formatCurrency(
-                                                budget.revised_committed_amount
+                                                budget.received_budget_amount
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            {budget.committed_open_quantity}
+                                            {budget.actual_budget_quantity}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {formatCurrency(
-                                                budget.committed_open_amount
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {budget.committed_received_quantity}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {formatCurrency(
-                                                budget.committed_received_amount
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {budget.committed_invoiced_quantity}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {formatCurrency(
-                                                budget.committed_invoiced_amount
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {budget.actual_quantity}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {formatCurrency(
-                                                budget.actual_amount
+                                                budget.actual_budget_amount
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right">

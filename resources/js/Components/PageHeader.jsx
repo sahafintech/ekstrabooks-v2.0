@@ -40,7 +40,7 @@ const PageHeader = ({
             </BreadcrumbList>
           </Breadcrumb>
         </div>
-        {userPackage.pos == 1 && (
+        {userPackage?.pos == 1 && (
           <Link href={route('receipts.pos')} className="mr-4">
             <Button variant="outline">POS</Button>
           </Link>

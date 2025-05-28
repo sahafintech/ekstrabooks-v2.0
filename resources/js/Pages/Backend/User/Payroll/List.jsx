@@ -929,7 +929,7 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                                         ))
                                     ) : (
                                         <TableRow>
-                                            <TableCell colSpan={13} className="h-24 text-center">
+                                            <TableCell colSpan={15} className="h-24 text-center">
                                                 No payrolls found.
                                             </TableCell>
                                         </TableRow>

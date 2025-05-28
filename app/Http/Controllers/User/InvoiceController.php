@@ -368,6 +368,7 @@ class InvoiceController extends Controller
                 $transaction->ref_id      = $invoice->id;
                 $transaction->ref_type    = 'invoice';
                 $transaction->customer_id = $invoice->customer_id;
+                $transaction->project_id = $request->input('project_id');
 
                 $transaction->save();
             }
@@ -385,6 +386,7 @@ class InvoiceController extends Controller
                 $transaction->ref_id      = $invoice->id;
                 $transaction->ref_type    = 'invoice';
                 $transaction->customer_id = $invoice->customer_id;
+                $transaction->project_id = $request->input('project_id');
                 $transaction->save();
             }
 
@@ -401,6 +403,7 @@ class InvoiceController extends Controller
                 $transaction->customer_id = $invoice->customer_id;
                 $transaction->ref_id      = $invoice->id;
                 $transaction->description = 'Credit Invoice #' . $invoice->invoice_number;
+                $transaction->project_id = $request->input('project_id');
                 $transaction->save();
             }
 
@@ -427,6 +430,7 @@ class InvoiceController extends Controller
                     $transaction->ref_id      = $invoice->id;
                     $transaction->ref_type    = 'invoice tax';
                     $transaction->tax_id      = $tax->id;
+                    $transaction->project_id = $request->input('project_id');
                     $transaction->save();
                 }
             }
@@ -462,6 +466,7 @@ class InvoiceController extends Controller
         $transaction->ref_type    = 'invoice';
         $transaction->customer_id = $invoice->customer_id;
         $transaction->description = 'Credit Invoice #' . $invoice->invoice_number;
+        $transaction->project_id = $request->input('project_id');
         $transaction->save();
 
         if ($request->input('discount_value') > 0) {
@@ -477,6 +482,7 @@ class InvoiceController extends Controller
             $transaction->ref_id      = $invoice->id;
             $transaction->ref_type    = 'invoice';
             $transaction->customer_id = $invoice->customer_id;
+            $transaction->project_id = $request->input('project_id');
             $transaction->save();
         }
 
@@ -653,7 +659,6 @@ class InvoiceController extends Controller
      */
     public function update(Request $request, $id)
     {
-        return $request->all();
         $validator = Validator::make($request->all(), [
             'customer_id'    => 'required',
             'title'          => 'required',
@@ -883,7 +888,7 @@ class InvoiceController extends Controller
                 $transaction->ref_id      = $invoice->id;
                 $transaction->ref_type    = 'invoice';
                 $transaction->customer_id = $invoice->customer_id;
-
+                $transaction->project_id = $request->input('project_id');
                 $transaction->save();
             }
 
@@ -900,6 +905,7 @@ class InvoiceController extends Controller
                 $transaction->ref_id      = $invoice->id;
                 $transaction->ref_type    = 'invoice';
                 $transaction->customer_id = $invoice->customer_id;
+                $transaction->project_id = $request->input('project_id');
                 $transaction->save();
             }
 
@@ -916,6 +922,7 @@ class InvoiceController extends Controller
                 $transaction->customer_id = $invoice->customer_id;
                 $transaction->ref_id      = $invoice->id;
                 $transaction->description = 'Credit Invoice #' . $invoice->invoice_number;
+                $transaction->project_id = $request->input('project_id');
                 $transaction->save();
             }
 
@@ -949,6 +956,7 @@ class InvoiceController extends Controller
                     $transaction->ref_id      = $invoice->id;
                     $transaction->ref_type    = 'invoice tax';
                     $transaction->tax_id      = $tax->id;
+                    $transaction->project_id = $request->input('project_id');
                     $transaction->save();
                 }
             }
@@ -1003,11 +1011,13 @@ class InvoiceController extends Controller
                 $transaction->ref_id      = $invoice->id;
                 $transaction->ref_type    = 'invoice';
                 $transaction->customer_id = $invoice->customer_id;
+                $transaction->project_id = $request->input('project_id');
                 $transaction->save();
             } else {
                 $transaction->trans_date = Carbon::parse($request->input('invoice_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
                 $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
                 $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
+                $transaction->project_id = $request->input('project_id');
                 $transaction->save();
             }
         }

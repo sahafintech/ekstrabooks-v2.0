@@ -55,20 +55,15 @@ class ProjectBudgetController extends Controller
             'cost_code_id' => 'required|exists:cost_codes,id',
             'description' => 'nullable|string',
             'uom' => 'nullable|string',
-            'original_budgeted_quantity' => 'nullable|numeric',
             'unit_rate' => 'nullable|numeric',
+            'original_budgeted_quantity' => 'nullable|numeric',
             'original_budgeted_amount' => 'nullable|numeric',
-            'revised_budgeted_quantity' => 'nullable|numeric',
-            'revised_budgeted_amount' => 'nullable|numeric',
-            'revised_committed_quantity' => 'nullable|numeric',
-            'revised_committed_amount' => 'nullable|numeric',
-            'committed_open_quantity' => 'nullable|numeric',
-            'committed_open_amount' => 'nullable|numeric',
-            'committed_received_quantity' => 'nullable|numeric',
-            'committed_invoiced_quantity' => 'nullable|numeric',
-            'committed_invoiced_amount' => 'nullable|numeric',
-            'actual_quantity' => 'nullable|numeric',
-            'actual_amount' => 'nullable|numeric',
+            'committed_budget_quantity' => 'nullable|numeric',
+            'committed_budget_amount' => 'nullable|numeric',
+            'received_budget_quantity' => 'nullable|numeric',
+            'received_budget_amount' => 'nullable|numeric',
+            'actual_budget_quantity' => 'nullable|numeric',
+            'actual_budget_amount' => 'nullable|numeric',
         ]);
 
 
@@ -83,19 +78,13 @@ class ProjectBudgetController extends Controller
         $project_budget->description = $request->input('description');
         $project_budget->uom = $request->input('uom');
         $project_budget->original_budgeted_quantity = $request->input('original_budgeted_quantity') ?? 0;
-        $project_budget->unit_rate = $request->input('unit_rate') ?? 0;
         $project_budget->original_budgeted_amount = $request->input('original_budgeted_amount') ?? 0;
-        $project_budget->revised_budgeted_quantity = $request->input('revised_budgeted_quantity') ?? 0;
-        $project_budget->revised_budgeted_amount = $request->input('revised_budgeted_amount') ?? 0;
-        $project_budget->revised_committed_quantity = $request->input('revised_committed_quantity') ?? 0;
-        $project_budget->revised_committed_amount = $request->input('revised_committed_amount') ?? 0;
-        $project_budget->committed_open_quantity = $request->input('committed_open_quantity') ?? 0;
-        $project_budget->committed_open_amount = $request->input('committed_open_amount') ?? 0;
-        $project_budget->committed_received_quantity = $request->input('committed_received_quantity') ?? 0;
-        $project_budget->committed_invoiced_quantity = $request->input('committed_invoiced_quantity') ?? 0;
-        $project_budget->committed_invoiced_amount = $request->input('committed_invoiced_amount') ?? 0;
-        $project_budget->actual_quantity = $request->input('actual_quantity') ?? 0;
-        $project_budget->actual_amount = $request->input('actual_amount') ?? 0;
+        $project_budget->committed_budget_quantity = $request->input('committed_budget_quantity') ?? 0;
+        $project_budget->committed_budget_amount = $request->input('committed_budget_amount') ?? 0;
+        $project_budget->received_budget_quantity = $request->input('received_budget_quantity') ?? 0;
+        $project_budget->received_budget_amount = $request->input('received_budget_amount') ?? 0;
+        $project_budget->actual_budget_quantity = $request->input('actual_budget_quantity') ?? 0;
+        $project_budget->actual_budget_amount = $request->input('actual_budget_amount') ?? 0;
         $project_budget->created_by     = Auth::id();
         $project_budget->save();
 
@@ -126,17 +115,12 @@ class ProjectBudgetController extends Controller
             'original_budgeted_quantity' => 'required|numeric',
             'unit_rate' => 'required|numeric',
             'original_budgeted_amount' => 'required|numeric',
-            'revised_budgeted_quantity' => 'required|numeric',
-            'revised_budgeted_amount' => 'required|numeric',
-            'revised_committed_quantity' => 'required|numeric',
-            'revised_committed_amount' => 'required|numeric',
-            'committed_open_quantity' => 'required|numeric',
-            'committed_open_amount' => 'required|numeric',
-            'committed_received_quantity' => 'required|numeric',
-            'committed_invoiced_quantity' => 'required|numeric',
-            'committed_invoiced_amount' => 'required|numeric',
-            'actual_quantity' => 'required|numeric',
-            'actual_amount' => 'required|numeric',
+            'committed_budget_quantity' => 'required|numeric',
+            'committed_budget_amount' => 'required|numeric',
+            'received_budget_quantity' => 'required|numeric',
+            'received_budget_amount' => 'required|numeric',
+            'actual_budget_quantity' => 'required|numeric',
+            'actual_budget_amount' => 'required|numeric',
         ]);
 
         if ($validator->fails()) {
@@ -152,17 +136,12 @@ class ProjectBudgetController extends Controller
         $project_budget->original_budgeted_quantity = $request->input('original_budgeted_quantity') ?? 0;
         $project_budget->unit_rate = $request->input('unit_rate') ?? 0;
         $project_budget->original_budgeted_amount = $request->input('original_budgeted_amount') ?? 0;
-        $project_budget->revised_budgeted_quantity = $request->input('revised_budgeted_quantity') ?? 0;
-        $project_budget->revised_budgeted_amount = $request->input('revised_budgeted_amount') ?? 0;
-        $project_budget->revised_committed_quantity = $request->input('revised_committed_quantity') ?? 0;
-        $project_budget->revised_committed_amount = $request->input('revised_committed_amount') ?? 0;
-        $project_budget->committed_open_quantity = $request->input('committed_open_quantity') ?? 0;
-        $project_budget->committed_open_amount = $request->input('committed_open_amount') ?? 0;
-        $project_budget->committed_received_quantity = $request->input('committed_received_quantity') ?? 0;
-        $project_budget->committed_invoiced_quantity = $request->input('committed_invoiced_quantity') ?? 0;
-        $project_budget->committed_invoiced_amount = $request->input('committed_invoiced_amount') ?? 0;
-        $project_budget->actual_quantity = $request->input('actual_quantity') ?? 0;
-        $project_budget->actual_amount = $request->input('actual_amount') ?? 0;
+        $project_budget->committed_budget_quantity = $request->input('committed_budget_quantity') ?? 0;
+        $project_budget->committed_budget_amount = $request->input('committed_budget_amount') ?? 0;
+        $project_budget->received_budget_quantity = $request->input('received_budget_quantity') ?? 0;
+        $project_budget->received_budget_amount = $request->input('received_budget_amount') ?? 0;
+        $project_budget->actual_budget_quantity = $request->input('actual_budget_quantity') ?? 0;
+        $project_budget->actual_budget_amount = $request->input('actual_budget_amount') ?? 0;
         $project_budget->updated_by    = Auth::id();
         $project_budget->save();
 

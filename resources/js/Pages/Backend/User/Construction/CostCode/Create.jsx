@@ -1,7 +1,7 @@
 import { useForm } from "@inertiajs/react";
 import { Label } from "@/Components/ui/label";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { SidebarInset, SidebarSeparator } from "@/Components/ui/sidebar";
+import { SidebarInset } from "@/Components/ui/sidebar";
 import PageHeader from "@/Components/PageHeader";
 import { Input } from "@/Components/ui/input";
 import InputError from "@/Components/InputError";

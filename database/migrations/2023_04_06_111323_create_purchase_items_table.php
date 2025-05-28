@@ -15,6 +15,9 @@ return new class extends Migration {
             $table->bigInteger('product_id')->nullable()->unsigned();
             $table->string('product_name')->nullable();
             $table->text('description')->nullable();
+            $table->bigInteger('project_id')->nullable();
+            $table->bigInteger('project_task_id')->nullable();
+            $table->bigInteger('cost_code_id')->nullable();
             $table->decimal('quantity', 10, 2);
             $table->decimal('unit_cost', 28, 8);
             $table->decimal('sub_total', 28, 8);

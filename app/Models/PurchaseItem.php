@@ -22,7 +22,7 @@ class PurchaseItem extends Model {
      * @var array
      */
     protected $fillable = [
-        'purchase_id', 'product_id', 'product_name', 'description', 'quantity', 'unit_cost', 'sub_total', 'account_id',
+        'purchase_id', 'product_id', 'product_name', 'description', 'quantity', 'unit_cost', 'sub_total', 'account_id', 'project_id', 'project_task_id', 'cost_code_id'
     ];
 
     public function product()

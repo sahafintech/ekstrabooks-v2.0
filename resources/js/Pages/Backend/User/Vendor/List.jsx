@@ -388,7 +388,7 @@ export default function List({ vendors = [], meta = {}, filters = {} }) {
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex flex-col md:flex-row gap-2">
                 <Link href={route("vendors.create")}>
                   <Button>
                     <Plus className="w-4 h-4 mr-2" />

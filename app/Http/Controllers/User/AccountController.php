@@ -351,11 +351,13 @@ class AccountController extends Controller
 
         // Get currencies for the dropdown
         $currencies = Currency::all();
+        $accountTypes = AccountType::all();
 
         return Inertia::render('Backend/User/Account/Edit', [
             'account' => $account,
             'openingBalance' => $openingBalance,
             'currencies' => $currencies,
+            'accountTypes' => $accountTypes,
         ]);
     }
 

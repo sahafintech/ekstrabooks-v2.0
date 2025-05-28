@@ -396,6 +396,7 @@ class ReceiptController extends Controller
                 $transaction->ref_id      = $receipt->id;
                 $transaction->ref_type    = 'receipt';
                 $transaction->customer_id = $receipt->customer_id;
+                $transaction->project_id = $request->input('project_id');
                 $transaction->save();
             }
 
@@ -412,6 +413,7 @@ class ReceiptController extends Controller
                 $transaction->ref_id      = $receipt->id;
                 $transaction->ref_type    = 'receipt';
                 $transaction->customer_id = $receipt->customer_id;
+                $transaction->project_id = $request->input('project_id');
                 $transaction->save();
 
                 $transaction              = new Transaction();
@@ -426,6 +428,7 @@ class ReceiptController extends Controller
                 $transaction->customer_id = $receipt->customer_id;
                 $transaction->ref_id      = $receipt->id;
                 $transaction->description = 'Cash Invoice #' . $receipt->receipt_number;
+                $transaction->project_id = $request->input('project_id');
                 $transaction->save();
             }
 
@@ -452,6 +455,7 @@ class ReceiptController extends Controller
                     $transaction->ref_id      = $receipt->id;
                     $transaction->ref_type    = 'receipt tax';
                     $transaction->tax_id      = $tax->id;
+                    $transaction->project_id = $request->input('project_id');
                     $transaction->save();
                 }
             }
@@ -490,6 +494,7 @@ class ReceiptController extends Controller
         $transaction->ref_id      = $receipt->id;
         $transaction->ref_type    = 'receipt';
         $transaction->customer_id = $receipt->customer_id;
+        $transaction->project_id = $request->input('project_id');
         $transaction->save();
 
         if ($request->input('discount_value') > 0) {
@@ -505,6 +510,7 @@ class ReceiptController extends Controller
             $transaction->ref_id      = $receipt->id;
             $transaction->ref_type    = 'receipt';
             $transaction->customer_id = $receipt->customer_id;
+            $transaction->project_id = $request->input('project_id');
             $transaction->save();
         }
 
@@ -730,6 +736,7 @@ class ReceiptController extends Controller
                 $transaction->ref_id      = $receipt->id;
                 $transaction->ref_type    = 'receipt';
                 $transaction->customer_id = $receipt->customer_id;
+                $transaction->project_id = $request->input('project_id');
                 $transaction->save();
             }
 
@@ -746,6 +753,7 @@ class ReceiptController extends Controller
                 $transaction->ref_id      = $receipt->id;
                 $transaction->ref_type    = 'receipt';
                 $transaction->customer_id = $receipt->customer_id;
+                $transaction->project_id = $request->input('project_id');
                 $transaction->save();
 
                 $transaction              = new Transaction();
@@ -760,6 +768,7 @@ class ReceiptController extends Controller
                 $transaction->customer_id = $receipt->customer_id;
                 $transaction->ref_id      = $receipt->id;
                 $transaction->description = 'Cash Invoice #' . $receipt->receipt_number;
+                $transaction->project_id = $request->input('project_id');
                 $transaction->save();
             }
 
@@ -793,6 +802,7 @@ class ReceiptController extends Controller
                     $transaction->ref_id      = $receipt->id;
                     $transaction->ref_type    = 'receipt tax';
                     $transaction->tax_id      = $tax->id;
+                    $transaction->project_id = $request->input('project_id');
                     $transaction->save();
                 }
             }

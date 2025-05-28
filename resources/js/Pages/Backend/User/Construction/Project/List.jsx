@@ -450,7 +450,7 @@ export default function List({ projects = [], meta = {}, filters = {} }) {
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex flex-col md:flex-row gap-2">
                 <Link href={route("projects.create")}>
                   <Button>
                     <Plus className="w-4 h-4 mr-2" />
@@ -608,7 +608,7 @@ export default function List({ projects = [], meta = {}, filters = {} }) {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={11} className="h-24 text-center">
+                      <TableCell colSpan={12} className="h-24 text-center">
                         No projects found.
                       </TableCell>
                     </TableRow>

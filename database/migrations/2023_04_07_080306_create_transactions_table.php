@@ -31,6 +31,9 @@ return new class extends Migration {
             $table->bigInteger('vendor_id')->nullable(); // Expense By Vendor
             $table->bigInteger('employee_id')->nullable(); // Expense By Employee
             $table->bigInteger('tax_id')->nullable(); // Expense By Tax
+            $table->bigInteger('project_id')->nullable();
+            $table->bigInteger('project_task_id')->nullable();
+            $table->bigInteger('cost_code_id')->nullable();
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
             $table->bigInteger('created_user_id')->nullable();

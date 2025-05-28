@@ -9,26 +9,17 @@ import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function Create({ currencies = [], accountTypes = [] }) {
-
     const [showCurrency, setShowCurrency] = useState(false);
 
     const { data, setData, post, processing, errors, reset } = useForm({
         account_code: "",
         account_name: "",
         account_type: "",
-        opening_date: format(new Date(), "yyyy-MM-dd"),
+        opening_date: new Date(),
         account_number: "",
         currency: "",
         description: "",
@@ -37,7 +28,8 @@ export default function Create({ currencies = [], accountTypes = [] }) {
 
     // Handle account type change to determine if currency should be shown
     useEffect(() => {
-        const isBankOrCash = data.account_type === "Bank" || data.account_type === "Cash";
+        const isBankOrCash =
+            data.account_type === "Bank" || data.account_type === "Cash";
         setShowCurrency(isBankOrCash);
 
         // Reset currency if not bank or cash
@@ -58,18 +50,27 @@ export default function Create({ currencies = [], accountTypes = [] }) {
     };
 
     const isAssetType = (type) => {
-        return ["Bank", "Cash", "Other Current Asset", "Fixed Asset"].includes(type);
+        return ["Bank", "Cash", "Other Current Asset", "Fixed Asset"].includes(
+            type
+        );
     };
 
     return (
         <AuthenticatedLayout>
             <SidebarInset>
-                <PageHeader page="Chart of Accounts" subpage="Create New" url="accounts.index" />
+                <PageHeader
+                    page="Chart of Accounts"
+                    subpage="Create New"
+                    url="accounts.index"
+                />
 
                 <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
                     <form onSubmit={submit}>
                         <div className="grid grid-cols-12 mt-2">
-                            <Label htmlFor="account_code" className="md:col-span-2 col-span-12">
+                            <Label
+                                htmlFor="account_code"
+                                className="md:col-span-2 col-span-12"
+                            >
                                 Account Code *
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
@@ -77,16 +78,24 @@ export default function Create({ currencies = [], accountTypes = [] }) {
                                     id="account_code"
                                     type="text"
                                     value={data.account_code}
-                                    onChange={(e) => setData("account_code", e.target.value)}
+                                    onChange={(e) =>
+                                        setData("account_code", e.target.value)
+                                    }
                                     className="md:w-1/2 w-full"
                                     required
                                 />
-                                <InputError message={errors.account_code} className="text-sm" />
+                                <InputError
+                                    message={errors.account_code}
+                                    className="text-sm"
+                                />
                             </div>
                         </div>
 
                         <div className="grid grid-cols-12 mt-2">
-                            <Label htmlFor="account_name" className="md:col-span-2 col-span-12">
+                            <Label
+                                htmlFor="account_name"
+                                className="md:col-span-2 col-span-12"
+                            >
                                 Account Name *
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
@@ -94,73 +103,77 @@ export default function Create({ currencies = [], accountTypes = [] }) {
                                     id="account_name"
                                     type="text"
                                     value={data.account_name}
-                                    onChange={(e) => setData("account_name", e.target.value)}
+                                    onChange={(e) =>
+                                        setData("account_name", e.target.value)
+                                    }
                                     className="md:w-1/2 w-full"
                                     required
                                 />
-                                <InputError message={errors.account_name} className="text-sm" />
+                                <InputError
+                                    message={errors.account_name}
+                                    className="text-sm"
+                                />
                             </div>
                         </div>
 
                         <div className="grid grid-cols-12 mt-2">
-                            <Label htmlFor="account_type" className="md:col-span-2 col-span-12">
+                            <Label
+                                htmlFor="account_type"
+                                className="md:col-span-2 col-span-12"
+                            >
                                 Account Type *
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                 <div className="md:w-1/2 w-full">
                                     <SearchableCombobox
-                                        options={accountTypes.map(accountType => ({
-                                            id: accountType.type,
-                                            name: accountType.type
-                                        }))}
+                                        options={accountTypes.map(
+                                            (accountType) => ({
+                                                id: accountType.type,
+                                                name: accountType.type,
+                                            })
+                                        )}
                                         value={data.account_type}
-                                        onChange={(value) => setData("account_type", value)}
+                                        onChange={(value) =>
+                                            setData("account_type", value)
+                                        }
                                         placeholder="Select account type"
                                     />
                                 </div>
-                                <InputError message={errors.account_type} className="text-sm" />
+                                <InputError
+                                    message={errors.account_type}
+                                    className="text-sm"
+                                />
                             </div>
                         </div>
 
                         <div className="grid grid-cols-12 mt-2">
-                            <Label htmlFor="opening_date" className="md:col-span-2 col-span-12">
+                            <Label
+                                htmlFor="opening_date"
+                                className="md:col-span-2 col-span-12"
+                            >
                                 Opening Date *
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant={"outline"}
-                                            className={cn(
-                                                "md:w-1/2 w-full justify-start text-left font-normal",
-                                                !data.opening_date && "text-muted-foreground"
-                                            )}
-                                        >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {data.opening_date ? (
-                                                format(new Date(data.opening_date), "PPP")
-                                            ) : (
-                                                <span>Pick a date</span>
-                                            )}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                        <Calendar
-                                            mode="single"
-                                            selected={data.opening_date ? new Date(data.opening_date) : undefined}
-                                            onSelect={(date) =>
-                                                setData("opening_date", date ? format(date, "yyyy-MM-dd") : "")
-                                            }
-                                            initialFocus
-                                        />
-                                    </PopoverContent>
-                                </Popover>
-                                <InputError message={errors.opening_date} className="text-sm" />
+                                <DateTimePicker
+                                    value={data.opening_date}
+                                    onChange={(date) =>
+                                        setData("opening_date", date)
+                                    }
+                                    className="md:w-1/2 w-full"
+                                    required
+                                />
+                                <InputError
+                                    message={errors.opening_date}
+                                    className="text-sm"
+                                />
                             </div>
                         </div>
 
                         <div className="grid grid-cols-12 mt-2">
-                            <Label htmlFor="account_number" className="md:col-span-2 col-span-12">
+                            <Label
+                                htmlFor="account_number"
+                                className="md:col-span-2 col-span-12"
+                            >
                                 Account Number
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
@@ -168,38 +181,59 @@ export default function Create({ currencies = [], accountTypes = [] }) {
                                     id="account_number"
                                     type="text"
                                     value={data.account_number}
-                                    onChange={(e) => setData("account_number", e.target.value)}
+                                    onChange={(e) =>
+                                        setData(
+                                            "account_number",
+                                            e.target.value
+                                        )
+                                    }
                                     className="md:w-1/2 w-full"
                                 />
-                                <InputError message={errors.account_number} className="text-sm" />
+                                <InputError
+                                    message={errors.account_number}
+                                    className="text-sm"
+                                />
                             </div>
                         </div>
 
                         {showCurrency && (
                             <div className="grid grid-cols-12 mt-2">
-                                <Label htmlFor="currency" className="md:col-span-2 col-span-12">
+                                <Label
+                                    htmlFor="currency"
+                                    className="md:col-span-2 col-span-12"
+                                >
                                     Currency *
                                 </Label>
                                 <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                     <div className="md:w-1/2 w-full">
                                         <SearchableCombobox
-                                            options={currencies.map(currency => ({
-                                                id: currency.name,
-                                                name: `${currency.name} - ${currency.description} (${currency.exchange_rate})`
-                                            }))}
+                                            options={currencies.map(
+                                                (currency) => ({
+                                                    id: currency.name,
+                                                    name: `${currency.name} - ${currency.description} (${currency.exchange_rate})`,
+                                                })
+                                            )}
                                             value={data.currency}
-                                            onChange={(value) => setData("currency", value)}
+                                            onChange={(value) =>
+                                                setData("currency", value)
+                                            }
                                             placeholder="Select currency"
                                         />
                                     </div>
-                                    <InputError message={errors.currency} className="text-sm" />
+                                    <InputError
+                                        message={errors.currency}
+                                        className="text-sm"
+                                    />
                                 </div>
                             </div>
                         )}
 
                         {isAssetType(data.account_type) && (
                             <div className="grid grid-cols-12 mt-2">
-                                <Label htmlFor="opening_balance" className="md:col-span-2 col-span-12">
+                                <Label
+                                    htmlFor="opening_balance"
+                                    className="md:col-span-2 col-span-12"
+                                >
                                     Opening Balance
                                 </Label>
                                 <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
@@ -209,27 +243,43 @@ export default function Create({ currencies = [], accountTypes = [] }) {
                                         step="0.01"
                                         min="0"
                                         value={data.opening_balance}
-                                        onChange={(e) => setData("opening_balance", e.target.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                "opening_balance",
+                                                e.target.value
+                                            )
+                                        }
                                         className="md:w-1/2 w-full"
                                     />
-                                    <InputError message={errors.opening_balance} className="text-sm" />
+                                    <InputError
+                                        message={errors.opening_balance}
+                                        className="text-sm"
+                                    />
                                 </div>
                             </div>
                         )}
 
                         <div className="grid grid-cols-12 mt-2">
-                            <Label htmlFor="description" className="md:col-span-2 col-span-12">
+                            <Label
+                                htmlFor="description"
+                                className="md:col-span-2 col-span-12"
+                            >
                                 Description
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                 <Textarea
                                     id="description"
                                     value={data.description}
-                                    onChange={(e) => setData("description", e.target.value)}
+                                    onChange={(e) =>
+                                        setData("description", e.target.value)
+                                    }
                                     className="md:w-1/2 w-full"
                                     rows={3}
                                 />
-                                <InputError message={errors.description} className="text-sm" />
+                                <InputError
+                                    message={errors.description}
+                                    className="text-sm"
+                                />
                             </div>
                         </div>
 

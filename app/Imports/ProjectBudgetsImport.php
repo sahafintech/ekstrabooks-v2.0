@@ -30,17 +30,12 @@ class ProjectBudgetsImport implements ToCollection, WithHeadingRow, WithValidati
             $project_budget->unit_rate = $row['unit_rate'] ?? 0;
             $project_budget->original_budgeted_quantity = $row['original_budgeted_quantity'] ?? 0;
             $project_budget->original_budgeted_amount = $row['original_budgeted_amount'] ?? 0;
-            $project_budget->revised_budgeted_quantity = $row['revised_budgeted_quantity'] ?? 0;
-            $project_budget->revised_budgeted_amount = $row['revised_budgeted_amount'] ?? 0;
-            $project_budget->revised_committed_quantity = $row['revised_committed_quantity'] ?? 0;
-            $project_budget->revised_committed_amount = $row['revised_committed_amount'] ?? 0;
-            $project_budget->committed_open_quantity = $row['committed_open_quantity'] ?? 0;
-            $project_budget->committed_open_amount = $row['committed_open_amount'] ?? 0;
-            $project_budget->committed_received_quantity = $row['committed_received_quantity'] ?? 0;
-            $project_budget->committed_invoiced_quantity = $row['committed_invoiced_quantity'] ?? 0;
-            $project_budget->committed_invoiced_amount = $row['committed_invoiced_amount'] ?? 0;
-            $project_budget->actual_quantity = $row['actual_quantity'] ?? 0;
-            $project_budget->actual_amount = $row['actual_amount'] ?? 0;
+            $project_budget->committed_budget_quantity = $row['committed_budget_quantity'] ?? 0;
+            $project_budget->committed_budget_amount = $row['committed_budget_amount'] ?? 0;
+            $project_budget->received_budget_quantity = $row['received_budget_quantity'] ?? 0;
+            $project_budget->received_budget_amount = $row['received_budget_amount'] ?? 0;
+            $project_budget->actual_budget_quantity = $row['actual_budget_quantity'] ?? 0;
+            $project_budget->actual_budget_amount = $row['actual_budget_amount'] ?? 0;
             $project_budget->created_by = Auth::id();
             $project_budget->save();
         }
