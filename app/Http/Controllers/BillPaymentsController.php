@@ -110,7 +110,7 @@ class BillPaymentsController extends Controller
         $validator = Validator::make($request->all(), [
             'trans_date' => 'required',
             'account_id' => 'required',
-            'method'     => 'required',
+            'method'     => 'nullable',
             'vendor_id' => 'required',
             'attachment' => 'nullable|mimes:jpeg,JPEG,png,PNG,jpg,doc,pdf,docx,zip',
         ]);
