@@ -92,26 +92,26 @@ class InventoryDetailsExport implements FromView
                 // Extract brand ID and name
                 [$brandId, $brandName] = explode('|', $brandKey);
 
-                return [
+                return collect([
                     'brand_id' => $brandId,
                     'brand_name' => $brandName,
                     'total_sold' => $brandGroup->sum('total_sold'),
                     'total_stock_cost' => $brandGroup->sum('total_stock_cost'),
                     'products' => $brandGroup->sortByDesc('total_sold')->values(),
-                ];
-            })->values()->all();
+                ]);
+            })->values();
 
-            return [
+            return collect([
                 'category_id' => $categoryId,
                 'category_name' => $categoryName,
                 'total_sold' => $categoryGroup->sum('total_sold'),
                 'total_stock_cost' => $categoryGroup->sum('total_stock_cost'),
-                'brands' => collect($brands)->sortByDesc('total_sold')->values()->all(),
-            ];
-        })->values()->all();
+                'brands' => $brands->sortByDesc('total_sold'),
+            ]);
+        })->values();
 
         // Sort categories by total_sold descending
-        $data['products'] = collect($groupedByCategory)->sortByDesc('total_sold')->values();
+        $data['products'] = $groupedByCategory->sortByDesc('total_sold');
 
         return view('backend.user.reports.exports.inventory_details', $data);
     }

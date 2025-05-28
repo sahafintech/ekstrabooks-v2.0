@@ -19,12 +19,12 @@ class InventorySummaryExport implements FromView
     {
         $products = Product::select(
             'products.*',
-            'categories.id as category_id',
-            'categories.name as category_name',
+            'sub_categories.id as category_id',
+            'sub_categories.name as category_name',
             'product_brands.id as brand_id',
             'product_brands.name as brand_name'
         )
-            ->join('categories', 'categories.id', '=', 'products.category_id')
+            ->join('sub_categories', 'sub_categories.id', '=', 'products.sub_category_id')
             ->join('product_brands', 'product_brands.id', '=', 'products.brand_id')
             ->addSelect([
                 'total_sold_invoices' => InvoiceItem::selectRaw('IFNULL(SUM(quantity), 0)')

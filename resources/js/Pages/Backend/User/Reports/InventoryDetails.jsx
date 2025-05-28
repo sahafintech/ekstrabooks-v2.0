@@ -40,6 +40,10 @@ export default function InventoryDetails({ categories, date1, date2, business_na
         });
     };
 
+    const exportInventoryDetails = () => {
+        window.location.href = route('reports.inventory_details_export')
+    }
+
     const handlePrint = () => {
         // Open new window
         const printWindow = window.open('', '_blank', 'width=800,height=600');
@@ -351,9 +355,9 @@ export default function InventoryDetails({ categories, date1, date2, business_na
                             <Button variant="outline" onClick={handlePrint}>
                                 Print
                             </Button>
-                            <a download href={route('reports.inventory_details_export')}>
+                            <button onClick={exportInventoryDetails}>
                                 <Button variant="outline">Export</Button>
-                            </a>
+                            </button>
                         </div>
 
                         <div className="rounded-md border printable-table mt-4">
