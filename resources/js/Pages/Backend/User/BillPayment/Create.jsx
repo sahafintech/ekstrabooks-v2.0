@@ -14,6 +14,7 @@ import axios from "axios";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/Components/ui/table";
 import { Checkbox } from "@/Components/ui/checkbox";
 import DateTimePicker from "@/Components/DateTimePicker";
+import { formatCurrency } from "@/lib/utils";
 
 export default function Create({ vendors = [], accounts, methods }) {
     const [invoices, setInvoices] = useState([]);
