@@ -190,6 +190,7 @@ class BillPaymentsController extends Controller
             $transaction->ref_id      = $request->invoices[$i]['invoice_id'] . ',' . $payment->id;
             $transaction->ref_type    = 'bill payment';
             $transaction->vendor_id = $request->vendor_id;
+            $transaction->project_id = $purchase->project_id;
             $transaction->save();
 
             $transaction              = new Transaction();
@@ -206,6 +207,7 @@ class BillPaymentsController extends Controller
             $transaction->ref_id      = $request->invoices[$i]['invoice_id'] . ',' . $payment->id;
             $transaction->ref_type    = 'bill payment';
             $transaction->vendor_id = $request->vendor_id;
+            $transaction->project_id = $purchase->project_id;
             $transaction->save();
 
             $purchase->paid   = $purchase->paid + convert_currency($purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $purchase->currency, $request->invoices[$i]['amount']));
@@ -428,6 +430,7 @@ class BillPaymentsController extends Controller
         $transaction->ref_id = $invoice['invoice_id'] . ',' . $payment->id;
         $transaction->ref_type = 'bill payment';
         $transaction->vendor_id = $request->vendor_id;
+        $transaction->project_id = $purchase->project_id;
         $transaction->save();
     }
 

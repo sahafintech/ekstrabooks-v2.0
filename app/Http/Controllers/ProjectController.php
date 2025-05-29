@@ -14,6 +14,7 @@ use App\Models\ProductUnit;
 use App\Models\Project;
 use App\Models\ProjectGroup;
 use App\Models\ProjectTask;
+use App\Models\Transaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
@@ -211,12 +212,14 @@ class ProjectController extends Controller
         $tab = $request->get('tab', 'tasks');
         $cost_codes = CostCode::all();
         $unit_of_measures = ProductUnit::all();
+        $transactions = Transaction::where('project_id', $id)->with('account')->get();
 
         return Inertia::render('Backend/User/Construction/Project/View', [
             'project' => $project,
             'activeTab' => $tab,
             'cost_codes' => $cost_codes,
             'unit_of_measures' => $unit_of_measures,
+            'transactions' => $transactions,
         ]);
     }
 

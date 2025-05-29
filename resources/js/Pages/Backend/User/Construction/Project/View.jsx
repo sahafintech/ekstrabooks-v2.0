@@ -12,14 +12,12 @@ import {
     ListChecks,
     Receipt,
     Users,
-    Building2,
-    AlertCircle,
     CheckCircle,
-    Timer,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import TaskList from "./TaskList";
 import BudgetList from "./BudgetList";
+import TransactionsList from "./TransactionsList";
 // Summary Cards Component
 const SummaryCards = ({ project = {} }) => {
     const cards = [
@@ -73,7 +71,7 @@ const SummaryCards = ({ project = {} }) => {
     );
 };
 
-export default function View({ project, activeTab, cost_codes, unit_of_measures }) {
+export default function View({ project, activeTab, cost_codes, unit_of_measures, transactions }) {
     const [currentTab, setCurrentTab] = useState(activeTab);
 
     const ProjectStatusBadge = ({ status }) => {
@@ -302,16 +300,7 @@ export default function View({ project, activeTab, cost_codes, unit_of_measures 
                             </TabsContent>
 
                             <TabsContent value="transactions">
-                                <div>
-                                    <h1>Project Transactions</h1>
-                                </div>
-                                <div>
-                                    {/* Transactions content will go here */}
-                                    <p className="text-gray-500">
-                                        Transaction history and management
-                                        interface will be implemented here.
-                                    </p>
-                                </div>
+                                <TransactionsList transactions={transactions} />
                             </TabsContent>
 
                             <TabsContent value="change-orders">

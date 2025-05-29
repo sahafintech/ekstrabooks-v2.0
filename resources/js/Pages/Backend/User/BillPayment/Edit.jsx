@@ -10,7 +10,7 @@ import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/Components/ui/table";
-import { parseDateObject } from "@/lib/utils";
+import { formatCurrency, parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function Edit({ payment, vendors = [], accounts, methods }) {

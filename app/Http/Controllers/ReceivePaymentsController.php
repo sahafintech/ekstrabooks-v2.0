@@ -231,6 +231,7 @@ class ReceivePaymentsController extends Controller
             $transaction->ref_id      = $request->invoices[$i]['invoice_id'] . ',' . $payment->id;
             $transaction->ref_type    = 'invoice payment';
             $transaction->customer_id = $request->customer_id;
+            $transaction->project_id  = $invoice->project_id;
             $transaction->save();
 
             $transaction              = new Transaction();
@@ -247,7 +248,7 @@ class ReceivePaymentsController extends Controller
             $transaction->ref_id      = $request->invoices[$i]['invoice_id'] . ',' . $payment->id;
             $transaction->ref_type    = 'invoice payment';
             $transaction->customer_id = $request->customer_id;
-
+            $transaction->project_id  = $invoice->project_id;
             $transaction->save();
 
             $invoice->paid   = $invoice->paid + convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->invoices[$i]['amount']));
@@ -416,6 +417,7 @@ class ReceivePaymentsController extends Controller
             $transaction->ref_id      = $request->invoices[$i]['invoice_id'] . ',' . $payment->id;
             $transaction->ref_type    = 'invoice payment';
             $transaction->customer_id = $request->customer_id;
+            $transaction->project_id  = $invoice->project_id;
             $transaction->save();
 
             $transaction              = new Transaction();
@@ -432,6 +434,7 @@ class ReceivePaymentsController extends Controller
             $transaction->ref_id      = $request->invoices[$i]['invoice_id'] . ',' . $payment->id;
             $transaction->ref_type    = 'invoice payment';
             $transaction->customer_id = $request->customer_id;
+            $transaction->project_id  = $invoice->project_id;
             $transaction->save();
 
             $invoice->paid   = $invoice->paid + convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->invoices[$i]['amount']));
