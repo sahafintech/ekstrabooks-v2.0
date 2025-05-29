@@ -26,6 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
+import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 
 // Delete Confirmation Modal Component
 const DeletePrescriptionModal = ({ show, onClose, onConfirm, processing }) => (
@@ -83,6 +84,80 @@ const DeleteAllPrescriptionsModal = ({ show, onClose, onConfirm, processing, cou
   </Modal>
 );
 
+// Change Status Modal Component
+const ChangeStatusModal = ({ show, onClose, onConfirm, processing, currentStatus }) => {
+  const [newStatus, setNewStatus] = useState(currentStatus);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onConfirm(newStatus);
+  };
+
+  return (
+    <Modal show={show} onClose={onClose}>
+      <form onSubmit={handleSubmit}>
+        <h2 className="text-lg font-medium mb-4">Change Prescription Status</h2>
+        <div className="mb-4">
+          <SearchableCombobox
+            options={
+              [
+                { name: "Not Started", id: 0 },
+                { name: "Working Progress", id: 1 },
+                { name: "Completed", id: 2 },
+                { name: "Delivered", id: 3 },
+              ]
+            }
+            value={newStatus}
+            onChange={(value) => setNewStatus(value)}
+          />
+        </div>
+        <div className="mt-6 flex justify-end">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            className="mr-3"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={processing}
+          >
+            Update Status
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+const PrescriptionStatusBadge = ({ status }) => {
+  const statusMap = {
+      0: {
+          label: "Not Started",
+          className: "text-red-400 bg-red-200 px-3 py-1 rounded text-xs",
+      },
+      1: {
+          label: "Working Progress",
+          className: "text-yellow-400 bg-yellow-200 px-3 py-1 rounded text-xs",
+      },
+      2: {
+          label: "Completed",
+          className: "text-green-400 bg-green-200 px-3 py-1 rounded text-xs",
+      },
+      3: {
+          label: "Delivered",
+          className: "text-blue-400 bg-blue-200 px-3 py-1 rounded text-xs",
+      },
+  };
+
+  return (
+      <span className={statusMap[status].className}>
+          {statusMap[status].label}
+      </span>
+  );
+};
 
 export default function List({ prescriptions = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
@@ -100,6 +175,10 @@ export default function List({ prescriptions = [], meta = {}, filters = {} }) {
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [prescriptionToDelete, setPrescriptionToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
+
+  // Change Status modal states
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [prescriptionToUpdate, setPrescriptionToUpdate] = useState(null);
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -241,6 +320,26 @@ export default function List({ prescriptions = [], meta = {}, filters = {} }) {
     );
   };
 
+  const handleStatusChange = (id) => {
+    const prescription = prescriptions.find(p => p.id === id);
+    setPrescriptionToUpdate(prescription);
+    setShowStatusModal(true);
+  };
+
+  const handleStatusUpdate = (newStatus) => {
+    setProcessing(true);
+
+    router.post(route('prescriptions.change_status', prescriptionToUpdate.id), 
+      { status: newStatus },
+      {
+        onSuccess: () => {
+          setShowStatusModal(false);
+          setPrescriptionToUpdate(null);
+          setProcessing(false);
+        },
+      }
+    );
+  };
 
   const renderPageNumbers = () => {
     const totalPages = meta.last_page;
@@ -375,6 +474,9 @@ export default function List({ prescriptions = [], meta = {}, filters = {} }) {
                     <TableHead className="cursor-pointer" onClick={() => handleSort("customer.mobile")}>
                       Mobile {renderSortIcon("customer.mobile")}
                     </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("status")}>
+                      Status {renderSortIcon("status")}
+                    </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -394,6 +496,7 @@ export default function List({ prescriptions = [], meta = {}, filters = {} }) {
                         <TableCell>{prescription.customer?.name}</TableCell>
                         <TableCell>{prescription.customer?.age}</TableCell>
                         <TableCell>{prescription.customer?.mobile}</TableCell>
+                        <TableCell>{<PrescriptionStatusBadge status={prescription.status} />}</TableCell>
                         <TableCell className="text-right">
                           <TableActions
                             actions={[
@@ -406,6 +509,11 @@ export default function List({ prescriptions = [], meta = {}, filters = {} }) {
                                 label: "Edit",
                                 icon: <Edit className="h-4 w-4" />,
                                 href: route("prescriptions.edit", prescription.id),
+                              },
+                              {
+                                label: "Change Status",
+                                icon: <Edit className="h-4 w-4" />,
+                                onClick: () => handleStatusChange(prescription.id),
                               },
                               {
                                 label: "Delete",
@@ -488,6 +596,14 @@ export default function List({ prescriptions = [], meta = {}, filters = {} }) {
         onConfirm={handleDeleteAll}
         processing={processing}
         count={selectedPrescriptions.length}
+      />
+
+      <ChangeStatusModal
+        show={showStatusModal}
+        onClose={() => setShowStatusModal(false)}
+        onConfirm={handleStatusUpdate}
+        processing={processing}
+        currentStatus={prescriptionToUpdate?.status}
       />
 
     </AuthenticatedLayout>

@@ -183,7 +183,6 @@ export default function POS({ products, categories, currencies, accounts, custom
   const loadPrescriptionItems = (prescriptionProduct) => {
     // Clear current cart first
     handleCancel();
-    setData('prescription_products_id', prescriptionProduct.id);
 
     if (!prescriptionProduct.items || prescriptionProduct.items.length === 0) {
       toast.error("No items found in this prescription");
@@ -216,6 +215,7 @@ export default function POS({ products, categories, currencies, accounts, custom
       quantity: prescriptionProduct.items.map(item => parseFloat(item.quantity)),
       unit_cost: prescriptionProduct.items.map(item => parseFloat(item.unit_cost)),
       invoice_date: new Date(),
+      prescription_products_id: prescriptionProduct.id,
     });
 
     console.log(prescription);

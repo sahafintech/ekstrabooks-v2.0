@@ -33,7 +33,7 @@ export function SearchableCombobox({
     return options.map(option => {
       if (typeof option === 'object' && option !== null) {
         return {
-          value: String(option.id || ''),
+          value: String(option.id !== undefined && option.id !== null ? option.id : ''),
           label: String(option.name || option.unit || option.account_name || '')
         }
       }
