@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Exports\ProjectExport;
 use App\Http\Controllers\Controller;
 use App\Imports\ProjectImport;
+use App\Models\Account;
 use App\Models\AuditLog;
+use App\Models\ChangeOrder;
 use App\Models\CostCode;
 use App\Models\Currency;
 use App\Models\Customer;
@@ -213,13 +215,17 @@ class ProjectController extends Controller
         $cost_codes = CostCode::all();
         $unit_of_measures = ProductUnit::all();
         $transactions = Transaction::where('project_id', $id)->with('account')->get();
-
+        $change_orders = ChangeOrder::where('project_id', $id)->with('project', 'project_task', 'cost_code')->get();
+        $accounts = Account::all();
+        
         return Inertia::render('Backend/User/Construction/Project/View', [
             'project' => $project,
             'activeTab' => $tab,
             'cost_codes' => $cost_codes,
             'unit_of_measures' => $unit_of_measures,
             'transactions' => $transactions,
+            'change_orders' => $change_orders,
+            'accounts' => $accounts,
         ]);
     }
 

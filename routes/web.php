@@ -5,6 +5,7 @@ use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\BillPaymentsController;
 use App\Http\Controllers\BrandsController;
 use App\Http\Controllers\BusinessTypeController;
+use App\Http\Controllers\ChangeOrderController;
 use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DefferedInvoiceController;
@@ -504,6 +505,9 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::match(['get', 'post'], 'project_subcontracts/{id}/send_email', [ProjectSubcontractController::class, 'send_email'])->name('project_subcontracts.send_email');
 		Route::resource('project_subcontract_payments', ProjectSubcontractPaymentController::class)->except('edit', 'create');
 		Route::post('project_subcontract_payments/bulk_destroy', [ProjectSubcontractPaymentController::class, 'bulk_destroy'])->name('project_subcontract_payments.bulk_destroy');
+
+		Route::resource('change_orders', ChangeOrderController::class)->only('store', 'update', 'destroy');
+		Route::post('bulk_destroy_change_orders', [ChangeOrderController::class, 'bulk_destroy'])->name('change_orders.bulk_destroy');
 		
 		//Staff Controller
 		Route::post('staffs/bulk_destroy', [StaffController::class, 'bulk_destroy'])->name('staffs.bulk_destroy');

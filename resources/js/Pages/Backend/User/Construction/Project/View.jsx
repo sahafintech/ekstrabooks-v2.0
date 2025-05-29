@@ -18,6 +18,7 @@ import { formatCurrency } from "@/lib/utils";
 import TaskList from "./TaskList";
 import BudgetList from "./BudgetList";
 import TransactionsList from "./TransactionsList";
+import ChangeOrders from "./ChangeOrders";
 // Summary Cards Component
 const SummaryCards = ({ project = {} }) => {
     const cards = [
@@ -71,7 +72,7 @@ const SummaryCards = ({ project = {} }) => {
     );
 };
 
-export default function View({ project, activeTab, cost_codes, unit_of_measures, transactions }) {
+export default function View({ project, activeTab, cost_codes, unit_of_measures, transactions, change_orders }) {
     const [currentTab, setCurrentTab] = useState(activeTab);
 
     const ProjectStatusBadge = ({ status }) => {
@@ -304,16 +305,7 @@ export default function View({ project, activeTab, cost_codes, unit_of_measures,
                             </TabsContent>
 
                             <TabsContent value="change-orders">
-                                <div>
-                                    <h1>Change Orders</h1>
-                                </div>
-                                <div>
-                                    {/* Change Orders content will go here */}
-                                    <p className="text-gray-500">
-                                        Change order management interface will
-                                        be implemented here.
-                                    </p>
-                                </div>
+                                <ChangeOrders change_orders={change_orders} project={project} cost_codes={cost_codes} />
                             </TabsContent>
 
                             <TabsContent value="time-sheet">
