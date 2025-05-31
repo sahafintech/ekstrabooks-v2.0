@@ -12,7 +12,6 @@ use App\Models\Receipt;
 use App\Models\SubscriptionPayment;
 use App\Models\Transaction;
 use App\Models\User;
-use Carbon\Carbon;
 use Database\Seeders\BusinessSettingSeeder;
 use Database\Seeders\CurrencySeeder;
 use Illuminate\Http\Request;

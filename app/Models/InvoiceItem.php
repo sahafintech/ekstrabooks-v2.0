@@ -60,4 +60,12 @@ class InvoiceItem extends Model {
         );
     }
 
+    protected function sumInsured(): Attribute {
+        $decimal_place = get_business_option('decimal_places', 2);
+
+        return Attribute::make(
+            get: fn(string|null $value) => $value !== null ? number_format($value, $decimal_place, '.', '') : null,
+        );
+    }
+
 }

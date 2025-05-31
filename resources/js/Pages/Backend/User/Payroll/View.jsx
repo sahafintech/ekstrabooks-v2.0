@@ -169,11 +169,11 @@ export default function View({ payroll, working_days, absence, allowances, deduc
                                     </div>
                                     <div>
                                         <div className="text-xs text-muted-foreground">Department</div>
-                                        <div className="text-sm font-medium">{payroll?.staff?.department || 'N/A'}</div>
+                                        <div className="text-sm font-medium">{payroll?.staff?.department?.name || 'N/A'}</div>
                                     </div>
                                     <div>
                                         <div className="text-xs text-muted-foreground">Designation</div>
-                                        <div className="text-sm font-medium">{payroll?.staff?.designation || 'N/A'}</div>
+                                        <div className="text-sm font-medium">{payroll?.staff?.designation?.name || 'N/A'}</div>
                                     </div>
                                 </div>
                             </div>

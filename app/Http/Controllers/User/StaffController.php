@@ -107,14 +107,12 @@ class StaffController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create(Request $request)
+    public function create()
     {
-        $departments = Department::where('business_id', $request->activeBusiness->id)->get();
-        $designations = Designation::where('business_id', $request->activeBusiness->id)->get();
+        $departments = Department::with('designations')->get();
 
         return Inertia::render('Backend/User/Staff/Create', [
             'departments' => $departments,
-            'designations' => $designations,
         ]);
     }
 
@@ -224,16 +222,13 @@ class StaffController extends Controller
      */
     public function edit(Request $request, $id)
     {
-        $employee = Employee::where('business_id', $request->activeBusiness->id)
-            ->findOrFail($id);
+        $employee = Employee::findOrFail($id);
 
-        $departments = Department::where('business_id', $request->activeBusiness->id)->get();
-        $designations = Designation::where('business_id', $request->activeBusiness->id)->get();
+        $departments = Department::with('designations')->get();
 
         return Inertia::render('Backend/User/Staff/Edit', [
             'employee' => $employee,
             'departments' => $departments,
-            'designations' => $designations,
         ]);
     }
 

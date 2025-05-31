@@ -385,7 +385,7 @@ export default function List({ employees = [], meta = {}, filters = {} }) {
   };
 
   const exportStaffs = () => {
-    router.get(route("staffs.export"));
+    window.location.href = route("staffs.export");
   };
 
   return (
@@ -400,7 +400,7 @@ export default function List({ employees = [], meta = {}, filters = {} }) {
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex flex-col md:flex-row gap-2">
                 <Link href={route("staffs.create")}>
                   <Button>
                     <Plus className="w-4 h-4 mr-2" />

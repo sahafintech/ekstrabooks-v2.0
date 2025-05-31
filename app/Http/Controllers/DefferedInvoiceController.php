@@ -658,20 +658,7 @@ class DefferedInvoiceController extends Controller
 
     public function update(Request $request, $id)
     {
-        Validator::make($request->all(), [
-            'customer_id'    => 'required',
-            'title'          => 'required',
-            'deffered_start' => 'required|date',
-            'deffered_end'   => 'required|after_or_equal:deffered_start',
-            'product_id'     => 'required',
-            'template'       => 'required',
-            'currency'       => 'required',
-            'invoice_category' => 'required',
-            'invoice_date'   => 'required|date',
-            'due_date'       => 'required|after_or_equal:invoice_date',
-        ], [
-            'product_id.required' => _lang('You must add at least one item'),
-        ]);
+        
 
         DB::beginTransaction();
 

@@ -12,33 +12,31 @@ import PageHeader from "@/Components/PageHeader";
 import { Separator } from "@/Components/ui/separator";
 import { Switch } from "@/Components/ui/switch";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
-import { Popover, PopoverContent, PopoverTrigger } from "@/Components/ui/popover";
-import { Calendar } from "@/Components/ui/calendar";
-import { CalendarIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { parseDateObject } from "@/lib/utils";
+import DateTimePicker from "@/Components/DateTimePicker";
 
-export default function Edit({ employee, departments = [], designations = [] }) {
+export default function Edit({ employee, departments = [] }) {
   const { errors, flash } = usePage().props;
   const [processing, setProcessing] = useState(false);
   const [updateCompanyDetails, setUpdateCompanyDetails] = useState(false);
   
   const [form, setForm] = useState({
-    employee_id: employee.employee_id || "",
-    name: employee.name || "",
-    date_of_birth: employee.date_of_birth ? new Date(employee.date_of_birth).toISOString().split('T')[0] : "",
-    email: employee.email || "",
-    phone: employee.phone || "",
-    city: employee.city || "",
-    country: employee.country || "",
-    department_id: employee.department_id ? employee.department_id.toString() : "",
-    designation_id: employee.designation_id ? employee.designation_id.toString() : "",
-    joining_date: employee.joining_date ? new Date(employee.joining_date).toISOString().split('T')[0] : "",
-    end_date: employee.end_date ? new Date(employee.end_date).toISOString().split('T')[0] : "",
-    basic_salary: employee.basic_salary || "",
-    bank_name: employee.bank_name || "",
-    branch_name: employee.branch_name || "",
-    account_name: employee.account_name || "",
-    account_number: employee.account_number || "",
+    employee_id: employee.employee_id,
+    name: employee.name,
+    date_of_birth: parseDateObject(employee.date_of_birth),
+    email: employee.email,
+    phone: employee.phone,
+    city: employee.city,
+    country: employee.country,
+    department_id: employee.department_id,
+    designation_id: employee.designation_id,
+    joining_date: parseDateObject(employee.joining_date),
+    end_date: parseDateObject(employee.end_date),
+    basic_salary: employee.basic_salary,
+    bank_name: employee.bank_name,
+    branch_name: employee.branch_name,
+    account_name: employee.account_name,
+    account_number: employee.account_number,
     update_company_details: "0"
   });
 
@@ -145,37 +143,12 @@ export default function Edit({ employee, departments = [], designations = [] }) 
                   Date of Birth
                 </Label>
                 <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "md:w-1/2 w-full justify-start text-left font-normal",
-                          !form.date_of_birth && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {form.date_of_birth ? (
-                          format(new Date(form.date_of_birth), "PPP")
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={form.date_of_birth ? new Date(form.date_of_birth) : undefined}
-                        onSelect={(date) =>
-                          setForm({
-                            ...form,
-                            date_of_birth: date ? format(date, "yyyy-MM-dd") : ""
-                          })
-                        }
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DateTimePicker
+                    value={form.date_of_birth}
+                    onChange={(date) => setForm({ ...form, date_of_birth: date })}
+                    className="md:w-1/2 w-full"
+                    required
+                  />
                   <InputError message={errors.date_of_birth} className="text-sm" />
                 </div>
               </div>
@@ -286,7 +259,7 @@ export default function Edit({ employee, departments = [], designations = [] }) 
                 <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                   <div className="md:w-1/2 w-full">
                     <SearchableCombobox
-                      options={designations.map(designation => ({
+                      options={departments.find(department => Number(department.id) === Number(form.department_id))?.designations.map((designation) => ({
                         id: designation.id.toString(),
                         name: designation.name
                       }))}
@@ -305,39 +278,12 @@ export default function Edit({ employee, departments = [], designations = [] }) 
                   Joining Date {updateCompanyDetails && <span className="text-red-500">*</span>}
                 </Label>
                 <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "md:w-1/2 w-full justify-start text-left font-normal",
-                          !form.joining_date && "text-muted-foreground"
-                        )}
-                        disabled={!updateCompanyDetails}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {form.joining_date ? (
-                          format(new Date(form.joining_date), "PPP")
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={form.joining_date ? new Date(form.joining_date) : undefined}
-                        onSelect={(date) =>
-                          setForm({
-                            ...form,
-                            joining_date: date ? format(date, "yyyy-MM-dd") : ""
-                          })
-                        }
-                        initialFocus
-                        disabled={!updateCompanyDetails}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DateTimePicker
+                    value={form.joining_date}
+                    onChange={(date) => setForm({ ...form, joining_date: date })}
+                    className="md:w-1/2 w-full"
+                    required
+                  />
                   <InputError message={errors.joining_date} className="text-sm" />
                 </div>
               </div>
@@ -347,39 +293,12 @@ export default function Edit({ employee, departments = [], designations = [] }) 
                   End Date
                 </Label>
                 <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "md:w-1/2 w-full justify-start text-left font-normal",
-                          !form.end_date && "text-muted-foreground"
-                        )}
-                        disabled={!updateCompanyDetails}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {form.end_date ? (
-                          format(new Date(form.end_date), "PPP")
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={form.end_date ? new Date(form.end_date) : undefined}
-                        onSelect={(date) =>
-                          setForm({
-                            ...form,
-                            end_date: date ? format(date, "yyyy-MM-dd") : ""
-                          })
-                        }
-                        initialFocus
-                        disabled={!updateCompanyDetails}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DateTimePicker
+                    value={form.end_date}
+                    onChange={(date) => setForm({ ...form, end_date: date })}
+                    className="md:w-1/2 w-full"
+                    required
+                  />
                   <InputError message={errors.end_date} className="text-sm" />
                 </div>
               </div>

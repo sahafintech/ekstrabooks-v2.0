@@ -62,6 +62,14 @@ class Employee extends Model {
 		);
 	}
 
+	protected function basicSalary(): Attribute{
+        $decimal_place = get_business_option('decimal_places', 2);
+
+        return Attribute::make(
+            get: fn($value) => number_format($value, $decimal_place, '.', ''),
+        );
+    }
+
 	protected function endDate(): Attribute {
 		$date_format = get_date_format();
 		return Attribute::make(

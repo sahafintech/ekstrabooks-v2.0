@@ -1,4 +1,4 @@
-import { Head, Link } from "@inertiajs/react";
+import { Link } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -8,27 +8,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/Components/ui/card";
-import { format, parse, isValid } from "date-fns";
 import { Pencil, ArrowLeft } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
 import { Badge } from "@/Components/ui/badge";
+import { formatCurrency } from "@/lib/utils";
 
 export default function View({ employee }) {
-  const formatDate = (dateString) => {
-    if (!dateString) return "-";
-    const parsed = parse(dateString, "yyyy-MM-dd", new Date());
-    if (!isValid(parsed)) return dateString;
-    return format(parsed, "dd MMM yyyy");
-  };
-
-  const formatCurrency = (amount) => {
-    if (!amount) return "-";
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD', // Using USD as default, you might want to make this dynamic
-    }).format(amount);
-  };
 
   return (
     <AuthenticatedLayout>
@@ -41,29 +27,11 @@ export default function View({ employee }) {
             url="staffs.index"
           />
           <div className="p-4">
-            <div className="mb-4 flex justify-between items-center">
-              <Link href={route("staffs.index")}>
-                <Button variant="outline" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to List
-                </Button>
-              </Link>
-              <Link href={route("staffs.edit", employee.id)}>
-                <Button size="sm">
-                  <Pencil className="h-4 w-4 mr-2" />
-                  Edit Staff
-                </Button>
-              </Link>
-            </div>
-
             <div className="grid gap-6">
               {/* Personal Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-xl font-bold">Personal Information</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <div className="text-xl font-bold">Personal Information</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-gray-500">Employee ID</p>
                       <p className="font-medium">{employee.employee_id}</p>
@@ -82,7 +50,7 @@ export default function View({ employee }) {
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-gray-500">Date of Birth</p>
-                      <p className="font-medium">{formatDate(employee.date_of_birth)}</p>
+                      <p className="font-medium">{employee.date_of_birth}</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-gray-500">Address</p>
@@ -93,15 +61,12 @@ export default function View({ employee }) {
                       </p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+              </div>
 
               {/* Employment Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-xl font-bold">Employment Information</CardTitle>
-                </CardHeader>
-                <CardContent>
+              <div>
+                <div className="text-xl font-bold">Employment Information</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-gray-500">Department</p>
@@ -113,18 +78,18 @@ export default function View({ employee }) {
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-gray-500">Joining Date</p>
-                      <p className="font-medium">{formatDate(employee.joining_date)}</p>
+                      <p className="font-medium">{employee.joining_date}</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-gray-500">End Date</p>
                       <p className="font-medium">
-                        {employee.end_date ? formatDate(employee.end_date) : 
+                        {employee.end_date ? employee.end_date : 
                           <Badge variant="success">Active</Badge>}
                       </p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-gray-500">Basic Salary</p>
-                      <p className="font-medium">{formatCurrency(employee.basic_salary)}</p>
+                      <p className="font-medium">{formatCurrency({ amount: employee.basic_salary })}</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-gray-500">Employment Status</p>
@@ -137,15 +102,13 @@ export default function View({ employee }) {
                       </p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
               {/* Bank Details */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-xl font-bold">Bank Details</CardTitle>
-                </CardHeader>
-                <CardContent>
+              <div>
+                <div className="text-xl font-bold">Bank Details</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-gray-500">Bank Name</p>
@@ -164,16 +127,14 @@ export default function View({ employee }) {
                       <p className="font-medium">{employee.account_number || "-"}</p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
               {/* Employment History */}
               {employee.department_history && employee.department_history.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-xl font-bold">Employment History</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                <div>
+                  <div className="text-xl font-bold">Employment History</div>
+                  <div className="space-y-4">
                     <div className="space-y-4">
                       {employee.department_history.map((history, index) => {
                         const details = typeof history.details === 'string' 
@@ -181,7 +142,7 @@ export default function View({ employee }) {
                           : history.details;
                         
                         return (
-                          <div key={index} className="p-4 border rounded-lg">
+                          <div key={index} className="p-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div className="space-y-1">
                                 <p className="text-sm font-medium text-gray-500">Department</p>
@@ -193,19 +154,19 @@ export default function View({ employee }) {
                               </div>
                               <div className="space-y-1">
                                 <p className="text-sm font-medium text-gray-500">From</p>
-                                <p className="font-medium">{formatDate(details.joining_date)}</p>
+                                <p className="font-medium">{details.joining_date}</p>
                               </div>
                               <div className="space-y-1">
                                 <p className="text-sm font-medium text-gray-500">To</p>
-                                <p className="font-medium">{details.end_date ? formatDate(details.end_date) : "Present"}</p>
+                                <p className="font-medium">{details.end_date ? details.end_date : "Present"}</p>
                               </div>
                             </div>
                           </div>
                         );
                       })}
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               )}
             </div>
           </div>

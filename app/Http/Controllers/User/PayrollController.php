@@ -273,7 +273,7 @@ class PayrollController extends Controller
      */
     public function show($id)
     {
-        $payroll      = Payroll::with('staff')->find($id);
+        $payroll      = Payroll::with('staff', 'staff.department', 'staff.designation')->find($id);
         $working_days = Attendance::whereMonth('date', $payroll->month)
             ->whereYear('date', $payroll->year)
             ->groupBy('date')->get()->count();
