@@ -11,6 +11,28 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/Components/ui/badge";
 import { toast } from "sonner";
 
+// Add print styles
+const printStyles = `
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        .print-container,
+        .print-container * {
+            visibility: visible;
+        }
+        .print-container {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        .no-print {
+            display: none !important;
+        }
+    }
+`;
+
 export default function View({ payroll, working_days, absence, allowances, deductions, advance }) {
     const [isLoading, setIsLoading] = useState({
         print: false,
@@ -47,20 +69,17 @@ export default function View({ payroll, working_days, absence, allowances, deduc
     const handleDownloadPDF = async () => {
         setIsLoading(prev => ({ ...prev, pdf: true }));
         try {
-            // Dynamically import the required libraries
             const html2canvas = (await import('html2canvas')).default;
             const { jsPDF } = await import('jspdf');
 
-            // Get the content element
             const content = document.querySelector('.print-container');
             if (!content) {
                 throw new Error("Content element not found");
             }
             
-            // Create a canvas from the content
             const canvas = await html2canvas(content, {
                 scale: 4,
-                useCORS: true, // Enable CORS for images
+                useCORS: true,
                 logging: false,
                 windowWidth: content.scrollWidth,
                 windowHeight: content.scrollHeight,
@@ -68,22 +87,18 @@ export default function View({ payroll, working_days, absence, allowances, deduc
                 backgroundColor: '#ffffff'
             });
 
-            // Calculate dimensions
-            const imgWidth = 210; // A4 width in mm
-            const pageHeight = 297; // A4 height in mm
+            const imgWidth = 210;
+            const pageHeight = 297;
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
             
-            // Create PDF with higher quality
             const pdf = new jsPDF('p', 'mm', 'a4');
             let heightLeft = imgHeight;
             let position = 0;
             let pageData = canvas.toDataURL('image/jpeg', 1.0);
 
-            // Add first page
             pdf.addImage(pageData, 'JPEG', 0, position, imgWidth, imgHeight);
             heightLeft -= pageHeight;
 
-            // Add subsequent pages if content is longer than one page
             while (heightLeft >= 0) {
                 position = heightLeft - imgHeight;
                 pdf.addPage();
@@ -91,7 +106,6 @@ export default function View({ payroll, working_days, absence, allowances, deduc
                 heightLeft -= pageHeight;
             }
 
-            // Save the PDF
             pdf.save(`Payslip_${payroll?.staff?.name}_${payroll?.month}_${payroll?.year}.pdf`);
         } catch (error) {
             console.error('Error generating PDF:', error);
@@ -103,12 +117,13 @@ export default function View({ payroll, working_days, absence, allowances, deduc
 
     return (
         <AuthenticatedLayout>
+            <style>{printStyles}</style>
             <SidebarInset>
                 <PageHeader page="Payrolls" subpage="View Payslip" url="payslips.index" />
                 
                 <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
                     {/* Action Buttons */}
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-2 no-print">
                         <Button variant="outline" size="sm" onClick={handlePrint} disabled={isLoading.print}>
                             <Printer className="w-4 h-4 mr-2" />
                             {isLoading.print ? "Printing..." : "Print Payslip"}
@@ -126,40 +141,39 @@ export default function View({ payroll, working_days, absence, allowances, deduc
                     </div>
                     
                     {/* Payslip Card */}
-                    <div className="shadow-sm p-3 print-container">
-                        <div className="pb-2">
-                            <div className="flex justify-between items-center">
-                                <h3 className="text-sm font-medium">Payslip</h3>
-                                <Badge variant={payroll?.status === 2 ? "success" : "warning"}>
-                                    {payroll?.status === 2 ? "Paid" : "Unpaid"}
-                                </Badge>
+                    <div className="rounded-md border printable-table p-4 mt-4 w-full lg:w-[210mm] min-h-[297mm] mx-auto bg-white print-container">
+                        {/* Header */}
+                        <div className="text-center p-4">
+                            <h1 className="text-lg font-bold">PAYSLIP</h1>
+                            <div className="flex items-center justify-center space-x-2 mt-2">
+                                <span>Period:</span>
+                                <span>{payroll?.month}/{payroll?.year}</span>
                             </div>
-                            <div className="text-sm text-muted-foreground">
-                                Period: {payroll?.month}/{payroll?.year}
-                            </div>
+                            <Badge variant={payroll?.status === 2 ? "success" : "warning"} className="mt-2">
+                                {payroll?.status === 2 ? "Paid" : "Unpaid"}
+                            </Badge>
                         </div>
+
                         <div className="p-4">
                             {/* Employee Information */}
-                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-6">
-                                <div className="md:col-span-6 space-y-2">
-                                    <h3 className="text-sm font-medium">Employee Information</h3>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div>
-                                            <div className="text-xs text-muted-foreground">Employee ID</div>
-                                            <div className="text-sm font-medium">{payroll?.staff?.employee_id}</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-xs text-muted-foreground">Employee Name</div>
-                                            <div className="text-sm font-medium">{payroll?.staff?.name}</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-xs text-muted-foreground">Department</div>
-                                            <div className="text-sm font-medium">{payroll?.staff?.department || 'N/A'}</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-xs text-muted-foreground">Designation</div>
-                                            <div className="text-sm font-medium">{payroll?.staff?.designation || 'N/A'}</div>
-                                        </div>
+                            <div className="mb-6">
+                                <h3 className="text-left underline font-bold mb-2">EMPLOYEE INFORMATION</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <div className="text-xs text-muted-foreground">Employee ID</div>
+                                        <div className="text-sm font-medium">{payroll?.staff?.employee_id}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-muted-foreground">Employee Name</div>
+                                        <div className="text-sm font-medium">{payroll?.staff?.name}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-muted-foreground">Department</div>
+                                        <div className="text-sm font-medium">{payroll?.staff?.department || 'N/A'}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-muted-foreground">Designation</div>
+                                        <div className="text-sm font-medium">{payroll?.staff?.designation || 'N/A'}</div>
                                     </div>
                                 </div>
                             </div>
@@ -168,7 +182,7 @@ export default function View({ payroll, working_days, absence, allowances, deduc
                             
                             {/* Attendance Summary */}
                             <div className="mb-6">
-                                <h3 className="text-sm font-medium mb-3">Attendance Summary</h3>
+                                <h3 className="text-left underline font-bold mb-2">ATTENDANCE SUMMARY</h3>
                                 <div className="grid grid-cols-3 gap-4">
                                     <div className="bg-slate-50 p-3 rounded-md text-center">
                                         <div className="text-xs text-muted-foreground mb-1">Working Days</div>
@@ -186,85 +200,73 @@ export default function View({ payroll, working_days, absence, allowances, deduc
                             </div>
                             
                             {/* Earnings and Deductions Tables */}
-                            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Earnings Table */}
-                                <div className="md:col-span-6">
-                                    <h3 className="text-sm font-medium mb-3">Earnings</h3>
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Description</TableHead>
-                                                <TableHead className="text-right">Amount</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            <TableRow>
-                                                <TableCell>Basic Salary</TableCell>
-                                                <TableCell className="text-right">
+                                <div>
+                                    <h3 className="text-left underline font-bold mb-2">EARNINGS</h3>
+                                    <table className="w-full !text-[12px]">
+                                        <tbody>
+                                            <tr>
+                                                <td>Basic Salary</td>
+                                                <td className="text-right">
                                                     {formatCurrency({ amount: payroll?.current_salary || 0 })}
-                                                </TableCell>
-                                            </TableRow>
+                                                </td>
+                                            </tr>
                                             
                                             {allowances && allowances.map((item, index) => (
-                                                <TableRow key={`allowance-${index}`}>
-                                                    <TableCell>{item.description || 'Allowance'}</TableCell>
-                                                    <TableCell className="text-right">
+                                                <tr key={`allowance-${index}`}>
+                                                    <td>{item.description || 'Allowance'}</td>
+                                                    <td className="text-right">
                                                         {formatCurrency({ amount: item.amount || 0 })}
-                                                    </TableCell>
-                                                </TableRow>
+                                                    </td>
+                                                </tr>
                                             ))}
                                             
-                                            <TableRow className="font-medium">
-                                                <TableCell>Total Earnings</TableCell>
-                                                <TableCell className="text-right">
+                                            <tr>
+                                                <td className="font-bold">Total Earnings</td>
+                                                <td className="text-right font-bold border-t border-black">
                                                     {formatCurrency({ 
                                                         amount: parseFloat(payroll?.current_salary || 0) + calculateTotalAllowances() 
                                                     })}
-                                                </TableCell>
-                                            </TableRow>
-                                        </TableBody>
-                                    </Table>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                                 
                                 {/* Deductions Table */}
-                                <div className="md:col-span-6">
-                                    <h3 className="text-sm font-medium mb-3">Deductions</h3>
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Description</TableHead>
-                                                <TableHead className="text-right">Amount</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
+                                <div>
+                                    <h3 className="text-left underline font-bold mb-2">DEDUCTIONS</h3>
+                                    <table className="w-full !text-[12px]">
+                                        <tbody>
                                             {deductions && deductions.map((item, index) => (
-                                                <TableRow key={`deduction-${index}`}>
-                                                    <TableCell>{item.description || 'Deduction'}</TableCell>
-                                                    <TableCell className="text-right">
+                                                <tr key={`deduction-${index}`}>
+                                                    <td>{item.description || 'Deduction'}</td>
+                                                    <td className="text-right">
                                                         {formatCurrency({ amount: item.amount || 0 })}
-                                                    </TableCell>
-                                                </TableRow>
+                                                    </td>
+                                                </tr>
                                             ))}
                                             
                                             {advance > 0 && (
-                                                <TableRow>
-                                                    <TableCell>Advance</TableCell>
-                                                    <TableCell className="text-right">
+                                                <tr>
+                                                    <td>Advance</td>
+                                                    <td className="text-right">
                                                         {formatCurrency({ amount: advance || 0 })}
-                                                    </TableCell>
-                                                </TableRow>
+                                                    </td>
+                                                </tr>
                                             )}
                                             
-                                            <TableRow className="font-medium">
-                                                <TableCell>Total Deductions</TableCell>
-                                                <TableCell className="text-right">
+                                            <tr>
+                                                <td className="font-bold">Total Deductions</td>
+                                                <td className="text-right font-bold border-t border-black">
                                                     {formatCurrency({ 
                                                         amount: calculateTotalDeductions() + parseFloat(advance || 0) 
                                                     })}
-                                                </TableCell>
-                                            </TableRow>
-                                        </TableBody>
-                                    </Table>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                             
@@ -272,8 +274,8 @@ export default function View({ payroll, working_days, absence, allowances, deduc
                             
                             {/* Net Salary Summary */}
                             <div className="bg-slate-50 p-4 rounded-md">
-                                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                                    <div className="md:col-span-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
                                         <div className="text-sm font-medium">Summary</div>
                                         <div className="grid grid-cols-2 gap-2 mt-2">
                                             <div className="text-xs text-muted-foreground">Total Earnings</div>
@@ -292,7 +294,7 @@ export default function View({ payroll, working_days, absence, allowances, deduc
                                         </div>
                                     </div>
                                     
-                                    <div className="md:col-span-6">
+                                    <div>
                                         <div className="text-sm font-medium text-muted-foreground">Net Salary</div>
                                         <div className="text-2xl font-bold mt-2">
                                             {formatCurrency({ amount: calculateNetSalary() })}

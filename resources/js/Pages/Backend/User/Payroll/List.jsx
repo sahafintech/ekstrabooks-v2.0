@@ -708,7 +708,7 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
     };
 
     const exportPayrolls = () => {
-        router.get(route("payslips.export"));
+        window.location.href = route("payslips.export");
     };
 
     return (
@@ -866,6 +866,52 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
+                                    <TableRow>
+                                        <TableCell colSpan={4}></TableCell>
+                                        <TableCell>
+                                            <span className="text-blue-600">
+                                                {formatCurrency({ amount: payrolls.reduce((acc, payroll) => acc + Number(payroll.current_salary || 0), 0) })}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="text-green-600">
+                                                {formatCurrency({ amount: payrolls.reduce((acc, payroll) => acc + Number(payroll.total_allowance || 0), 0) })}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="text-red-600">
+                                                {formatCurrency({ amount: payrolls.reduce((acc, payroll) => acc + Number(payroll.total_tax || 0), 0) })}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="text-red-600">
+                                                {formatCurrency({ amount: payrolls.reduce((acc, payroll) => acc + Number(payroll.total_deduction || 0), 0) })}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="text-red-600">
+                                                {formatCurrency({ amount: payrolls.reduce((acc, payroll) => acc + Number(payroll.advance || 0), 0) })}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="text-green-600">
+                                                {formatCurrency({ amount: payrolls.reduce((acc, payroll) => acc + Number(payroll.net_salary || 0), 0) })}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="text-green-600">
+                                                {formatCurrency({ amount: payrolls.reduce((acc, payroll) => acc + Number(payroll.paid || 0), 0) })}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="text-red-600">
+                                                {formatCurrency({ amount: payrolls.reduce((acc, payroll) => acc + (Number(payroll.net_salary || 0) - Number(payroll.paid || 0)), 0) })}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell></TableCell>
+                                        <TableCell></TableCell>
+                                        <TableCell></TableCell>
+                                    </TableRow>
                                     {payrolls.length > 0 ? (
                                         payrolls.map((payroll, index) => (
                                             <TableRow key={payroll.id}>

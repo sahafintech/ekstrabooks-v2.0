@@ -14,21 +14,12 @@ class PayslipsExport implements FromView, WithTitle, WithColumnFormatting
      * @return \Illuminate\Support\Collection
      */
 
-    protected $month;
-    protected $year;
-
-    public function __construct($month, $year)
-    {
-        $this->month = $month;
-        $this->year = $year;
-    }
-
     public function view(): View
     {
         return view('backend.user.reports.exports.payslips', [
-            'payslips' => Payroll::where('month', $this->month)->where('year', $this->year)->get(),
-            'month' => $this->month,
-            'year' => $this->year
+            'payslips' => Payroll::where('month', session('month'))->where('year', session('year'))->get(),
+            'month' => session('month'),
+            'year' => session('year')
         ]);
     }
 

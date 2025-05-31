@@ -63,6 +63,8 @@ class CashPurchaseController extends Controller
 			$query->where(function ($q) use ($search) {
 				$q->where('bill_no', 'like', "%$search%")
 					->orWhere('title', 'like', "%$search%")
+					->orWhere('purchase_date', 'like', "%$search%")
+					->orWhere('grand_total', 'like', "%$search%")
 					->orWhereHas('vendor', function ($q) use ($search) {
 						$q->where('name', 'like', "%$search%");
 					});

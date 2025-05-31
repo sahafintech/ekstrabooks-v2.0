@@ -78,6 +78,10 @@ class PurchaseController extends Controller
 			$query->where(function ($q) use ($search) {
 				$q->where('purchases.bill_no', 'like', "%$search%")
 					->orWhere('purchases.title', 'like', "%$search%")
+					->orWhere('purchases.purchase_date', 'like', "%$search%")
+					->orWhere('purchases.due_date', 'like', "%$search%")
+					->orWhere('purchases.grand_total', 'like', "%$search%")
+					->orWhere('purchases.paid', 'like', "%$search%")
 					->orWhereHas('vendor', function ($q) use ($search) {
 						$q->where('name', 'like', "%$search%");
 					});
@@ -987,6 +991,7 @@ class PurchaseController extends Controller
 		return Vendor::where('id', $request->id)
 			->with(['purchases' => function ($query) {
 				$query->where('status', 0)->orWhere('status', 1)
+					->where('approval_status', 1)
 					->where('cash', 0)
 					->where('order', 0);
 			}])

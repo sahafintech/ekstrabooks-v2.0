@@ -92,7 +92,6 @@ class PayrollController extends Controller
         // Handle relationship sorting
         if (str_contains($sortColumn, '.')) {
             $parts = explode('.', $sortColumn);
-            $relation = $parts[0];
             $column = $parts[1];
             $query->join('employees', 'payslips.employee_id', '=', 'employees.id')
                 ->where('employees.business_id', $request->activeBusiness->id)
@@ -236,14 +235,14 @@ class PayrollController extends Controller
             $benefits        = $employee->employee_benefits->where('month', $month)->where('year', $year)->first()?->salary_benefits()->where('type', 'add')->get();
             $deductions      = $employee->employee_benefits->where('month', $month)->where('year', $year)->first()?->salary_benefits()->where('type', 'deduct')->get();
             $total_benefits  = $employee->basic_salary + $benefits?->sum('amount');
-            $total_deduction = $deductions?->sum('amount') + $employee->employee_benefits->where('month', $month)->where('year', $year)->first()?->advance + $absence_fine;
+            $total_deduction = $deductions?->sum('amount') + $absence_fine;
 
             $payroll                    = new Payroll();
             $payroll->employee_id       = $employee->id;
             $payroll->month             = $month;
             $payroll->year              = $year;
             $payroll->current_salary    = $employee->basic_salary;
-            $payroll->net_salary        = ($total_benefits - $total_deduction);
+            $payroll->net_salary        = ($total_benefits - ($total_deduction + $employee->employee_benefits->where('month', $month)->where('year', $year)->first()?->advance));
             $payroll->tax_amount        = 0;
 
             $payroll->total_allowance   = $benefits?->sum('amount');
@@ -383,29 +382,33 @@ class PayrollController extends Controller
         $benefits = 0;
         if (isset($request->allowances)) {
             for ($i = 0; $i < count($request->allowances); $i++) {
-                $employee_benefit->salary_benefits()->save(new SalaryBenefit([
-                    'employee_benefit_id' => $employee_benefit->id,
-                    'date'                => Carbon::parse($request->allowances[$i]['date'])->format('Y-m-d'),
-                    'description'         => $request->allowances[$i]['description'],
-                    'amount'              => $request->allowances[$i]['amount'],
-                    'type'                => 'add',
-                ]));
-                $benefits += $request->allowances[$i]['amount'];
+                if (!empty($request->allowances[$i]['date']) && !empty($request->allowances[$i]['amount'])) {
+                    $employee_benefit->salary_benefits()->save(new SalaryBenefit([
+                        'employee_benefit_id' => $employee_benefit->id,
+                        'date'                => Carbon::parse($request->allowances[$i]['date'])->format('Y-m-d'),
+                        'description'         => $request->allowances[$i]['description'],
+                        'amount'              => $request->allowances[$i]['amount'],
+                        'type'                => 'add',
+                    ]));
+                    $benefits += $request->allowances[$i]['amount'];
+                }
             }
         }
 
         $deductions = 0;
         if (isset($request->deductions)) {
             for ($i = 0; $i < count($request->deductions); $i++) {
-                $employee_benefit->salary_benefits()->save(new SalaryBenefit([
-                    'employee_benefit_id' => $employee_benefit->id,
-                    'date'                => Carbon::parse($request->deductions[$i]['date'])->format('Y-m-d'),
-                    'description'         => $request->deductions[$i]['description'],
-                    'amount'              => $request->deductions[$i]['amount'],
-                    'account_id'          => $request->deductions[$i]['account_id'],
-                    'type'                => 'deduct',
-                ]));
-                $deductions += $request->deductions[$i]['amount'];
+                if (!empty($request->deductions[$i]['date']) && !empty($request->deductions[$i]['amount']) && !empty($request->deductions[$i]['account_id'])) {
+                    $employee_benefit->salary_benefits()->save(new SalaryBenefit([
+                        'employee_benefit_id' => $employee_benefit->id,
+                        'date'                => Carbon::parse($request->deductions[$i]['date'])->format('Y-m-d'),
+                        'description'         => $request->deductions[$i]['description'],
+                        'amount'              => $request->deductions[$i]['amount'],
+                        'account_id'          => $request->deductions[$i]['account_id'],
+                        'type'                => 'deduct',
+                    ]));
+                    $deductions += $request->deductions[$i]['amount'];
+                }
             }
         }
 
@@ -456,7 +459,7 @@ class PayrollController extends Controller
                 $payslip = Payroll::find($payment['id']);
                 if ($payslip->status == 4) {
                     continue;
-                }                
+                }
                 $payslip->paid = $payslip->paid + $payment['amount'];
                 $payslip->save();
 
@@ -667,7 +670,7 @@ class PayrollController extends Controller
         $audit->event = 'Exported Payslips for ' . date('F', mktime(0, 0, 0, session('month'), 10)) . ' ' . session('year');
         $audit->save();
 
-        return Excel::download(new PayslipsExport(session('month'), session('year')), 'Payroll ' . now()->format('d m Y') . '.xlsx');
+        return Excel::download(new PayslipsExport(), 'Payroll ' . date('F', mktime(0, 0, 0, session('month'), 10)) . ' ' . session('year') . '.xlsx');
     }
 
     public function bulk_approve(Request $request)
