@@ -457,7 +457,7 @@ export default function Edit({
 
                                         {/* account */}
                                         <div className="col-span-12 sm:col-span-3">
-                                            <Label>Account *</Label>
+                                            <Label>Account</Label>
                                             <SearchableCombobox
                                                 options={accounts.map(
                                                     (account) => ({

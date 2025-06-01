@@ -398,7 +398,7 @@ class PayrollController extends Controller
         $deductions = 0;
         if (isset($request->deductions)) {
             for ($i = 0; $i < count($request->deductions); $i++) {
-                if (!empty($request->deductions[$i]['date']) && !empty($request->deductions[$i]['amount']) && !empty($request->deductions[$i]['account_id'])) {
+                if (!empty($request->deductions[$i]['date']) && !empty($request->deductions[$i]['amount'])) {
                     $employee_benefit->salary_benefits()->save(new SalaryBenefit([
                         'employee_benefit_id' => $employee_benefit->id,
                         'date'                => Carbon::parse($request->deductions[$i]['date'])->format('Y-m-d'),
