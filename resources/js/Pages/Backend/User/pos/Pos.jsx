@@ -218,9 +218,6 @@ export default function POS({ products, categories, currencies, accounts, custom
       prescription_products_id: prescriptionProduct.id,
     });
 
-    console.log(prescription);
-    console.log(data);
-
     setShowPrescriptionsModal(false);
     toast.success("Prescription items loaded into cart");
   };
@@ -252,7 +249,6 @@ export default function POS({ products, categories, currencies, accounts, custom
   const taxRateMap = new Map(taxes.map(t => [t.id, Number(t.rate)]));
 
   const calculateTaxes = () => {
-    console.log(data.taxes)
     return cartItems.reduce((sum, item) => {
       const base = Number(item.quantity) * Number(item.unit_cost);
 
@@ -289,10 +285,16 @@ export default function POS({ products, categories, currencies, accounts, custom
   };
 
   const changeCurrency = () => {
-    if (pos_default_currency_change) {
-      setData('currency', pos_default_currency_change)
-
-      handleCurrencyChange(pos_default_currency_change)
+    if (data.currency === baseCurrency.name) {
+      // If current currency is base currency, switch to pos_default_currency
+      if (pos_default_currency_change) {
+        setData('currency', pos_default_currency_change)
+        handleCurrencyChange(pos_default_currency_change)
+      }
+    } else {
+      // If current currency is not base currency, switch back to base currency
+      setData('currency', baseCurrency.name)
+      handleCurrencyChange(baseCurrency.name)
     }
   }
 
@@ -322,6 +324,23 @@ export default function POS({ products, categories, currencies, accounts, custom
       setExchangeRate(currentRate);
       setData('exchange_rate', currentRate);
 
+      // Update cart items with new exchange rate
+      const updatedCartItems = cartItems.map(item => {
+        // Find the original product to get its base selling price
+        const originalProduct = products.find(p => p.id === item.id);
+        if (originalProduct) {
+          return {
+            ...item,
+            unit_cost: originalProduct.selling_price * currentRate
+          };
+        }
+        return item;
+      });
+      setCartItems(updatedCartItems);
+
+      // Update the unit_cost in form data
+      setData('unit_cost', updatedCartItems.map(item => item.unit_cost));
+
       fetch(`/user/find_currency/${currencyObj.name}`)
         .then(response => response.json())
         .then(apiData => {
@@ -329,6 +348,20 @@ export default function POS({ products, categories, currencies, accounts, custom
             const apiRate = parseFloat(apiData.exchange_rate);
             setExchangeRate(apiRate);
             setData('exchange_rate', apiRate);
+
+            // Update cart items again with API exchange rate
+            const updatedCartItemsWithApiRate = cartItems.map(item => {
+              const originalProduct = products.find(p => p.id === item.id);
+              if (originalProduct) {
+                return {
+                  ...item,
+                  unit_cost: originalProduct.selling_price * apiRate
+                };
+              }
+              return item;
+            });
+            setCartItems(updatedCartItemsWithApiRate);
+            setData('unit_cost', updatedCartItemsWithApiRate.map(item => item.unit_cost));
           }
         })
         .catch(error => {
@@ -409,6 +442,9 @@ export default function POS({ products, categories, currencies, accounts, custom
     // Check if the product is already in the cart
     const existingItemIndex = cartItems.findIndex(item => item.id === product.id);
 
+    // Calculate the unit cost with exchange rate
+    const unitCostWithExchangeRate = product.selling_price * exchangeRate;
+
     if (existingItemIndex !== -1) {
       // Product already exists in cart, increment quantity
       const updatedCart = [...cartItems];
@@ -419,7 +455,7 @@ export default function POS({ products, categories, currencies, accounts, custom
       setCartItems([...cartItems, {
         id: product.id,
         name: product.name,
-        unit_cost: product.selling_price || 0,
+        unit_cost: unitCostWithExchangeRate,
         quantity: 1,
         code: product.code || ''
       }]);
@@ -428,7 +464,7 @@ export default function POS({ products, categories, currencies, accounts, custom
       setData('product_name', [...data.product_name, product.name]);
       setData('description', [...data.description, '']);
       setData('quantity', [...data.quantity, 1]);
-      setData('unit_cost', [...data.unit_cost, product.selling_price || 0]);
+      setData('unit_cost', [...data.unit_cost, unitCostWithExchangeRate]);
     }
   };
 
@@ -1319,7 +1355,6 @@ export default function POS({ products, categories, currencies, accounts, custom
                             }))}
                             value={data.currency}
                             onChange={(selectedValue) => {
-                              console.log("Currency selected:", selectedValue);
                               setData("currency", selectedValue);
                               handleCurrencyChange(selectedValue);
                             }}

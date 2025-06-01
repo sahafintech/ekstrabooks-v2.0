@@ -169,7 +169,7 @@ const InvoiceStatusBadge = ({ status }) => {
   );
 };
 
-const SummaryCards = ({ summary = {} }) => {
+const SummaryCards = ({ summary = {}, business }) => {
   const cards = [
     {
       title: "Total Invoices",
@@ -180,21 +180,21 @@ const SummaryCards = ({ summary = {} }) => {
     },
     {
       title: "Grand Total",
-      value: formatCurrency({ amount: summary.grand_total || 0, currency: 'USD' }),
+      value: formatCurrency({ amount: summary.grand_total || 0, currency: business.currency }),
       description: "Total amount of all invoices",
       icon: DollarSign,
       iconColor: "text-green-500"
     },
     {
       title: "Total Paid",
-      value: formatCurrency({ amount: summary.total_paid || 0, currency: 'USD' }),
+      value: formatCurrency({ amount: summary.total_paid || 0, currency: business.currency }),
       description: "Total amount paid",
       icon: CreditCard,
       iconColor: "text-purple-500"
     },
     {
       title: "Total Due",
-      value: formatCurrency({ amount: summary.total_due || 0, currency: 'USD' }),
+      value: formatCurrency({ amount: summary.total_due || 0, currency: business.currency }),
       description: "Total amount due",
       icon: AlertCircle,
       iconColor: "text-orange-500"
@@ -222,7 +222,7 @@ const SummaryCards = ({ summary = {} }) => {
   );
 };
 
-export default function List({ invoices = [], meta = {}, filters = {}, customers = [], summary = {} }) {
+export default function List({ invoices = [], meta = {}, filters = {}, customers = [], summary = {}, business }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedInvoices, setSelectedInvoices] = useState([]);
@@ -533,7 +533,7 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
             url="invoices.index"
           />
           <div className="p-4">
-            <SummaryCards summary={summary} />
+            <SummaryCards summary={summary} business={business} />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div className="flex flex-col md:flex-row gap-2">
                 <Link href={route("invoices.create")}>
@@ -665,9 +665,15 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
                         <TableCell>{invoice.customer ? invoice.customer.name : "-"}</TableCell>
                         <TableCell>{invoice.invoice_date}</TableCell>
                         <TableCell>{invoice.due_date}</TableCell>
-                        <TableCell className="text-right">{formatCurrency({ amount: invoice.grand_total })}</TableCell>
-                        <TableCell className="text-right">{formatCurrency({ amount: invoice.paid })}</TableCell>
-                        <TableCell className="text-right">{formatCurrency({ amount: invoice.grand_total - invoice.paid })}</TableCell>
+                        <TableCell className="text-right">
+                          {invoice.grand_total !== invoice.converted_total ? (
+                            <span>
+                              {formatCurrency({ amount: invoice.grand_total, currency: business.currency })} ({formatCurrency({ amount: invoice.converted_total, currency: invoice.currency })})
+                            </span>
+                          ) : (
+                            <span>{formatCurrency({ amount: invoice.grand_total, currency: business.currency })}</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <InvoiceStatusBadge status={invoice.status} />
                         </TableCell>

@@ -100,7 +100,7 @@ class ReceiptController extends Controller
 
         // Get summary statistics for all receipts matching filters
         $allReceipts = Receipt::query();
-        
+
         if ($search) {
             $allReceipts->where(function ($q) use ($search) {
                 $q->where('receipt_number', 'like', "%$search%")
@@ -146,6 +146,7 @@ class ReceiptController extends Controller
             'filters' => request()->only(['search', 'per_page', 'customer_id', 'date_range']),
             'customers' => Customer::select('id', 'name')->orderBy('id')->get(),
             'summary' => $summary,
+            'business' => $request->activeBusiness,
         ]);
     }
 
@@ -1031,12 +1032,10 @@ class ReceiptController extends Controller
             $subTotal = ($subTotal + $line_total);
 
             //Calculate Taxes
-            if (isset($request->tax_amount)) {
-                foreach ($request->tax_amount as $index => $amount) {
-                    if ($amount == 0) {
-                        continue;
-                    }
-                    $tax         = Tax::find($index);
+            if (isset($request->taxes)) {
+                for ($j = 0; $j < count($request->taxes); $j++) {
+                    $taxId       = $request->taxes[$j];
+                    $tax         = Tax::find($taxId);
                     $product_tax = ($line_total / 100) * $tax->rate;
                     $taxAmount += $product_tax;
                 }
@@ -1044,9 +1043,9 @@ class ReceiptController extends Controller
 
             //Calculate Discount
             if ($request->discount_type == '0') {
-                $discountAmount = ($subTotal / 100) * $request->discount_value;
+                $discountAmount = ($subTotal / 100) * $request->discount_value ?? 0;
             } else if ($request->discount_type == '1') {
-                $discountAmount = $request->discount_value;
+                $discountAmount = $request->discount_value ?? 0;
             }
         }
 
@@ -1054,10 +1053,10 @@ class ReceiptController extends Controller
         $grandTotal = ($subTotal + $taxAmount) - $discountAmount;
 
         return array(
-            'subTotal'       => $subTotal,
-            'taxAmount'      => $taxAmount,
-            'discountAmount' => $discountAmount,
-            'grandTotal'     => $grandTotal,
+            'subTotal'       => $subTotal / $request->exchange_rate,
+            'taxAmount'      => $taxAmount / $request->exchange_rate,
+            'discountAmount' => $discountAmount / $request->exchange_rate,
+            'grandTotal'     => $grandTotal / $request->exchange_rate,
         );
     }
 

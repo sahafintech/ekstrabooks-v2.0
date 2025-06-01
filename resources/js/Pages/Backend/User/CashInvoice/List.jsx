@@ -154,7 +154,7 @@ const DeleteAllReceiptsModal = ({ show, onClose, onConfirm, processing, count })
   </Modal>
 );
 
-const SummaryCards = ({ receipts = [] }) => {
+const SummaryCards = ({ receipts = [], business }) => {
   const totalInvoices = receipts.length;
   const grandTotal = receipts.reduce((sum, receipt) => sum + parseFloat(receipt.grand_total), 0);
   const uniqueCustomers = new Set(receipts.map(receipt => receipt.customer?.id)).size;
@@ -174,7 +174,7 @@ const SummaryCards = ({ receipts = [] }) => {
     },
     {
       title: "Grand Total",
-      value: formatCurrency({ amount: grandTotal, currency: receipts[0]?.currency || 'USD' }),
+      value: formatCurrency({ amount: grandTotal, currency: business.currency}),
       description: "Total amount of all invoices",
       icon: DollarSign,
       iconColor: "text-green-500"
@@ -215,7 +215,7 @@ const SummaryCards = ({ receipts = [] }) => {
   );
 };
 
-export default function List({ receipts = [], meta = {}, filters = {}, customers = [] }) {
+export default function List({ receipts = [], meta = {}, filters = {}, customers = [], business }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedRows, setSelectedRows] = useState([]);
@@ -474,7 +474,7 @@ export default function List({ receipts = [], meta = {}, filters = {}, customers
             url="receipts.index"
           />
           <div className="p-4">
-            <SummaryCards receipts={receipts} />
+            <SummaryCards receipts={receipts} business={business} />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div className="flex flex-col md:flex-row gap-2">
                 <Link href={route("receipts.create")}>
@@ -613,7 +613,15 @@ export default function List({ receipts = [], meta = {}, filters = {}, customers
                           {receipt.receipt_date}
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatCurrency(receipt.grand_total)}
+                          {receipt.grand_total !== receipt.converted_total ? (
+                            <span>
+                              {formatCurrency({ amount: receipt.grand_total, currency: business.currency })} ({formatCurrency({ amount: receipt.converted_total, currency: receipt.currency })})
+                            </span>
+                          ) : (
+                            <span>
+                              {formatCurrency({ amount: receipt.grand_total, currency: business.currency })}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           <TableActions

@@ -133,10 +133,10 @@ export default function InvoicePos({ business, receipt }) {
                         <tbody>
                             {receipt.items.map((item, i) => (
                                 <tr key={i}>
-                                    <td style={{ padding: '2px 0' }}>{item.product_name}</td>
-                                    <td style={{ textAlign: 'right', padding: '2px 0' }}>{item.quantity}</td>
-                                    <td style={{ textAlign: 'right', padding: '2px 0' }}>{formatCurrency({ amount: item.unit_cost, currency: business.currency })}</td>
-                                    <td style={{ textAlign: 'right', padding: '2px 0' }}>{formatCurrency({ amount: item.sub_total, currency: business.currency })}</td>
+                                    <td style={{ padding: '2px 0', fontSize: 10 }}>{item.product_name}</td>
+                                    <td style={{ textAlign: 'right', padding: '2px 0', fontSize: 10 }}>{item.quantity}</td>
+                                    <td style={{ textAlign: 'right', padding: '2px 0', fontSize: 10 }}>{formatCurrency({ amount: item.unit_cost, currency: receipt.currency })}</td>
+                                    <td style={{ textAlign: 'right', padding: '2px 0', fontSize: 10 }}>{formatCurrency({ amount: item.sub_total, currency: receipt.currency })}</td>
                                 </tr>
                             ))}
                         </tbody>

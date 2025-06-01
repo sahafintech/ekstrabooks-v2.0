@@ -122,6 +122,8 @@ class BusinessSettingsController extends Controller
                 return Inertia::render('Backend/User/Business/Settings/PurchaseReturn', $data);
             case 'pos_settings':
                 return Inertia::render('Backend/User/Business/Settings/PosSettings', $data);
+            case 'payroll':
+                return Inertia::render('Backend/User/Business/Settings/Payroll', $data);
             default:
                 return Inertia::render('Backend/User/Business/Settings/General', $data);
         }
@@ -141,6 +143,25 @@ class BusinessSettingsController extends Controller
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = auth()->user()->id;
         $audit->event = 'Updated Business Settings for ' . $request->activeBusiness->name;
+        $audit->save();
+
+        return back()->with('success', _lang('Saved Successfully'));
+    }
+
+    public function store_payroll_settings(Request $request, $businessId)
+    {
+        $settingsData = $request->except($this->ignoreRequests);
+
+        foreach ($settingsData as $key => $value) {
+            $value = is_array($value) ? json_encode($value) : $value;
+            update_business_option($key, $value, $businessId);
+        }
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Updated Payroll Settings for ' . $request->activeBusiness->name;
         $audit->save();
 
         return back()->with('success', _lang('Saved Successfully'));

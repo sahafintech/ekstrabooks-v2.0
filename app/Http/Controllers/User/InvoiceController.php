@@ -168,6 +168,7 @@ class InvoiceController extends Controller
             ]),
             'customers' => Customer::select('id', 'name')->orderBy('id')->get(),
             'summary' => $summary,
+            'business' => $request->activeBusiness,
         ]);
     }
 

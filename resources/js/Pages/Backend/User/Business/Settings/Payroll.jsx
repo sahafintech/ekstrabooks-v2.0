@@ -11,25 +11,27 @@ import { Label } from "@/Components/ui/label";
 import { toast } from "sonner";
 import InputError from "@/Components/InputError";
 
-export default function General({ business, id, timezones = [], dateFormats = [], languages = [], financial_years = [], activeTab }) {    
+export default function Payroll({ business, id, timezones = [], dateFormats = [], languages = [], financial_years = [], activeTab }) {    
     const { data, setData, post, processing, errors } = useForm({
         // General Settings
-        timezone: business?.system_settings?.find((setting) => setting.name === "timezone")?.value || "Africa/Mogadishu",
-        language: business?.system_settings?.find((setting) => setting.name === "language")?.value || "English---us",
-        date_format: business?.system_settings?.find((setting) => setting.name === "date_format")?.value || "Y-m-d",
-        time_format: business?.system_settings?.find((setting) => setting.name === "time_format")?.value || "24",
-        financial_year: business?.system_settings?.find((setting) => setting.name === "financial_year")?.value || "January,December",
-        period_start_day: business?.system_settings?.find((setting) => setting.name === "period_start_day")?.value || "1",
-        period_end_day: business?.system_settings?.find((setting) => setting.name === "period_end_day")?.value || "31",
-        journal_number: business?.system_settings?.find((setting) => setting.name === "journal_number")?.value || "100001",
+        overtime_rate_multiplier: business?.system_settings?.find((setting) => setting.name === "overtime_rate_multiplier")?.value || "1.5",
+        public_holiday_rate_multiplier: business?.system_settings?.find((setting) => setting.name === "public_holiday_rate_multiplier")?.value || "2",
+        weekly_holiday_rate_multiplier: business?.system_settings?.find((setting) => setting.name === "weekly_holiday_rate_multiplier")?.value || "1.5",
     });
 
     const submitGeneralSettings = (e) => {
         e.preventDefault();
         post(route("business.store_general_settings", id), {
             preserveScroll: true,
+        });
+    };
+
+    const submitPayrollSettings = (e) => {
+        e.preventDefault();
+        post(route("business.store_payroll_settings", id), {
+            preserveScroll: true,
             onSuccess: () => {
-                toast.success("General settings updated successfully");
+                toast.success("Payroll settings updated successfully");
             },
         });
     };
@@ -270,6 +272,70 @@ export default function General({ business, id, timezones = [], dateFormats = []
                                             className="w-full"
                                         />
                                         <InputError message={errors.journal_number} className="mt-1" />
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-start mt-6">
+                                    <Button type="submit" disabled={processing}>
+                                        {processing ? "Saving..." : "Save Changes"}
+                                    </Button>
+                                </div>
+                            </form>
+                        )}
+
+                        {/* Payroll Settings */}
+                        {activeTab === "payroll" && (
+                            <form onSubmit={submitPayrollSettings}>
+                                <h2 className="text-xl font-semibold mb-6">Payroll Settings</h2>
+
+                                <div className="grid grid-cols-12 mb-4">
+                                    <Label htmlFor="overtime_rate_multiplier" className="col-span-3 flex items-center">
+                                        Overtime Rate Multiplier
+                                    </Label>
+                                    <div className="col-span-9">
+                                        <Input
+                                            id="overtime_rate_multiplier"
+                                            type="number"
+                                            step="0.1"
+                                            value={data.overtime_rate_multiplier}
+                                            onChange={(e) => setData("overtime_rate_multiplier", e.target.value)}
+                                            className="w-full"
+                                        />
+                                        <InputError message={errors.overtime_rate_multiplier} className="mt-1" />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-12 mb-4">
+                                    <Label htmlFor="public_holiday_rate_multiplier" className="col-span-3 flex items-center">
+                                        Public Holiday Rate Multiplier
+                                    </Label>
+                                    <div className="col-span-9">
+                                        <Input
+                                            id="public_holiday_rate_multiplier"
+                                            type="number"
+                                            step="0.1"
+                                            value={data.public_holiday_rate_multiplier}
+                                            onChange={(e) => setData("public_holiday_rate_multiplier", e.target.value)}
+                                            className="w-full"
+                                        />
+                                        <InputError message={errors.public_holiday_rate_multiplier} className="mt-1" />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-12 mb-4">
+                                    <Label htmlFor="weekly_holiday_rate_multiplier" className="col-span-3 flex items-center">
+                                        Weekly Holiday Rate Multiplier
+                                    </Label>
+                                    <div className="col-span-9">
+                                        <Input
+                                            id="weekly_holiday_rate_multiplier"
+                                            type="number"
+                                            step="0.1"
+                                            value={data.weekly_holiday_rate_multiplier}
+                                            onChange={(e) => setData("weekly_holiday_rate_multiplier", e.target.value)}
+                                            className="w-full"
+                                        />
+                                        <InputError message={errors.weekly_holiday_rate_multiplier} className="mt-1" />
                                     </div>
                                 </div>
 

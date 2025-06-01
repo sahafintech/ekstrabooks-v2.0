@@ -147,7 +147,7 @@ class DashboardController extends Controller
 				->selectRaw("SUM(transactions.base_currency_amount) as total")
 				->where('dr_cr', 'dr')
 				->when($request->range, function ($query) use ($request) {
-					$query->where('trans_date', '>=', now()->subDays($request->range));
+					$query->where('trans_date', '>=', now()->subDays(intval($request->range)));
 				})
 				->when($request->custom, function ($query) use ($start_date, $end_date) {
 					$query->whereDate('trans_date', '>=', $start_date)
@@ -162,7 +162,7 @@ class DashboardController extends Controller
 				->selectRaw("SUM(transactions.base_currency_amount) as total")
 				->where('dr_cr', 'cr')
 				->when($request->range, function ($query) use ($request) {
-					$query->where('trans_date', '>=', now()->subDays($request->range));
+					$query->where('trans_date', '>=', now()->subDays(intval($request->range)));
 				})
 				->when($request->custom, function ($query) use ($start_date, $end_date) {
 					$query->whereDate('trans_date', '>=', $start_date)
@@ -185,7 +185,7 @@ class DashboardController extends Controller
 				->selectRaw("SUM(transactions.base_currency_amount) as total")
 				->where('dr_cr', 'dr')
 				->when($request->range, function ($query) use ($request) {
-					$query->where('trans_date', '>=', now()->subDays($request->range));
+					$query->where('trans_date', '>=', now()->subDays(intval($request->range)));
 				})
 				->when($request->custom, function ($query) use ($request, $start_date, $end_date) {
 					$query->whereDate('trans_date', '>=', $start_date)
@@ -205,7 +205,7 @@ class DashboardController extends Controller
 				->selectRaw("SUM(transactions.base_currency_amount) as total")
 				->where('dr_cr', 'cr')
 				->when($request->range, function ($query) use ($request) {
-					$query->where('trans_date', '>=', now()->subDays($request->range));
+					$query->where('trans_date', '>=', now()->subDays(intval($request->range)));
 				})
 				->when($request->custom, function ($query) use ($request, $start_date, $end_date) {
 					$query->whereDate('trans_date', '>=', $start_date)
@@ -551,7 +551,7 @@ class DashboardController extends Controller
 				->withSum(['transactions as dr_amount' => function ($query) use ($request, $start_date, $end_date) {
 					$query->where('dr_cr', 'dr')
 						->when($request->range, function ($query) use ($request) {
-							$query->where('trans_date', '>=', now()->subDays($request->range));
+							$query->where('trans_date', '>=', now()->subDays(intval($request->range)));
 						})
 						->when($request->custom, function ($query) use ($start_date, $end_date) {
 							$query->whereDate('trans_date', '>=', $start_date)
@@ -561,7 +561,7 @@ class DashboardController extends Controller
 				->withSum(['transactions as cr_amount' => function ($query) use ($request, $start_date, $end_date) {
 					$query->where('dr_cr', 'cr')
 						->when($request->range, function ($query) use ($request) {
-							$query->where('trans_date', '>=', now()->subDays($request->range));
+							$query->where('trans_date', '>=', now()->subDays(intval($request->range)));
 						})
 						->when($request->custom, function ($query) use ($start_date, $end_date) {
 							$query->whereDate('trans_date', '>=', $start_date)
@@ -580,7 +580,7 @@ class DashboardController extends Controller
 				->withSum(['transactions as dr_amount' => function ($query) use ($request, $start_date, $end_date) {
 					$query->where('dr_cr', 'dr')
 						->when($request->range, function ($query) use ($request) {
-							$query->where('trans_date', '>=', now()->subDays($request->range));
+							$query->where('trans_date', '>=', now()->subDays(intval($request->range)));
 						})
 						->when($request->custom, function ($query) use ($start_date, $end_date) {
 							$query->whereDate('trans_date', '>=', $start_date)
@@ -590,7 +590,7 @@ class DashboardController extends Controller
 				->withSum(['transactions as cr_amount' => function ($query) use ($request, $start_date, $end_date) {
 					$query->where('dr_cr', 'cr')
 						->when($request->range, function ($query) use ($request) {
-							$query->where('trans_date', '>=', now()->subDays($request->range));
+							$query->where('trans_date', '>=', now()->subDays(intval($request->range)));
 						})
 						->when($request->custom, function ($query) use ($start_date, $end_date) {
 							$query->whereDate('trans_date', '>=', $start_date)

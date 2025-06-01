@@ -270,7 +270,23 @@ class BusinessSettingSeeder extends Seeder
                 'name' => 'queue_number',
                 'value' => '1',
                 'business_id' => $this->businessId
-            ]
+            ],
+            // payroll
+            [
+                'name' => 'overtime_rate_multiplier',
+                'value' => '1.5',
+                'business_id' => $this->businessId
+            ],
+            [
+                'name' => 'public_holiday_rate_multiplier',
+                'value' => '2',
+                'business_id' => $this->businessId
+            ],
+            [
+                'name' => 'weekly_rate_multiplier',
+                'value' => '1.5',
+                'business_id' => $this->businessId
+            ],
         ]);
     }
 }
