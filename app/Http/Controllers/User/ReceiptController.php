@@ -1401,8 +1401,8 @@ class ReceiptController extends Controller
                     $transaction->dr_cr       = 'cr';
                     $transaction->transaction_currency    = $request->currency;
                     $transaction->currency_rate = $invoice->exchange_rate;
-                    $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $invoiceItem->sub_total));
-                    $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $invoiceItem->sub_total);
+                    $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $invoiceItem->sub_total / $invoice->exchange_rate));
+                    $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $invoiceItem->sub_total / $invoice->exchange_rate);
                     $transaction->description = _lang('Credit Invoice Income') . ' #' . $invoice->invoice_number;
                     $transaction->ref_id      = $invoice->id;
                     $transaction->ref_type    = 'invoice';

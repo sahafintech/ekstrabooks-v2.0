@@ -674,6 +674,8 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
                             <span>{formatCurrency({ amount: invoice.grand_total, currency: business.currency })}</span>
                           )}
                         </TableCell>
+                        <TableCell className="text-right">{formatCurrency({ amount: invoice.paid })}</TableCell>
+                        <TableCell className="text-right">{formatCurrency({ amount: invoice.grand_total - invoice.paid })}</TableCell>
                         <TableCell>
                           <InvoiceStatusBadge status={invoice.status} />
                         </TableCell>
