@@ -245,9 +245,9 @@ class Transaction extends Model
 
     public function nameWIthTax() {
         if($this->ref_type === 'invoice tax' || $this->ref_type === 'd invoice tax') {
-            return $this->tax->name . ' (' . Invoice::find($this->ref_id)->customer->name . ')';
+            return $this->tax->name . ' (' . Invoice::find($this->ref_id)?->customer?->name . ')';
         }else if($this->ref_type === 'receipt tax') {
-            return $this->tax->name . ' (' . Receipt::find($this->ref_id)->customer->name . ')';
+            return $this->tax->name . ' (' . Receipt::find($this->ref_id)?->customer?->name . ')';
         }
         
         return $this->tax->name;
