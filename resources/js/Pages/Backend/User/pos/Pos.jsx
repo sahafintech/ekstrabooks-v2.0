@@ -7,21 +7,24 @@ import { Button } from "@/Components/ui/button";
 import { Input } from "@/Components/ui/input";
 import Modal from "@/Components/Modal";
 import { ScrollArea } from "@/Components/ui/scroll-area";
-import { Link } from "@inertiajs/react";
+import { Link, usePage } from "@inertiajs/react";
 import { Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useForm } from "@inertiajs/react";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Label } from "@/Components/ui/label";
-import { toast } from "sonner";
 import InputError from "@/Components/InputError";
 import DateTimePicker from "@/Components/DateTimePicker";
+import { Toaster } from "@/Components/ui/toaster";
+import { useToast } from "@/hooks/use-toast";
 
 export default function POS({ products, categories, currencies, accounts, customers, methods, baseCurrency, holdList, todayList, prescriptionProducts, pos_default_currency_change, pos_default_taxes, pos_product_image, taxes }) {
   // State to track which category is currently active
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [lastInputTime, setLastInputTime] = useState(0);
+  const { flash = {} } = usePage().props;
+  const { toast } = useToast();
 
   const { data, setData, post, processing, errors, reset } = useForm({
     customer_id: "",
@@ -47,18 +50,31 @@ export default function POS({ products, categories, currencies, accounts, custom
     taxes: [],
   });
 
+  useEffect(() => {
+    if (flash && flash.success) {
+      toast({
+        title: "Success",
+        description: flash.success,
+      });
+    }
+
+    if (flash && flash.error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: flash.error,
+      });
+    }
+  }, [flash, toast]);
+
   const handleSubmit = () => {
     post(route("receipts.pos_store"), {
       preserveScroll: true,
       preserveState: true,
       onSuccess: () => {
-        toast.success("Invoice saved successfully");
         setShowPaymentModal(false);
         reset();
         setCartItems([]);
-      },
-      onError: () => {
-        toast.error("Failed to save invoice");
       },
     });
   };
@@ -88,13 +104,15 @@ export default function POS({ products, categories, currencies, accounts, custom
       method: "",
       credit_cash: "cash",
     });
-    toast.success("Transaction canceled");
   };
 
   // Function to handle holding the current cart
   const handleHold = () => {
     if (cartItems.length === 0) {
-      toast.error("Cannot hold an empty cart");
+      toast({
+        title: "Error",
+        description: "Cannot hold an empty cart",
+      });
       return;
     }
 
@@ -118,12 +136,8 @@ export default function POS({ products, categories, currencies, accounts, custom
     post(route("hold_pos_invoices.store"), holdData, {
       preserveScroll: true,
       onSuccess: () => {
-        toast.success("Transaction held successfully");
         handleCancel(); // Clear the cart after holding
         setHoldDescription("");
-      },
-      onError: () => {
-        toast.error("Failed to hold transaction");
       },
     });
   };
@@ -176,7 +190,10 @@ export default function POS({ products, categories, currencies, accounts, custom
     });
 
     setShowHoldListModal(false);
-    toast.success("Held transaction loaded");
+    toast({
+      title: "Success",
+      description: "Held transaction loaded",
+    });
   };
 
   // Function to load prescription items into the cart
@@ -185,7 +202,10 @@ export default function POS({ products, categories, currencies, accounts, custom
     handleCancel();
 
     if (!prescriptionProduct.items || prescriptionProduct.items.length === 0) {
-      toast.error("No items found in this prescription");
+      toast({
+        title: "Error",
+        description: "No items found in this prescription",
+      });
       return;
     }
 
@@ -219,7 +239,6 @@ export default function POS({ products, categories, currencies, accounts, custom
     });
 
     setShowPrescriptionsModal(false);
-    toast.success("Prescription items loaded into cart");
   };
 
   // Cart state
@@ -287,14 +306,14 @@ export default function POS({ products, categories, currencies, accounts, custom
   const changeCurrency = () => {
     if (data.currency === baseCurrency.name) {
       // If current currency is base currency, switch to pos_default_currency
-      if (pos_default_currency_change) {
-        setData('currency', pos_default_currency_change)
-        handleCurrencyChange(pos_default_currency_change)
+      if (pos_default_currency_change === data.currency) {
+        setData('currency', baseCurrency.name);
+        handleCurrencyChange(baseCurrency.name);
       }
     } else {
       // If current currency is not base currency, switch back to base currency
-      setData('currency', baseCurrency.name)
-      handleCurrencyChange(baseCurrency.name)
+      setData('currency', baseCurrency.name);
+      handleCurrencyChange(baseCurrency.name);
     }
   }
 
@@ -498,6 +517,7 @@ export default function POS({ products, categories, currencies, accounts, custom
   return (
     // Full screen height layout in a flex column
     <div className="h-screen flex flex-col">
+      <Toaster />
       {/* -------------------------
           TOP BAR: Search + Dialog Buttons
       ------------------------- */}
@@ -591,17 +611,17 @@ export default function POS({ products, categories, currencies, accounts, custom
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {holdList.map((hold, index) => (
-                            <tr key={hold.id || index} className="hover:bg-gray-50">
+                          {holdList.map((hold) => (
+                            <tr key={hold.id} className="hover:bg-gray-50">
                               <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                {hold.id || `Hold-${index + 1}`}
-                                <div className="text-xs text-gray-500">{hold.description || new Date(hold.created_at || new Date())}</div>
+                                {hold.id}
+                                <div className="text-xs text-gray-500">{hold.description}</div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                {hold.customer_name || 'No Customer'}
+                                {hold.customer_name}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                {formatCurrency({ amount: hold.grand_total || 0, currency: hold.currency || baseCurrency.name })}
+                                {formatCurrency({ amount: hold.grand_total, currency: hold.currency })}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 <Button
@@ -672,19 +692,19 @@ export default function POS({ products, categories, currencies, accounts, custom
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {todayList.map((invoice, index) => {
+                          {todayList.map((invoice) => {
                             const customer = customers.find(c => c.id === parseInt(invoice.customer_id));
 
                             return (
-                              <tr key={invoice.id || index} className="hover:bg-gray-50">
+                              <tr key={invoice.id} className="hover:bg-gray-50">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                  {invoice.receipt_number || invoice.invoice_number || `Invoice-${index + 1}`}
+                                  {invoice.receipt_number || invoice.invoice_number}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm">
                                   {customer?.name || 'No Customer'}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                  {formatCurrency({ amount: invoice.grand_total || 0, currency: invoice.currency || baseCurrency.name })}
+                                  {formatCurrency({ amount: invoice.grand_total, currency: invoice.currency })}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                   <Link
