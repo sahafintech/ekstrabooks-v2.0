@@ -640,7 +640,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                     </div>
 
                     <div>
-                      <Label>Product Name *</Label>
+                      <Label>Item or Service Name *</Label>
                       <Input
                         type="text"
                         value={accountItem.product_name || ""}
@@ -658,22 +658,6 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                     </div>
 
                     <div>
-                      <Label>Amount *</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={accountItem.unit_cost}
-                        onChange={(e) => {
-                          const updatedAccounts = [...purchaseAccounts];
-                          updatedAccounts[index].unit_cost = parseFloat(e.target.value);
-                          setPurchaseAccounts(updatedAccounts);
-                          setData("unit_cost", updatedAccounts.map(account => account.unit_cost));
-                        }}
-                      />
-                    </div>
-
-                    <div>
                       <Label>Quantity *</Label>
                       <Input
                         type="number"
@@ -687,6 +671,22 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                             ...purchaseItems.map(item => item.quantity),
                             ...updatedAccounts.map(account => account.quantity)
                           ]);
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <Label>Amount *</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={accountItem.unit_cost}
+                        onChange={(e) => {
+                          const updatedAccounts = [...purchaseAccounts];
+                          updatedAccounts[index].unit_cost = parseFloat(e.target.value);
+                          setPurchaseAccounts(updatedAccounts);
+                          setData("unit_cost", updatedAccounts.map(account => account.unit_cost));
                         }}
                       />
                     </div>
