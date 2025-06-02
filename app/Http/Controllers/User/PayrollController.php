@@ -510,7 +510,7 @@ class PayrollController extends Controller
                     ->whereNotNull('account_id')
                     ->get();
 
-                if ($payslip->status !== 3 && $payslip->status !== 4) {
+                if ($payslip->status == 4) {
                     foreach ($deductions as $deduction) {
                         $transaction = new Transaction();
                         $transaction->trans_date = Carbon::parse($request->input('payment_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
@@ -527,21 +527,19 @@ class PayrollController extends Controller
                     }
                 }
 
-                if ($payslip->status !== 3 && $payslip->status !== 4) {
-                    if ($payslip->advance > 0) {
-                        $transaction                          = new Transaction();
-                        $transaction->trans_date              = Carbon::parse($request->input('payment_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-                        $transaction->account_id              = $request->advance_account_id;
-                        $transaction->dr_cr                   = 'cr';
-                        $transaction->transaction_amount      = $payslip->advance;
-                        $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                        $transaction->base_currency_amount    = $payslip->advance;
-                        $transaction->description             = _lang('Staff Salary Advance ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
-                        $transaction->ref_id                  = $payslip->employee_id;
-                        $transaction->ref_type                = 'payslip';
-                        $transaction->employee_id             = $payslip->employee_id;
-                        $transaction->save();
-                    }
+                if ($payslip->status == 4 && $payslip->advance > 0) {
+                    $transaction                          = new Transaction();
+                    $transaction->trans_date              = Carbon::parse($request->input('payment_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+                    $transaction->account_id              = $request->advance_account_id;
+                    $transaction->dr_cr                   = 'cr';
+                    $transaction->transaction_amount      = $payslip->advance;
+                    $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
+                    $transaction->base_currency_amount    = $payslip->advance;
+                    $transaction->description             = _lang('Staff Salary Advance ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
+                    $transaction->ref_id                  = $payslip->employee_id;
+                    $transaction->ref_type                = 'payslip';
+                    $transaction->employee_id             = $payslip->employee_id;
+                    $transaction->save();
                 }
             }
 
