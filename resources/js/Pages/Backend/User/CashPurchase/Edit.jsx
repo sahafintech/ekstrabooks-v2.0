@@ -16,7 +16,17 @@ import DateTimePicker from "@/Components/DateTimePicker";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 
 export default function Edit({ vendors = [], products = [], bill, currencies = [], taxes = [], accounts = [], credit_account, inventory, taxIds, theAttachments, projects = [], cost_codes = [], construction_module }) {
-  const [purchaseItems, setPurchaseItems] = useState([]);
+  const [purchaseItems, setPurchaseItems] = useState([{
+    product_id: "",
+    product_name: "",
+    description: "",
+    quantity: 1,
+    unit_cost: 0,
+    account_id: inventory.id,
+    project_id: null,
+    project_task_id: null,
+    cost_code_id: null
+  }]);
   const [purchaseAccounts, setPurchaseAccounts] = useState([]);
   const [exchangeRate, setExchangeRate] = useState(1);
   const [baseCurrencyInfo, setBaseCurrencyInfo] = useState(null);
@@ -93,9 +103,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
     setData("currency", bill.currency);
     setData("exchange_rate", bill.exchange_rate);
     setExchangeRate(bill.exchange_rate);
-    // …and your dates, vendor, title, etc…
   }, []);
-
 
   // ------------------------------------------------
   // Keep Inertia form arrays in sync with our two local lists
@@ -182,7 +190,6 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
         if (!updatedItems[index].description) {
           updatedItems[index].description = product.description || "";
         }
-      } else {
       }
     }
 
@@ -483,7 +490,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <div className="md:w-1/2 w-full">
                   <SearchableCombobox
-                    className="mt-1" coun
+                    className="mt-1"
                     options={accounts.map(account => ({
                       id: account.id,
                       name: account.account_name
@@ -708,6 +715,24 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                         }}
                       />
                     </div>
+
+                    <div>
+                      <Label>Quantity *</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={accountItem.quantity}
+                        onChange={(e) => {
+                          const updatedAccounts = [...purchaseAccounts];
+                          updatedAccounts[index].quantity = parseInt(e.target.value);
+                          setPurchaseAccounts(updatedAccounts);
+                          setData("quantity", [
+                            ...purchaseItems.map(item => item.quantity),
+                            ...updatedAccounts.map(account => account.quantity)
+                          ]);
+                        }}
+                      />
+                    </div>
                   </div>
 
                   {/* Second Row */}
@@ -822,7 +847,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
             <SidebarSeparator className="my-4" />
 
             <div className="grid grid-cols-12 mt-2">
-              <Label htmlFor="discount_type" className="md:col-span-2 col-span-12">
+              <Label htmlFor="taxes" className="md:col-span-2 col-span-12">
                 Tax
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
@@ -1016,9 +1041,9 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
 
             <div className="mt-6 space-y-2">
               <div className="space-y-2">
-                <div className="text-sm">Subtotal: {calculateSubtotal()}</div>
-                <div className="text-sm">Taxes: {calculateTaxes()}</div>
-                <div className="text-sm">Discount: {calculateDiscount()}</div>
+                <div className="text-sm">Subtotal: {Number(calculateSubtotal()).toFixed(2)}</div>
+                <div className="text-sm">Taxes: {Number(calculateTaxes()).toFixed(2)}</div>
+                <div className="text-sm">Discount: {Number(calculateDiscount()).toFixed(2)}</div>
                 {renderTotal()}
               </div>
 
@@ -1028,8 +1053,19 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                   variant="secondary"
                   onClick={() => {
                     reset();
-                    setPurchaseItems([]);
+                    setPurchaseItems([{
+                      product_id: "",
+                      product_name: "",
+                      description: "",
+                      quantity: 1,
+                      unit_cost: 0,
+                      account_id: inventory.id,
+                      project_id: null,
+                      project_task_id: null,
+                      cost_code_id: null
+                    }]);
                     setPurchaseAccounts([]);
+                    setAttachments([]);
                   }}
                 >
                   Reset

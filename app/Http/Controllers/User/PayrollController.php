@@ -650,7 +650,9 @@ class PayrollController extends Controller
         $audit->save();
 
         // delete transactions
-        $transactions = Transaction::where('ref_id', $payroll->employee_id)->where('ref_type', 'payslip')->get();
+        $transactions = Transaction::where('ref_id', $payroll->employee_id)->where('ref_type', 'payslip')
+            ->where('description', 'like', '%' . $payroll->month . '/' . $payroll->year . '%')
+            ->get();
         foreach ($transactions as $transaction) {
             $transaction->delete();
         }
@@ -788,7 +790,7 @@ class PayrollController extends Controller
 
         foreach ($payslips as $payslip) {
             // delete transactions
-            $transactions = Transaction::where('ref_id', $payslip->employee_id)->where('ref_type', 'payslip')->get();
+            $transactions = Transaction::where('ref_id', $payslip->employee_id)->where('ref_type', 'payslip')->where('description', 'like', '%' . $payslip->month . '/' . $payslip->year . '%')->get();
             foreach ($transactions as $transaction) {
                 $transaction->delete();
             }
