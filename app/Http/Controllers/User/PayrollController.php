@@ -488,18 +488,20 @@ class PayrollController extends Controller
                 $payslip->transaction_id = $transaction->id;
                 $payslip->save();
 
-                $transaction                          = new Transaction();
-                $transaction->trans_date              = Carbon::parse($request->input('payment_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-                $transaction->account_id              = $request->debit_account_id;
-                $transaction->dr_cr                   = 'dr';
-                $transaction->transaction_amount      = $payment['amount'];
-                $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                $transaction->base_currency_amount    = $payment['amount'];
-                $transaction->description             = _lang('Staff Salary ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
-                $transaction->ref_id                  = $payslip->employee_id;
-                $transaction->ref_type                = 'payslip';
-                $transaction->employee_id             = $payslip->employee_id;
-                $transaction->save();
+                if ($payslip->status == 4) {
+                    $transaction                          = new Transaction();
+                    $transaction->trans_date              = Carbon::parse($request->input('payment_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+                    $transaction->account_id              = $request->debit_account_id;
+                    $transaction->dr_cr                   = 'dr';
+                    $transaction->transaction_amount      = $payslip->current_salary;
+                    $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
+                    $transaction->base_currency_amount    = $payslip->current_salary;
+                    $transaction->description             = _lang('Staff Salary ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
+                    $transaction->ref_id                  = $payslip->employee_id;
+                    $transaction->ref_type                = 'payslip';
+                    $transaction->employee_id             = $payslip->employee_id;
+                    $transaction->save();
+                }
 
                 // Process deductions with specific accounts
                 $deductions = SalaryBenefit::whereHas('employee_benefit', function ($query) use ($payslip) {
