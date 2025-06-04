@@ -3,8 +3,7 @@
 namespace App\Imports;
 
 use App\Models\Account;
-use App\Models\Brand;
-use App\Models\Category;
+use App\Models\Brands;
 use App\Models\Currency;
 use App\Models\Product;
 use App\Models\ProductUnit;
@@ -81,7 +80,7 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
                     'expiry_date' => $expiry_date ?? null,
                     'code' => $row['code'] ?? null,
                     'reorder_point' => $row['reorder_point'] ?? null,
-                    'brand_id' => Brand::where('name', $row['brand'])->first()->id ?? null,
+                    'brand_id' => Brands::where('name', $row['brand'])->first()->id ?? null,
                     'sub_category_id' => SubCategory::where('name', $row['sub_category'])->first()->id ?? null,
                 ]);
 
@@ -113,6 +112,11 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
                     $transaction->save();
                 }
             } else {
+                $previous_initial_stock = $product->intial_stock ?? 0;
+                $new_initial_stock = $row['intial_stock'] ?? 0;
+
+                $stock_difference = $new_initial_stock - $previous_initial_stock;
+
                 $product->update([
                     'type' => $row['type'],
                     'product_unit_id' => ProductUnit::where('unit', 'like', '%' . $row['unit'] . '%')->first()->id ?? null,
@@ -120,7 +124,7 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
                     'descriptions' => $row['descriptions'],
                     'stock_management' => $row['stock_management'],
                     'intial_stock' => $row['intial_stock'] ?? 0,
-                    'stock' => $product->stock + $row['intial_stock'] ?? 0,
+                    'stock' => $product->stock + max($stock_difference, 0),
                     'allow_for_selling' => $row['allow_for_selling'],
                     'income_account_id' => get_account($row['income_account_name'])->id,
                     'allow_for_purchasing' => $row['allow_for_purchasing'],
@@ -129,20 +133,20 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
                     'expiry_date' => $expiry_date,
                     'code' => $row['code'] ?? null,
                     'reorder_point' => $row['reorder_point'] ?? null,
-                    'brand_id' => Brand::where('name', $row['brand'])->first()->id ?? null,
+                    'brand_id' => Brands::where('name', $row['brand'])->first()->id ?? null,
                     'sub_category_id' => SubCategory::where('name', $row['sub_category'])->first()->id ?? null,
                 ]);
 
-                if ($row['intial_stock'] > 0) {
+                if ($stock_difference > 0) {
                     $transaction              = new Transaction();
                     $transaction->trans_date  = now()->format('Y-m-d H:i:s');
                     $transaction->account_id  = get_account('Inventory')->id;
                     $transaction->dr_cr       = 'dr';
                     $transaction->transaction_currency    = request()->activeBusiness->currency;
                     $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                    $transaction->base_currency_amount    = $product->purchase_cost * $row['intial_stock'];
-                    $transaction->transaction_amount      = $product->purchase_cost * $row['intial_stock'];
-                    $transaction->description = $product->name . ' Addition Stock #' . $row['intial_stock'];
+                    $transaction->base_currency_amount    = $product->purchase_cost * $stock_difference;
+                    $transaction->transaction_amount      = $product->purchase_cost * $stock_difference;
+                    $transaction->description = $product->name . ' Addition Stock #' . $stock_difference;
                     $transaction->ref_id      = $product->id;
                     $transaction->ref_type    = 'product';
                     $transaction->save();
@@ -153,9 +157,9 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
                     $transaction->dr_cr       = 'cr';
                     $transaction->transaction_currency    = request()->activeBusiness->currency;
                     $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                    $transaction->base_currency_amount    = $product->purchase_cost * $row['intial_stock'];
-                    $transaction->transaction_amount      = $product->purchase_cost * $row['intial_stock'];
-                    $transaction->description = $product->name . ' Addition Stock #' . $row['intial_stock'];
+                    $transaction->base_currency_amount    = $product->purchase_cost * $stock_difference;
+                    $transaction->transaction_amount      = $product->purchase_cost * $stock_difference;
+                    $transaction->description = $product->name . ' Addition Stock #' . $stock_difference;
                     $transaction->ref_id      = $product->id;
                     $transaction->ref_type    = 'product';
                     $transaction->save();
@@ -181,8 +185,8 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
             'status' => 'required|in:1,0',
             'expiry_date' => 'nullable',
             'code' => 'nullable',
-            'brand' => 'nullable',
-            'sub_category' => 'nullable',
+            'brand' => 'nullable|exists:brands,name',
+            'sub_category' => 'nullable|exists:sub_categories,name',
             'image' => 'nullable',
         ];
     }

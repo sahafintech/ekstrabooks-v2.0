@@ -8,7 +8,6 @@ use App\Imports\ProductImport;
 use App\Models\Account;
 use App\Models\AuditLog;
 use App\Models\Brands;
-use App\Models\Category;
 use App\Models\Currency;
 use App\Models\Product;
 use App\Models\ProductUnit;
@@ -251,9 +250,7 @@ class ProductController extends Controller
     public function show($id)
     {
         $activeTab = request()->get('tab', 'details');
-        $product = Product::with('income_account')
-            ->with('expense_account')
-            ->with('product_unit')
+        $product = Product::with(['income_account', 'expense_account', 'product_unit', 'brand', 'category'])
             ->withSum('invoice_items', 'quantity')
             ->withSum('invoice_items', 'sub_total')
             ->withSum('purchase_items', 'quantity')

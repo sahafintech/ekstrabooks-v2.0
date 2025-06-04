@@ -5,7 +5,7 @@ let _settings = {
     thousandSep:     ',',
     baseCurrency:    'USD',
     currencyPosition:'left',
-    date_format:     'Y-m-d',
+    date_format:     'd/m/Y',
   };
   
   export function initSettings(newSettings) {

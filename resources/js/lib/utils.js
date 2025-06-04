@@ -1,8 +1,8 @@
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge"
-import { format as formatDateFns } from 'date-fns';
 import * as chrono from 'chrono-node';
 import { getSettings } from './settings';
+import { parse } from 'date-fns';
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -139,19 +139,32 @@ const phpToDateFnsFormat = (phpFmt) => {
 export function parseDateObject(dateString) {
   if (!dateString) return null;
 
-  // Try chrono first (it returns a JS Date or null)
-  let date = chrono.parseDate(dateString);
+  const settings = getSettings();
+  const dateFormat = phpToDateFnsFormat(settings.date_format);
 
-  // Fallback to native Date if chrono couldn't figure it out
-  if (!date || isNaN(date)) {
+  try {
+    // First try parsing with the business's date format
+    const parsedDate = parse(dateString, dateFormat, new Date());
+    if (!isNaN(parsedDate)) {
+      return parsedDate;
+    }
+
+    // Fallback to chrono if the format doesn't match
+    let date = chrono.parseDate(dateString);
+    if (date && !isNaN(date)) {
+      return date;
+    }
+
+    // Last resort: try native Date
     date = new Date(dateString);
-  }
+    if (!isNaN(date)) {
+      return date;
+    }
 
-  // If still invalid, log and return null
-  if (isNaN(date)) {
     console.error('Invalid date:', dateString);
     return null;
+  } catch (error) {
+    console.error('Error parsing date:', error);
+    return null;
   }
-
-  return date;
 }

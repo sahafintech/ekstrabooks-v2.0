@@ -10,12 +10,13 @@ use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
 
-class InventoryAdjustmentImport implements ToCollection, WithHeadingRow, WithValidation
+class InventoryAdjustmentImport implements ToCollection, WithHeadingRow, WithValidation, SkipsEmptyRows
 {
 
     public function collection(Collection $rows)
@@ -106,12 +107,12 @@ class InventoryAdjustmentImport implements ToCollection, WithHeadingRow, WithVal
     public function rules(): array
     {
         return [
-            'adjustment_date' => ['required', 'date'],
-            'product_name' => ['required', 'exists:products,name'],
-            'account_name' => ['required', 'exists:accounts,account_name'],
-            'quantity_on_hand' => ['required', 'numeric'],
-            'adjusted_quantity' => ['required', 'numeric'],
-            'description' => ['nullable', 'string'],
+            'adjustment_date' => 'required',
+            'product_name' => 'required|exists:products,name',
+            'account_name' => 'required|exists:accounts,account_name',
+            'quantity_on_hand' => 'required',
+            'adjusted_quantity' => 'required',
+            'description' => 'nullable',
         ];
     }
 }

@@ -56,7 +56,7 @@ class Product extends Model {
     }
 
     public function category() {
-        return $this->belongsTo(SubCategory::class)->withDefault();
+        return $this->belongsTo(SubCategory::class, 'sub_category_id', 'id')->withDefault();
     }
 
     public function brand() {
