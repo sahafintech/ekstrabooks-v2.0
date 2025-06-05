@@ -931,9 +931,6 @@ class ReportController extends Controller
 
 			$transactions = $query->paginate($per_page);
 
-			$base_currency = $request->activeBusiness->currency;
-			$business_name = $request->activeBusiness->name;
-
 			return Inertia::render('Backend/User/Reports/GeneralJournal', [
 				'transactions' => $transactions->getCollection()->map(function ($transaction) {
 					$transaction->payee_name = $transaction->payee_name;
@@ -941,8 +938,8 @@ class ReportController extends Controller
 				}),
 				'date1' => $date1,
 				'date2' => $date2,
-				'base_currency' => $base_currency,
-				'business_name' => $business_name,
+				'base_currency' => $request->activeBusiness->currency,
+				'business_name' => $request->activeBusiness->name,
 				'meta' => [
 					'current_page' => $transactions->currentPage(),
 					'from' => $transactions->firstItem(),
@@ -957,6 +954,8 @@ class ReportController extends Controller
 					'search' => $search,
 					'sorting' => $sorting,
 				],
+				'total_debit' => Transaction::where('dr_cr', 'dr')->whereRaw("date(transactions.trans_date) >= '$date1' AND date(transactions.trans_date) <= '$date2'")->sum('base_currency_amount'),
+				'total_credit' => Transaction::where('dr_cr', 'cr')->whereRaw("date(transactions.trans_date) >= '$date1' AND date(transactions.trans_date) <= '$date2'")->sum('base_currency_amount'),
 			]);
 		} else {
 			@ini_set('max_execution_time', 0);
@@ -1004,15 +1003,12 @@ class ReportController extends Controller
 
 			$transactions = $query->paginate($per_page);
 
-			$base_currency = $request->activeBusiness->currency;
-			$business_name = $request->activeBusiness->name;
-
 			return Inertia::render('Backend/User/Reports/GeneralJournal', [
 				'transactions' => $transactions->items(),
 				'date1' => $date1,
 				'date2' => $date2,
-				'business_name' => $business_name,
-				'base_currency' => $base_currency,
+				'base_currency' => $request->activeBusiness->currency,
+				'business_name' => $request->activeBusiness->name,
 				'meta' => [
 					'current_page' => $transactions->currentPage(),
 					'from' => $transactions->firstItem(),
@@ -1027,6 +1023,8 @@ class ReportController extends Controller
 					'search' => $search,
 					'sorting' => $sorting,
 				],
+				'total_debit' => Transaction::where('dr_cr', 'dr')->whereRaw("date(transactions.trans_date) >= '$date1' AND date(transactions.trans_date) <= '$date2'")->sum('base_currency_amount'),
+				'total_credit' => Transaction::where('dr_cr', 'cr')->whereRaw("date(transactions.trans_date) >= '$date1' AND date(transactions.trans_date) <= '$date2'")->sum('base_currency_amount'),
 			]);
 		}
 	}

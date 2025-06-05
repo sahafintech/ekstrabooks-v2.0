@@ -259,6 +259,13 @@ export default function DashboardUser({
                                                 onClick={() => {
                                                     setIsCustom(false);
                                                     setSelectedRange("all");
+                                                    router.visit(route("dashboard.index"), {
+                                                        preserveState: true,
+                                                        preserveScroll: true,
+                                                        data: {
+                                                            range: "all",
+                                                        },
+                                                    });
                                                 }}
                                             >
                                                 Clear

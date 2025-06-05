@@ -34,6 +34,8 @@ export default function GeneralJournal({
     base_currency,
     business_name,
     filters = {},
+    total_debit,
+    total_credit,
 }) {
     const [search, setSearch] = useState(filters.search || "");
     const [perPage, setPerPage] = useState(50);
@@ -510,20 +512,42 @@ export default function GeneralJournal({
                                                 "base_currency_amount"
                                             )}
                                         </TableHead>
+                                        <TableHead className="!text-[10px]">
+                                            Difference
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     <TableRow>
                                         <TableCell colSpan={10}></TableCell>
                                         <TableCell>
-                                            {formatCurrency(transactions.reduce((sum, transaction) => 
-                                                sum + (transaction.dr_cr === "dr" ? transaction.base_currency_amount : 0), 0
-                                            ))}
+                                            {formatCurrency({
+                                                amount: total_debit,
+                                            })}
                                         </TableCell>
                                         <TableCell>
-                                            {formatCurrency(transactions.reduce((sum, transaction) => 
-                                                sum + (transaction.dr_cr === "cr" ? transaction.base_currency_amount : 0), 0
-                                            ))}
+                                            {formatCurrency({
+                                                amount: total_credit,
+                                            })}
+                                        </TableCell>
+                                        <TableCell>
+                                            {total_debit - total_credit !== 0 ? (
+                                            <span className="text-red-500">
+                                                {formatCurrency({
+                                                    amount:
+                                                        total_debit -
+                                                        total_credit,
+                                                    })}
+                                                </span>
+                                            ) : (
+                                                <span className="text-green-500">
+                                                    {formatCurrency({
+                                                        amount:
+                                                            total_debit -
+                                                            total_credit,
+                                                    })}
+                                                </span>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                     {transactions.length > 0 ? (
