@@ -291,7 +291,14 @@ export default function List({ receipts = [], meta = {}, filters = {}, customers
     setCurrentPage(page);
     router.get(
       route("receipts.index"),
-      { search, page, per_page: perPage, sorting },
+      { 
+        search, 
+        page, 
+        per_page: perPage, 
+        sorting,
+        customer_id: selectedCustomer,
+        date_range: dateRange
+      },
       { preserveState: true }
     );
   };

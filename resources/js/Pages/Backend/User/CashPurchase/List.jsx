@@ -459,7 +459,15 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
     setCurrentPage(page);
     router.get(
       route("cash_purchases.index"),
-      { search, page, per_page: perPage },
+      { 
+        search, 
+        page, 
+        per_page: perPage,
+        vendor_id: selectedVendor,
+        date_range: dateRange,
+        status: selectedStatus,
+        sorting: sorting
+      },
       { preserveState: true }
     );
   };

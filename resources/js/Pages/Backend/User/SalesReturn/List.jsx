@@ -420,7 +420,15 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
         setCurrentPage(page);
         router.get(
             route("sales_returns.index"),
-            { search, page, per_page: perPage },
+            { 
+                search, 
+                page, 
+                per_page: perPage,
+                sorting,
+                customer_id: selectedCustomer,
+                date_range: dateRange,
+                status: selectedStatus
+            },
             { preserveState: true }
         );
     };

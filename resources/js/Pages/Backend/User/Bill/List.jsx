@@ -591,6 +591,7 @@ export default function List({
                 date_range: dateRange,
                 approval_status: selectedApprovalStatus,
                 status: selectedBillStatus,
+                sorting: sorting
             },
             { preserveState: true }
         );
@@ -963,9 +964,8 @@ export default function List({
                                         </TableHead>
                                         <TableHead
                                             className="cursor-pointer text-right"
-                                            onClick={() => handleSort("due")}
                                         >
-                                            Due {renderSortIcon("due")}
+                                            Due
                                         </TableHead>
                                         <TableHead
                                             className="cursor-pointer"

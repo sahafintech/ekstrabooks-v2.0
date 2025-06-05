@@ -165,7 +165,14 @@ export default function List({ payments = [], meta = {}, filters = {}, customers
         setCurrentPage(page);
         router.get(
             route("receive_payments.index"),
-            { search, page, per_page: perPage },
+            { 
+                search, 
+                page, 
+                per_page: perPage,
+                customer_id: selectedCustomer,
+                date_range: dateRange,
+                sorting
+            },
             { preserveState: true }
         );
     };

@@ -421,7 +421,15 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
         setCurrentPage(page);
         router.get(
             route("purchase_returns.index"),
-            { search, page, per_page: perPage },
+            { 
+                search,
+                page,
+                per_page: perPage,
+                vendor_id: selectedVendor,
+                date_range: dateRange,
+                status: selectedStatus,
+                sorting: sorting
+            },
             { preserveState: true }
         );
     };

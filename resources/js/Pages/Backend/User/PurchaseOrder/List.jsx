@@ -564,7 +564,14 @@ export default function List({
         setCurrentPage(page);
         router.get(
             route("purchase_orders.index"),
-            { search, page, per_page: perPage },
+            { 
+                search,
+                page,
+                per_page: perPage,
+                vendor_id: selectedVendor,
+                date_range: dateRange,
+                sorting: sorting
+            },
             { preserveState: true }
         );
     };

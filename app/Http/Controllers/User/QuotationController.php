@@ -91,8 +91,10 @@ class QuotationController extends Controller
 
         // Filter by date range
         if ($request->has('date_range') && $request->date_range) {
-            $query->where('quotation_date', '>=', $request->date_range[0])
-                ->orWhere('quotation_date', '<=', $request->date_range[1]);
+            $query->where(function($q) use ($request) {
+                $q->where('quotation_date', '>=', $request->date_range[0])
+                  ->where('quotation_date', '<=', $request->date_range[1]);
+            });
         }
 
         // Filter by status
