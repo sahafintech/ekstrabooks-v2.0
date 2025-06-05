@@ -32,7 +32,7 @@ import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import InputError from "@/Components/InputError";
 import RichTextEditor from "@/Components/RichTextEditor";
 import { QRCodeSVG } from 'qrcode.react';
-
+import { Badge } from "@/Components/ui/badge";
 export default function View({ bill, attachments, decimalPlace, email_templates }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
@@ -76,6 +76,29 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
           });
         }
       }, [flash, toast]);
+
+      const BillStatusBadge = ({ status }) => {
+        const statusMap = {
+            0: {
+                label: "Active",
+                className: "text-blue-600",
+            },
+            1: {
+                label: "Partial Paid",
+                className: "text-yellow-600",
+            },
+            2: {
+                label: "Paid",
+                className: "text-green-600",
+            },
+        };
+    
+        return (
+            <Badge variant="outline" className={statusMap[status].className}>
+                {statusMap[status].label}: (Paid {formatCurrency({ amount: bill.paid, currency: bill.currency })})
+            </Badge>
+        );
+    };
 
     const handleEmailInvoice = () => {
         setIsEmailModalOpen(true);
@@ -441,6 +464,7 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
                                         {bill.order_number && (
                                             <p><span className="font-medium">Order Number:</span> {bill.order_number}</p>
                                         )}
+                                        <BillStatusBadge status={bill.status} />
                                     </div>
                                     <div className="mt-4 md:flex md:justify-end">
                                         <QRCodeSVG 

@@ -27,6 +27,7 @@ import { Table, TableBody, TableHeader, TableRow, TableHead, TableCell } from "@
 import { QRCodeSVG } from 'qrcode.react';
 import Modal from "@/Components/Modal";
 import { Input } from "@/Components/ui/input";
+import { Badge } from "@/Components/ui/badge";
 
 export default function View({ bill, attachments, decimalPlace }) {
     const [isLoading, setIsLoading] = useState({
@@ -199,6 +200,11 @@ export default function View({ bill, attachments, decimalPlace }) {
                                         <p><span className="font-medium">Due Date:</span> {bill.due_date}</p>
                                         {bill.order_number && (
                                             <p><span className="font-medium">Order Number:</span> {bill.order_number}</p>
+                                        )}
+                                        {bill.paid > 0 && (
+                                            <Badge variant="outline" className="mt-2 text-green-600">
+                                                Paid: {formatCurrency({ amount: bill.paid, currency: bill.currency })}
+                                            </Badge>
                                         )}
                                     </div>
                                     <div className="mt-4 md:flex md:justify-end">
