@@ -150,11 +150,22 @@ class JournalController extends Controller
             }
         }
 
-        $currentTime = Carbon::now();
+        foreach ($request->journal_entries as $entry) {
+            if ($entry['account_id'] == null) {
+                return redirect()->back()->with('error', _lang('Please select an account'));
+            }
 
-        if ($request->journal_entries[0]['account_id'] == 0) {
-            return redirect()->back()->with('error', _lang('Choose At Least one account'));
+            if ($entry['debit'] == null && $entry['credit'] == null) {
+                return redirect()->back()->with('error', _lang('Please enter a debit or credit amount'));
+            }
+
+            if ($entry['date'] == null) {
+                return redirect()->back()->with('error', _lang('Please select a date'));
+            }
+            
         }
+
+        $currentTime = Carbon::now();
 
         $journal = new Journal();
         $journal->date = Carbon::parse($request->input('date'))->format('Y-m-d');

@@ -8,24 +8,34 @@ import { Input } from "@/Components/ui/input";
 import { Textarea } from "@/Components/ui/textarea";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { useToast } from "@/hooks/use-toast";
+import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { PlusCircle, Trash, AlertCircle, CheckCircle2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/Components/ui/alert";
+import { useEffect } from "react";
 
-export default function Create({
-    currencies = [],
-    accounts = [],
-    customers = [],
-    vendors = [],
-    journal_number,
-    base_currency,
-    projects = [],
-    cost_codes = [],
-    construction_module,
-}) {
+export default function Create({currencies = [], accounts = [], customers = [], vendors = [], journal_number, base_currency, projects = [], cost_codes = [], construction_module}) {
     const { toast } = useToast();
+    const { flash } = usePage().props;
+
+    useEffect(() => {
+        if (flash && flash.success) {
+          toast({
+            title: "Success",
+            description: flash.success,
+          });
+        }
+    
+        if (flash && flash.error) {
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: flash.error,
+          });
+        }
+      }, [flash, toast]);
 
     const { data, setData, post, processing, errors } = useForm({
         date: new Date(),
@@ -92,12 +102,7 @@ export default function Create({
         e.preventDefault();
 
         post(route("journals.store"), {
-            onSuccess: () => {
-                toast({
-                    title: "Success",
-                    description: "Journal entry created successfully",
-                });
-            },
+            onSuccess: () => {},
         });
     };
 
@@ -160,6 +165,7 @@ export default function Create({
     return (
         <AuthenticatedLayout>
             <SidebarInset>
+                <Toaster />
                 <div className="main-content">
                     <PageHeader
                         page="Journals"

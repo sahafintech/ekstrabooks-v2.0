@@ -423,12 +423,12 @@ class InventoryAdjustmentController extends Controller
 
     public function import_adjustments(Request $request)
     {
-        return $request;
         $request->validate([
-            'adjustments_file' => 'required|mimes:xls,xlsx',
+            'adjustments_file' => 'required|mimes:xls,xlsx,csv',
         ]);
 
-        Excel::import(new InventoryAdjustmentImport, $request->file('adjustments_file'));
+        try {
+            Excel::import(new InventoryAdjustmentImport, $request->file('adjustments_file'));
 
         // audit log
         $audit = new AuditLog();
@@ -437,7 +437,10 @@ class InventoryAdjustmentController extends Controller
         $audit->event = 'Imported Inventory Adjustments';
         $audit->save();
 
-        return redirect()->route('inventory_adjustments.index')->with('success', _lang('Inventory Adjustments Imported'));
+            return redirect()->route('inventory_adjustments.index')->with('success', _lang('Inventory Adjustments Imported'));
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', _lang('An error occurred: ') . $e->getMessage());
+        }
     }
 
     /**

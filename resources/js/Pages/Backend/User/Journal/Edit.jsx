@@ -1,4 +1,4 @@
-import { Link, useForm } from "@inertiajs/react";
+import { Link, useForm, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -8,11 +8,13 @@ import { Input } from "@/Components/ui/input";
 import { Textarea } from "@/Components/ui/textarea";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { useToast } from "@/hooks/use-toast";
+import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { PlusCircle, Trash, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/Components/ui/alert";
+import { useEffect } from "react";
 
 export default function Edit({
     currencies = [],
@@ -26,6 +28,23 @@ export default function Edit({
     construction_module,
 }) {
     const { toast } = useToast();
+    const { flash } = usePage().props;
+    useEffect(() => {
+        if (flash && flash.success) {
+          toast({
+            title: "Success",
+            description: flash.success,
+          });
+        }
+    
+        if (flash && flash.error) {
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: flash.error,
+          });
+        }
+      }, [flash, toast]);
 
     const { data, setData, post, processing, errors } = useForm({
         date: parseDateObject(journal.date),
@@ -102,12 +121,7 @@ export default function Edit({
         e.preventDefault();
 
         post(route("journals.update", journal.id), {
-            onSuccess: () => {
-                toast({
-                    title: "Success",
-                    description: "Journal entry updated successfully",
-                });
-            },
+            onSuccess: () => {},
         });
     };
 
@@ -170,6 +184,7 @@ export default function Edit({
     return (
         <AuthenticatedLayout>
             <SidebarInset>
+                <Toaster />
                 <div className="main-content">
                     <PageHeader
                         page="Journals"
