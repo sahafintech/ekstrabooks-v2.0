@@ -301,7 +301,7 @@ export function StaffSidebar(props) {
                 isActive: url.startsWith(prescriptionsBase),
             });
         }
-        if (perms.has("deffered_invoices.index")) {
+        if (userPackage.deffered_invoice === 1 && perms.has("deffered_invoices.index")) {
             items.push({
                 title: "Deferred Invoice",
                 url: route("deffered_invoices.index"),

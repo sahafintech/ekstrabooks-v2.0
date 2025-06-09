@@ -255,11 +255,11 @@ export function UserSidebar({ ...props }) {
                     url: route("prescriptions.index"),
                     isActive: url.startsWith(prescriptionsBase),
                 }] : []),
-                {
+                ...(userPackage.deffered_invoice === 1 ? [{
                     title: "Deferred Invoice",
                     url: route("deffered_invoices.index"),
                     isActive: url.startsWith(deferredInvoicesBase),
-                },
+                }] : []),
                 {
                     title: "Received Payment",
                     url: route("receive_payments.index"),

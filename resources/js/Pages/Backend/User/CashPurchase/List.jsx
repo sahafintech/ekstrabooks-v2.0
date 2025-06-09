@@ -257,12 +257,12 @@ const SummaryCards = ({ summary = {} }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       {cards.map((card, index) => (
-        <div key={index} className="bg-white rounded-lg shadow-sm p-4">
+        <div key={index} className="bg-gray-100 rounded-lg shadow-sm p-4">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <h3 className="text-sm font-medium">
+            <h3 className="text-lg font-medium">
               {card.title}
             </h3>
-            <card.icon className={`h-4 w-4 ${card.iconColor}`} />
+            <card.icon className={`h-8 w-8 ${card.iconColor}`} />
           </div>
           <div className="text-2xl font-bold">{card.value}
           <p className="text-xs text-muted-foreground">

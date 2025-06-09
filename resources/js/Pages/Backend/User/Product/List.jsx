@@ -70,7 +70,7 @@ const SummaryCards = ({ summary = {} }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       {cards.map((card, index) => (
-        <div key={index} className="bg-gray-100 rounded-lg shadow-lg p-4">
+        <div key={index} className="bg-gray-100 rounded-lg shadow-sm p-4">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <h3 className="text-lg font-medium">
               {card.title}
