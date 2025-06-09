@@ -219,28 +219,38 @@ class PayrollController extends Controller
         }
 
         foreach ($employees as $employee) {
+            // Initialize variables with default values
+            $required_working_days = cal_days_in_month(CAL_GREGORIAN, $request->month, $request->year);
+            $public_holidays = 0;
+            $weekend = 0;
+            $required_working_hours = $employee->working_hours * $required_working_days;
+            $actual_working_hours = $required_working_hours;
+            $overtime_hours = 0;
 
-            $weekends = json_decode(get_business_option('weekends'));
-            $holidays = Holiday::where('business_id', request()->activeBusiness->id)
-                ->whereMonth('date', $request->month)
-                ->whereYear('date', $request->year)
-                ->get();
-            $required_working_days = cal_days_in_month(CAL_GREGORIAN, $request->month, $request->year) - $holidays->count() - $this->countSpecificDaysInMonth($request->year, $request->month, $weekends);
-            $public_holidays = Timesheet::where('employee_id', $employee->id)->whereIn('date', $holidays->pluck('date'))->sum('working_hours');
-            $weekend = Timesheet::where('employee_id', $employee->id)
-                ->whereMonth('date', $request->month)
-                ->whereYear('date', $request->year)
-                ->get()
-                ->filter(function ($timesheet) use ($weekends) {
-                    return in_array(strtolower(\Carbon\Carbon::createFromFormat(get_date_format(), $timesheet->date)->format('l')), $weekends);
-                })
-                ->sum('working_hours');
-            $required_working_hours = $required_working_days * $employee->working_hours;
-            $actual_working_hours = Timesheet::where('employee_id', $employee->id)
-                ->whereMonth('date', $request->month)
-                ->whereYear('date', $request->year)
-                ->sum('working_hours');
-            $overtime_hours = min(max($actual_working_hours - $required_working_hours, 0), $employee->max_overtime_hours * $required_working_days);
+            // Only calculate from timesheet if employee is timesheet-based and package has timesheet module
+            if ($employee->timesheet_based == 1 && package()->timesheet_module == 1) {
+                $weekends = json_decode(get_business_option('weekends'));
+                $holidays = Holiday::where('business_id', request()->activeBusiness->id)
+                    ->whereMonth('date', $request->month)
+                    ->whereYear('date', $request->year)
+                    ->get();
+                $required_working_days = cal_days_in_month(CAL_GREGORIAN, $request->month, $request->year) - $holidays->count() - $this->countSpecificDaysInMonth($request->year, $request->month, $weekends);
+                $public_holidays = Timesheet::where('employee_id', $employee->id)->whereIn('date', $holidays->pluck('date'))->sum('working_hours');
+                $weekend = Timesheet::where('employee_id', $employee->id)
+                    ->whereMonth('date', $request->month)
+                    ->whereYear('date', $request->year)
+                    ->get()
+                    ->filter(function ($timesheet) use ($weekends) {
+                        return in_array(strtolower(\Carbon\Carbon::createFromFormat(get_date_format(), $timesheet->date)->format('l')), $weekends);
+                    })
+                    ->sum('working_hours');
+                $required_working_hours = $required_working_days * $employee->working_hours;
+                $actual_working_hours = Timesheet::where('employee_id', $employee->id)
+                    ->whereMonth('date', $request->month)
+                    ->whereYear('date', $request->year)
+                    ->sum('working_hours');
+                $overtime_hours = min(max($actual_working_hours - $required_working_hours, 0), $employee->max_overtime_hours * $required_working_days);
+            }
 
             $benefits        = $employee->employee_benefits->where('month', $month)->where('year', $year)->first()?->salary_benefits()->where('type', 'add')->get();
             $deductions      = $employee->employee_benefits->where('month', $month)->where('year', $year)->first()?->salary_benefits()->where('type', 'deduct')->get();
@@ -265,10 +275,8 @@ class PayrollController extends Controller
             $payroll->total_cost_public_holiday = $payroll->cost_public_holiday * $public_holidays;
             $payroll->total_cost_weekend        = $payroll->cost_weekend * $weekend;
             $payroll->current_salary            = $employee->basic_salary;
-            // $payroll->net_salary                = ($total_benefits - ($total_deduction + $employee->employee_benefits->where('month', $month)->where('year', $year)->first()?->advance));
             $payroll->net_salary                = $payroll->total_cost_normal_hours + $payroll->total_cost_overtime_hours + $payroll->total_cost_public_holiday + $payroll->total_cost_weekend;
             $payroll->tax_amount                = 0;
-
             $payroll->total_allowance           = $benefits?->sum('amount');
             $payroll->total_deduction           = $total_deduction;
             $payroll->absence_fine              = 0;
