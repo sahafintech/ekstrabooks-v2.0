@@ -24,7 +24,7 @@
     <style>
         * {
             scrollbar-width: thin;
-            font-size: 12px;
+            font-size: 14px;
         }
         main {
             width: 100px;

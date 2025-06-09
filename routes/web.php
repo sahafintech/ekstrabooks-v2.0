@@ -540,6 +540,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('attendance_logs', AttendanceLogController::class)->except('show', 'edit', 'update', 'destroy');
 		Route::post('import_attendance_logs', [AttendanceLogController::class, 'import_attendance_logs'])->name('attendance_logs.import');
 		Route::get('export_attendance_logs', [AttendanceLogController::class, 'export_attendance_logs'])->name('attendance_logs.export');
+		Route::get('fetch_attendance_logs', [AttendanceLogController::class, 'fetch'])->name('attendance_logs.fetch');
 
 		//Time Sheet Controller
 		Route::resource('timesheets', TimesheetController::class);
