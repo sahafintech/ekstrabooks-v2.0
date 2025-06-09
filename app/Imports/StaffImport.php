@@ -47,6 +47,9 @@ class StaffImport implements ToCollection, WithHeadingRow, WithValidation, Skips
             $staff->department_id               = Department::where('name', $row['department'])->first()->id;
             $staff->designation_id              = Designation::where('name', $row['designation'])->first()->id;
             $staff->basic_salary                = $row['base_salary'];
+            $staff->working_hours               = $row['working_hours'];
+            $staff->time_sheet_based            = $row['time_sheet_based'];
+            $staff->max_overtime_hours          = $row['max_overtime_hours'];
             $staff->joining_date                = $joining_date;
             $staff->end_date                    = $end_date;
             $staff->bank_name                   = $row['bank_name'];
@@ -70,6 +73,9 @@ class StaffImport implements ToCollection, WithHeadingRow, WithValidation, Skips
             'department'    => 'required|exists:departments,name',
             'designation'   => 'required|exists:designations,name',
             'base_salary'   => 'required',
+            'working_hours' => 'required',
+            'time_sheet_based' => 'required|in:0,1',
+            'max_overtime_hours' => 'required',
             'joining_date'  => 'required',
             'end_date'      => 'nullable',
             'bank_name'     => 'nullable',

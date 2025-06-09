@@ -283,7 +283,7 @@ class BusinessSettingSeeder extends Seeder
                 'business_id' => $this->businessId
             ],
             [
-                'name' => 'weekly_rate_multiplier',
+                'name' => 'weekend_holiday_rate_multiplier',
                 'value' => '1.5',
                 'business_id' => $this->businessId
             ],

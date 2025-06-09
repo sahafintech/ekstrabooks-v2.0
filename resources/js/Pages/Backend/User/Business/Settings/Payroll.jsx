@@ -16,7 +16,7 @@ export default function Payroll({ business, id, timezones = [], dateFormats = []
         // General Settings
         overtime_rate_multiplier: business?.system_settings?.find((setting) => setting.name === "overtime_rate_multiplier")?.value || "1.5",
         public_holiday_rate_multiplier: business?.system_settings?.find((setting) => setting.name === "public_holiday_rate_multiplier")?.value || "2",
-        weekly_holiday_rate_multiplier: business?.system_settings?.find((setting) => setting.name === "weekly_holiday_rate_multiplier")?.value || "1.5",
+        weekend_holiday_rate_multiplier: business?.system_settings?.find((setting) => setting.name === "weekend_holiday_rate_multiplier")?.value || "1.5",
     });
 
     const submitGeneralSettings = (e) => {
@@ -323,19 +323,19 @@ export default function Payroll({ business, id, timezones = [], dateFormats = []
                                 </div>
 
                                 <div className="grid grid-cols-12 mb-4">
-                                    <Label htmlFor="weekly_holiday_rate_multiplier" className="col-span-3 flex items-center">
-                                        Weekly Holiday Rate Multiplier
+                                    <Label htmlFor="weekend_holiday_rate_multiplier" className="col-span-3 flex items-center">
+                                        Weekend Holiday Rate Multiplier
                                     </Label>
                                     <div className="col-span-9">
                                         <Input
-                                            id="weekly_holiday_rate_multiplier"
+                                            id="weekend_holiday_rate_multiplier"
                                             type="number"
                                             step="0.1"
-                                            value={data.weekly_holiday_rate_multiplier}
-                                            onChange={(e) => setData("weekly_holiday_rate_multiplier", e.target.value)}
+                                            value={data.weekend_holiday_rate_multiplier}
+                                            onChange={(e) => setData("weekend_holiday_rate_multiplier", e.target.value)}
                                             className="w-full"
                                         />
-                                        <InputError message={errors.weekly_holiday_rate_multiplier} className="mt-1" />
+                                        <InputError message={errors.weekend_holiday_rate_multiplier} className="mt-1" />
                                     </div>
                                 </div>
 

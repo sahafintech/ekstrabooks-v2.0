@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/Components/ui/select";
-import { Plus, Edit, Trash, EyeIcon, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Edit, Trash, ChevronUp, ChevronDown } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -85,6 +85,60 @@ const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, cou
   </Modal>
 );
 
+const ApproveAllLeavesModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to approve {count} selected leave record{count !== 1 ? 's' : ''}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Approve Selected
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+const RejectAllLeavesModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to reject {count} selected leave record{count !== 1 ? 's' : ''}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="destructive"
+          disabled={processing}
+        >
+          Reject Selected
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
 export default function List({ leaves = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
@@ -92,7 +146,7 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
   const [dateFilter, setDateFilter] = useState(filters.date || "");
-  const [perPage, setPerPage] = useState(meta.per_page || 10);
+  const [perPage, setPerPage] = useState(meta.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
   const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
@@ -100,6 +154,8 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [showApproveAllModal, setShowApproveAllModal] = useState(false);
+  const [showRejectAllModal, setShowRejectAllModal] = useState(false);
   const [leaveToDelete, setLeaveToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
 
@@ -201,6 +257,10 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
 
     if (bulkAction === "delete") {
       setShowDeleteAllModal(true);
+    } else if (bulkAction === "approve") {
+      setShowApproveAllModal(true);
+    } else if (bulkAction === "reject") {
+      setShowRejectAllModal(true);
     }
   };
 
@@ -250,6 +310,50 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
     );
   };
 
+  const handleApproveAll = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+
+    router.post(route("leaves.bulk_approve"),
+      {
+        ids: selectedLeaves,
+      },
+      {
+        onSuccess: () => {
+          setShowApproveAllModal(false);
+          setProcessing(false);
+          setSelectedLeaves([]);
+          setIsAllSelected(false);
+          setBulkAction("");
+        },
+        onError: () => {
+          setProcessing(false);
+        }
+      });
+  };
+
+  const handleRejectAll = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+
+    router.post(route("leaves.bulk_reject"),
+      {
+        ids: selectedLeaves,
+      },
+      {
+        onSuccess: () => {
+          setShowRejectAllModal(false);
+          setProcessing(false);
+          setSelectedLeaves([]);
+          setIsAllSelected(false);
+          setBulkAction("");
+        },
+        onError: () => {
+          setProcessing(false);
+        }
+      });
+  };
+
   const handleSort = (column) => {
     let direction = "asc";
     if (sorting.column === column && sorting.direction === "asc") {
@@ -277,15 +381,6 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
     );
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "-";
-    try {
-      return format(new Date(dateString), "PPP");
-    } catch (error) {
-      return dateString;
-    }
-  };
-
   const getLeaveTypeLabel = (type) => {
     const types = {
       casual: "Casual Leave",
@@ -296,16 +391,28 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
     return types[type] || type;
   };
 
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'approved':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Approved</span>;
-      case 'rejected':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Rejected</span>;
-      case 'pending':
-      default:
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending</span>;
-    }
+  const LeaveStatusBadge = ({ status }) => {
+      const statusMap = {
+          0: {
+              label: "Pending",
+              className: "text-gray-600 bg-gray-200 px-3 py-1 rounded text-xs",
+          },
+          1: {
+              label: "Approved",
+              className:
+                  "text-green-600 bg-green-200 px-3 py-1 rounded text-xs",
+          },
+          2: {
+              label: "Cancelled",
+              className: "text-red-600 bg-red-200 px-3 py-1 rounded text-xs",
+          },
+      };
+
+      return (
+          <span className={statusMap[status].className}>
+              {statusMap[status].label}
+          </span>
+      );
   };
 
   const renderPageNumbers = () => {
@@ -374,6 +481,8 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="delete">Delete Selected</SelectItem>
+                    <SelectItem value="approve">Approve Selected</SelectItem>
+                    <SelectItem value="reject">Reject Selected</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button
@@ -452,18 +561,13 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
                         <TableCell>{leave.staff?.name || '-'}</TableCell>
                         <TableCell>{getLeaveTypeLabel(leave.leave_type)}</TableCell>
                         <TableCell>{leave.leave_duration === 'full_day' ? 'Full Day' : 'Half Day'}</TableCell>
-                        <TableCell>{formatDate(leave.start_date)}</TableCell>
-                        <TableCell>{formatDate(leave.end_date)}</TableCell>
+                        <TableCell>{leave.start_date}</TableCell>
+                        <TableCell>{leave.end_date}</TableCell>
                         <TableCell>{leave.total_days}</TableCell>
-                        <TableCell>{getStatusBadge(leave.status)}</TableCell>
+                        <TableCell><LeaveStatusBadge status={leave.status} /></TableCell>
                         <TableCell className="text-right">
                           <TableActions
                             actions={[
-                              {
-                                label: "View",
-                                icon: <EyeIcon className="h-4 w-4" />,
-                                href: route("leaves.show", leave.id),
-                              },
                               {
                                 label: "Edit",
                                 icon: <Edit className="h-4 w-4" />,
@@ -548,6 +652,22 @@ export default function List({ leaves = [], meta = {}, filters = {} }) {
         show={showDeleteAllModal}
         onClose={() => setShowDeleteAllModal(false)}
         onConfirm={handleBulkDeleteConfirm}
+        processing={processing}
+        count={selectedLeaves.length}
+      />
+
+      <ApproveAllLeavesModal
+        show={showApproveAllModal}
+        onClose={() => setShowApproveAllModal(false)}
+        onConfirm={handleApproveAll}
+        processing={processing}
+        count={selectedLeaves.length}
+      />
+
+      <RejectAllLeavesModal
+        show={showRejectAllModal}
+        onClose={() => setShowRejectAllModal(false)}
+        onConfirm={handleRejectAll}
         processing={processing}
         count={selectedLeaves.length}
       />

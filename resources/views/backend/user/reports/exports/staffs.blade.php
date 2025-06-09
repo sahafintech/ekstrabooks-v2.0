@@ -31,6 +31,9 @@
         <td style="background-color: lightgray; font-size: 12px;">{{ _lang('department') }}</td>
         <td style="background-color: lightgray; font-size: 12px;">{{ _lang('designation') }}</td>
         <td style="background-color: lightgray; font-size: 12px;">{{ _lang('base_salary') }}</td>
+        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('working_hours') }}</td>
+        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('time_sheet_based') }}</td>
+        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('max_overtime_hours') }}</td>
         <td style="background-color: lightgray; font-size: 12px;">{{ _lang('joining_date') }}</td>
         <td style="background-color: lightgray; font-size: 12px;">{{ _lang('end_date') }}</td>
         <td style="background-color: lightgray; font-size: 12px;">{{ _lang('bank_name') }}</td>
@@ -51,6 +54,9 @@
             <td>{{ \App\Models\Department::find($staff->department_id)->name }}</td>
             <td>{{ \App\Models\Designation::find($staff->designation_id)->name }}</td>
             <td>{{ $staff->base_salary }}</td>
+            <td>{{ $staff->working_hours }}</td>
+            <td>{{ $staff->time_sheet_based }}</td>
+            <td>{{ $staff->max_overtime_hours }}</td>
             <td>{{ $staff->joining_date }}</td>
             <td>{{ $staff->end_date }}</td>
             <td>{{ $staff->bank_name }}</td>

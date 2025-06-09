@@ -21,14 +21,6 @@ import {
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogTrigger
-} from "@/Components/ui/dialog";
 import { Textarea } from "@/Components/ui/textarea";
 import { Plus, Edit, Trash, Search, ChevronUp, ChevronDown } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
@@ -36,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
+import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
@@ -88,6 +81,138 @@ const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, cou
         >
           Delete Selected
         </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+// Create Modal Component
+const CreateModal = ({ show, onClose, onSubmit, form, errors, departments, handleInputChange, handleDepartmentChange, processing }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onSubmit}>
+      <h2 className="text-lg font-medium mb-4">Add Designation</h2>
+      <div className="grid gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="name">Name <span className="text-red-500">*</span></Label>
+          <Input
+            id="name"
+            name="name"
+            value={form.name}
+            onChange={handleInputChange}
+            placeholder="Enter designation name"
+          />
+          {errors.name && (
+            <p className="text-sm text-red-500">{errors.name}</p>
+          )}
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="department_id">Department <span className="text-red-500">*</span></Label>
+          <SearchableCombobox
+            options={
+              departments.map((department) => ({
+                id: department.id,
+                name: department.name,
+              }))
+            }
+            value={form.department_id}
+            onChange={handleDepartmentChange}
+            placeholder="Select department"
+          />
+          {errors.department_id && (
+            <p className="text-sm text-red-500">{errors.department_id}</p>
+          )}
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="descriptions">Description</Label>
+          <Textarea
+            id="descriptions"
+            name="descriptions"
+            value={form.descriptions}
+            onChange={handleInputChange}
+            placeholder="Enter designation description"
+            rows={3}
+          />
+          {errors.descriptions && (
+            <p className="text-sm text-red-500">{errors.descriptions}</p>
+          )}
+        </div>
+      </div>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button type="submit" disabled={processing}>Save</Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+// Edit Modal Component
+const EditModal = ({ show, onClose, onSubmit, form, errors, departments, handleInputChange, handleDepartmentChange, processing }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onSubmit}>
+      <h2 className="text-lg font-medium mb-4">Edit Designation</h2>
+      <div className="grid gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="name">Name <span className="text-red-500">*</span></Label>
+          <Input
+            id="name"
+            name="name"
+            value={form.name}
+            onChange={handleInputChange}
+            placeholder="Enter designation name"
+          />
+          {errors.name && (
+            <p className="text-sm text-red-500">{errors.name}</p>
+          )}
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="department_id">Department <span className="text-red-500">*</span></Label>
+          <SearchableCombobox
+            options={
+              departments.map((department) => ({
+                id: department.id,
+                name: department.name,
+              }))
+            }
+            placeholder="Select department"
+            value={form.department_id}
+            onChange={handleDepartmentChange}
+          />
+          {errors.department_id && (
+            <p className="text-sm text-red-500">{errors.department_id}</p>
+          )}
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="descriptions">Description</Label>
+          <Textarea
+            id="descriptions"
+            name="descriptions"
+            value={form.descriptions}
+            onChange={handleInputChange}
+            placeholder="Enter designation description"
+            rows={3}
+          />
+          {errors.descriptions && (
+            <p className="text-sm text-red-500">{errors.descriptions}</p>
+          )}
+        </div>
+      </div>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button type="submit" disabled={processing}>Update</Button>
       </div>
     </form>
   </Modal>
@@ -314,6 +439,7 @@ export default function List({ designations = [], departments = [], meta = {}, f
 
   const handleCreateSubmit = (e) => {
     e.preventDefault();
+    setIsProcessing(true);
 
     router.post(route("designations.store"), form, {
       preserveState: true,
@@ -324,9 +450,11 @@ export default function List({ designations = [], departments = [], meta = {}, f
           descriptions: "",
           department_id: ""
         });
+        setIsProcessing(false);
       },
       onError: (errors) => {
         setErrors(errors);
+        setIsProcessing(false);
       }
     });
   };
@@ -345,15 +473,18 @@ export default function List({ designations = [], departments = [], meta = {}, f
 
   const handleEditSubmit = (e) => {
     e.preventDefault();
+    setIsProcessing(true);
 
     router.put(route("designations.update", editingDesignation.id), form, {
       preserveState: true,
       onSuccess: () => {
         setIsEditDialogOpen(false);
         setEditingDesignation(null);
+        setIsProcessing(false);
       },
       onError: (errors) => {
         setErrors(errors);
+        setIsProcessing(false);
       }
     });
   };
@@ -523,133 +654,31 @@ export default function List({ designations = [], departments = [], meta = {}, f
             )}
           </div>
 
-          {/* Create Dialog */}
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Designation</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleCreateSubmit}>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">Name <span className="text-red-500">*</span></Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      value={form.name}
-                      onChange={handleInputChange}
-                      placeholder="Enter designation name"
-                    />
-                    {errors.name && (
-                      <p className="text-sm text-red-500">{errors.name}</p>
-                    )}
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="department_id">Department <span className="text-red-500">*</span></Label>
-                    <Select value={form.department_id} onValueChange={handleDepartmentChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departments.map((department) => (
-                          <SelectItem key={department.id} value={department.id.toString()}>
-                            {department.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {errors.department_id && (
-                      <p className="text-sm text-red-500">{errors.department_id}</p>
-                    )}
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="descriptions">Description</Label>
-                    <Textarea
-                      id="descriptions"
-                      name="descriptions"
-                      value={form.descriptions}
-                      onChange={handleInputChange}
-                      placeholder="Enter designation description"
-                      rows={3}
-                    />
-                    {errors.descriptions && (
-                      <p className="text-sm text-red-500">{errors.descriptions}</p>
-                    )}
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">Save</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+          {/* Create Modal */}
+          <CreateModal
+            show={isCreateDialogOpen}
+            onClose={() => setIsCreateDialogOpen(false)}
+            onSubmit={handleCreateSubmit}
+            form={form}
+            errors={errors}
+            departments={departments}
+            handleInputChange={handleInputChange}
+            handleDepartmentChange={handleDepartmentChange}
+            processing={isProcessing}
+          />
 
-          {/* Edit Dialog */}
-          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Edit Designation</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleEditSubmit}>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">Name <span className="text-red-500">*</span></Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      value={form.name}
-                      onChange={handleInputChange}
-                      placeholder="Enter designation name"
-                    />
-                    {errors.name && (
-                      <p className="text-sm text-red-500">{errors.name}</p>
-                    )}
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="department_id">Department <span className="text-red-500">*</span></Label>
-                    <Select value={form.department_id} onValueChange={handleDepartmentChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departments.map((department) => (
-                          <SelectItem key={department.id} value={department.id.toString()}>
-                            {department.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {errors.department_id && (
-                      <p className="text-sm text-red-500">{errors.department_id}</p>
-                    )}
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="descriptions">Description</Label>
-                    <Textarea
-                      id="descriptions"
-                      name="descriptions"
-                      value={form.descriptions}
-                      onChange={handleInputChange}
-                      placeholder="Enter designation description"
-                      rows={3}
-                    />
-                    {errors.descriptions && (
-                      <p className="text-sm text-red-500">{errors.descriptions}</p>
-                    )}
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">Update</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+          {/* Edit Modal */}
+          <EditModal
+            show={isEditDialogOpen}
+            onClose={() => setIsEditDialogOpen(false)}
+            onSubmit={handleEditSubmit}
+            form={form}
+            errors={errors}
+            departments={departments}
+            handleInputChange={handleInputChange}
+            handleDepartmentChange={handleDepartmentChange}
+            processing={isProcessing}
+          />
 
           {/* Delete Confirmation Modal */}
           <DeleteConfirmationModal

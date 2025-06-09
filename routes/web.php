@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountTypeController;
+use App\Http\Controllers\AttendanceLogController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\BillPaymentsController;
 use App\Http\Controllers\BrandsController;
@@ -41,7 +42,6 @@ use App\Http\Controllers\TeamController;
 use App\Http\Controllers\TestimonialController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\User\AccountController;
-use App\Http\Controllers\User\AttendanceController;
 use App\Http\Controllers\User\AwardController;
 use App\Http\Controllers\User\BusinessController;
 use App\Http\Controllers\User\BusinessSettingsController;
@@ -51,6 +51,7 @@ use App\Http\Controllers\ProjectBudgetController;
 use App\Http\Controllers\ProjectSubcontractController;
 use App\Http\Controllers\ProjectSubcontractPaymentController;
 use App\Http\Controllers\ProjectTaskController;
+use App\Http\Controllers\TimesheetController;
 use App\Http\Controllers\User\CustomerController;
 use App\Http\Controllers\User\CustomerDocumentController;
 use App\Http\Controllers\User\DepartmentController;
@@ -130,11 +131,9 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 		//User Management
 		Route::get('users/{id}/login_as_user', [UserController::class, 'login_as_user'])->name('users.login_as_user');
-		Route::get('users/get_table_data', [UserController::class, 'get_table_data']);
 		Route::resource('users', UserController::class)->middleware("demo:PUT|PATCH|DELETE");
 
 		//Subscription Payments
-		Route::get('subscription_payments/get_table_data', [SubscriptionPaymentController::class, 'get_table_data']);
 		Route::resource('subscription_payments', SubscriptionPaymentController::class)->middleware("demo:PUT|PATCH|DELETE");
 
 		Route::group(['middleware' => 'demo'], function () {
@@ -156,7 +155,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 			//Email Subscribers
 			Route::match(['get', 'post'], 'email_subscribers/send_email', [EmailSubscriberController::class, 'send_email'])->name('email_subscribers.send_email');
 			Route::get('email_subscribers/export', [EmailSubscriberController::class, 'export'])->name('email_subscribers.export');
-			Route::get('email_subscribers/get_table_data', [EmailSubscriberController::class, 'get_table_data']);
 			Route::get('email_subscribers', [EmailSubscriberController::class, 'index'])->name('email_subscribers.index');
 			Route::delete('email_subscribers/{id}/destroy', [EmailSubscriberController::class, 'destroy'])->name('email_subscribers.destroy');
 
@@ -242,7 +240,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('business/{id}/store_purchase_return_settings', [BusinessSettingsController::class, 'store_purchase_return_settings'])->name('business.store_purchase_return_settings');
 		Route::post('business/{id}/store_currency_settings', [BusinessSettingsController::class, 'store_currency_settings'])->name('business.store_currency_settings');
 		Route::post('business/{id}/store_general_settings', [BusinessSettingsController::class, 'store_general_settings'])->name('business.store_general_settings');
-
+		Route::post('business/{id}/store_payroll_settings', [BusinessSettingsController::class, 'store_payroll_settings'])->name('business.store_payroll_settings');
 		// Business Settings Route (with tab parameter)
 		Route::get('business/{id}/settings/{tab?}', [BusinessSettingsController::class, 'settings'])->name('business.settings');
 
@@ -280,7 +278,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('export_customers', [CustomerController::class, 'export_customers'])->name('customers.export');
 
 		//Vendors
-		Route::get('vendors/get_table_data', [VendorController::class, 'get_table_data']);
 		Route::resource('vendors', VendorController::class);
 		Route::post('import_suppliers', [VendorController::class, 'import_vendors'])->name('vendors.import');
 		Route::get('export_suppliers', [VendorController::class, 'export_vendors'])->name('vendors.export');
@@ -289,7 +286,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		//Product Controller
 		Route::resource('product_units', ProductUnitController::class)->except('show');
 		Route::post('product_units/bulk_destroy', [ProductUnitController::class, 'bulk_destroy'])->name('product_units.bulk_destroy');
-		Route::get('products/get_table_data', [ProductController::class, 'get_table_data']);
 		Route::get('products/export', [ProductController::class, 'product_export'])->name('products.export');
 		Route::resource('products', ProductController::class);
 		Route::post('import_products', [ProductController::class, 'import_products'])->name('products.import');
@@ -318,7 +314,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::match(['get', 'post'], 'invoices/receive_payment', [InvoiceController::class, 'receive_payment'])->name('invoices.receive_payment');
 		Route::get('invoices/{id}/duplicate', [InvoiceController::class, 'duplicate'])->name('invoices.duplicate');
 		Route::get('invoices/{id}/get_invoice_link', [InvoiceController::class, 'get_invoice_link'])->name('invoices.get_invoice_link');
-		Route::post('invoices/get_table_data', [InvoiceController::class, 'get_table_data']);
 		Route::resource('invoices', InvoiceController::class);
 		Route::resource('receive_payments', ReceivePaymentsController::class);
 		Route::post('import_invoices', [InvoiceController::class, 'import_invoices'])->name('invoices.import');
@@ -366,7 +361,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('recurring_invoices/{id}/end_recurring', [RecurringInvoiceController::class, 'end_recurring'])->name('recurring_invoices.end_recurring');
 		Route::get('recurring_invoices/{id}/duplicate', [RecurringInvoiceController::class, 'duplicate'])->name('recurring_invoices.duplicate');
 		Route::get('recurring_invoices/{id}/approve', [RecurringInvoiceController::class, 'approve'])->name('recurring_invoices.approve');
-		Route::post('recurring_invoices/get_table_data', [RecurringInvoiceController::class, 'get_table_data']);
 		Route::resource('recurring_invoices', RecurringInvoiceController::class);
 
 		// Deffered Invoices
@@ -376,7 +370,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('deffered_invoices/filter', [DefferedInvoiceController::class, 'deffered_invoices_filter'])->name('deffered_invoices.filter');
 		Route::post('deffered_invoices/bulk_destroy', [DefferedInvoiceController::class, 'bulk_destroy'])->name('deffered_invoices.bulk_destroy');
 		Route::post('deffered_invoices/send_email/{id}', [DefferedInvoiceController::class, 'send_email'])->name('deffered_invoices.send_email');
-		Route::get('deffered_invoices/{id}/', [DefferedInvoiceController::class, 'show_public_deffered_invoice'])->name('deffered_invoices.show_public_deffered_invoice');
 
 		// deffered payments
 		Route::resource('deffered_receive_payments', DefferedPaymentController::class);
@@ -454,7 +447,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('invoice_templates', InvoiceTemplateController::class);
 
 		//Transaction
-		Route::get('transactions/get_table_data', [TransactionController::class, 'get_table_data']);
 		Route::resource('transactions', TransactionController::class);
 
 		//Transaction Methods
@@ -533,22 +525,25 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('vendor/documents/create/{id}', [VendorDocumentController::class, 'create'])->name('vendor.documents.create');
 
 		//Holiday Controller
-		Route::get('holidays/get_table_data', [HolidayController::class, 'get_table_data']);
 		Route::match(['get', 'post'], 'holidays/weekends', [HolidayController::class, 'weekends'])->name('holidays.weekends');
 		Route::resource('holidays', HolidayController::class)->except('show');
 
 		//Leave Application
 		Route::resource('leave_types', LeaveTypeController::class)->except('show');
 		Route::post('leaves/bulk_destroy', [LeaveController::class, 'bulk_destroy'])->name('leaves.bulk_destroy');
+		Route::post('leaves/bulk_approve', [LeaveController::class, 'bulk_approve'])->name('leaves.bulk_approve');
+		Route::post('leaves/bulk_reject', [LeaveController::class, 'bulk_reject'])->name('leaves.bulk_reject');
 		Route::resource('leaves', LeaveController::class);
 
 		//Attendance Controller
-		Route::get('attendance/get_table_data', [AttendanceController::class, 'get_table_data']);
-		Route::post('attendance/create', [AttendanceController::class, 'create'])->name('attendance.create');
-		Route::resource('attendance', AttendanceController::class)->except('show', 'edit', 'update', 'destroy');
-		Route::post('import_attendance', [AttendanceController::class, 'import_attendance'])->name('attendances.import');
-		Route::get('absent_fine', [AttendanceController::class, 'absent_fine'])->name('attendances.absent_fine');
-		Route::post('absent_fine', [AttendanceController::class, 'store_absent_fine'])->name('attendances.store_absent_fine');
+		Route::post('attendance_logs/create', [AttendanceLogController::class, 'create'])->name('attendance_logs.create');
+		Route::resource('attendance_logs', AttendanceLogController::class)->except('show', 'edit', 'update', 'destroy');
+		Route::post('import_attendance_logs', [AttendanceLogController::class, 'import_attendance_logs'])->name('attendance_logs.import');
+		Route::get('export_attendance_logs', [AttendanceLogController::class, 'export_attendance_logs'])->name('attendance_logs.export');
+
+		//Time Sheet Controller
+		Route::resource('timesheets', TimesheetController::class);
+
 
 		//Award Controller
 		Route::post('awards/bulk_destroy', [AwardController::class, 'bulk_destroy'])->name('awards.bulk_destroy');
@@ -559,7 +554,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('payslips/store_accrual', [PayrollController::class, 'store_accrual'])->name('payslips.store_accrual');
 		Route::match(['get', 'post'], 'payslips/accrue', [PayrollController::class, 'accrue_payroll'])->name('payslips.accrue');
 		Route::match(['get', 'post'], 'payslips/make_payment', [PayrollController::class, 'make_payment'])->name('payslips.make_payment');
-		Route::get('payslips/get_table_data', [PayrollController::class, 'get_table_data']);
 		Route::resource('payslips', PayrollController::class);
 		Route::get('payslips_export', [PayrollController::class, 'export_payslips'])->name('payslips.export');
 		Route::post('payslips/bulk_approve', [PayrollController::class, 'bulk_approve'])->name('payslips.bulk_approve');
@@ -583,7 +577,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::match(['get', 'post'], 'reports/journal', [ReportController::class, 'journal'])->name('reports.journal');
 		Route::match(['get', 'post'], 'reports/income_statement', [ReportController::class, 'income_statement'])->name('reports.income_statement');
 		Route::match(['get', 'post'], 'reports/purchase_by_vendor', [ReportController::class, 'purchase_by_vendor'])->name('reports.purchase_by_vendor');
-		Route::match(['get', 'post'], 'reports/attendance_report', [ReportController::class, 'attendance_report'])->name('reports.attendance_report');
 		Route::match(['get', 'post'], 'reports/payroll_report', [ReportController::class, 'payroll_report'])->name('reports.payroll_report');
 		Route::match(['get', 'post'], 'reports/tax_report', [ReportController::class, 'tax_report'])->name('reports.tax_report');
 		Route::get('reports/ledger_export', [ReportController::class, 'ledger_export'])->name('reports.ledger_export');
@@ -636,9 +629,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 	//Switch Business
 	Route::get('business/switch_business/{id}', [BusinessController::class, 'switch_business'])->name('business.switch_business');
-
-	//Ajax Select2 Controller
-	Route::get('ajax/get_table_data', 'Select2Controller@get_table_data');
 });
 
 Route::get('users/back_to_admin', [UserController::class, 'back_to_admin'])->name('users.back_to_admin')->middleware('auth');

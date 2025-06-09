@@ -47,7 +47,7 @@ class AwardController extends Controller
         $per_page = $request->get('per_page', 10);
         $search = $request->get('search', '');
 
-        $query = Award::query();
+        $query = Award::with('staff');
 
         // Apply search if provided
         if (!empty($search)) {

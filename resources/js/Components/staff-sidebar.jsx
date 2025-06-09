@@ -65,8 +65,8 @@ export function StaffSidebar(props) {
 
     // HR & Payroll
     const staffsBase = "/user/staffs";
-    const attendanceBase = "/user/attendance";
-    const departmentsBase = "/user/departments";
+    const attendanceLogsBase = "/user/attendance_logs";
+    const timeSheetsBase = "/user/timesheets";
     const designationsBase = "/user/designations";
     const payslipsBase = "/user/payslips";
     const holidaysBase = "/user/holidays";
@@ -347,7 +347,7 @@ export function StaffSidebar(props) {
         if (
             [
                 "staffs.index",
-                "attendance.index",
+                "attendance_logs.index",
                 "departments.index",
                 "designations.index",
                 "payslips.index",
@@ -364,13 +364,25 @@ export function StaffSidebar(props) {
                     isActive: url.startsWith(staffsBase),
                 });
             }
-            if (perms.has("attendance.index")) {
-                items.push({
-                    title: "Attendance",
-                    url: route("attendance.index"),
-                    isActive: url.startsWith(attendanceBase),
-                });
+            if (userPackage.attendance_module === 1) {
+                if (perms.has("attendance_logs.index")) {
+                    items.push({
+                        title: "Attendance Logs",
+                        url: route("attendance_logs.index"),
+                        isActive: url.startsWith(attendanceLogsBase),
+                    });
+                }
             }
+            if (userPackage.time_sheet_module === 1) {
+                if (perms.has("timesheets.index")) {
+                    items.push({
+                        title: "Time Sheets",
+                        url: route("timesheets.index"),
+                        isActive: url.startsWith(timeSheetsBase),
+                    });
+                }
+            }
+
             if (perms.has("departments.index")) {
                 items.push({
                     title: "Departments",

@@ -165,6 +165,9 @@ class StaffController extends Controller
         $employee->department_id   = $request->input('department_id');
         $employee->designation_id  = $request->input('designation_id');
         $employee->basic_salary    = $request->input('basic_salary');
+        $employee->working_hours   = $request->input('working_hours');
+        $employee->time_sheet_based = $request->input('time_sheet_based');
+        $employee->max_overtime_hours = $request->input('max_overtime_hours');
         $employee->joining_date    = Carbon::parse($request->input('joining_date'))->format('Y-m-d');
         $employee->end_date        = $request->input('end_date') ? Carbon::parse($request->input('end_date'))->format('Y-m-d') : null;
         $employee->bank_name       = $request->input('bank_name');
@@ -281,6 +284,9 @@ class StaffController extends Controller
         $employee->phone         = $request->input('phone');
         $employee->city          = $request->input('city');
         $employee->country       = $request->input('country');
+        $employee->working_hours = $request->input('working_hours');
+        $employee->time_sheet_based = $request->input('time_sheet_based');
+        $employee->max_overtime_hours = $request->input('max_overtime_hours');
         $employee->basic_salary  = $request->input('basic_salary');
 
         if ($request->update_company_details == 1) {

@@ -63,7 +63,8 @@ export function UserSidebar({ ...props }) {
 
     // HR & Payroll
     const staffsBase = "/user/staffs";
-    const attendanceBase = "/user/attendance";
+    const attendanceLogsBase = "/user/attendance_logs";
+    const timeSheetsBase = "/user/timesheets";
     const departmentsBase = "/user/departments";
     const designationsBase = "/user/designations";
     const payslipsBase = "/user/payslips";
@@ -285,24 +286,30 @@ export function UserSidebar({ ...props }) {
             icon: GroupIcon,
             isActive:
                 url.startsWith(staffsBase) ||
-                url.startsWith(attendanceBase) ||
+                url.startsWith(attendanceLogsBase) ||
                 url.startsWith(departmentsBase) ||
                 url.startsWith(designationsBase) ||
                 url.startsWith(payslipsBase) ||
                 url.startsWith(holidaysBase) ||
                 url.startsWith(leavesBase) ||
-                url.startsWith(awardsBase),
+                url.startsWith(awardsBase) ||
+                url.startsWith(timeSheetsBase),
             items: [
                 {
                     title: "Staff Management",
                     url: route("staffs.index"),
                     isActive: url.startsWith(staffsBase),
                 },
-                {
-                    title: "Attendance",
-                    url: route("attendance.index"),
-                    isActive: url.startsWith(attendanceBase),
-                },
+                ...(userPackage.time_sheet_module === 1 ? [{
+                    title: "Attendance Logs",
+                    url: route("attendance_logs.index"),
+                    isActive: url.startsWith(attendanceLogsBase),
+                }] : []),
+                ...(userPackage.time_sheet_module === 1 ? [{
+                    title: "Time Sheet",
+                    url: route("timesheets.index"),
+                    isActive: url.startsWith(timeSheetsBase),
+                }] : []),
                 {
                     title: "Departments",
                     url: route("departments.index"),

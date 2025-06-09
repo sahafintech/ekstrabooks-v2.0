@@ -26,14 +26,23 @@ import {
     DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { Edit, EyeIcon, FileDown, MoreVertical, Plus, Trash, ChevronUp, ChevronDown } from "lucide-react";
+import {
+    Edit,
+    EyeIcon,
+    FileDown,
+    MoreVertical,
+    Plus,
+    Trash,
+    ChevronUp,
+    ChevronDown,
+} from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
-import { formatCurrency } from "@/lib/utils";
+import { formatAmount, formatCurrency } from "@/lib/utils";
 import { Label } from "@/Components/ui/label";
 import DateTimePicker from "@/Components/DateTimePicker";
 
@@ -66,11 +75,18 @@ const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
 );
 
 // Bulk Delete Confirmation Modal Component
-const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, count }) => (
+const BulkDeleteConfirmationModal = ({
+    show,
+    onClose,
+    onConfirm,
+    processing,
+    count,
+}) => (
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
-                Are you sure you want to delete {count} selected {count !== 1 ? 'payslips' : 'payslip'}?
+                Are you sure you want to delete {count} selected{" "}
+                {count !== 1 ? "payslips" : "payslip"}?
             </h2>
             <div className="mt-6 flex justify-end">
                 <Button
@@ -93,11 +109,18 @@ const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, cou
     </Modal>
 );
 
-const BulkApproveConfirmationModal = ({ show, onClose, onConfirm, processing, count }) => (
+const BulkApproveConfirmationModal = ({
+    show,
+    onClose,
+    onConfirm,
+    processing,
+    count,
+}) => (
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
-                Are you sure you want to approve {count} selected {count !== 1 ? 'payslips' : 'payslip'}?
+                Are you sure you want to approve {count} selected{" "}
+                {count !== 1 ? "payslips" : "payslip"}?
             </h2>
             <div className="mt-6 flex justify-end">
                 <Button
@@ -108,11 +131,7 @@ const BulkApproveConfirmationModal = ({ show, onClose, onConfirm, processing, co
                 >
                     Cancel
                 </Button>
-                <Button
-                    type="submit"
-                    variant="default"
-                    disabled={processing}
-                >
+                <Button type="submit" variant="default" disabled={processing}>
                     Approve Selected
                 </Button>
             </div>
@@ -120,11 +139,18 @@ const BulkApproveConfirmationModal = ({ show, onClose, onConfirm, processing, co
     </Modal>
 );
 
-const BulkRejectConfirmationModal = ({ show, onClose, onConfirm, processing, count }) => (
+const BulkRejectConfirmationModal = ({
+    show,
+    onClose,
+    onConfirm,
+    processing,
+    count,
+}) => (
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
-                Are you sure you want to reject {count} selected {count !== 1 ? 'payslips' : 'payslip'}?
+                Are you sure you want to reject {count} selected{" "}
+                {count !== 1 ? "payslips" : "payslip"}?
             </h2>
             <div className="mt-6 flex justify-end">
                 <Button
@@ -135,11 +161,7 @@ const BulkRejectConfirmationModal = ({ show, onClose, onConfirm, processing, cou
                 >
                     Cancel
                 </Button>
-                <Button
-                    type="submit"
-                    variant="default"
-                    disabled={processing}
-                >
+                <Button type="submit" variant="default" disabled={processing}>
                     Reject Selected
                 </Button>
             </div>
@@ -147,22 +169,37 @@ const BulkRejectConfirmationModal = ({ show, onClose, onConfirm, processing, cou
     </Modal>
 );
 
-const BulkAccrueConfirmationModal = ({ show, onClose, onConfirm, processing, count, accounts, liabilityAccountId, expenseAccountId, setLiabilityAccountId, setExpenseAccountId }) => (
+const BulkAccrueConfirmationModal = ({
+    show,
+    onClose,
+    onConfirm,
+    processing,
+    count,
+    accounts,
+    liabilityAccountId,
+    expenseAccountId,
+    setLiabilityAccountId,
+    setExpenseAccountId,
+}) => (
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
-                Are you sure you want to accrue {count} selected {count !== 1 ? 'payslips' : 'payslip'}?
+                Are you sure you want to accrue {count} selected{" "}
+                {count !== 1 ? "payslips" : "payslip"}?
             </h2>
             <div className="flex flex-1 flex-col gap-4 p-4 mt-4">
                 <div className="grid grid-cols-12 mt-2">
-                    <Label htmlFor="liability_account_id" className="md:col-span-3 col-span-12">
+                    <Label
+                        htmlFor="liability_account_id"
+                        className="md:col-span-3 col-span-12"
+                    >
                         Liablity Account
                     </Label>
                     <div className="md:col-span-9 col-span-12 md:mt-0 mt-2">
                         <SearchableCombobox
-                            options={accounts.map(account => ({
+                            options={accounts.map((account) => ({
                                 id: account.id,
-                                name: account.account_name
+                                name: account.account_name,
                             }))}
                             value={liabilityAccountId}
                             onChange={(value) => setLiabilityAccountId(value)}
@@ -172,14 +209,17 @@ const BulkAccrueConfirmationModal = ({ show, onClose, onConfirm, processing, cou
                 </div>
 
                 <div className="grid grid-cols-12 mt-2">
-                    <Label htmlFor="expense_account_id" className="md:col-span-3 col-span-12">
+                    <Label
+                        htmlFor="expense_account_id"
+                        className="md:col-span-3 col-span-12"
+                    >
                         Expense Account
                     </Label>
                     <div className="md:col-span-9 col-span-12 md:mt-0 mt-2">
                         <SearchableCombobox
-                            options={accounts.map(account => ({
+                            options={accounts.map((account) => ({
                                 id: account.id,
-                                name: account.account_name
+                                name: account.account_name,
                             }))}
                             value={expenseAccountId}
                             onChange={(value) => setExpenseAccountId(value)}
@@ -210,15 +250,37 @@ const BulkAccrueConfirmationModal = ({ show, onClose, onConfirm, processing, cou
     </Modal>
 );
 
-const BulkPaymentConfirmationModal = ({ show, onClose, onConfirm, processing, count, accounts, methods, debitAccountId, creditAccountId, setDebitAccountId, setCreditAccountId, advanceAccountId, setAdvanceAccountId, paymentMethod, setPaymentMethod, paymentDate, setPaymentDate }) => (
+const BulkPaymentConfirmationModal = ({
+    show,
+    onClose,
+    onConfirm,
+    processing,
+    count,
+    accounts,
+    methods,
+    debitAccountId,
+    creditAccountId,
+    setDebitAccountId,
+    setCreditAccountId,
+    advanceAccountId,
+    setAdvanceAccountId,
+    paymentMethod,
+    setPaymentMethod,
+    paymentDate,
+    setPaymentDate,
+}) => (
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
-                Are you sure you want to pay {count} selected {count !== 1 ? 'payslips' : 'payslip'}?
+                Are you sure you want to pay {count} selected{" "}
+                {count !== 1 ? "payslips" : "payslip"}?
             </h2>
             <div className="flex flex-1 flex-col gap-4 p-4 mt-4">
                 <div className="grid grid-cols-12 mt-2">
-                    <Label htmlFor="credit_account_id" className="md:col-span-3 col-span-12">
+                    <Label
+                        htmlFor="credit_account_id"
+                        className="md:col-span-3 col-span-12"
+                    >
                         Payment Date *
                     </Label>
                     <div className="md:col-span-9 col-span-12 md:mt-0 mt-2">
@@ -231,14 +293,17 @@ const BulkPaymentConfirmationModal = ({ show, onClose, onConfirm, processing, co
                 </div>
 
                 <div className="grid grid-cols-12 mt-2">
-                    <Label htmlFor="credit_account_id" className="md:col-span-3 col-span-12">
+                    <Label
+                        htmlFor="credit_account_id"
+                        className="md:col-span-3 col-span-12"
+                    >
                         Credit Account *
                     </Label>
                     <div className="md:col-span-9 col-span-12 md:mt-0 mt-2">
                         <SearchableCombobox
-                            options={accounts.map(account => ({
+                            options={accounts.map((account) => ({
                                 id: account.id,
-                                name: account.account_name
+                                name: account.account_name,
                             }))}
                             value={creditAccountId}
                             onChange={(value) => setCreditAccountId(value)}
@@ -248,14 +313,17 @@ const BulkPaymentConfirmationModal = ({ show, onClose, onConfirm, processing, co
                 </div>
 
                 <div className="grid grid-cols-12 mt-2">
-                    <Label htmlFor="debit_account_id" className="md:col-span-3 col-span-12">
+                    <Label
+                        htmlFor="debit_account_id"
+                        className="md:col-span-3 col-span-12"
+                    >
                         Debit Account *
                     </Label>
                     <div className="md:col-span-9 col-span-12 md:mt-0 mt-2">
                         <SearchableCombobox
-                            options={accounts.map(account => ({
+                            options={accounts.map((account) => ({
                                 id: account.id,
-                                name: account.account_name
+                                name: account.account_name,
                             }))}
                             value={debitAccountId}
                             onChange={(value) => setDebitAccountId(value)}
@@ -265,14 +333,17 @@ const BulkPaymentConfirmationModal = ({ show, onClose, onConfirm, processing, co
                 </div>
 
                 <div className="grid grid-cols-12 mt-2">
-                    <Label htmlFor="advance_account_id" className="md:col-span-3 col-span-12">
+                    <Label
+                        htmlFor="advance_account_id"
+                        className="md:col-span-3 col-span-12"
+                    >
                         Advance Account *
                     </Label>
                     <div className="md:col-span-9 col-span-12 md:mt-0 mt-2">
                         <SearchableCombobox
-                            options={accounts.map(account => ({
+                            options={accounts.map((account) => ({
                                 id: account.id,
-                                name: account.account_name
+                                name: account.account_name,
                             }))}
                             value={advanceAccountId}
                             onChange={(value) => setAdvanceAccountId(value)}
@@ -282,14 +353,17 @@ const BulkPaymentConfirmationModal = ({ show, onClose, onConfirm, processing, co
                 </div>
 
                 <div className="grid grid-cols-12 mt-2">
-                    <Label htmlFor="method" className="md:col-span-3 col-span-12">
+                    <Label
+                        htmlFor="method"
+                        className="md:col-span-3 col-span-12"
+                    >
                         Payment Method
                     </Label>
                     <div className="md:col-span-9 col-span-12 md:mt-0 mt-2">
                         <SearchableCombobox
-                            options={methods.map(method => ({
+                            options={methods.map((method) => ({
                                 id: method.name,
-                                name: method.name
+                                name: method.name,
                             }))}
                             value={paymentMethod}
                             onChange={(value) => setPaymentMethod(value)}
@@ -320,8 +394,17 @@ const BulkPaymentConfirmationModal = ({ show, onClose, onConfirm, processing, co
     </Modal>
 );
 
-export default function List({ payrolls = [], meta = {}, filters = {}, years, year, month, accounts, methods }) {
-    const { flash = {}, errors = {} } = usePage().props;
+export default function List({
+    payrolls = [],
+    meta = {},
+    filters = {},
+    years,
+    year,
+    month,
+    accounts,
+    methods,
+}) {
+    const { flash = {}, errors = {}, userPackage } = usePage().props;
     const { toast } = useToast();
     const [selectedPaylips, setSelectedPayslips] = useState([]);
     const [isAllSelected, setIsAllSelected] = useState(false);
@@ -346,14 +429,17 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
     const [advanceAccountId, setAdvanceAccountId] = useState(null);
     const [paymentMethod, setPaymentMethod] = useState(null);
     const [paymentDate, setPaymentDate] = useState(null);
-    const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
+    const [sorting, setSorting] = useState(
+        filters.sorting || { column: "id", direction: "desc" }
+    );
     const [paymentAmounts, setPaymentAmounts] = useState({});
 
     useEffect(() => {
         // Initialize paymentAmounts with the correct due amounts
         const initialPaymentAmounts = {};
-        payrolls.forEach(payroll => {
-            initialPaymentAmounts[payroll.id] = payroll.net_salary - payroll.paid;
+        payrolls.forEach((payroll) => {
+            initialPaymentAmounts[payroll.id] =
+                payroll.net_salary - payroll.paid;
         });
         setPaymentAmounts(initialPaymentAmounts);
     }, [payrolls]);
@@ -386,7 +472,9 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
 
     const toggleSelectPayroll = (id) => {
         if (selectedPaylips.includes(id)) {
-            setSelectedPayslips(selectedPaylips.filter((payrollId) => payrollId !== id));
+            setSelectedPayslips(
+                selectedPaylips.filter((payrollId) => payrollId !== id)
+            );
             setIsAllSelected(false);
         } else {
             setSelectedPayslips([...selectedPaylips, id]);
@@ -397,10 +485,20 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
     };
 
     useEffect(() => {
-        if (selectedMonth && selectedYear && (selectedMonth !== month || selectedYear !== year)) {
+        if (
+            selectedMonth &&
+            selectedYear &&
+            (selectedMonth !== month || selectedYear !== year)
+        ) {
             router.get(
                 route("payslips.index"),
-                { search, page: 1, per_page: perPage, month: selectedMonth, year: selectedYear },
+                {
+                    search,
+                    page: 1,
+                    per_page: perPage,
+                    month: selectedMonth,
+                    year: selectedYear,
+                },
                 { preserveState: true }
             );
         }
@@ -410,7 +508,13 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
         setSearch(e.target.value);
         router.get(
             route("payslips.index"),
-            { search: e.target.value, page: 1, per_page: perPage, month: selectedMonth, year: selectedYear },
+            {
+                search: e.target.value,
+                page: 1,
+                per_page: perPage,
+                month: selectedMonth,
+                year: selectedYear,
+            },
             { preserveState: true }
         );
     };
@@ -419,7 +523,13 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
         setPerPage(value);
         router.get(
             route("payslips.index"),
-            { search, page: 1, per_page: value, month: selectedMonth, year: selectedYear },
+            {
+                search,
+                page: 1,
+                per_page: value,
+                month: selectedMonth,
+                year: selectedYear,
+            },
             { preserveState: true }
         );
     };
@@ -428,7 +538,13 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
         setCurrentPage(page);
         router.get(
             route("payslips.index"),
-            { search, page, per_page: perPage, month: selectedMonth, year: selectedYear },
+            {
+                search,
+                page,
+                per_page: perPage,
+                month: selectedMonth,
+                year: selectedYear,
+            },
             { preserveState: true }
         );
     };
@@ -484,7 +600,7 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
             },
             onError: () => {
                 setIsProcessing(false);
-            }
+            },
         });
     };
 
@@ -495,7 +611,7 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
         router.post(
             route("payslips.bulk_delete"),
             {
-                ids: selectedPaylips
+                ids: selectedPaylips,
             },
             {
                 preserveState: true,
@@ -508,7 +624,7 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                 },
                 onError: () => {
                     setIsProcessing(false);
-                }
+                },
             }
         );
     };
@@ -533,7 +649,7 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                 },
                 onError: () => {
                     setIsProcessing(false);
-                }
+                },
             }
         );
     };
@@ -545,7 +661,7 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
         router.post(
             route("payslips.bulk_reject"),
             {
-                ids: selectedPaylips
+                ids: selectedPaylips,
             },
             {
                 preserveState: true,
@@ -558,7 +674,7 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                 },
                 onError: () => {
                     setIsProcessing(false);
-                }
+                },
             }
         );
     };
@@ -572,7 +688,7 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
             {
                 ids: selectedPaylips,
                 liability_account_id: liabilityAccountId,
-                expense_account_id: expenseAccountId
+                expense_account_id: expenseAccountId,
             },
             {
                 preserveState: true,
@@ -585,15 +701,15 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                 },
                 onError: () => {
                     setIsProcessing(false);
-                }
+                },
             }
         );
     };
 
     const handlePaymentAmountChange = (payrollId, amount) => {
-        setPaymentAmounts(prev => ({
+        setPaymentAmounts((prev) => ({
             ...prev,
-            [payrollId]: amount
+            [payrollId]: amount,
         }));
     };
 
@@ -602,9 +718,11 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
         setIsProcessing(true);
 
         // Create an array of payment data including the payment amounts
-        const paymentData = selectedPaylips.map(id => ({
+        const paymentData = selectedPaylips.map((id) => ({
             id,
-            amount: paymentAmounts[id] || payrolls.find(p => p.id === id)?.net_salary
+            amount:
+                paymentAmounts[id] ||
+                payrolls.find((p) => p.id === id)?.net_salary,
         }));
 
         router.post(
@@ -615,7 +733,7 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                 debit_account_id: debitAccountId,
                 advance_account_id: advanceAccountId,
                 method: paymentMethod,
-                payment_date: paymentDate
+                payment_date: paymentDate,
             },
             {
                 preserveState: true,
@@ -629,7 +747,7 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                 },
                 onError: () => {
                     setIsProcessing(false);
-                }
+                },
             }
         );
     };
@@ -652,10 +770,18 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
         return (
             <span className="inline-flex flex-col ml-1">
                 <ChevronUp
-                    className={`w-3 h-3 ${isActive && sorting.direction === "asc" ? "text-gray-800" : "text-gray-300"}`}
+                    className={`w-3 h-3 ${
+                        isActive && sorting.direction === "asc"
+                            ? "text-gray-800"
+                            : "text-gray-300"
+                    }`}
                 />
                 <ChevronDown
-                    className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc" ? "text-gray-800" : "text-gray-300"}`}
+                    className={`w-3 h-3 -mt-1 ${
+                        isActive && sorting.direction === "desc"
+                            ? "text-gray-800"
+                            : "text-gray-300"
+                    }`}
                 />
             </span>
         );
@@ -666,7 +792,10 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
         const pages = [];
         const maxPagesToShow = 5;
 
-        let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+        let startPage = Math.max(
+            1,
+            currentPage - Math.floor(maxPagesToShow / 2)
+        );
         let endPage = startPage + maxPagesToShow - 1;
 
         if (endPage > totalPages) {
@@ -737,8 +866,11 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={exportPayrolls}>
-                                            <FileDown className="mr-2 h-4 w-4" /> Export
+                                        <DropdownMenuItem
+                                            onClick={exportPayrolls}
+                                        >
+                                            <FileDown className="mr-2 h-4 w-4" />{" "}
+                                            Export
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
@@ -759,13 +891,18 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                                         { name: "December", id: "12" },
                                     ]}
                                     value={selectedMonth}
-                                    onChange={(value) => setSelectedMonth(value)}
+                                    onChange={(value) =>
+                                        setSelectedMonth(value)
+                                    }
                                     className="w-full md:w-44"
                                     placeholder="Select month"
                                 />
                                 {/* year */}
                                 <SearchableCombobox
-                                    options={years.map(year => ({ id: year, name: year }))}
+                                    options={years.map((year) => ({
+                                        id: year,
+                                        name: year,
+                                    }))}
                                     value={selectedYear}
                                     onChange={(value) => setSelectedYear(value)}
                                     className="w-full md:w-44"
@@ -784,25 +921,46 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
 
                         <div className="mb-4 flex flex-col md:flex-row gap-4 justify-between">
                             <div className="flex items-center gap-2">
-                                <Select value={bulkAction} onValueChange={setBulkAction}>
+                                <Select
+                                    value={bulkAction}
+                                    onValueChange={setBulkAction}
+                                >
                                     <SelectTrigger className="w-[180px]">
                                         <SelectValue placeholder="Bulk actions" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="delete">Delete Selected</SelectItem>
-                                        <SelectItem value="approve">Approve Selected</SelectItem>
-                                        <SelectItem value="reject">Reject Selected</SelectItem>
-                                        <SelectItem value="accrue">Accrue Selected</SelectItem>
-                                        <SelectItem value="pay">Pay Selected</SelectItem>
+                                        <SelectItem value="delete">
+                                            Delete Selected
+                                        </SelectItem>
+                                        <SelectItem value="approve">
+                                            Approve Selected
+                                        </SelectItem>
+                                        <SelectItem value="reject">
+                                            Reject Selected
+                                        </SelectItem>
+                                        <SelectItem value="accrue">
+                                            Accrue Selected
+                                        </SelectItem>
+                                        <SelectItem value="pay">
+                                            Pay Selected
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
-                                <Button onClick={handleBulkAction} variant="outline">
+                                <Button
+                                    onClick={handleBulkAction}
+                                    variant="outline"
+                                >
                                     Apply
                                 </Button>
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className="text-sm text-gray-500">Show</span>
-                                <Select value={perPage.toString()} onValueChange={handlePerPageChange}>
+                                <span className="text-sm text-gray-500">
+                                    Show
+                                </span>
+                                <Select
+                                    value={perPage.toString()}
+                                    onValueChange={handlePerPageChange}
+                                >
                                     <SelectTrigger className="w-[80px]">
                                         <SelectValue placeholder="10" />
                                     </SelectTrigger>
@@ -813,7 +971,9 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                                         <SelectItem value="100">100</SelectItem>
                                     </SelectContent>
                                 </Select>
-                                <span className="text-sm text-gray-500">entries</span>
+                                <span className="text-sm text-gray-500">
+                                    entries
+                                </span>
                             </div>
                         </div>
 
@@ -824,88 +984,611 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                                         <TableHead className="w-[50px]">
                                             <Checkbox
                                                 checked={isAllSelected}
-                                                onCheckedChange={toggleSelectAll}
+                                                onCheckedChange={
+                                                    toggleSelectAll
+                                                }
                                             />
                                         </TableHead>
-                                        <TableHead className="w-[80px] cursor-pointer" onClick={() => handleSort("id")}>
+                                        <TableHead
+                                            className="w-[80px] cursor-pointer whitespace-nowrap"
+                                            onClick={() => handleSort("id")}
+                                        >
                                             NO {renderSortIcon("id")}
                                         </TableHead>
-                                        <TableHead className="cursor-pointer" onClick={() => handleSort("employee_id")}>
-                                            Employee ID {renderSortIcon("employee_id")}
+                                        <TableHead
+                                            className="cursor-pointer whitespace-nowrap"
+                                            onClick={() =>
+                                                handleSort("employee_id")
+                                            }
+                                        >
+                                            Employee ID{" "}
+                                            {renderSortIcon("employee_id")}
                                         </TableHead>
-                                        <TableHead className="cursor-pointer" onClick={() => handleSort("staff.name")}>
+                                        <TableHead
+                                            className="cursor-pointer whitespace-nowrap"
+                                            onClick={() =>
+                                                handleSort("staff.name")
+                                            }
+                                        >
                                             Name {renderSortIcon("staff.name")}
                                         </TableHead>
-                                        <TableHead className="cursor-pointer" onClick={() => handleSort("current_salary")}>
-                                            Basic Salary {renderSortIcon("current_salary")}
+                                        {userPackage.time_sheet_module ===
+                                            1 && (
+                                            <>
+                                                <TableHead
+                                                    className="cursor-pointer whitespace-nowrap"
+                                                    onClick={() =>
+                                                        handleSort(
+                                                            "required_working_days"
+                                                        )
+                                                    }
+                                                >
+                                                    Required Working Days{" "}
+                                                    {renderSortIcon(
+                                                        "required_working_days"
+                                                    )}
+                                                </TableHead>
+                                                <TableHead
+                                                    className="cursor-pointer whitespace-nowrap"
+                                                    onClick={() =>
+                                                        handleSort(
+                                                            "public_holiday"
+                                                        )
+                                                    }
+                                                >
+                                                    Public Holiday{" "}
+                                                    {renderSortIcon(
+                                                        "public_holiday"
+                                                    )}
+                                                </TableHead>
+                                                <TableHead
+                                                    className="cursor-pointer whitespace-nowrap"
+                                                    onClick={() =>
+                                                        handleSort("weekend")
+                                                    }
+                                                >
+                                                    Weekend{" "}
+                                                    {renderSortIcon("weekend")}
+                                                </TableHead>
+                                                <TableHead
+                                                    className="cursor-pointer whitespace-nowrap"
+                                                    onClick={() =>
+                                                        handleSort(
+                                                            "required_working_hours"
+                                                        )
+                                                    }
+                                                >
+                                                    Required Working Hours{" "}
+                                                    {renderSortIcon(
+                                                        "required_working_hours"
+                                                    )}
+                                                </TableHead>
+                                                <TableHead
+                                                    className="cursor-pointer whitespace-nowrap"
+                                                    onClick={() =>
+                                                        handleSort(
+                                                            "overtime_hours"
+                                                        )
+                                                    }
+                                                >
+                                                    Overtime Hours{" "}
+                                                    {renderSortIcon(
+                                                        "overtime_hours"
+                                                    )}
+                                                </TableHead>
+                                                <TableHead
+                                                    className="cursor-pointer whitespace-nowrap"
+                                                    onClick={() =>
+                                                        handleSort(
+                                                            "cost_overtime_hours"
+                                                        )
+                                                    }
+                                                >
+                                                    Cost of Overtime Hours{" "}
+                                                    {renderSortIcon(
+                                                        "cost_overtime_hours"
+                                                    )}
+                                                </TableHead>
+                                                <TableHead
+                                                    className="cursor-pointer whitespace-nowrap"
+                                                    onClick={() =>
+                                                        handleSort(
+                                                            "cost_public_holiday"
+                                                        )
+                                                    }
+                                                >
+                                                    Cost of Public Holiday{" "}
+                                                    {renderSortIcon(
+                                                        "cost_public_holiday"
+                                                    )}
+                                                </TableHead>
+                                                <TableHead
+                                                    className="cursor-pointer whitespace-nowrap"
+                                                    onClick={() =>
+                                                        handleSort(
+                                                            "cost_weekend"
+                                                        )
+                                                    }
+                                                >
+                                                    Cost of Weekend{" "}
+                                                    {renderSortIcon(
+                                                        "cost_weekend"
+                                                    )}
+                                                </TableHead>
+                                                <TableHead
+                                                    className="cursor-pointer whitespace-nowrap"
+                                                    onClick={() =>
+                                                        handleSort(
+                                                            "total_cost_normal_hours"
+                                                        )
+                                                    }
+                                                >
+                                                    Total Cost of Normal Hours{" "}
+                                                    {renderSortIcon(
+                                                        "total_cost_normal_hours"
+                                                    )}
+                                                </TableHead>
+                                                <TableHead
+                                                    className="cursor-pointer whitespace-nowrap"
+                                                    onClick={() =>
+                                                        handleSort(
+                                                            "total_cost_overtime_hours"
+                                                        )
+                                                    }
+                                                >
+                                                    Total Cost of Overtime Hours{" "}
+                                                    {renderSortIcon(
+                                                        "total_cost_overtime_hours"
+                                                    )}
+                                                </TableHead>
+                                                <TableHead
+                                                    className="cursor-pointer whitespace-nowrap"
+                                                    onClick={() =>
+                                                        handleSort(
+                                                            "total_cost_public_holiday"
+                                                        )
+                                                    }
+                                                >
+                                                    Total Cost of Public
+                                                    Holidays{" "}
+                                                    {renderSortIcon(
+                                                        "total_cost_public_holiday"
+                                                    )}
+                                                </TableHead>
+                                                <TableHead
+                                                    className="cursor-pointer whitespace-nowrap"
+                                                    onClick={() =>
+                                                        handleSort(
+                                                            "total_cost_weekend"
+                                                        )
+                                                    }
+                                                >
+                                                    Total Cost of Weekends{" "}
+                                                    {renderSortIcon(
+                                                        "total_cost_weekend"
+                                                    )}
+                                                </TableHead>
+                                            </>
+                                        )}
+                                        <TableHead
+                                            className="cursor-pointer whitespace-nowrap"
+                                            onClick={() =>
+                                                handleSort("current_salary")
+                                            }
+                                        >
+                                            Basic Salary{" "}
+                                            {renderSortIcon("current_salary")}
                                         </TableHead>
-                                        <TableHead className="cursor-pointer" onClick={() => handleSort("total_allowance")}>
-                                            Additions {renderSortIcon("total_allowance")}
+                                        <TableHead
+                                            className="cursor-pointer whitespace-nowrap"
+                                            onClick={() =>
+                                                handleSort("total_allowance")
+                                            }
+                                        >
+                                            Additions{" "}
+                                            {renderSortIcon("total_allowance")}
                                         </TableHead>
-                                        <TableHead className="cursor-pointer" onClick={() => handleSort("tax_amount")}>
-                                            Payroll Tax {renderSortIcon("tax_amount")}
+                                        <TableHead
+                                            className="cursor-pointer whitespace-nowrap"
+                                            onClick={() =>
+                                                handleSort("tax_amount")
+                                            }
+                                        >
+                                            Payroll Tax{" "}
+                                            {renderSortIcon("tax_amount")}
                                         </TableHead>
-                                        <TableHead className="cursor-pointer" onClick={() => handleSort("total_deduction")}>
-                                            Other Deductions {renderSortIcon("total_deduction")}
+                                        <TableHead
+                                            className="cursor-pointer whitespace-nowrap"
+                                            onClick={() =>
+                                                handleSort("total_deduction")
+                                            }
+                                        >
+                                            Other Deductions{" "}
+                                            {renderSortIcon("total_deduction")}
                                         </TableHead>
-                                        <TableHead className="cursor-pointer" onClick={() => handleSort("advance")}>
-                                            Salary Advance Deductions {renderSortIcon("advance")}
+                                        <TableHead
+                                            className="cursor-pointer whitespace-nowrap"
+                                            onClick={() =>
+                                                handleSort("advance")
+                                            }
+                                        >
+                                            Salary Advance Deductions{" "}
+                                            {renderSortIcon("advance")}
                                         </TableHead>
-                                        <TableHead className="cursor-pointer" onClick={() => handleSort("net_salary")}>
-                                            Net Salary {renderSortIcon("net_salary")}
+                                        <TableHead
+                                            className="cursor-pointer whitespace-nowrap"
+                                            onClick={() =>
+                                                handleSort("net_salary")
+                                            }
+                                        >
+                                            Net Salary{" "}
+                                            {renderSortIcon("net_salary")}
                                         </TableHead>
-                                        <TableHead className="cursor-pointer" onClick={() => handleSort("paid")}>
+                                        <TableHead
+                                            className="cursor-pointer whitespace-nowrap"
+                                            onClick={() => handleSort("paid")}
+                                        >
                                             Paid {renderSortIcon("paid")}
                                         </TableHead>
                                         <TableHead>Due Amount</TableHead>
                                         <TableHead>Amount</TableHead>
-                                        <TableHead className="cursor-pointer" onClick={() => handleSort("status")}>
+                                        <TableHead
+                                            className="cursor-pointer"
+                                            onClick={() => handleSort("status")}
+                                        >
                                             Status {renderSortIcon("status")}
                                         </TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
+                                        <TableHead className="text-right">
+                                            Actions
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     <TableRow>
                                         <TableCell colSpan={4}></TableCell>
+                                        {userPackage.time_sheet_module ===
+                                            1 && (
+                                            <>
+                                                <TableCell>
+                                                    <span className="text-blue-600">
+                                                        {formatAmount(
+                                                            payrolls.reduce(
+                                                                (
+                                                                    acc,
+                                                                    payroll
+                                                                ) =>
+                                                                    acc +
+                                                                    Number(
+                                                                        payroll.required_working_days ||
+                                                                            0
+                                                                    ),
+                                                                0
+                                                            )
+                                                        )}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-blue-600">
+                                                        {formatAmount(
+                                                            payrolls.reduce(
+                                                                (
+                                                                    acc,
+                                                                    payroll
+                                                                ) =>
+                                                                    acc +
+                                                                    Number(
+                                                                        payroll.public_holiday ||
+                                                                            0
+                                                                    ),
+                                                                0
+                                                            )
+                                                        )}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-blue-600">
+                                                        {formatAmount(
+                                                            payrolls.reduce(
+                                                                (
+                                                                    acc,
+                                                                    payroll
+                                                                ) =>
+                                                                    acc +
+                                                                    Number(
+                                                                        payroll.weekend ||
+                                                                            0
+                                                                    ),
+                                                                0
+                                                            )
+                                                        )}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-blue-600">
+                                                        {formatAmount(
+                                                            payrolls.reduce(
+                                                                (
+                                                                    acc,
+                                                                    payroll
+                                                                ) =>
+                                                                    acc +
+                                                                    Number(
+                                                                        payroll.required_working_hours ||
+                                                                            0
+                                                                    ),
+                                                                0
+                                                            )
+                                                        )}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-blue-600">
+                                                        {formatAmount(
+                                                            payrolls.reduce(
+                                                                (
+                                                                    acc,
+                                                                    payroll
+                                                                ) =>
+                                                                    acc +
+                                                                    Number(
+                                                                        payroll.overtime_hours ||
+                                                                            0
+                                                                    ),
+                                                                0
+                                                            )
+                                                        )}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-blue-600">
+                                                        {formatCurrency({
+                                                            amount: payrolls.reduce(
+                                                                (
+                                                                    acc,
+                                                                    payroll
+                                                                ) =>
+                                                                    acc +
+                                                                    Number(
+                                                                        payroll.cost_overtime_hours ||
+                                                                            0
+                                                                    ),
+                                                                0
+                                                            ),
+                                                        })}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-blue-600">
+                                                        {formatCurrency({
+                                                            amount: payrolls.reduce(
+                                                                (
+                                                                    acc,
+                                                                    payroll
+                                                                ) =>
+                                                                    acc +
+                                                                    Number(
+                                                                        payroll.cost_public_holiday ||
+                                                                            0
+                                                                    ),
+                                                                0
+                                                            ),
+                                                        })}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-blue-600">
+                                                        {formatCurrency({
+                                                            amount: payrolls.reduce(
+                                                                (
+                                                                    acc,
+                                                                    payroll
+                                                                ) =>
+                                                                    acc +
+                                                                    Number(
+                                                                        payroll.cost_weekend ||
+                                                                            0
+                                                                    ),
+                                                                0
+                                                            ),
+                                                        })}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-blue-600">
+                                                        {formatCurrency({
+                                                            amount: payrolls.reduce(
+                                                                (
+                                                                    acc,
+                                                                    payroll
+                                                                ) =>
+                                                                    acc +
+                                                                    Number(
+                                                                        payroll.total_cost_normal_hours ||
+                                                                            0
+                                                                    ),
+                                                                0
+                                                            ),
+                                                        })}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-blue-600">
+                                                        {formatCurrency({
+                                                            amount: payrolls.reduce(
+                                                                (
+                                                                    acc,
+                                                                    payroll
+                                                                ) =>
+                                                                    acc +
+                                                                    Number(
+                                                                        payroll.total_cost_overtime_hours ||
+                                                                            0
+                                                                    ),
+                                                                0
+                                                            ),
+                                                        })}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-blue-600">
+                                                        {formatCurrency({
+                                                            amount: payrolls.reduce(
+                                                                (
+                                                                    acc,
+                                                                    payroll
+                                                                ) =>
+                                                                    acc +
+                                                                    Number(
+                                                                        payroll.total_cost_public_holiday ||
+                                                                            0
+                                                                    ),
+                                                                0
+                                                            ),
+                                                        })}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-blue-600">
+                                                        {formatCurrency({
+                                                            amount: payrolls.reduce(
+                                                                (
+                                                                    acc,
+                                                                    payroll
+                                                                ) =>
+                                                                    acc +
+                                                                    Number(
+                                                                        payroll.total_cost_weekend ||
+                                                                            0
+                                                                    ),
+                                                                0
+                                                            ),
+                                                        })}
+                                                    </span>
+                                                </TableCell>
+                                            </>
+                                        )}
                                         <TableCell>
                                             <span className="text-blue-600">
-                                                {formatCurrency({ amount: payrolls.reduce((acc, payroll) => acc + Number(payroll.current_salary || 0), 0) })}
+                                                {formatCurrency({
+                                                    amount: payrolls.reduce(
+                                                        (acc, payroll) =>
+                                                            acc +
+                                                            Number(
+                                                                payroll.current_salary ||
+                                                                    0
+                                                            ),
+                                                        0
+                                                    ),
+                                                })}
                                             </span>
                                         </TableCell>
                                         <TableCell>
                                             <span className="text-green-600">
-                                                {formatCurrency({ amount: payrolls.reduce((acc, payroll) => acc + Number(payroll.total_allowance || 0), 0) })}
+                                                {formatCurrency({
+                                                    amount: payrolls.reduce(
+                                                        (acc, payroll) =>
+                                                            acc +
+                                                            Number(
+                                                                payroll.total_allowance ||
+                                                                    0
+                                                            ),
+                                                        0
+                                                    ),
+                                                })}
                                             </span>
                                         </TableCell>
                                         <TableCell>
                                             <span className="text-red-600">
-                                                {formatCurrency({ amount: payrolls.reduce((acc, payroll) => acc + Number(payroll.total_tax || 0), 0) })}
+                                                {formatCurrency({
+                                                    amount: payrolls.reduce(
+                                                        (acc, payroll) =>
+                                                            acc +
+                                                            Number(
+                                                                payroll.total_tax ||
+                                                                    0
+                                                            ),
+                                                        0
+                                                    ),
+                                                })}
                                             </span>
                                         </TableCell>
                                         <TableCell>
                                             <span className="text-red-600">
-                                                {formatCurrency({ amount: payrolls.reduce((acc, payroll) => acc + Number(payroll.total_deduction || 0), 0) })}
+                                                {formatCurrency({
+                                                    amount: payrolls.reduce(
+                                                        (acc, payroll) =>
+                                                            acc +
+                                                            Number(
+                                                                payroll.total_deduction ||
+                                                                    0
+                                                            ),
+                                                        0
+                                                    ),
+                                                })}
                                             </span>
                                         </TableCell>
                                         <TableCell>
                                             <span className="text-red-600">
-                                                {formatCurrency({ amount: payrolls.reduce((acc, payroll) => acc + Number(payroll.advance || 0), 0) })}
+                                                {formatCurrency({
+                                                    amount: payrolls.reduce(
+                                                        (acc, payroll) =>
+                                                            acc +
+                                                            Number(
+                                                                payroll.advance ||
+                                                                    0
+                                                            ),
+                                                        0
+                                                    ),
+                                                })}
                                             </span>
                                         </TableCell>
                                         <TableCell>
                                             <span className="text-green-600">
-                                                {formatCurrency({ amount: payrolls.reduce((acc, payroll) => acc + Number(payroll.net_salary || 0), 0) })}
+                                                {formatCurrency({
+                                                    amount: payrolls.reduce(
+                                                        (acc, payroll) =>
+                                                            acc +
+                                                            Number(
+                                                                payroll.net_salary ||
+                                                                    0
+                                                            ),
+                                                        0
+                                                    ),
+                                                })}
                                             </span>
                                         </TableCell>
                                         <TableCell>
                                             <span className="text-green-600">
-                                                {formatCurrency({ amount: payrolls.reduce((acc, payroll) => acc + Number(payroll.paid || 0), 0) })}
+                                                {formatCurrency({
+                                                    amount: payrolls.reduce(
+                                                        (acc, payroll) =>
+                                                            acc +
+                                                            Number(
+                                                                payroll.paid ||
+                                                                    0
+                                                            ),
+                                                        0
+                                                    ),
+                                                })}
                                             </span>
                                         </TableCell>
                                         <TableCell>
                                             <span className="text-red-600">
-                                                {formatCurrency({ amount: payrolls.reduce((acc, payroll) => acc + (Number(payroll.net_salary || 0) - Number(payroll.paid || 0)), 0) })}
+                                                {formatCurrency({
+                                                    amount: payrolls.reduce(
+                                                        (acc, payroll) =>
+                                                            acc +
+                                                            (Number(
+                                                                payroll.net_salary ||
+                                                                    0
+                                                            ) -
+                                                                Number(
+                                                                    payroll.paid ||
+                                                                        0
+                                                                )),
+                                                        0
+                                                    ),
+                                                })}
                                             </span>
                                         </TableCell>
                                         <TableCell></TableCell>
@@ -917,55 +1600,208 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                                             <TableRow key={payroll.id}>
                                                 <TableCell>
                                                     <Checkbox
-                                                        checked={selectedPaylips.includes(payroll.id)}
-                                                        onCheckedChange={() => toggleSelectPayroll(payroll.id)}
+                                                        checked={selectedPaylips.includes(
+                                                            payroll.id
+                                                        )}
+                                                        onCheckedChange={() =>
+                                                            toggleSelectPayroll(
+                                                                payroll.id
+                                                            )
+                                                        }
                                                     />
                                                 </TableCell>
-                                                <TableCell>{index + 1}</TableCell>
                                                 <TableCell>
-                                                    <Link href={route("payslips.show", payroll.id)} className="text-blue-600 underline">
-                                                        {payroll.staff.employee_id}
+                                                    {index + 1}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Link
+                                                        href={route(
+                                                            "payslips.show",
+                                                            payroll.id
+                                                        )}
+                                                        className="text-blue-600 underline"
+                                                    >
+                                                        {
+                                                            payroll.staff
+                                                                .employee_id
+                                                        }
                                                     </Link>
                                                 </TableCell>
-                                                <TableCell>{payroll.staff.name}</TableCell>
-                                                <TableCell>{formatCurrency({ amount: payroll.current_salary })}</TableCell>
-                                                <TableCell>{formatCurrency({ amount: payroll.total_allowance })}</TableCell>
-                                                <TableCell>{formatCurrency({ amount: payroll.total_tax })}</TableCell>
-                                                <TableCell>{formatCurrency({ amount: payroll.total_deduction })}</TableCell>
-                                                <TableCell>{formatCurrency({ amount: payroll.advance })}</TableCell>
-                                                <TableCell>{formatCurrency({ amount: payroll.net_salary })}</TableCell>
-                                                <TableCell>{formatCurrency({ amount: payroll.paid })}</TableCell>
-                                                <TableCell>{formatCurrency({ amount: payroll.net_salary - payroll.paid })}</TableCell>
+                                                <TableCell className="whitespace-nowrap">
+                                                    {payroll.staff.name}
+                                                </TableCell>
+                                                {userPackage.time_sheet_module ===
+                                                    1 && (
+                                                    <>
+                                                        <TableCell className="whitespace-nowrap">
+                                                            {formatAmount(
+                                                                payroll.required_working_days
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="whitespace-nowrap">
+                                                            {formatAmount(
+                                                                payroll.public_holiday
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="whitespace-nowrap">
+                                                            {formatAmount(
+                                                                payroll.weekend
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="whitespace-nowrap">
+                                                            {formatAmount(
+                                                                payroll.required_working_hours
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="whitespace-nowrap">
+                                                            {formatAmount(
+                                                                payroll.overtime_hours
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="whitespace-nowrap">
+                                                            {formatCurrency({
+                                                                amount: payroll.cost_overtime_hours,
+                                                            })}
+                                                        </TableCell>
+                                                        <TableCell className="whitespace-nowrap">
+                                                            {formatCurrency({
+                                                                amount: payroll.cost_public_holiday,
+                                                            })}
+                                                        </TableCell>
+                                                        <TableCell className="whitespace-nowrap">
+                                                            {formatCurrency({
+                                                                amount: payroll.cost_weekend,
+                                                            })}
+                                                        </TableCell>
+                                                        <TableCell className="whitespace-nowrap">
+                                                            {formatCurrency({
+                                                                amount: payroll.total_cost_normal_hours,
+                                                            })}
+                                                        </TableCell>
+                                                        <TableCell className="whitespace-nowrap">
+                                                            {formatCurrency({
+                                                                amount: payroll.total_cost_overtime_hours,
+                                                            })}
+                                                        </TableCell>
+                                                        <TableCell className="whitespace-nowrap">
+                                                            {formatCurrency({
+                                                                amount: payroll.total_cost_public_holiday,
+                                                            })}
+                                                        </TableCell>
+                                                        <TableCell className="whitespace-nowrap">
+                                                            {formatCurrency({
+                                                                amount: payroll.total_cost_weekend,
+                                                            })}
+                                                        </TableCell>
+                                                    </>
+                                                )}
+                                                <TableCell className="whitespace-nowrap">
+                                                    {formatCurrency({
+                                                        amount: payroll.current_salary,
+                                                    })}
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap">
+                                                    {formatCurrency({
+                                                        amount: payroll.total_allowance,
+                                                    })}
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap">
+                                                    {formatCurrency({
+                                                        amount: payroll.total_tax,
+                                                    })}
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap">
+                                                    {formatCurrency({
+                                                        amount: payroll.total_deduction,
+                                                    })}
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap">
+                                                    {formatCurrency({
+                                                        amount: payroll.advance,
+                                                    })}
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap">
+                                                    {formatCurrency({
+                                                        amount: payroll.net_salary,
+                                                    })}
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap">
+                                                    {formatCurrency({
+                                                        amount: payroll.paid,
+                                                    })}
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap">
+                                                    {formatCurrency({
+                                                        amount:
+                                                            payroll.net_salary -
+                                                            payroll.paid,
+                                                    })}
+                                                </TableCell>
                                                 <TableCell>
                                                     <Input
                                                         type="number"
-                                                        value={paymentAmounts[payroll.id] || payroll.net_salary - payroll.paid}
-                                                        onChange={(e) => handlePaymentAmountChange(payroll.id, parseFloat(e.target.value))}
+                                                        value={
+                                                            paymentAmounts[
+                                                                payroll.id
+                                                            ] ||
+                                                            payroll.net_salary -
+                                                                payroll.paid
+                                                        }
+                                                        onChange={(e) =>
+                                                            handlePaymentAmountChange(
+                                                                payroll.id,
+                                                                parseFloat(
+                                                                    e.target
+                                                                        .value
+                                                                )
+                                                            )
+                                                        }
                                                         className="w-32"
                                                         min="0"
                                                         max={payroll.net_salary}
                                                         step="0.01"
-                                                        disabled={payroll.status === 4}
+                                                        disabled={
+                                                            payroll.status === 4
+                                                        }
                                                     />
                                                 </TableCell>
-                                                <TableCell><PayrollStatusBadge status={payroll.status} /></TableCell>
+                                                <TableCell>
+                                                    <PayrollStatusBadge
+                                                        status={payroll.status}
+                                                    />
+                                                </TableCell>
                                                 <TableCell className="text-right">
                                                     <TableActions
                                                         actions={[
                                                             {
                                                                 label: "View",
-                                                                icon: <EyeIcon className="h-4 w-4" />,
-                                                                href: route("payslips.show", payroll.id),
+                                                                icon: (
+                                                                    <EyeIcon className="h-4 w-4" />
+                                                                ),
+                                                                href: route(
+                                                                    "payslips.show",
+                                                                    payroll.id
+                                                                ),
                                                             },
                                                             {
                                                                 label: "Edit",
-                                                                icon: <Edit className="h-4 w-4" />,
-                                                                href: route("payslips.edit", payroll.id),
+                                                                icon: (
+                                                                    <Edit className="h-4 w-4" />
+                                                                ),
+                                                                href: route(
+                                                                    "payslips.edit",
+                                                                    payroll.id
+                                                                ),
                                                             },
                                                             {
                                                                 label: "Delete",
-                                                                icon: <Trash className="h-4 w-4" />,
-                                                                onClick: () => handleDeleteConfirm(payroll.id),
+                                                                icon: (
+                                                                    <Trash className="h-4 w-4" />
+                                                                ),
+                                                                onClick: () =>
+                                                                    handleDeleteConfirm(
+                                                                        payroll.id
+                                                                    ),
                                                                 destructive: true,
                                                             },
                                                         ]}
@@ -975,7 +1811,10 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                                         ))
                                     ) : (
                                         <TableRow>
-                                            <TableCell colSpan={15} className="h-24 text-center">
+                                            <TableCell
+                                                colSpan={15}
+                                                className="h-24 text-center"
+                                            >
                                                 No payrolls found.
                                             </TableCell>
                                         </TableRow>
@@ -987,9 +1826,12 @@ export default function List({ payrolls = [], meta = {}, filters = {}, years, ye
                         {meta.last_page > 1 && (
                             <div className="flex justify-between items-center mt-4">
                                 <div className="text-sm text-gray-500">
-                                    Showing {meta.from || 0} to {meta.to || 0} of {meta.total} entries
+                                    Showing {meta.from || 0} to {meta.to || 0}{" "}
+                                    of {meta.total} entries
                                 </div>
-                                <div className="flex gap-1">{renderPageNumbers()}</div>
+                                <div className="flex gap-1">
+                                    {renderPageNumbers()}
+                                </div>
                             </div>
                         )}
                     </div>

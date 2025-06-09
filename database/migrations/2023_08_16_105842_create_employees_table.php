@@ -18,6 +18,9 @@ return new class extends Migration {
             $table->string('phone', 30)->nullable();
             $table->string('city', 191)->nullable();
             $table->string('country', 191)->nullable();
+            $table->integer('working_hours')->nullable();
+            $table->tinyInteger('time_sheet_based')->default(0);
+            $table->integer('max_overtime_hours')->default(0);
             $table->decimal('basic_salary', 28, 8);
 
             $table->bigInteger('department_id')->unsigned()->nullable();

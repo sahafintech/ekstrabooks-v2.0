@@ -9,18 +9,11 @@ import { Textarea } from "@/Components/ui/textarea";
 import {
   SearchableCombobox
 } from "@/Components/ui/searchable-combobox";
-import { cn } from "@/lib/utils";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/Components/ui/popover";
-import { Calendar } from "@/Components/ui/calendar";
-import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
+import { cn, parseDateObject } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function Edit({ leave, staff = [] }) {
   const { errors } = usePage().props;
@@ -30,12 +23,36 @@ export default function Edit({ leave, staff = [] }) {
     employee_id: leave.employee_id?.toString() || "",
     leave_type: leave.leave_type || "casual",
     leave_duration: leave.leave_duration || "full_day",
-    start_date: leave.start_date || "",
-    end_date: leave.end_date || "",
-    total_days: leave.total_days?.toString() || "",
-    description: leave.description || "",
-    status: leave.status || "pending"
+    start_date: parseDateObject(leave.start_date),
+    end_date: parseDateObject(leave.end_date),
+    total_days: leave.total_days?.toString(),
+    description: leave.description,
+    status: leave.status
   });
+
+  const LeaveStatusBadge = ({ status }) => {
+    const statusMap = {
+        0: {
+            label: "Pending",
+            className: "text-primary bg-primary/10 px-3 py-1 rounded text-xs",
+        },
+        1: {
+            label: "Approved",
+            className:
+                "text-secondary bg-secondary/10 px-3 py-1 rounded text-xs",
+        },
+        2: {
+            label: "Cancelled",
+            className: "text-danger bg-danger/10 px-3 py-1 rounded text-xs",
+        },
+    };
+
+    return (
+        <span className={statusMap[status].className}>
+            {statusMap[status].label}
+        </span>
+    );
+};
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -47,7 +64,7 @@ export default function Edit({ leave, staff = [] }) {
   };
 
   const handleDateChange = (name, date) => {
-    const formattedDate = date ? format(date, 'yyyy-MM-dd') : '';
+    const formattedDate = date;
     setForm(prev => ({ ...prev, [name]: formattedDate }));
 
     // Calculate total days when both dates are set
@@ -182,33 +199,12 @@ export default function Edit({ leave, staff = [] }) {
                   Start Date *
                 </Label>
                 <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "md:w-1/2 w-full justify-start text-left font-normal",
-                          !form.start_date && "text-muted-foreground",
-                          errors.start_date && "border-red-500"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {form.start_date ? (
-                          format(new Date(form.start_date), "PPP")
-                        ) : (
-                          <span>Select start date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={form.start_date ? new Date(form.start_date) : undefined}
-                        onSelect={(date) => handleDateChange('start_date', date)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DateTimePicker
+                    value={form.start_date}
+                    onChange={(date) => handleDateChange('start_date', date)}
+                    className="md:w-1/2 w-full"
+                    required
+                  />
                   {errors.start_date && (
                     <p className="text-red-500 text-sm">{errors.start_date}</p>
                   )}
@@ -220,33 +216,12 @@ export default function Edit({ leave, staff = [] }) {
                   End Date *
                 </Label>
                 <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "md:w-1/2 w-full justify-start text-left font-normal",
-                          !form.end_date && "text-muted-foreground",
-                          errors.end_date && "border-red-500"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {form.end_date ? (
-                          format(new Date(form.end_date), "PPP")
-                        ) : (
-                          <span>Select end date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={form.end_date ? new Date(form.end_date) : undefined}
-                        onSelect={(date) => handleDateChange('end_date', date)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DateTimePicker
+                    value={form.end_date}
+                    onChange={(date) => handleDateChange('end_date', date)}
+                    className="md:w-1/2 w-full"
+                    required
+                  />
                   {errors.end_date && (
                     <p className="text-red-500 text-sm">{errors.end_date}</p>
                   )}
@@ -264,6 +239,7 @@ export default function Edit({ leave, staff = [] }) {
                     value={form.total_days}
                     onChange={handleInputChange}
                     name="total_days"
+                    readOnly
                     className={cn("md:w-1/2 w-full", errors.total_days && "border-red-500")}
                   />
                   {errors.total_days && (
@@ -292,24 +268,10 @@ export default function Edit({ leave, staff = [] }) {
 
               <div className="grid grid-cols-12 mt-2">
                 <Label htmlFor="status" className="md:col-span-2 col-span-12">
-                  Status *
+                  Status
                 </Label>
                 <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                  <SearchableCombobox
-                    options={[
-                      { id: 'pending', name: 'Pending' },
-                      { id: 'approved', name: 'Approved' },
-                      { id: 'rejected', name: 'Rejected' }
-                    ]}
-                    value={form.status}
-                    onChange={(value) => handleSelectChange('status', value)}
-                    placeholder="Select status"
-                    emptyMessage="No status options found"
-                    className={cn("md:w-1/2 w-full", errors.status && "border-red-500")}
-                  />
-                  {errors.status && (
-                    <p className="text-red-500 text-sm">{errors.status}</p>
-                  )}
+                  <LeaveStatusBadge status={form.status} />
                 </div>
               </div>
 

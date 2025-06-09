@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Head, Link, router, usePage } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -15,35 +15,20 @@ import {
 import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogFooter,
-    DialogTrigger,
-} from "@/Components/ui/dialog";
-import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
 } from "@/Components/ui/select";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/Components/ui/popover";
-import { Calendar } from "@/Components/ui/calendar";
-import { Plus, Edit, Trash, Search, CalendarIcon } from "lucide-react";
+import { Plus, Edit, Trash } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
-import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import { parseDateObject } from "@/lib/utils";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
@@ -178,13 +163,13 @@ const WeekendSelectionModal = ({
     );
 };
 
-export default function List({ holidays = [], meta = {}, filters = {} }) {
+export default function List({ holidays = [], meta = {}, filters = {}, weekends = [] }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
     const [selectedHolidays, setSelectedHolidays] = useState([]);
     const [isAllSelected, setIsAllSelected] = useState(false);
     const [search, setSearch] = useState(filters.search || "");
-    const [perPage, setPerPage] = useState(meta.per_page || 10);
+    const [perPage, setPerPage] = useState(meta.per_page || 50);
     const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
     const [bulkAction, setBulkAction] = useState("");
     const [dateFilter, setDateFilter] = useState(filters.date || "");
@@ -196,7 +181,6 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
     const [form, setForm] = useState({
         title: "",
         date: "",
-        details: "",
     });
 
     // Form errors
@@ -209,7 +193,7 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
     const [isProcessing, setIsProcessing] = useState(false);
     // Weekend selection modal state
     const [showWeekendModal, setShowWeekendModal] = useState(false);
-    const [selectedWeekends, setSelectedWeekends] = useState([]);
+    const [selectedWeekends, setSelectedWeekends] = useState(weekends || []);
 
     useEffect(() => {
         if (flash && flash.success) {
@@ -227,25 +211,6 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
             });
         }
     }, [flash, toast]);
-
-    // Fetch weekend days when component mounts
-    useEffect(() => {
-        const fetchWeekendDays = async () => {
-            try {
-                const response = await fetch(route("holidays.weekends"));
-                const data = await response.json();
-                if (data && data.weekends) {
-                    setSelectedWeekends(
-                        Array.isArray(data.weekends) ? data.weekends : []
-                    );
-                }
-            } catch (error) {
-                console.error("Error fetching weekend days:", error);
-            }
-        };
-
-        fetchWeekendDays();
-    }, []);
 
     const toggleSelectAll = () => {
         if (isAllSelected) {
@@ -281,42 +246,47 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
                 weekends: selectedWeekends,
             },
             {
+                preserveState: true,
                 onSuccess: () => {
                     setShowWeekendModal(false);
                     setIsProcessing(false);
-                    toast({
-                        title: "Success",
-                        description: "Weekend days updated successfully",
-                    });
                 },
-                onError: (errors) => {
+                onError: () => {
                     setIsProcessing(false);
-                    toast({
-                        variant: "destructive",
-                        title: "Error",
-                        description: "Failed to update weekend days",
-                    });
                 },
+                onFinish: () => {
+                    setIsProcessing(false);
+                }
             }
         );
     };
 
+    // Reset processing state when modal closes
+    useEffect(() => {
+        if (!showWeekendModal) {
+            setIsProcessing(false);
+        }
+    }, [showWeekendModal]);
+
     const handleSearch = (e) => {
         e.preventDefault();
+        const value = e.target.value;
+        setSearch(value);
+
         router.get(
             route("holidays.index"),
-            { search, date: dateFilter, page: 1, per_page: perPage },
+            { search: value, page: 1, per_page: perPage },
             { preserveState: true }
         );
-    };
+      };
 
     const handleDateFilterChange = (date) => {
-        setDateFilter(date ? format(date, "yyyy-MM-dd") : "");
+        setDateFilter(date);
         router.get(
             route("holidays.index"),
             {
                 search,
-                date: date ? format(date, "yyyy-MM-dd") : "",
+                date: date,
                 page: 1,
                 per_page: perPage,
             },
@@ -406,7 +376,6 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
         setForm({
             title: "",
             date: "",
-            details: "",
         });
         setErrors({});
         setIsCreateDialogOpen(true);
@@ -414,14 +383,17 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
 
     const handleCreateSubmit = (e) => {
         e.preventDefault();
+        setIsProcessing(true);
 
         router.post(route("holidays.store"), form, {
             preserveState: true,
             onSuccess: () => {
                 setIsCreateDialogOpen(false);
+                setIsProcessing(false);
             },
             onError: (errors) => {
                 setErrors(errors);
+                setIsProcessing(false);
             },
         });
     };
@@ -431,8 +403,7 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
         setEditingHoliday(holiday);
         setForm({
             title: holiday.title,
-            date: holiday.date,
-            details: holiday.details || "",
+            date: parseDateObject(holiday.date),
         });
         setErrors({});
         setIsEditDialogOpen(true);
@@ -440,15 +411,18 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
 
     const handleEditSubmit = (e) => {
         e.preventDefault();
+        setIsProcessing(true);
 
         router.put(route("holidays.update", editingHoliday.id), form, {
             preserveState: true,
             onSuccess: () => {
                 setIsEditDialogOpen(false);
                 setEditingHoliday(null);
+                setIsProcessing(false);
             },
             onError: (errors) => {
                 setErrors(errors);
+                setIsProcessing(false);
             },
         });
     };
@@ -460,26 +434,6 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
             ...form,
             [name]: value,
         });
-    };
-
-    const formatDate = (dateString) => {
-        if (!dateString) return "-";
-        try {
-            return format(new Date(dateString), "PPP");
-        } catch (error) {
-            return dateString;
-        }
-    };
-
-    // Function to safely check if a date string is valid for display
-    const isValidDate = (dateString) => {
-        if (!dateString) return false;
-        try {
-            const date = new Date(dateString);
-            return !isNaN(date.getTime());
-        } catch (error) {
-            return false;
-        }
     };
 
     // Generate pagination buttons
@@ -579,8 +533,8 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
                         url="holidays.index"
                     />
                     <div className="p-4">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                            <div className="flex flex-col md:flex-row gap-4">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+                            <div className="flex flex-col md:flex-row gap-2">
                                 <Button onClick={openCreateDialog}>
                                     <Plus className="w-4 h-4 mr-2" />
                                     Add Holiday
@@ -592,63 +546,19 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
                                     Weekend
                                 </Button>
                             </div>
-                            <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                                <form
-                                    onSubmit={handleSearch}
-                                    className="flex flex-col md:flex-row gap-2"
-                                >
-                                    <Input
-                                        placeholder="Search holidays..."
-                                        value={search}
-                                        onChange={(e) =>
-                                            setSearch(e.target.value)
-                                        }
-                                        className="w-full md:w-60"
-                                    />
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                variant={"outline"}
-                                                className={cn(
-                                                    "w-full md:w-auto justify-start text-left font-normal",
-                                                    !dateFilter &&
-                                                        "text-muted-foreground"
-                                                )}
-                                            >
-                                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                                {dateFilter ? (
-                                                    format(
-                                                        new Date(dateFilter),
-                                                        "PPP"
-                                                    )
-                                                ) : (
-                                                    <span>Filter by date</span>
-                                                )}
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent
-                                            className="w-auto p-0"
-                                            align="start"
-                                        >
-                                            <Calendar
-                                                mode="single"
-                                                selected={
-                                                    dateFilter
-                                                        ? new Date(dateFilter)
-                                                        : undefined
-                                                }
-                                                onSelect={
-                                                    handleDateFilterChange
-                                                }
-                                                initialFocus
-                                            />
-                                        </PopoverContent>
-                                    </Popover>
-                                    <Button type="submit">
-                                        <Search className="w-4 h-4 mr-2" />
-                                        Search
-                                    </Button>
-                                </form>
+                            <div className="flex flex-col md:flex-row gap-2">
+                                <Input
+                                    placeholder="Search holidays..."
+                                    value={search}
+                                    onChange={handleSearch}
+                                    className="w-full md:w-60"
+                                />
+                                <DateTimePicker
+                                    value={dateFilter}
+                                    onChange={(date) =>
+                                        handleDateFilterChange(date)
+                                    }
+                                />
                             </div>
                         </div>
 
@@ -719,7 +629,6 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
                                         </TableHead>
                                         <TableHead>Title</TableHead>
                                         <TableHead>Date</TableHead>
-                                        <TableHead>Details</TableHead>
                                         <TableHead className="text-right">
                                             Actions
                                         </TableHead>
@@ -748,14 +657,7 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
                                                     {holiday.title}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {isValidDate(holiday.date)
-                                                        ? formatDate(
-                                                              holiday.date
-                                                          )
-                                                        : "-"}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {holiday.details || "-"}
+                                                    {holiday.date}
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <TableActions
@@ -814,16 +716,15 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
                     </div>
 
                     {/* Create Dialog */}
-                    <Dialog
-                        open={isCreateDialogOpen}
-                        onOpenChange={setIsCreateDialogOpen}
+                    <Modal
+                        show={isCreateDialogOpen}
+                        onClose={() => setIsCreateDialogOpen(false)}
+                        maxWidth="2xl"
                     >
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Add Holiday</DialogTitle>
-                            </DialogHeader>
+                        <div>
+                            <h2 className="text-lg font-medium mb-4">Add Holiday</h2>
                             <form onSubmit={handleCreateSubmit}>
-                                <div className="grid gap-4 py-4">
+                                <div className="grid gap-4">
                                     <div className="grid gap-2">
                                         <Label htmlFor="title">Title</Label>
                                         <Input
@@ -845,84 +746,23 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
                                     </div>
                                     <div className="grid gap-2">
                                         <Label htmlFor="date">Date</Label>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant={"outline"}
-                                                    className={cn(
-                                                        "w-full justify-start text-left font-normal",
-                                                        !form.date &&
-                                                            "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {form.date &&
-                                                    isValidDate(form.date) ? (
-                                                        format(
-                                                            new Date(form.date),
-                                                            "PPP"
-                                                        )
-                                                    ) : (
-                                                        <span>Select date</span>
-                                                    )}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent
-                                                className="w-auto p-0"
-                                                align="start"
-                                            >
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={
-                                                        form.date &&
-                                                        isValidDate(form.date)
-                                                            ? new Date(
-                                                                  form.date
-                                                              )
-                                                            : undefined
-                                                    }
-                                                    onSelect={(date) =>
-                                                        setForm({
-                                                            ...form,
-                                                            date: date
-                                                                ? format(
-                                                                      date,
-                                                                      "yyyy-MM-dd"
-                                                                  )
-                                                                : "",
-                                                        })
-                                                    }
-                                                    initialFocus
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
+                                        <DateTimePicker
+                                            value={form.date}
+                                            onChange={(date) =>
+                                                setForm({
+                                                    ...form,
+                                                    date: date
+                                                })
+                                            }
+                                        />
                                         {errors.date && (
                                             <p className="text-red-500 text-sm">
                                                 {errors.date}
                                             </p>
                                         )}
                                     </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="details">Details</Label>
-                                        <Input
-                                            id="details"
-                                            name="details"
-                                            value={form.details}
-                                            onChange={handleInputChange}
-                                            className={
-                                                errors.details
-                                                    ? "border-red-500"
-                                                    : ""
-                                            }
-                                        />
-                                        {errors.details && (
-                                            <p className="text-red-500 text-sm">
-                                                {errors.details}
-                                            </p>
-                                        )}
-                                    </div>
                                 </div>
-                                <DialogFooter>
+                                <div className="mt-6 flex justify-end gap-2">
                                     <Button
                                         type="button"
                                         variant="outline"
@@ -932,23 +772,22 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
                                     >
                                         Cancel
                                     </Button>
-                                    <Button type="submit">Save</Button>
-                                </DialogFooter>
+                                    <Button type="submit" disabled={isProcessing}>Save</Button>
+                                </div>
                             </form>
-                        </DialogContent>
-                    </Dialog>
+                        </div>
+                    </Modal>
 
                     {/* Edit Dialog */}
-                    <Dialog
-                        open={isEditDialogOpen}
-                        onOpenChange={setIsEditDialogOpen}
+                    <Modal
+                        show={isEditDialogOpen}
+                        onClose={() => setIsEditDialogOpen(false)}
+                        maxWidth="2xl"
                     >
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Edit Holiday</DialogTitle>
-                            </DialogHeader>
+                        <div>
+                            <h2 className="text-lg font-medium mb-4">Edit Holiday</h2>
                             <form onSubmit={handleEditSubmit}>
-                                <div className="grid gap-4 py-4">
+                                <div className="grid gap-4">
                                     <div className="grid gap-2">
                                         <Label htmlFor="edit-title">
                                             Title
@@ -972,86 +811,23 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
                                     </div>
                                     <div className="grid gap-2">
                                         <Label htmlFor="edit-date">Date</Label>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant={"outline"}
-                                                    className={cn(
-                                                        "w-full justify-start text-left font-normal",
-                                                        !form.date &&
-                                                            "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {form.date &&
-                                                    isValidDate(form.date) ? (
-                                                        format(
-                                                            new Date(form.date),
-                                                            "PPP"
-                                                        )
-                                                    ) : (
-                                                        <span>Select date</span>
-                                                    )}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent
-                                                className="w-auto p-0"
-                                                align="start"
-                                            >
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={
-                                                        form.date &&
-                                                        isValidDate(form.date)
-                                                            ? new Date(
-                                                                  form.date
-                                                              )
-                                                            : undefined
-                                                    }
-                                                    onSelect={(date) =>
-                                                        setForm({
-                                                            ...form,
-                                                            date: date
-                                                                ? format(
-                                                                      date,
-                                                                      "yyyy-MM-dd"
-                                                                  )
-                                                                : "",
-                                                        })
-                                                    }
-                                                    initialFocus
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
+                                        <DateTimePicker
+                                            value={form.date}
+                                            onChange={(date) =>
+                                                setForm({
+                                                    ...form,
+                                                    date: date
+                                                })
+                                            }
+                                        />
                                         {errors.date && (
                                             <p className="text-red-500 text-sm">
                                                 {errors.date}
                                             </p>
                                         )}
                                     </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="edit-details">
-                                            Details
-                                        </Label>
-                                        <Input
-                                            id="edit-details"
-                                            name="details"
-                                            value={form.details}
-                                            onChange={handleInputChange}
-                                            className={
-                                                errors.details
-                                                    ? "border-red-500"
-                                                    : ""
-                                            }
-                                        />
-                                        {errors.details && (
-                                            <p className="text-red-500 text-sm">
-                                                {errors.details}
-                                            </p>
-                                        )}
-                                    </div>
                                 </div>
-                                <DialogFooter>
+                                <div className="mt-6 flex justify-end gap-2">
                                     <Button
                                         type="button"
                                         variant="outline"
@@ -1061,11 +837,11 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
                                     >
                                         Cancel
                                     </Button>
-                                    <Button type="submit">Update</Button>
-                                </DialogFooter>
+                                    <Button type="submit" disabled={isProcessing}>Update</Button>
+                                </div>
                             </form>
-                        </DialogContent>
-                    </Dialog>
+                        </div>
+                    </Modal>
 
                     {/* Delete Confirmation Modal */}
                     <DeleteConfirmationModal
@@ -1089,7 +865,7 @@ export default function List({ holidays = [], meta = {}, filters = {} }) {
                         show={showWeekendModal}
                         onClose={() => setShowWeekendModal(false)}
                         onConfirm={handleWeekendSubmit}
-                        processing={false}
+                        processing={isProcessing}
                         selectedWeekends={selectedWeekends}
                         setSelectedWeekends={setSelectedWeekends}
                     />

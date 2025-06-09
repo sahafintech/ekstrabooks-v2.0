@@ -12,9 +12,11 @@ use App\Models\AuditLog;
 use App\Models\Currency;
 use App\Models\Employee;
 use App\Models\EmployeeBenefit;
+use App\Models\Holiday;
 use App\Models\Payroll;
 use App\Models\SalaryBenefit;
 use App\Models\Tax;
+use App\Models\Timesheet;
 use App\Models\Transaction;
 use App\Models\TransactionMethod;
 use App\Utilities\Overrider;
@@ -217,39 +219,61 @@ class PayrollController extends Controller
         }
 
         foreach ($employees as $employee) {
-            //Get Absence Fine
-            $absence_fine = 0;
-            $full_day     = AbsentFine::where('business_id', request()->activeBusiness->id)->first()->full_day_fine ?? 0;
-            $half_day     = AbsentFine::where('business_id', request()->activeBusiness->id)->first()->half_day_fine ?? 0;
 
-            $absence_fine = Attendance::select([
-                DB::raw("IFNULL(SUM(CASE WHEN leave_duration = 'half_day' THEN $half_day ELSE $full_day END),0) AS absence_fine"),
-            ])
-                ->where('employee_id', $employee->id)
-                ->whereMonth('date', $month)
-                ->whereYear('date', $year)
-                ->where('attendance.status', 0)
-                ->first()
-                ->absence_fine;
+            $weekends = json_decode(get_business_option('weekends'));
+            $holidays = Holiday::where('business_id', request()->activeBusiness->id)
+                ->whereMonth('date', $request->month)
+                ->whereYear('date', $request->year)
+                ->get();
+            $required_working_days = cal_days_in_month(CAL_GREGORIAN, $request->month, $request->year) - $holidays->count() - $this->countSpecificDaysInMonth($request->year, $request->month, $weekends);
+            $public_holidays = Timesheet::where('employee_id', $employee->id)->whereIn('date', $holidays->pluck('date'))->sum('working_hours');
+            $weekend = Timesheet::where('employee_id', $employee->id)
+                ->whereMonth('date', $request->month)
+                ->whereYear('date', $request->year)
+                ->get()
+                ->filter(function ($timesheet) use ($weekends) {
+                    return in_array(strtolower(\Carbon\Carbon::createFromFormat(get_date_format(), $timesheet->date)->format('l')), $weekends);
+                })
+                ->sum('working_hours');
+            $required_working_hours = $required_working_days * $employee->working_hours;
+            $actual_working_hours = Timesheet::where('employee_id', $employee->id)
+                ->whereMonth('date', $request->month)
+                ->whereYear('date', $request->year)
+                ->sum('working_hours');
+            $overtime_hours = min(max($actual_working_hours - $required_working_hours, 0), $employee->max_overtime_hours * $required_working_days);
 
             $benefits        = $employee->employee_benefits->where('month', $month)->where('year', $year)->first()?->salary_benefits()->where('type', 'add')->get();
             $deductions      = $employee->employee_benefits->where('month', $month)->where('year', $year)->first()?->salary_benefits()->where('type', 'deduct')->get();
             $total_benefits  = $employee->basic_salary + $benefits?->sum('amount');
-            $total_deduction = $deductions?->sum('amount') + $absence_fine;
+            $total_deduction = $deductions?->sum('amount');
 
-            $payroll                    = new Payroll();
-            $payroll->employee_id       = $employee->id;
-            $payroll->month             = $month;
-            $payroll->year              = $year;
-            $payroll->current_salary    = $employee->basic_salary;
-            $payroll->net_salary        = ($total_benefits - ($total_deduction + $employee->employee_benefits->where('month', $month)->where('year', $year)->first()?->advance));
-            $payroll->tax_amount        = 0;
+            $payroll                            = new Payroll();
+            $payroll->employee_id               = $employee->id;
+            $payroll->month                     = $month;
+            $payroll->year                      = $year;
+            $payroll->required_working_days     = $required_working_days;
+            $payroll->public_holiday            = $public_holidays;
+            $payroll->weekend                   = $weekend;
+            $payroll->required_working_hours    = $required_working_hours;
+            $payroll->overtime_hours            = $overtime_hours;
+            $payroll->cost_normal_hours         = $employee->basic_salary / $required_working_hours;
+            $payroll->cost_overtime_hours       = $employee->basic_salary / $required_working_hours * get_business_option('overtime_rate_multiplier');
+            $payroll->cost_public_holiday       = $employee->basic_salary / $required_working_hours * get_business_option('public_holiday_rate_multiplier');
+            $payroll->cost_weekend              = $employee->basic_salary / $required_working_hours * get_business_option('weekend_holiday_rate_multiplier');
+            $payroll->total_cost_normal_hours   = $payroll->cost_normal_hours * $actual_working_hours;
+            $payroll->total_cost_overtime_hours = $payroll->cost_overtime_hours * $overtime_hours;
+            $payroll->total_cost_public_holiday = $payroll->cost_public_holiday * $public_holidays;
+            $payroll->total_cost_weekend        = $payroll->cost_weekend * $weekend;
+            $payroll->current_salary            = $employee->basic_salary;
+            // $payroll->net_salary                = ($total_benefits - ($total_deduction + $employee->employee_benefits->where('month', $month)->where('year', $year)->first()?->advance));
+            $payroll->net_salary                = $payroll->total_cost_normal_hours + $payroll->total_cost_overtime_hours + $payroll->total_cost_public_holiday + $payroll->total_cost_weekend;
+            $payroll->tax_amount                = 0;
 
-            $payroll->total_allowance   = $benefits?->sum('amount');
-            $payroll->total_deduction   = $total_deduction;
-            $payroll->absence_fine      = $absence_fine;
-            $payroll->advance           = $employee->employee_benefits->where('month', $month)->where('year', $year)->first()?->advance;
-            $payroll->status            = 0;
+            $payroll->total_allowance           = $benefits?->sum('amount');
+            $payroll->total_deduction           = $total_deduction;
+            $payroll->absence_fine              = 0;
+            $payroll->advance                   = $employee->employee_benefits->where('month', $month)->where('year', $year)->first()?->advance;
+            $payroll->status                    = 0;
             $payroll->save();
         }
 
@@ -263,6 +287,40 @@ class PayrollController extends Controller
         $audit->save();
 
         return redirect()->route('payslips.index')->with('success', _lang('Payslip Generated Successfully'));
+    }
+
+    function countSpecificDaysInMonth($year, $month, $weekends)
+    {
+        $totalDays = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+        $count = 0;
+
+        // Map day names to numbers for easy comparison
+        $dayMap = [
+            'sunday' => 0,
+            'monday' => 1,
+            'tuesday' => 2,
+            'wednesday' => 3,
+            'thursday' => 4,
+            'friday' => 5,
+            'saturday' => 6,
+        ];
+
+        // Convert weekend names to day numbers
+        $weekendNumbers = array_map(function ($day) use ($dayMap) {
+            return $dayMap[$day];
+        }, $weekends);
+
+        // Loop through each day of the month
+        for ($day = 1; $day <= $totalDays; $day++) {
+            $timestamp = mktime(0, 0, 0, $month, $day, $year);
+            $dayOfWeek = date('w', $timestamp); // 0 (Sun) to 6 (Sat)
+
+            if (in_array($dayOfWeek, $weekendNumbers)) {
+                $count++;
+            }
+        }
+
+        return $count;
     }
 
     /**
@@ -311,6 +369,14 @@ class PayrollController extends Controller
         $advance = $payroll->employee->employee_benefits()->where('month', $payroll->month)
             ->where('year', $payroll->year)->first()?->advance;
 
+        $actual_normal_working_hours = Timesheet::where('employee_id', $payroll->employee_id)
+            ->whereMonth('date', $payroll->month)
+            ->whereYear('date', $payroll->year)
+            ->sum('working_hours');
+        $overtime_hours = min(max($actual_normal_working_hours - $payroll->required_working_hours, 0), $payroll->employee->max_overtime_hours * $payroll->required_working_days);
+
+        $actual_working_hours = $actual_normal_working_hours - $overtime_hours;
+
         return Inertia::render('Backend/User/Payroll/View', [
             'payroll' => $payroll,
             'working_days' => $working_days,
@@ -318,6 +384,7 @@ class PayrollController extends Controller
             'allowances' => $allowances,
             'deductions' => $deductions,
             'advance' => $advance,
+            'actual_working_hours' => $actual_working_hours,
         ]);
     }
 

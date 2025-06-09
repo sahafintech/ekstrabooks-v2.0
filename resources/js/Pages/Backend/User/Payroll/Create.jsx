@@ -1,12 +1,14 @@
-import { useForm } from "@inertiajs/react";
+import { useForm, usePage } from "@inertiajs/react";
 import { Label } from "@/Components/ui/label";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import PageHeader from "@/Components/PageHeader";
 import InputError from "@/Components/InputError";
 import { Button } from "@/Components/ui/button";
-import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import { Toaster } from "@/Components/ui/toaster";
+import { useToast } from "@/hooks/use-toast";
+import { useEffect } from "react";
 
 export default function Create({ years }) {
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -14,20 +16,37 @@ export default function Create({ years }) {
         year: "",
     });
 
+    const { flash = {} } = usePage().props;
+    const { toast } = useToast();
+
     const submit = (e) => {
         e.preventDefault();
         post(route("payslips.store"), {
             preserveScroll: true,
-            onSuccess: () => {
-                toast.success("Payroll generated successfully");
-                reset();
-            },
         });
     };
+
+    useEffect(() => {
+        if (flash && flash.success) {
+          toast({
+            title: "Success",
+            description: flash.success,
+          });
+        }
+    
+        if (flash && flash.error) {
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: flash.error,
+          });
+        }
+      }, [flash, toast]);
 
     return (
         <AuthenticatedLayout>
             <SidebarInset>
+                <Toaster />
                 <PageHeader page="Payrolls" subpage="Add New" url="payslips.index" />
 
                 <div className="flex flex-1 flex-col gap-4 p-4 pt-0">

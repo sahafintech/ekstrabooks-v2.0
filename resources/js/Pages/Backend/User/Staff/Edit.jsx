@@ -6,7 +6,6 @@ import { Button } from "@/Components/ui/button";
 import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
 import InputError from "@/Components/InputError";
-import { format } from "date-fns";
 import { toast } from "sonner";
 import PageHeader from "@/Components/PageHeader";
 import { Separator } from "@/Components/ui/separator";
@@ -14,6 +13,7 @@ import { Switch } from "@/Components/ui/switch";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
+import { RadioGroup, RadioGroupItem } from "@/Components/ui/radio-group";
 
 export default function Edit({ employee, departments = [] }) {
   const { errors, flash } = usePage().props;
@@ -33,6 +33,9 @@ export default function Edit({ employee, departments = [] }) {
     joining_date: parseDateObject(employee.joining_date),
     end_date: parseDateObject(employee.end_date),
     basic_salary: employee.basic_salary,
+    working_hours: employee.working_hours,
+    time_sheet_based: employee.time_sheet_based?.toString() || "0",
+    max_overtime_hours: employee.max_overtime_hours,
     bank_name: employee.bank_name,
     branch_name: employee.branch_name,
     account_name: employee.account_name,
@@ -319,6 +322,63 @@ export default function Edit({ employee, departments = [] }) {
                     required
                   />
                   <InputError message={errors.basic_salary} className="text-sm" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-12 mt-2">
+                <Label htmlFor="working_hours" className="md:col-span-2 col-span-12">
+                  Working Hours
+                </Label>
+                <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                  <Input
+                    type="number"
+                    id="working_hours"
+                    name="working_hours"
+                    value={form.working_hours}
+                    onChange={handleInputChange}
+                    className="md:w-1/2 w-full"
+                  />
+                  <InputError message={errors.working_hours} className="text-sm" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-12 mt-4">
+                <Label htmlFor="time_sheet_based" className="md:col-span-2 col-span-12">
+                  Time Sheet Based
+                </Label>
+                <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                  <RadioGroup
+                    value={form.time_sheet_based}
+                    onValueChange={(value) => handleSelectChange("time_sheet_based", value)}
+                    className="flex gap-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="0" id="no" />
+                      <Label htmlFor="no">No</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="1" id="yes" />
+                      <Label htmlFor="yes">Yes</Label>
+                    </div>
+                  </RadioGroup>
+                  <InputError message={errors.time_sheet_based} className="text-sm" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-12 mt-4">
+                <Label htmlFor="max_overtime_hours" className="md:col-span-2 col-span-12">
+                  Max Overtime Hours/Day
+                </Label>
+                <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                  <Input
+                    type="number"
+                    id="max_overtime_hours"
+                    name="max_overtime_hours"
+                    value={form.max_overtime_hours}
+                    onChange={handleInputChange}
+                    className="md:w-1/2 w-full"
+                  />
+                  <InputError message={errors.max_overtime_hours} className="text-sm" />
                 </div>
               </div>
 

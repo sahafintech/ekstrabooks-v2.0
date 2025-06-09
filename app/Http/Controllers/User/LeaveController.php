@@ -31,7 +31,7 @@ class LeaveController extends Controller
      */
     public function index(Request $request)
     {
-        $per_page = $request->get('per_page', 10);
+        $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
         $date = $request->get('date', '');
 
@@ -311,5 +311,53 @@ class LeaveController extends Controller
         $audit->save();
 
         return redirect()->route('leaves.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    public function bulk_approve(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'ids' => 'required|array',
+            'ids.*' => 'exists:leaves,id',
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator);
+        }
+
+        // Delete the leaves
+        Leave::whereIn('id', $request->ids)->update(['status' => 1]);
+
+        // Audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Bulk Approved Leaves: ' . count($request->ids) . ' leaves';
+        $audit->save();
+
+        return redirect()->route('leaves.index')->with('success', _lang('Approved Successfully'));
+    }
+
+    public function bulk_reject(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'ids' => 'required|array',
+            'ids.*' => 'exists:leaves,id',
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator);
+        }
+
+        // Delete the leaves
+        Leave::whereIn('id', $request->ids)->update(['status' => 2]);
+
+        // Audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Bulk Rejected Leaves: ' . count($request->ids) . ' leaves';
+        $audit->save();
+
+        return redirect()->route('leaves.index')->with('success', _lang('Rejected Successfully'));
     }
 }

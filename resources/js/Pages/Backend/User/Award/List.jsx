@@ -44,6 +44,7 @@ import { format } from "date-fns";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
 import { cn } from "@/lib/utils";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
@@ -131,6 +132,8 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
   });
   const [errors, setErrors] = useState({});
   const [awardDate, setAwardDate] = useState(null);
+  const [isCreateProcessing, setIsCreateProcessing] = useState(false);
+  const [isEditProcessing, setIsEditProcessing] = useState(false);
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -306,6 +309,7 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
 
   const handleCreateSubmit = (e) => {
     e.preventDefault();
+    setIsCreateProcessing(true);
 
     router.post(route("awards.store"), form, {
       preserveState: true,
@@ -319,9 +323,11 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
           details: ""
         });
         setAwardDate(null);
+        setIsCreateProcessing(false);
       },
       onError: (errors) => {
         setErrors(errors);
+        setIsCreateProcessing(false);
       }
     });
   };
@@ -360,15 +366,18 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
 
   const handleEditSubmit = (e) => {
     e.preventDefault();
+    setIsEditProcessing(true);
 
     router.put(route("awards.update", editingAward.id), form, {
       preserveState: true,
       onSuccess: () => {
         setIsEditDialogOpen(false);
         setEditingAward(null);
+        setIsEditProcessing(false);
       },
       onError: (errors) => {
         setErrors(errors);
+        setIsEditProcessing(false);
       }
     });
   };
@@ -639,28 +648,11 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
                       <Label htmlFor="award_date" className="mb-2 block">
                         Award Date <span className="text-red-500">*</span>
                       </Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !awardDate && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {awardDate ? format(awardDate, "PPP") : <span>Pick a date</span>}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            selected={awardDate}
-                            onSelect={handleDateChange}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <DateTimePicker
+                        value={form.award_date}
+                        onChange={(date) => setForm({ ...form, award_date: date })}
+                        required
+                      />
                       {errors.award_date && (
                         <p className="text-red-500 text-sm mt-1">{errors.award_date}</p>
                       )}
@@ -718,10 +710,13 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
                     type="button"
                     variant="secondary"
                     onClick={() => setIsCreateDialogOpen(false)}
+                    disabled={isCreateProcessing}
                   >
                     Cancel
                   </Button>
-                  <Button type="submit">Save Award</Button>
+                  <Button type="submit" disabled={isCreateProcessing}>
+                    {isCreateProcessing ? "Saving..." : "Save Award"}
+                  </Button>
                 </DialogFooter>
               </form>
             </DialogContent>
@@ -757,28 +752,11 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
                       <Label htmlFor="award_date" className="mb-2 block">
                         Award Date <span className="text-red-500">*</span>
                       </Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !awardDate && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {awardDate ? format(awardDate, "PPP") : <span>Pick a date</span>}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            selected={awardDate}
-                            onSelect={handleDateChange}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <DateTimePicker
+                        value={form.award_date}
+                        onChange={(date) => setForm({ ...form, award_date: date })}
+                        required
+                      />
                       {errors.award_date && (
                         <p className="text-red-500 text-sm mt-1">{errors.award_date}</p>
                       )}
@@ -836,10 +814,13 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
                     type="button"
                     variant="secondary"
                     onClick={() => setIsEditDialogOpen(false)}
+                    disabled={isEditProcessing}
                   >
                     Cancel
                   </Button>
-                  <Button type="submit">Update Award</Button>
+                  <Button type="submit" disabled={isEditProcessing}>
+                    {isEditProcessing ? "Updating..." : "Update Award"}
+                  </Button>
                 </DialogFooter>
               </form>
             </DialogContent>

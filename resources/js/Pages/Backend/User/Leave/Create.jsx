@@ -10,17 +10,11 @@ import {
   SearchableCombobox
 } from "@/Components/ui/searchable-combobox";
 import { cn } from "@/lib/utils";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/Components/ui/popover";
-import { Calendar } from "@/Components/ui/calendar";
-import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function Create({ staff = [] }) {
   const { errors } = usePage().props;
@@ -34,7 +28,7 @@ export default function Create({ staff = [] }) {
     end_date: "",
     total_days: "",
     description: "",
-    status: "pending"
+    status: 0
   });
 
   const handleInputChange = (e) => {
@@ -47,7 +41,7 @@ export default function Create({ staff = [] }) {
   };
 
   const handleDateChange = (name, date) => {
-    const formattedDate = date ? format(date, 'yyyy-MM-dd') : '';
+    const formattedDate = date;
     setForm(prev => ({ ...prev, [name]: formattedDate }));
 
     // Calculate total days when both dates are set
@@ -182,33 +176,12 @@ export default function Create({ staff = [] }) {
                   Start Date *
                 </Label>
                 <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "md:w-1/2 w-full justify-start text-left font-normal",
-                          !form.start_date && "text-muted-foreground",
-                          errors.start_date && "border-red-500"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {form.start_date ? (
-                          format(new Date(form.start_date), "PPP")
-                        ) : (
-                          <span>Select start date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={form.start_date ? new Date(form.start_date) : undefined}
-                        onSelect={(date) => handleDateChange('start_date', date)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DateTimePicker
+                    value={form.start_date}
+                    onChange={(date) => handleDateChange('start_date', date)}
+                    className="md:w-1/2 w-full"
+                    required
+                  />
                   {errors.start_date && (
                     <p className="text-red-500 text-sm">{errors.start_date}</p>
                   )}
@@ -220,33 +193,12 @@ export default function Create({ staff = [] }) {
                   End Date *
                 </Label>
                 <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "md:w-1/2 w-full justify-start text-left font-normal",
-                          !form.end_date && "text-muted-foreground",
-                          errors.end_date && "border-red-500"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {form.end_date ? (
-                          format(new Date(form.end_date), "PPP")
-                        ) : (
-                          <span>Select end date</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={form.end_date ? new Date(form.end_date) : undefined}
-                        onSelect={(date) => handleDateChange('end_date', date)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DateTimePicker
+                    value={form.end_date}
+                    onChange={(date) => handleDateChange('end_date', date)}
+                    className="md:w-1/2 w-full"
+                    required
+                  />
                   {errors.end_date && (
                     <p className="text-red-500 text-sm">{errors.end_date}</p>
                   )}
@@ -264,6 +216,7 @@ export default function Create({ staff = [] }) {
                     value={form.total_days}
                     onChange={handleInputChange}
                     name="total_days"
+                    readOnly
                     className={cn("md:w-1/2 w-full", errors.total_days && "border-red-500")}
                   />
                   {errors.total_days && (
@@ -286,29 +239,6 @@ export default function Create({ staff = [] }) {
                   />
                   {errors.description && (
                     <p className="text-red-500 text-sm">{errors.description}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-12 mt-2">
-                <Label htmlFor="status" className="md:col-span-2 col-span-12">
-                  Status *
-                </Label>
-                <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                  <SearchableCombobox
-                    options={[
-                      { id: 'pending', name: 'Pending' },
-                      { id: 'approved', name: 'Approved' },
-                      { id: 'rejected', name: 'Rejected' }
-                    ]}
-                    value={form.status}
-                    onChange={(value) => handleSelectChange('status', value)}
-                    placeholder="Select status"
-                    emptyMessage="No status options found"
-                    className={cn("md:w-1/2 w-full", errors.status && "border-red-500")}
-                  />
-                  {errors.status && (
-                    <p className="text-red-500 text-sm">{errors.status}</p>
                   )}
                 </div>
               </div>
