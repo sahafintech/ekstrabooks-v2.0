@@ -199,12 +199,12 @@ export function UserSidebar({ ...props }) {
                     isActive: url.startsWith(cashPurchasesBase),
                 },
                 {
-                    title: "Bill Invoice",
+                    title: "Credit Purchase",
                     url: route("bill_invoices.index"),
                     isActive: url.startsWith(billInvoicesBase),
                 },
                 {
-                    title: "Pay Bills",
+                    title: "Pay Credit Purchase",
                     url: route("bill_payments.index"),
                     isActive: url.startsWith(billPaymentsBase),
                 },

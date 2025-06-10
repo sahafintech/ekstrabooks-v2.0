@@ -366,7 +366,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
     post(route("bill_invoices.update", bill.id), formData, {
       preserveScroll: true,
       onSuccess: () => {
-        toast.success("Bill invoice updated successfully");
+        toast.success("Credit Purchase updated successfully");
       },
     });
   };
@@ -374,7 +374,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
   return (
     <AuthenticatedLayout>
       <SidebarInset>
-        <PageHeader page="Bill Invoices" subpage="Edit Bill Invoice" url="bill_invoices.index" />
+        <PageHeader page="Credit Purchase" subpage="Edit Credit Purchase" url="bill_invoices.index" />
 
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           <form onSubmit={submit}>
@@ -1024,7 +1024,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
                   Reset
                 </Button>
                 <Button type="submit" disabled={processing}>
-                  Update Bill
+                  Update Credit Purchase
                 </Button>
               </div>
             </div>

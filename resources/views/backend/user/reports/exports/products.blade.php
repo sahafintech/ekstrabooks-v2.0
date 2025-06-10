@@ -1,5 +1,6 @@
 <table>
     <tr>
+        <td style="background-color: lightgray; font-size: 12px">id</td>
         <td style="background-color: lightgray; font-size: 12px">name</td>
         <td style="background-color: lightgray; font-size: 12px">sub_category_id</td>
         <td style="background-color: lightgray; font-size: 12px">sub_category</td>
@@ -30,6 +31,7 @@
     <tbody>
         @foreach($products as $product)
         <tr>
+            <td>{{ $product->id }}</td>
             <td>{{ $product->name }}</td>
             <td>{{ $product->sub_category_id }}</td>
             <td>{{ $product->category->name }}</td>
@@ -43,13 +45,7 @@
             <td>{{ $product->expiry_date }}</td>
             <td>{{ $product->code }}</td>
             <td>{{ $product->reorder_point }}</td>
-            <td>
-                @if($product->stock_management)
-                Yes
-                @else
-                No
-                @endif
-            </td>
+            <td>{{ $product->stock_management }}</td>
             <td>{{ $product->initial_stock }}</td>
             <td>{{ $product->total_stock_in }}</td>
             <td>{{ $product->total_sold_invoices + $product->total_sold_receipts }}</td>

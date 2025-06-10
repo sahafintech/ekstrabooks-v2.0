@@ -222,14 +222,14 @@ export function StaffSidebar(props) {
         }
         if (perms.has("bill_invoices.index")) {
             items.push({
-                title: "Bill Invoice",
+                title: "Credit Purchase",
                 url: route("bill_invoices.index"),
                 isActive: url.startsWith(billInvoicesBase),
             });
         }
         if (perms.has("bill_payments.index")) {
             items.push({
-                title: "Pay Bills",
+                title: "Pay Credit Purchase",
                 url: route("bill_payments.index"),
                 isActive: url.startsWith(billPaymentsBase),
             });

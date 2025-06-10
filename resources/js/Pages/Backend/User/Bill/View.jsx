@@ -212,8 +212,8 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
             <SidebarInset>
                 <div className="space-y-4">
                     <PageHeader
-                        page="Bill Invoices"
-                        subpage={`Bill Invoices #${bill.bill_no}`}
+                        page="Credit Purchase"
+                        subpage={`Credit Purchase #${bill.bill_no}`}
                         url="bill_invoices.index"
                     />
 
@@ -262,7 +262,7 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
                                 <DropdownMenuItem asChild>
                                     <Link href={route("bill_invoices.edit", bill.id)} className="flex items-center">
                                         <Edit className="mr-2 h-4 w-4" />
-                                        <span>Edit Cash Purchase</span>
+                                        <span>Edit Credit Purchase</span>
                                     </Link>
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -432,7 +432,7 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
                         </div>
                     </Modal>
 
-                    <div className="print-container">
+                    <div className="print-container lg:w-[210mm] min-h-[297mm] mx-auto rounded-md border p-4">
                         <div className="p-6 sm:p-8">
                             {/* Invoice Header */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -458,8 +458,8 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
                                 <div className="md:text-right">
                                     <h1 className="text-2xl font-bold">{bill.title}</h1>
                                     <div className="mt-2 text-sm">
-                                        <p><span className="font-medium">Cash Purchase #:</span> {bill.bill_no}</p>
-                                        <p><span className="font-medium">Cash Purchase Date:</span> {bill.purchase_date}</p>
+                                        <p><span className="font-medium">Credit Purchase #:</span> {bill.bill_no}</p>
+                                        <p><span className="font-medium">Credit Purchase Date:</span> {bill.purchase_date}</p>
                                         <p><span className="font-medium">Due Date:</span> {bill.due_date}</p>
                                         {bill.order_number && (
                                             <p><span className="font-medium">Order Number:</span> {bill.order_number}</p>

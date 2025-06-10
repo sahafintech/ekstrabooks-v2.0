@@ -755,7 +755,7 @@ export default function List({
             <SidebarInset>
                 <div className="main-content">
                     <PageHeader
-                        page="Bill Invoices"
+                        page="Credit Purchase"
                         subpage="List"
                         url="bill_invoices.index"
                     />
@@ -766,7 +766,7 @@ export default function List({
                                 <Link href={route("bill_invoices.create")}>
                                     <Button>
                                         <Plus className="h-4 w-4 mr-2" />
-                                        Add Bill
+                                        Add Credit Purchase
                                     </Button>
                                 </Link>
                                 <DropdownMenu>
@@ -871,7 +871,7 @@ export default function List({
                                     ]}
                                     value={selectedBillStatus}
                                     onChange={handleBillStatusChange}
-                                    placeholder="Select bill status"
+                                    placeholder="Select purchase status"
                                     className="w-[200px]"
                                 />
                             </div>

@@ -58,7 +58,7 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
                 $expiry_date = Date::excelToDateTimeObject($row['expiry_date']);
             }
 
-            $product = Product::where('name', $row['name'])->first();
+            $product = Product::where('id', $row['id'])->first();
 
             if ($product == null) {
                 $product = Product::create([
@@ -70,8 +70,8 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
                     'descriptions' => $row['descriptions'],
                     'image' => $row['image'] ?? 'default.png',
                     'stock_management' => $row['stock_management'],
-                    'intial_stock' => $row['intial_stock'] ?? 0,
-                    'stock' => $row['intial_stock'] ?? 0,
+                    'initial_stock' => $row['initial_stock'] ?? 0,
+                    'stock' => $row['initial_stock'] ?? 0,
                     'allow_for_selling' => $row['allow_for_selling'],
                     'income_account_id' => get_account($row['income_account_name'])->id,
                     'allow_for_purchasing' => $row['allow_for_purchasing'],
@@ -84,16 +84,16 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
                     'sub_category_id' => SubCategory::where('name', $row['sub_category'])->first()->id ?? null,
                 ]);
 
-                if ($row['intial_stock'] > 0) {
+                if ($row['initial_stock'] > 0) {
                     $transaction              = new Transaction();
                     $transaction->trans_date  = now()->format('Y-m-d H:i:s');
                     $transaction->account_id  = get_account('Inventory')->id;
                     $transaction->dr_cr       = 'dr';
                     $transaction->transaction_currency    = request()->activeBusiness->currency;
                     $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                    $transaction->base_currency_amount    = $product->purchase_cost * $row['intial_stock'];
-                    $transaction->transaction_amount      = $product->purchase_cost * $row['intial_stock'];
-                    $transaction->description = $product->name . ' Opening Stock #' . $row['intial_stock'];
+                    $transaction->base_currency_amount    = $product->purchase_cost * $row['initial_stock'];
+                    $transaction->transaction_amount      = $product->purchase_cost * $row['initial_stock'];
+                    $transaction->description = $product->name . ' Opening Stock #' . $row['initial_stock'];
                     $transaction->ref_id      = $product->id;
                     $transaction->ref_type    = 'product';
                     $transaction->save();
@@ -104,26 +104,27 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
                     $transaction->dr_cr       = 'cr';
                     $transaction->transaction_currency    = request()->activeBusiness->currency;
                     $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                    $transaction->base_currency_amount    = $product->purchase_cost * $row['intial_stock'];
-                    $transaction->transaction_amount      = $product->purchase_cost * $row['intial_stock'];
-                    $transaction->description = $product->name . ' Opening Stock #' . $row['intial_stock'];
+                    $transaction->base_currency_amount    = $product->purchase_cost * $row['initial_stock'];
+                    $transaction->transaction_amount      = $product->purchase_cost * $row['initial_stock'];
+                    $transaction->description = $product->name . ' Opening Stock #' . $row['initial_stock'];
                     $transaction->ref_id      = $product->id;
                     $transaction->ref_type    = 'product';
                     $transaction->save();
                 }
             } else {
-                $previous_initial_stock = $product->intial_stock ?? 0;
-                $new_initial_stock = $row['intial_stock'] ?? 0;
+                $previous_initial_stock = $product->initial_stock ?? 0;
+                $new_initial_stock = $row['initial_stock'] ?? 0;
 
                 $stock_difference = $new_initial_stock - $previous_initial_stock;
 
                 $product->update([
+                    'name' => $row['name'],
                     'type' => $row['type'],
                     'product_unit_id' => ProductUnit::where('unit', 'like', '%' . $row['unit'] . '%')->first()->id ?? null,
                     'selling_price' => $row['selling_price'] ?? 0,
                     'descriptions' => $row['descriptions'],
                     'stock_management' => $row['stock_management'],
-                    'intial_stock' => $row['intial_stock'] ?? 0,
+                    'initial_stock' => $row['initial_stock'] ?? 0,
                     'stock' => $product->stock + max($stock_difference, 0),
                     'allow_for_selling' => $row['allow_for_selling'],
                     'income_account_id' => get_account($row['income_account_name'])->id,
@@ -179,15 +180,14 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
             'descriptions' => 'nullable',
             'stock_management' => 'required|in:1,0',
             'allow_for_selling' => 'required|in:1,0',
-            'income_account_name' => 'required|exists:accounts,account_name',
+            'income_account_name' => 'required_if:allow_for_selling,1|exists:accounts,account_name',
             'allow_for_purchasing' => 'required|in:1,0',
-            'expense_account_name' => 'required|exists:accounts,account_name',
+            'expense_account_name' => 'required_if:allow_for_purchasing,1|exists:accounts,account_name',
             'status' => 'required|in:1,0',
             'expiry_date' => 'nullable',
             'code' => 'nullable',
-            'brand' => 'nullable|exists:brands,name',
+            'brand' => 'nullable|exists:product_brands,name',
             'sub_category' => 'nullable|exists:sub_categories,name',
-            'image' => 'nullable',
         ];
     }
 }

@@ -342,7 +342,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
   return (
     <AuthenticatedLayout>
       <SidebarInset>
-        <PageHeader page="Bill Invoices" subpage="Create New" url="bill_invoices.index" />
+        <PageHeader page="Credit Purchases" subpage="Create New" url="bill_invoices.index" />
 
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           <form onSubmit={submit}>
@@ -1021,7 +1021,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                   Reset
                 </Button>
                 <Button type="submit" disabled={processing}>
-                  Create Bill
+                  Create Credit Purchase
                 </Button>
               </div>
             </div>
