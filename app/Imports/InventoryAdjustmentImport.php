@@ -24,7 +24,7 @@ class InventoryAdjustmentImport implements ToCollection, WithHeadingRow, WithVal
 
         foreach ($rows as $row) {
 
-            $product = Product::where('name', $row['product_name'])->firstOrFail();
+            $product = Product::where('id', $row['id'])->firstOrFail();
             $account = Account::where('account_name', $row['account_name'])->firstOrFail();
 
             $adjustment = new InventoryAdjustment();
@@ -108,7 +108,7 @@ class InventoryAdjustmentImport implements ToCollection, WithHeadingRow, WithVal
     {
         return [
             'adjustment_date' => 'required',
-            'product_name' => 'required|exists:products,name',
+            'id' => 'required|exists:products,id',
             'account_name' => 'required|exists:accounts,account_name',
             'quantity_on_hand' => 'required',
             'adjusted_quantity' => 'required',

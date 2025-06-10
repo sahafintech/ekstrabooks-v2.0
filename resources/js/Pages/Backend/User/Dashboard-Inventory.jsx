@@ -9,6 +9,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/Components/ui/select";
+import { Button } from "@/Components/ui/button";
+import DateTimePicker from "@/Components/DateTimePicker";
 import {
     Table,
     TableBody,
@@ -63,16 +65,33 @@ export default function DashboardInventory({
 }) {
     const [selectedRange, setSelectedRange] = useState(range || 'all');
     const [customRange, setCustomRange] = useState(custom || '');
+    const [isCustom, setIsCustom] = useState(false);
     const [dashboardType, setDashboardType] = useState(dashboard_type);
 
     const handleRangeChange = (value) => {
         setSelectedRange(value);
         if (value === 'custom') {
-            // Initialize date picker
-            initializeDatePicker();
+            setIsCustom(true);
         } else {
-            document.getElementById('filter_form').submit();
+            router.visit(route('dashboard.inventory'), {
+                preserveState: true,
+                preserveScroll: true,
+                data: {
+                    range: value,
+                }
+            });
         }
+    };
+
+    const handleDateRangeChange = (dateRange) => {
+        setCustomRange(dateRange);
+        router.visit(route('dashboard.inventory'), {
+            preserveState: true,
+            preserveScroll: true,
+            data: {
+                custom: dateRange,
+            }
+        });
     };
 
     const handleDashboardTypeChange = (value) => {
@@ -226,7 +245,7 @@ export default function DashboardInventory({
                                 </h3>
                             </div>
 
-                            <div className="flex items-center justify-end space-x-4">
+                            <div className="flex items-center justify-end space-x-2">
                                 <Select value={dashboardType} onValueChange={handleDashboardTypeChange}>
                                     <SelectTrigger className="w-[200px]">
                                         <SelectValue placeholder="Select dashboard type" />
@@ -237,19 +256,51 @@ export default function DashboardInventory({
                                     </SelectContent>
                                 </Select>
 
-                                <Select value={selectedRange} onValueChange={handleRangeChange}>
-                                    <SelectTrigger className="w-[200px]">
-                                        <SelectValue placeholder="Select range" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Time</SelectItem>
-                                        <SelectItem value="7">Last 7 Days</SelectItem>
-                                        <SelectItem value="30">Last 30 Days</SelectItem>
-                                        <SelectItem value="60">Last 60 Days</SelectItem>
-                                        <SelectItem value="360">Last Year</SelectItem>
-                                        <SelectItem value="custom">Custom Range</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <div className="flex space-x-2">
+                                    {!isCustom && (
+                                        <Select value={selectedRange} onValueChange={handleRangeChange}>
+                                            <SelectTrigger className="w-[200px]">
+                                                <SelectValue placeholder="Select range" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">All Time</SelectItem>
+                                                <SelectItem value="7">Last 7 Days</SelectItem>
+                                                <SelectItem value="30">Last 30 Days</SelectItem>
+                                                <SelectItem value="60">Last 60 Days</SelectItem>
+                                                <SelectItem value="360">Last Year</SelectItem>
+                                                <SelectItem value="custom">Custom Range</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+
+                                    {isCustom && (
+                                        <div className="flex items-center space-x-2">
+                                            <DateTimePicker
+                                                value={customRange}
+                                                onChange={handleDateRangeChange}
+                                                className="w-[250px]"
+                                                isRange={true}
+                                            />
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    setIsCustom(false);
+                                                    setSelectedRange("all");
+                                                    router.visit(route("dashboard.inventory"), {
+                                                        preserveState: true,
+                                                        preserveScroll: true,
+                                                        data: {
+                                                            range: "all",
+                                                        },
+                                                    });
+                                                }}
+                                            >
+                                                Clear
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
