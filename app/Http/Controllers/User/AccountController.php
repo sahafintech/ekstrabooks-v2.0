@@ -612,6 +612,7 @@ class AccountController extends Controller
             'accounts_file' => 'required|mimes:xls,xlsx',
         ]);
 
+        try {
         Excel::import(new AccountsImport, $request->file('accounts_file'));
 
         // audit log
@@ -620,6 +621,9 @@ class AccountController extends Controller
         $audit->changed_by = auth()->id();
         $audit->event = 'Imported Accounts';
         $audit->save();
+        } catch (\Exception $e) {
+            return redirect()->route('accounts.index')->with('error', $e->getMessage());
+        }
 
         return redirect()->route('accounts.index')->with('success', _lang('Accounts Imported'));
     }

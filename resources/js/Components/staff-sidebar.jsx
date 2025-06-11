@@ -67,6 +67,7 @@ export function StaffSidebar(props) {
     const staffsBase = "/user/staffs";
     const attendanceLogsBase = "/user/attendance_logs";
     const timeSheetsBase = "/user/timesheets";
+    const departmentsBase = "/user/departments";
     const designationsBase = "/user/designations";
     const payslipsBase = "/user/payslips";
     const holidaysBase = "/user/holidays";

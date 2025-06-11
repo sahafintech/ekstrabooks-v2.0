@@ -587,7 +587,7 @@ export default function List({ products = [], meta = {}, filters = {}, summary =
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={8} className="h-24 text-center">
+                      <TableCell colSpan={9} className="h-24 text-center">
                         No products found.
                       </TableCell>
                     </TableRow>

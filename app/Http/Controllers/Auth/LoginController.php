@@ -88,7 +88,7 @@ class LoginController extends Controller
                 ->withErrors($errors);
         }
 
-        if ($user->user_type == 'user') {
+        if ($user->user_type == 'user' && request()->has('activeBusiness')) {
             // audit log
             $audit = new AuditLog();
             $audit->date_changed = date('Y-m-d H:i:s');

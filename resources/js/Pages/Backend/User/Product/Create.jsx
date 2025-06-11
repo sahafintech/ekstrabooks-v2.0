@@ -11,8 +11,12 @@ import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
 import { Switch } from "@/Components/ui/switch";
 import DateTimePicker from "@/Components/DateTimePicker";
+import { useState } from "react";
+import { X } from "lucide-react";
 
 export default function Create({ productUnits = [], categories = [], brands = [], accounts = [] }) {
+  const [imagePreview, setImagePreview] = useState(null);
+
   const { data, setData, post, processing, errors, reset } = useForm({
     name: "",
     type: "product",
@@ -46,6 +50,28 @@ export default function Create({ productUnits = [], categories = [], brands = []
     });
   };
 
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setData("image", file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setData("image", null);
+    setImagePreview(null);
+    // Clear the file input value
+    const fileInput = document.getElementById('image');
+    if (fileInput) {
+      fileInput.value = '';
+    }
+  };
+
   return (
     <AuthenticatedLayout>
       <SidebarInset>
@@ -62,10 +88,27 @@ export default function Create({ productUnits = [], categories = [], brands = []
                   id="image"
                   type="file"
                   accept="image/*"
-                  onChange={(e) => setData("image", e.target.files[0])}
+                  onChange={handleImageChange}
                   className="md:w-1/2 w-full"
                 />
                 <InputError message={errors.image} className="text-sm" />
+                
+                {imagePreview && (
+                  <div className="relative mt-2 md:w-1/2 w-full">
+                    <img 
+                      src={imagePreview} 
+                      alt="Preview" 
+                      className="w-full h-48 object-contain rounded-lg border"
+                    />
+                    <button
+                      type="button"
+                      onClick={removeImage}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 

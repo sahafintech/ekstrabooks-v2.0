@@ -12,8 +12,12 @@ import { Textarea } from "@/Components/ui/textarea";
 import { Switch } from "@/Components/ui/switch";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { parseDateObject } from "@/lib/utils";
+import { useState } from "react";
+import { X } from "lucide-react";
 
 export default function Edit({ auth, product, productUnits = [], categories = [], brands = [], accounts = [] }) {
+  const [imagePreview, setImagePreview] = useState(product.image ? `/uploads/media/${product.image}` : null);
+
   const { data, setData, put, processing, errors } = useForm({
     name: product.name,
     type: product.type,
@@ -36,6 +40,28 @@ export default function Edit({ auth, product, productUnits = [], categories = []
     image: null,
     _method: "PUT",
   });
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setData("image", file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setData("image", null);
+    setImagePreview(null);
+    // Clear the file input value
+    const fileInput = document.getElementById('image');
+    if (fileInput) {
+      fileInput.value = '';
+    }
+  };
 
   const submit = (e) => {
     e.preventDefault();
@@ -67,10 +93,27 @@ export default function Edit({ auth, product, productUnits = [], categories = []
                   id="image"
                   type="file"
                   accept="image/*"
-                  onChange={(e) => setData("image", e.target.files[0])}
+                  onChange={handleImageChange}
                   className="md:w-1/2 w-full"
                 />
                 <InputError message={errors.image} className="text-sm" />
+                
+                {imagePreview && (
+                  <div className="relative mt-2 md:w-1/2 w-full">
+                    <img 
+                      src={imagePreview} 
+                      alt="Preview" 
+                      className="w-full h-48 object-contain rounded-lg border"
+                    />
+                    <button
+                      type="button"
+                      onClick={removeImage}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 

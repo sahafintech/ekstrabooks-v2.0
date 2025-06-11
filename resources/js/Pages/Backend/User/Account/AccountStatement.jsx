@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Head, router, useForm } from "@inertiajs/react";
+import { router, useForm } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -22,15 +22,7 @@ import {
 import { Input } from "@/Components/ui/input";
 import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/Components/ui/popover";
-import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
-import { cn, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/Components/ui/badge";
 import DateTimePicker from "@/Components/DateTimePicker";
 
@@ -298,7 +290,7 @@ export default function AccountStatement({
                                     <span className="ml-2 text-primary">
                                         {formatCurrency({
                                             amount: currenct_balance,
-                                            currency,
+                                            currency: currency,
                                         })}
                                     </span>
                                 </div>

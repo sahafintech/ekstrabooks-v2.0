@@ -43,9 +43,6 @@ class SystemUserController extends Controller
 
 	public function change_role(Request $request, $userId)
 	{
-		if (!$request->ajax()) {
-			return back();
-		}
 
 		$validator = Validator::make($request->all(), [
 			'business_id' => 'required|array',

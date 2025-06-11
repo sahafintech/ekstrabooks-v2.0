@@ -188,7 +188,7 @@ class ProductController extends Controller
         $product->selling_price        = $request->allow_for_selling == 1 ? $request->input('selling_price') : 0;
         $product->image                = $image;
         $product->descriptions         = $request->input('descriptions');
-        $product->expiry_date          = Carbon::parse($request->input('expiry_date'))->format('Y-m-d');
+        $product->expiry_date          = $request->input('expiry_date') ? Carbon::parse($request->input('expiry_date'))->format('Y-m-d') : null;
         $product->code                 = $request->input('code');
         $product->reorder_point        = $request->input('reorder_point');
         $product->stock                = $request->input('initial_stock') ?? 0;
@@ -331,12 +331,6 @@ class ProductController extends Controller
                 ->withInput();
         }
 
-        if ($request->hasfile('image')) {
-            $file  = $request->file('image');
-            $image = time() . $file->getClientOriginalName();
-            $file->move(public_path() . "/uploads/media/", $image);
-        }
-
         if (!Account::where('account_name', 'Common Shares')->where('business_id', $request->activeBusiness->id)->exists()) {
             $account                  = new Account();
             $account->account_code    = '3000';
@@ -362,16 +356,31 @@ class ProductController extends Controller
         }
 
         $product                  = Product::find($id);
+
+        $image = $product->image;
+
+        if($request->image == null) {
+            if (file_exists(public_path() . '/uploads/media/' . $image && $image != 'default.png')) {
+                unlink(public_path() . '/uploads/media/' . $image);
+            }
+
+            $image = 'default.png';
+        }
+
+        if ($request->hasfile('image')) {
+            $file  = $request->file('image');
+            $image = time() . $file->getClientOriginalName();
+            $file->move(public_path() . "/uploads/media/", $image);
+        }
+
         $product->name                 = $request->input('name');
         $product->type                 = $request->input('type');
         $product->product_unit_id      = $request->input('product_unit_id');
         $product->purchase_cost        = $request->allow_for_purchasing == 1 ? $request->input('purchase_cost') : 0;
         $product->selling_price        = $request->allow_for_selling == 1 ? $request->input('selling_price') : 0;
-        if ($request->hasfile('image')) {
-            $product->image = $image;
-        }
+        $product->image = $image;
         $product->descriptions         = $request->input('descriptions');
-        $product->expiry_date          = Carbon::parse($request->input('expiry_date'))->format('Y-m-d');
+        $product->expiry_date          = $request->input('expiry_date') ? Carbon::parse($request->input('expiry_date'))->format('Y-m-d') : null;
         $product->code                 = $request->input('code');
         $product->reorder_point        = $request->input('reorder_point');
         $product->allow_for_selling    = $request->input('allow_for_selling');
@@ -470,6 +479,11 @@ class ProductController extends Controller
         $transactions = Transaction::where('ref_id', $id)->where('ref_type', 'product')->get();
         foreach ($transactions as $transaction) {
             $transaction->delete();
+        }
+
+        // delete product image
+        if (file_exists(public_path() . '/uploads/media/' . $product->image && $product->image != 'default.png')) {
+            unlink(public_path() . '/uploads/media/' . $product->image);
         }
 
         $product->delete();

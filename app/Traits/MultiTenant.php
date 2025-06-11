@@ -23,11 +23,13 @@ trait MultiTenant
             }
 
             static::saving(function ($model) use ($activeBusiness, $user) {
-                if (Schema::hasColumn($model->table, 'business_id')) {
-                    $model->business_id = $activeBusiness->id;
-                }
-                if (Schema::hasColumn($model->table, 'user_id')) {
-                    $model->user_id = $activeBusiness->user_id;
+                if (request()->has('activeBusiness')) {
+                    if (Schema::hasColumn($model->table, 'business_id')) {
+                        $model->business_id = $activeBusiness->id;
+                    }
+                    if (Schema::hasColumn($model->table, 'user_id')) {
+                        $model->user_id = $activeBusiness->user_id;
+                    }
                 }
                 if (Schema::hasColumn($model->table, 'created_user_id')) {
                     if (!$model->exists) {

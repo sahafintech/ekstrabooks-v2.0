@@ -306,15 +306,15 @@ export default function POS({ products, categories, currencies, accounts, custom
   const changeCurrency = () => {
     if (data.currency === baseCurrency.name) {
       // If current currency is base currency, switch to pos_default_currency
-      if (pos_default_currency_change === data.currency) {
-        setData('currency', baseCurrency.name);
-        handleCurrencyChange(baseCurrency.name);
-      }
+        setData('currency', pos_default_currency_change);
+        handleCurrencyChange(pos_default_currency_change);
     } else {
       // If current currency is not base currency, switch back to base currency
       setData('currency', baseCurrency.name);
       handleCurrencyChange(baseCurrency.name);
     }
+
+    console.log(data.currency);
   }
 
   const addTax = () => {
@@ -461,29 +461,31 @@ export default function POS({ products, categories, currencies, accounts, custom
     // Check if the product is already in the cart
     const existingItemIndex = cartItems.findIndex(item => item.id === product.id);
 
-    // Calculate the unit cost with exchange rate
-    const unitCostWithExchangeRate = product.selling_price * exchangeRate;
-
     if (existingItemIndex !== -1) {
       // Product already exists in cart, increment quantity
       const updatedCart = [...cartItems];
       updatedCart[existingItemIndex].quantity += 1;
       setCartItems(updatedCart);
     } else {
-      // Add new product to cart
-      setCartItems([...cartItems, {
+      // Add new product to cart with initial unit cost as selling price
+      const initialUnitCost = product.selling_price * exchangeRate;
+      
+      const newItem = {
         id: product.id,
         name: product.name,
-        unit_cost: unitCostWithExchangeRate,
+        unit_cost: initialUnitCost,
         quantity: 1,
         code: product.code || ''
-      }]);
+      };
+      
+      setCartItems([...cartItems, newItem]);
 
+      // Update form data
       setData('product_id', [...data.product_id, product.id]);
       setData('product_name', [...data.product_name, product.name]);
       setData('description', [...data.description, '']);
       setData('quantity', [...data.quantity, 1]);
-      setData('unit_cost', [...data.unit_cost, unitCostWithExchangeRate]);
+      setData('unit_cost', [...data.unit_cost, initialUnitCost]);
     }
   };
 
@@ -494,12 +496,23 @@ export default function POS({ products, categories, currencies, accounts, custom
 
   // Function to update item price in cart
   const updateItemPrice = (itemId, newPrice) => {
-    setCartItems(cartItems.map(item => {
+    // Update cart items
+    const updatedCartItems = cartItems.map(item => {
       if (item.id === itemId) {
-        return { ...item, unit_cost: newPrice };
+        return { ...item, unit_cost: parseFloat(newPrice) || 0 };
       }
       return item;
-    }));
+    });
+    setCartItems(updatedCartItems);
+
+    // Update form data unit_cost array
+    const updatedUnitCosts = data.product_id.map((pid, index) => {
+      if (pid === itemId) {
+        return parseFloat(newPrice) || 0;
+      }
+      return data.unit_cost[index];
+    });
+    setData('unit_cost', updatedUnitCosts);
   };
 
   // Function to update item quantity in cart
