@@ -1112,7 +1112,10 @@ export default function POS({ products, categories, currencies, accounts, custom
               ) : (
                 cartItems.map(item => (
                   <div key={item.id} className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] items-center border-b py-2 gap-2">
-                    <span className="truncate" title={item.name}>{item.name}</span>
+                    <div className="flex flex-col">
+                      <span className="truncate" title={item.name}>{item.name}</span>
+                      {item.unit_cost == 0 && <span className="text-red-500 text-xs">Are you sure this product/service is Zero ?</span>}
+                    </div>
                     <div className="relative">
                       <Input
                         type="number"
