@@ -34,11 +34,11 @@
             <td>{{ $product->id }}</td>
             <td>{{ $product->name }}</td>
             <td>{{ $product->sub_category_id }}</td>
-            <td>{{ $product->category->name }}</td>
+            <td>{{ $product->sub_category_name }}</td>
             <td>{{ $product->brand_id }}</td>
-            <td>{{ $product->brand->name }}</td>
+            <td>{{ $product->brand_name }}</td>
             <td>{{ $product->type }}</td>
-            <td>{{ $product->product_unit->unit }}</td>
+            <td>{{ $product->product_unit_name }}</td>
             <td>{{ $product->purchase_cost }}</td>
             <td>{{ $product->selling_price }}</td>
             <td>{{ $product->descriptions }}</td>
@@ -53,9 +53,9 @@
             <td>{{ $product->total_stock_adjustment_deducted }}</td>
             <td>{{ $product->stock }}</td>
             <td>{{ $product->stock * $product->purchase_cost }}</td>
-            <td>{{ $product->income_account->account_name }}</td>
+            <td>{{ $product->income_account_name }}</td>
             <td>{{ $product->allow_for_selling }}</td>
-            <td>{{ $product->expense_account->account_name }}</td>
+            <td>{{ $product->expense_account_name }}</td>
             <td>{{ $product->allow_for_purchasing }}</td>
             <td>{{ $product->status }}</td>
         </tr>

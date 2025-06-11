@@ -40,6 +40,7 @@ class InventoryDetailsExport implements FromView
             ->join('sub_categories', 'sub_categories.id', '=', 'products.sub_category_id')
             ->join('product_brands', 'product_brands.id', '=', 'products.brand_id')
             ->join('main_categories', 'main_categories.id', '=', 'sub_categories.main_category_id')
+            ->where('products.stock_management', 1)
             ->addSelect([
                 'total_sold_invoices' => InvoiceItem::selectRaw('IFNULL(SUM(quantity), 0)')
                     ->whereColumn('product_id', 'products.id')

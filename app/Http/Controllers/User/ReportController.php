@@ -2829,6 +2829,7 @@ class ReportController extends Controller
 				->leftJoin('sub_categories', 'sub_categories.id', '=', 'products.sub_category_id')
 				->leftJoin('product_brands', 'product_brands.id', '=', 'products.brand_id')
 				->leftJoin('main_categories', 'main_categories.id', '=', 'sub_categories.main_category_id')
+				->where('products.stock_management', 1)
 				->addSelect([
 					'total_sold_invoices' => InvoiceItem::selectRaw('IFNULL(SUM(quantity), 0)')
 						->whereColumn('product_id', 'products.id')
@@ -2958,7 +2959,8 @@ class ReportController extends Controller
 			)
 				->leftJoin('sub_categories', 'sub_categories.id', '=', 'products.sub_category_id')
 				->leftJoin('product_brands', 'product_brands.id', '=', 'products.brand_id')
-				->leftJoin('main_categories', 'main_categories.id', '=', 'sub_categories.main_category_id');
+				->leftJoin('main_categories', 'main_categories.id', '=', 'sub_categories.main_category_id')
+				->where('products.stock_management', 1);
 
 			if ($main_category !== 'all') {
 				$query->where('main_categories.id', $main_category);
@@ -3096,6 +3098,7 @@ class ReportController extends Controller
 			)
 				->leftjoin('sub_categories', 'sub_categories.id', '=', 'products.sub_category_id')
 				->leftjoin('product_brands', 'product_brands.id', '=', 'products.brand_id')
+				->where('products.stock_management', 1)
 				->addSelect([
 					'total_sold_invoices' => InvoiceItem::selectRaw('IFNULL(SUM(quantity), 0)')
 						->whereColumn('product_id', 'products.id')
@@ -3217,6 +3220,7 @@ class ReportController extends Controller
 			)
 				->leftjoin('sub_categories', 'sub_categories.id', '=', 'products.sub_category_id')
 				->leftjoin('product_brands', 'product_brands.id', '=', 'products.brand_id')
+				->where('products.stock_management', 1)
 				->addSelect([
 					'total_sold_invoices' => InvoiceItem::selectRaw('IFNULL(SUM(quantity), 0)')
 						->whereColumn('product_id', 'products.id')
