@@ -127,6 +127,12 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
     const handleDownloadPDF = async () => {
         setIsLoading(prev => ({ ...prev, pdf: true }));
         try {
+            // Add a class to hide attachments
+            const attachmentsSection = document.querySelector('.attachments-section');
+            if (attachmentsSection) {
+                attachmentsSection.classList.add('pdf-hidden');
+            }
+
             // Dynamically import the required libraries
             const html2canvas = (await import('html2canvas')).default;
             const { jsPDF } = await import('jspdf');
@@ -170,6 +176,11 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
 
             // Save the PDF
             pdf.save(`Bill_${bill.bill_no}.pdf`);
+
+            // Remove the class after PDF generation
+            if (attachmentsSection) {
+                attachmentsSection.classList.remove('pdf-hidden');
+            }
         } catch (error) {
             console.error('Error generating PDF:', error);
             toast({
@@ -601,7 +612,7 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
 
                             {/* Attachments - hidden when printing */}
                             {attachments && attachments.length > 0 && (
-                                <div className="mt-8 print:hidden">
+                                <div className="mt-8 print:hidden attachments-section">
                                     <h3 className="font-medium mb-4">Attachments:</h3>
                                     <div className="overflow-hidden border rounded-md">
                                         <table className="min-w-full divide-y divide-gray-200">
@@ -669,6 +680,11 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
           .flex.space-x-2 {
             display: none !important;
           }
+        }
+
+        /* Hide attachments when generating PDF */
+        .pdf-hidden {
+          display: none !important;
         }
       `}</style>
         </AuthenticatedLayout>

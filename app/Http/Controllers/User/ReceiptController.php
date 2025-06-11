@@ -1083,11 +1083,6 @@ class ReceiptController extends Controller
             return redirect()->back()->withInput()->with('error', _lang('Quantity is required'));
         }
 
-        // if unit cost is less than 0 or null then return with error
-        if (in_array(null, $request->unit_cost) || in_array('', $request->unit_cost)) {
-            return redirect()->back()->withInput()->with('error', _lang('Unit Cost is required'));
-        }
-
         $default_accounts = ['Accounts Receivable', 'Sales Tax Payable', 'Sales Discount Allowed', 'Inventory'];
 
         // if these accounts are not exists then create it
