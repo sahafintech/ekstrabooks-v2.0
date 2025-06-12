@@ -219,6 +219,11 @@ class PayrollController extends Controller
         }
 
         foreach ($employees as $employee) {
+
+            if($employee->working_hours == 0 || $employee->working_hours == null){
+                return back()->with('error', _lang('Working hours is not set for ' . $employee->name . ' !'));
+            }
+
             // Initialize variables with default values
             $required_working_days = cal_days_in_month(CAL_GREGORIAN, $request->month, $request->year);
             $public_holidays = 0;
@@ -267,9 +272,9 @@ class PayrollController extends Controller
             $payroll->required_working_hours    = $required_working_hours;
             $payroll->overtime_hours            = $overtime_hours;
             $payroll->cost_normal_hours         = $employee->basic_salary / $required_working_hours;
-            $payroll->cost_overtime_hours       = $employee->basic_salary / $required_working_hours * get_business_option('overtime_rate_multiplier');
-            $payroll->cost_public_holiday       = $employee->basic_salary / $required_working_hours * get_business_option('public_holiday_rate_multiplier');
-            $payroll->cost_weekend              = $employee->basic_salary / $required_working_hours * get_business_option('weekend_holiday_rate_multiplier');
+            $payroll->cost_overtime_hours       = $employee->basic_salary / $required_working_hours * floatval(get_business_option('overtime_rate_multiplier'));
+            $payroll->cost_public_holiday       = $employee->basic_salary / $required_working_hours * floatval(get_business_option('public_holiday_rate_multiplier'));
+            $payroll->cost_weekend              = $employee->basic_salary / $required_working_hours * floatval(get_business_option('weekend_holiday_rate_multiplier'));
             $payroll->total_cost_normal_hours   = $payroll->cost_normal_hours * $actual_working_hours;
             $payroll->total_cost_overtime_hours = $payroll->cost_overtime_hours * $overtime_hours;
             $payroll->total_cost_public_holiday = $payroll->cost_public_holiday * $public_holidays;
