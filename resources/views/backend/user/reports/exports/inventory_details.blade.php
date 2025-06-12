@@ -54,6 +54,7 @@
             </th>
         </tr>
         <tr>
+            <th style="background-color: lightgray; font-size: 12px;">{{ _lang('id') }}</th>
             <th style="background-color: lightgray; font-size: 12px;">{{ _lang('Code') }}</th>
             <th style="background-color: lightgray; font-size: 12px;">{{ _lang('Product Name') }}</th>
             <th style="background-color: lightgray; font-size: 12px;">{{ _lang('Opening Stock') }}</th>
@@ -143,6 +144,7 @@
         {{-- Products within Brand --}}
         @foreach($brand['products'] as $product)
         <tr>
+            <td>{{ $product->id }}</td>
             <td>{{ $product->code }}</td>
             <td>{{ $product->name }}</td>
             <td>{{ $product->initial_stock }}</td>

@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
 import { parseDateObject } from "@/lib/utils";
-import { useState, useEffect } from "react";
 import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function Edit({
@@ -19,11 +18,7 @@ export default function Edit({
     currencies = [],
     accountTypes = [],
 }) {
-    const [showCurrency, setShowCurrency] = useState(
-        account.account_type === "Bank" || account.account_type === "Cash"
-    );
 
-    // Prepare initial form data from account data
     const { data, setData, put, processing, errors } = useForm({
         account_code: account.account_code,
         account_name: account.account_name,
@@ -34,18 +29,6 @@ export default function Edit({
         description: account.description,
         opening_balance: openingBalance,
     });
-
-    // Handle account type change to determine if currency should be shown
-    useEffect(() => {
-        const isBankOrCash =
-            data.account_type === "Bank" || data.account_type === "Cash";
-        setShowCurrency(isBankOrCash);
-
-        // Reset currency if not bank or cash
-        if (!isBankOrCash) {
-            setData("currency", "");
-        }
-    }, [data.account_type]);
 
     const submit = (e) => {
         e.preventDefault();
@@ -156,6 +139,37 @@ export default function Edit({
 
                         <div className="grid grid-cols-12 mt-2">
                             <Label
+                                htmlFor="currency"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Currency
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                <div className="md:w-1/2 w-full">
+                                    <SearchableCombobox
+                                        className="mt-1"
+                                        options={currencies.map((currency) => ({
+                                            id: currency.name,
+                                            value: currency.name,
+                                            label: currency.name,
+                                            name: `${currency.name} - ${currency.description} (${currency.exchange_rate})`,
+                                        }))}
+                                        value={data.currency}
+                                        onChange={(selectedValue) => {
+                                            setData("currency", selectedValue);
+                                        }}
+                                        placeholder="Select currency"
+                                    />
+                                </div>
+                                <InputError
+                                    message={errors.currency}
+                                    className="text-sm"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label
                                 htmlFor="opening_date"
                                 className="md:col-span-2 col-span-12"
                             >
@@ -203,38 +217,6 @@ export default function Edit({
                                 />
                             </div>
                         </div>
-
-                        {showCurrency && (
-                            <div className="grid grid-cols-12 mt-2">
-                                <Label
-                                    htmlFor="currency"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Currency *
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                                    <div className="md:w-1/2 w-full">
-                                        <SearchableCombobox
-                                            options={currencies.map(
-                                                (currency) => ({
-                                                    id: currency.name,
-                                                    name: `${currency.name} - ${currency.description} (${currency.exchange_rate})`,
-                                                })
-                                            )}
-                                            value={data.currency}
-                                            onChange={(value) =>
-                                                setData("currency", value)
-                                            }
-                                            placeholder="Select currency"
-                                        />
-                                    </div>
-                                    <InputError
-                                        message={errors.currency}
-                                        className="text-sm"
-                                    />
-                                </div>
-                            </div>
-                        )}
 
                         {isAssetType(data.account_type) && (
                             <div className="grid grid-cols-12 mt-2">

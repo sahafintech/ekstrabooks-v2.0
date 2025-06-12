@@ -55,10 +55,10 @@ class JournalImport implements ToCollection, WithHeadingRow, WithCalculatedFormu
         }
 
         // calculate total debit and credit
-        $total_debit = array_sum(array_column($rows->toArray(), 'debit'));
-        $total_credit = array_sum(array_column($rows->toArray(), 'credit'));
+        $total_debit = number_format(array_sum(array_column($rows->toArray(), 'debit')), get_business_option('decimal_places'));
+        $total_credit = number_format(array_sum(array_column($rows->toArray(), 'credit')), get_business_option('decimal_places'));
 
-        if ($total_debit != $total_credit) {
+        if (floatval($total_debit) != floatval($total_credit)) {
             return redirect()->back()->withInput()->with('error', _lang('Debit and Credit must be equal'));
         }
 

@@ -92,7 +92,7 @@ export default function InventoryDetails({ categories, date1, date2, business_na
         categories.forEach(cat => {
             const catOpen = getTotalInitialStock(cat);
             const catIn = getTotalStockIn(cat);
-            const catOut = cat.total_sold;
+            const catOut = getTotalStockOut(cat);
             const catAdjAdd = getTotalStockAdjustmentAdded(cat);
             const catAdjDed = getTotalStockAdjustmentDeducted(cat);
             const catBal = getTotalStockBalance(cat);
@@ -118,7 +118,7 @@ export default function InventoryDetails({ categories, date1, date2, business_na
             cat.brands.forEach(brand => {
                 const bOpen = getTotalInitialStock(brand);
                 const bIn = getTotalStockIn(brand);
-                const bOut = brand.total_sold;
+                const bOut = getTotalStockOut(brand);
                 const bAdjAdd = getTotalStockAdjustmentAdded(brand);
                 const bAdjDed = getTotalStockAdjustmentDeducted(brand);
                 const bBal = getTotalStockBalance(brand);
@@ -211,6 +211,24 @@ export default function InventoryDetails({ categories, date1, date2, business_na
         if (Array.isArray(node.brands)) {
             return node.brands.reduce(
                 (sum, brand) => sum + getTotalStockIn(brand),
+                0
+            );
+        }
+        return 0;
+    }
+
+    function getTotalStockOut(node) {
+        // If it's a brand, sum its products
+        if (Array.isArray(node.products)) {
+            return node.products.reduce(
+                (sum, prod) => sum + (Number(prod.total_sold) || 0),
+                0
+            );
+        }
+        // If it's a category, sum each brand recursively
+        if (Array.isArray(node.brands)) {
+            return node.brands.reduce(
+                (sum, brand) => sum + getTotalStockOut(brand),
                 0
             );
         }
@@ -364,6 +382,7 @@ export default function InventoryDetails({ categories, date1, date2, business_na
                             <ReportTable>
                                 <TableHeader>
                                     <TableRow>
+                                        <TableHead className="!text-[10px]">ID</TableHead>
                                         <TableHead className="!text-[10px]">Code</TableHead>
                                         <TableHead className="!text-[10px]">Name</TableHead>
                                         <TableHead className="!text-[10px]">Opening Stock</TableHead>
@@ -376,11 +395,38 @@ export default function InventoryDetails({ categories, date1, date2, business_na
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
+                                    <TableRow>
+                                        <TableCell className="!text-[10px]"></TableCell>
+                                        <TableCell className="!text-[10px]"></TableCell>
+                                        <TableCell className="!text-[10px]"></TableCell>
+                                        <TableCell className="!text-[10px]">
+                                            <strong>{categories.reduce((sum, cat) => sum + getTotalInitialStock(cat), 0)}</strong>
+                                        </TableCell>
+                                        <TableCell className="!text-[10px]">
+                                            <strong>{categories.reduce((sum, cat) => sum + getTotalStockIn(cat), 0)}</strong>
+                                        </TableCell>
+                                        <TableCell className="!text-[10px]">
+                                            <strong>{categories.reduce((sum, cat) => sum + getTotalStockOut(cat), 0)}</strong>
+                                        </TableCell>
+                                        <TableCell className="!text-[10px]">
+                                            <strong>{categories.reduce((sum, cat) => sum + getTotalStockAdjustmentAdded(cat), 0)}</strong>
+                                        </TableCell>
+                                        <TableCell className="!text-[10px]">
+                                            <strong>{categories.reduce((sum, cat) => sum + getTotalStockAdjustmentDeducted(cat), 0)}</strong>
+                                        </TableCell>
+                                        <TableCell className="!text-[10px]">
+                                            <strong>{categories.reduce((sum, cat) => sum + getTotalStockBalance(cat), 0)}</strong>
+                                        </TableCell>
+                                        <TableCell className="text-right !text-[10px]">
+                                            <strong>{formatCurrency({ amount: categories.reduce((sum, cat) => sum + getTotalStockCost(cat), 0) })}</strong>
+                                        </TableCell>
+                                    </TableRow>
                                     {categories.length > 0 ? (
                                         categories.map((cat) => (
                                             <React.Fragment key={cat.id}>
                                                 {/* Category row */}
                                                 <TableRow className="bg-gray-100">
+                                                    <TableCell className="!text-[10px]"></TableCell>
                                                     <TableCell className="!text-[10px]"></TableCell>
                                                     <TableCell className="!text-[10px]">
                                                         <strong>{cat.category_name}</strong>
@@ -392,7 +438,7 @@ export default function InventoryDetails({ categories, date1, date2, business_na
                                                         <strong>{getTotalStockIn(cat)}</strong>
                                                     </TableCell>
                                                     <TableCell className="!text-[10px]">
-                                                        <strong>{cat.total_sold}</strong>
+                                                        <strong>{getTotalStockOut(cat)}</strong>
                                                     </TableCell>
                                                     <TableCell className="!text-[10px]">
                                                         <strong>{getTotalStockAdjustmentAdded(cat)}</strong>
@@ -413,6 +459,7 @@ export default function InventoryDetails({ categories, date1, date2, business_na
                                                     <React.Fragment key={brand.id}>
                                                         <TableRow className="bg-gray-100 !text-[10px]">
                                                             <TableCell className="!text-[10px]"></TableCell>
+                                                            <TableCell className="!text-[10px]"></TableCell>
                                                             <TableCell className="!text-[10px]">
                                                                 <strong>{brand.brand_name}</strong>
                                                             </TableCell>
@@ -423,7 +470,7 @@ export default function InventoryDetails({ categories, date1, date2, business_na
                                                                 <strong>{getTotalStockIn(brand)}</strong>
                                                             </TableCell>
                                                             <TableCell className="!text-[10px]">
-                                                                <strong>{brand.total_sold}</strong>
+                                                                <strong>{getTotalStockOut(brand)}</strong>
                                                             </TableCell>
                                                             <TableCell className="!text-[10px]">
                                                                 <strong>{getTotalStockAdjustmentAdded(brand)}</strong>
@@ -443,6 +490,9 @@ export default function InventoryDetails({ categories, date1, date2, business_na
                                                         {brand.products.map((prod) => (
                                                             <TableRow key={prod.id}>
                                                                 <TableCell className="!text-[10px]">
+                                                                    {prod.id}
+                                                                </TableCell>
+                                                                <TableCell className="!text-[10px]">
                                                                     {prod.code}
                                                                 </TableCell>
                                                                 <TableCell className="!text-[10px]">
@@ -455,7 +505,7 @@ export default function InventoryDetails({ categories, date1, date2, business_na
                                                                     {prod.total_stock_in}
                                                                 </TableCell>
                                                                 <TableCell className="!text-[10px]">
-                                                                    {prod.total_sold}
+                                                                    {getTotalStockOut(prod)}
                                                                 </TableCell>
                                                                 <TableCell className="!text-[10px]">
                                                                     {prod.total_stock_adjustment_added}

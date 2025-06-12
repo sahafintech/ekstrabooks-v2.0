@@ -2970,40 +2970,37 @@ class ReportController extends Controller
 				$query->where('sub_categories.id', $sub_category);
 			}
 
-			$products = $query->addSelect([
-				'total_sold_invoices' => InvoiceItem::selectRaw('IFNULL(SUM(quantity), 0)')
-					->whereColumn('product_id', 'products.id')
-					->whereIn('product_id', Product::pluck('id')) // Ensures all products are included
-					->whereHas('invoice', function ($query) use ($date1, $date2) {
-						$query->whereBetween('invoice_date', [$date1, $date2]);
-					}, 'or'), // OR condition ensures products without invoices are not excluded
-
-				'total_sold_receipts' => ReceiptItem::selectRaw('IFNULL(SUM(quantity), 0)')
-					->whereColumn('product_id', 'products.id')
-					->whereIn('product_id', Product::pluck('id'))
-					->whereHas('receipt', function ($query) use ($date1, $date2) {
-						$query->whereBetween('receipt_date', [$date1, $date2]);
-					}, 'or'),
-
-				'total_stock_in' => PurchaseItem::selectRaw('IFNULL(SUM(quantity), 0)')
-					->whereColumn('product_id', 'products.id')
-					->whereIn('product_id', Product::pluck('id'))
-					->whereHas('purchase', function ($query) use ($date1, $date2) {
-						$query->whereBetween('purchase_date', [$date1, $date2]);
-					}, 'or'),
-
-				'total_stock_adjustment_added' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
-					->whereColumn('product_id', 'products.id')
-					->where('adjustment_type', 'adds')
-					->whereDate('adjustment_date', '>=', $date1)
-					->whereDate('adjustment_date', '<=', $date2),
-
-				'total_stock_adjustment_deducted' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
-					->whereColumn('product_id', 'products.id')
-					->where('adjustment_type', 'deducts')
-					->whereDate('adjustment_date', '>=', $date1)
-					->whereDate('adjustment_date', '<=', $date2),
-			])->get()
+				$products = $query->addSelect([
+					'total_sold_invoices' => InvoiceItem::selectRaw('IFNULL(SUM(quantity), 0)')
+						->whereColumn('product_id', 'products.id')
+						->whereHas('invoice', function ($query) use ($date1, $date2) {
+							$query->whereDate('invoice_date', '>=', $date1)
+								->whereDate('invoice_date', '<=', $date2);
+						}),
+					'total_sold_receipts' => ReceiptItem::selectRaw('IFNULL(SUM(quantity), 0)')
+						->whereColumn('product_id', 'products.id')
+						->whereHas('receipt', function ($query) use ($date1, $date2) {
+							$query->whereDate('receipt_date', '>=', $date1)
+								->whereDate('receipt_date', '<=', $date2);
+						}),
+					'total_stock_in' => PurchaseItem::selectRaw('IFNULL(SUM(quantity), 0)')
+						->whereColumn('product_id', 'products.id')
+						->whereHas('purchase', function ($query) use ($date1, $date2) {
+							$query->whereDate('purchase_date', '>=', $date1)
+								->whereDate('purchase_date', '<=', $date2);
+						}),
+					'total_stock_adjustment_added' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
+						->whereColumn('product_id', 'products.id')
+						->where('adjustment_type', 'adds')
+						->whereDate('adjustment_date', '>=', $date1)
+						->whereDate('adjustment_date', '<=', $date2),
+					'total_stock_adjustment_deducted' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
+						->whereColumn('product_id', 'products.id')
+						->where('adjustment_type', 'deducts')
+						->whereDate('adjustment_date', '>=', $date1)
+						->whereDate('adjustment_date', '<=', $date2),
+				])
+				->get()
 				->map(function ($product) {
 					// Calculate the total sold by summing invoices and receipts
 					$product->total_sold = ($product->total_sold_invoices ?? 0) + ($product->total_sold_receipts ?? 0);

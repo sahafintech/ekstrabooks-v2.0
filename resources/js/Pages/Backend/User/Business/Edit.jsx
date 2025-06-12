@@ -417,7 +417,7 @@ export default function Edit({ business_types = [], currencies = [], countries =
                                                                 updatedCurrencies[index] = e.target.value;
                                                                 setData("bank_accounts", {
                                                                     ...data.bank_accounts,
-                                                                    currency: updatedCurrencies,
+                                                                    account_currency: updatedCurrencies,
                                                                 });
                                                             }}
                                                             className="w-full"
@@ -456,18 +456,17 @@ export default function Edit({ business_types = [], currencies = [], countries =
                                                     <td className="border px-4 py-2">
                                                         <Select
                                                             value={data.bank_accounts.display_on_invoice[index] || "0"}
-                                                            onChange={(e) => {
+                                                            onValueChange={(value) => {
                                                                 const updatedDisplayOnInvoice = [...data.bank_accounts.display_on_invoice];
-                                                                updatedDisplayOnInvoice[index] = e.target.value;
+                                                                updatedDisplayOnInvoice[index] = value;
                                                                 setData("bank_accounts", {
                                                                     ...data.bank_accounts,
                                                                     display_on_invoice: updatedDisplayOnInvoice,
                                                                 });
                                                             }}
-                                                            className="w-full p-2 border rounded-md"
                                                         >
                                                             <SelectTrigger id="display_on_invoice" className="w-full">
-                                                                <SelectValue value={data.bank_accounts.display_on_invoice[index] || "0"} />
+                                                                <SelectValue placeholder="Select" />
                                                             </SelectTrigger>
                                                             <SelectContent>
                                                                 <SelectItem value="1">Yes</SelectItem>

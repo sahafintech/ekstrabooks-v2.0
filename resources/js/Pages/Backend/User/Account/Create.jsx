@@ -148,6 +148,37 @@ export default function Create({ currencies = [], accountTypes = [] }) {
 
                         <div className="grid grid-cols-12 mt-2">
                             <Label
+                                htmlFor="currency"
+                                className="md:col-span-2 col-span-12"
+                            >
+                                Currency
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                <div className="md:w-1/2 w-full">
+                                    <SearchableCombobox
+                                        className="mt-1"
+                                        options={currencies.map((currency) => ({
+                                            id: currency.name,
+                                            value: currency.name,
+                                            label: currency.name,
+                                            name: `${currency.name} - ${currency.description} (${currency.exchange_rate})`,
+                                        }))}
+                                        value={data.currency}
+                                        onChange={(selectedValue) => {
+                                            setData("currency", selectedValue);
+                                        }}
+                                        placeholder="Select currency"
+                                    />
+                                </div>
+                                <InputError
+                                    message={errors.currency}
+                                    className="text-sm"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label
                                 htmlFor="opening_date"
                                 className="md:col-span-2 col-span-12"
                             >
@@ -195,38 +226,6 @@ export default function Create({ currencies = [], accountTypes = [] }) {
                                 />
                             </div>
                         </div>
-
-                        {showCurrency && (
-                            <div className="grid grid-cols-12 mt-2">
-                                <Label
-                                    htmlFor="currency"
-                                    className="md:col-span-2 col-span-12"
-                                >
-                                    Currency *
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                                    <div className="md:w-1/2 w-full">
-                                        <SearchableCombobox
-                                            options={currencies.map(
-                                                (currency) => ({
-                                                    id: currency.name,
-                                                    name: `${currency.name} - ${currency.description} (${currency.exchange_rate})`,
-                                                })
-                                            )}
-                                            value={data.currency}
-                                            onChange={(value) =>
-                                                setData("currency", value)
-                                            }
-                                            placeholder="Select currency"
-                                        />
-                                    </div>
-                                    <InputError
-                                        message={errors.currency}
-                                        className="text-sm"
-                                    />
-                                </div>
-                            </div>
-                        )}
 
                         {isAssetType(data.account_type) && (
                             <div className="grid grid-cols-12 mt-2">
