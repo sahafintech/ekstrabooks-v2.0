@@ -32,11 +32,12 @@ class AccountStatement implements FromView, WithTitle, WithColumnFormatting
         $date1 = Carbon::parse($this->date1)->format('Y-m-d');
         $date2 = Carbon::parse($this->date2)->format('Y-m-d');
 
-        $account = Account::where('id', $this->id)->first();
+        $account = Account::where('id', $this->id)->with('transactions')->first();
 
         $transactions = $account->transactions()
             ->whereDate('trans_date', '>=', $date1)
             ->whereDate('trans_date', '<=', $date2)
+            ->orderBy('trans_date', 'asc')
             ->get();
 
         return view('backend.user.reports.exports.account_statement', compact('account', 'transactions'));

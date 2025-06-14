@@ -664,9 +664,17 @@ class AccountController extends Controller
 
             foreach ($transactions as $key => $transaction) {
                 if ($transaction->dr_cr == 'dr') {
-                    $balance += $transaction->base_currency_amount;
+                    if ($account->currency == NULL) {
+                        $balance += $transaction->base_currency_amount;
+                    } else {
+                        $balance += $transaction->transaction_amount;
+                    }
                 } else {
-                    $balance -= $transaction->base_currency_amount;
+                    if ($account->currency == NULL) {
+                        $balance -= $transaction->base_currency_amount;
+                    } else {
+                        $balance -= $transaction->transaction_amount;
+                    }
                 }
                 $running_balance[$key] = $balance;
             }
@@ -717,9 +725,17 @@ class AccountController extends Controller
 
             foreach ($transactions as $key => $transaction) {
                 if ($transaction->dr_cr == 'dr') {
-                    $balance += $transaction->base_currency_amount;
+                    if ($account->currency == NULL) {
+                        $balance += $transaction->base_currency_amount;
+                    } else {
+                        $balance += $transaction->transaction_amount;
+                    }
                 } else {
-                    $balance -= $transaction->base_currency_amount;
+                    if ($account->currency == NULL) {
+                        $balance -= $transaction->base_currency_amount;
+                    } else {
+                        $balance -= $transaction->transaction_amount;
+                    }
                 }
                 $running_balance[$key] = $balance;
             }

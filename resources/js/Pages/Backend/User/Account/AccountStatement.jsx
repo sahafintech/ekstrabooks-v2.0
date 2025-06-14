@@ -48,7 +48,7 @@ export default function AccountStatement({
 
     const handleExport = () => {
         window.location.href = route(
-            "accounts.account_statement_export",
+            "accounts.export_account_statement",
             account.id
         );
     };
@@ -206,18 +206,6 @@ export default function AccountStatement({
                         <td>${
                             transaction.dr_cr === "cr"
                                 ? transaction.transaction_amount
-                                : 0
-                        }</td>
-                        <td>${transaction.currency_rate || "N/A"}</td>
-                        <td>${currency}</td>
-                        <td>${
-                            transaction.dr_cr === "dr"
-                                ? transaction.base_currency_amount
-                                : 0
-                        }</td>
-                        <td>${
-                            transaction.dr_cr === "cr"
-                                ? transaction.base_currency_amount
                                 : 0
                         }</td>
                     </tr>

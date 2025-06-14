@@ -529,10 +529,10 @@ if (!function_exists('get_timezone_list')) {
 				'name' => 'GMT ' . date('P', $timestamp) . ' ' . $zone
 			];
 		}
-		
+
 		// Reset to default timezone
 		date_default_timezone_set(config('app.timezone'));
-		
+
 		return $timezones;
 	}
 }
@@ -659,9 +659,9 @@ if (!function_exists('payroll_status')) {
 			return "<span class='text-gray-400'>" . _lang('Draft') . "</span>";
 		} else if ($status == 1) {
 			return "<span class='text-secondary'>" . _lang('Approved') . "</span>";
-		}else if($status == 2){
+		} else if ($status == 2) {
 			return "<span class='text-danger'>" . _lang('Accrued') . "</span>";
-		}else if ($status == 3) {
+		} else if ($status == 3) {
 			return "<span class='text-success'>" . _lang('Paid') . "</span>";
 		}
 	}
@@ -793,17 +793,33 @@ if (!function_exists('get_account_balance')) {
 		$account = Account::where('id', $accountId)->first();
 
 		if ($account->dr_cr == 'dr') {
-			$result = DB::select("SELECT (SELECT IFNULL( SUM(base_currency_amount), 0)
+			if ($account->currency == NULL) {
+				$result = DB::select("SELECT (SELECT IFNULL( SUM(base_currency_amount), 0)
             FROM transactions WHERE dr_cr = 'dr' AND account_id = $accountId AND transactions.business_id = $business_id) - (SELECT IFNULL( SUM(base_currency_amount), 0)
             FROM transactions WHERE dr_cr = 'cr' AND account_id = $accountId AND transactions.business_id = $business_id) as balance");
 
-			return $result[0]->balance ?? 0;
+				return $result[0]->balance ?? 0;
+			} else {
+				$result = DB::select("SELECT (SELECT IFNULL( SUM(transaction_amount), 0)
+            FROM transactions WHERE dr_cr = 'dr' AND account_id = $accountId AND transactions.business_id = $business_id) - (SELECT IFNULL( SUM(transaction_amount), 0)
+            FROM transactions WHERE dr_cr = 'cr' AND account_id = $accountId AND transactions.business_id = $business_id) as balance");
+
+				return $result[0]->balance ?? 0;
+			}
 		} else {
-			$result = DB::select("SELECT (SELECT IFNULL( SUM(base_currency_amount), 0)
+			if ($account->currency == NULL) {
+				$result = DB::select("SELECT (SELECT IFNULL( SUM(base_currency_amount), 0)
             FROM transactions WHERE dr_cr = 'cr' AND account_id = $accountId AND transactions.business_id = $business_id) - (SELECT IFNULL( SUM(base_currency_amount), 0)
             FROM transactions WHERE dr_cr = 'dr' AND account_id = $accountId AND transactions.business_id = $business_id) as balance");
 
-			return $result[0]->balance ?? 0;
+				return $result[0]->balance ?? 0;
+			} else {
+				$result = DB::select("SELECT (SELECT IFNULL( SUM(transaction_amount), 0)
+            FROM transactions WHERE dr_cr = 'cr' AND account_id = $accountId AND transactions.business_id = $business_id) - (SELECT IFNULL( SUM(transaction_amount), 0)
+            FROM transactions WHERE dr_cr = 'dr' AND account_id = $accountId AND transactions.business_id = $business_id) as balance");
+
+				return $result[0]->balance ?? 0;
+			}
 		}
 	}
 }
