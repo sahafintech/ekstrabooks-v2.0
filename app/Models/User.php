@@ -45,6 +45,8 @@ class User extends Authenticatable implements MustVerifyEmail {
         'email_verified_at' => 'datetime',
     ];
 
+    protected $appends = ['business_ids', 'role'];
+
     public function scopeActive($query) {
         return $query->where('status', 1);
     }
@@ -66,6 +68,14 @@ class User extends Authenticatable implements MustVerifyEmail {
 
     public function business() {
         return $this->belongsToMany(Business::class, 'business_users')->withPivot('owner_id', 'is_active', 'role_id');
+    }
+
+    public function getBusinessIdsAttribute(){
+        return BusinessUser::where('user_id', $this->id)->pluck('business_id') ?? [];
+    }
+
+    public function getRoleAttribute(){
+        return BusinessUser::where('user_id', $this->id)->first()->role_id ?? null;
     }
 
     public function roles(): BelongsToMany {
