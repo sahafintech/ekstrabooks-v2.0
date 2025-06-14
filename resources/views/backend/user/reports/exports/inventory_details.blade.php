@@ -3,6 +3,7 @@
         <tr>
             <th></th>
             <th></th>
+            <th></th>
             <th>
                 <p>{{ $products->flatMap(function($category) {
                         return $category['brands'];

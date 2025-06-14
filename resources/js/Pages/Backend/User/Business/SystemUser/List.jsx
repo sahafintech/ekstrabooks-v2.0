@@ -96,10 +96,19 @@ const DeleteAllUsersModal = ({
 // change role modal
 const ChangeRoleModal = ({ show, onClose, onConfirm, processing, user, roles, businesses }) => {
     const [data, setData] = useState({
-        role_id: user?.pivot?.role_id,
-        business_id: [user?.pivot?.business_id],
+        role_id: null,
+        business_id: [],
     });
 
+    useEffect(() => {
+        if (user) {
+            setData({
+                role_id: user.role,
+                business_id: user.business_ids,
+            });
+        }
+    }, [user]);
+    
     const handleSubmit = (e) => {
         e.preventDefault();
         onConfirm(data);
@@ -123,13 +132,10 @@ const ChangeRoleModal = ({ show, onClose, onConfirm, processing, user, roles, bu
                         <SearchableCombobox
                             id="role_id"
                             label="Role"
-                            options={[
-                                { id: "admin", name: "Admin" },
-                                ...roles.map((role) => ({
-                                    id: role.id,
-                                    name: role.name,
-                                })),
-                            ]}
+                            options={roles.map((role) => ({
+                                id: role.id,
+                                name: role.name,
+                            }))}
                             value={data.role_id}
                             onChange={(value) =>
                                 setData({ ...data, role_id: value })
@@ -149,8 +155,6 @@ const ChangeRoleModal = ({ show, onClose, onConfirm, processing, user, roles, bu
                     </Label>
                     <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                         <SearchableMultiSelectCombobox
-                            id="business_id"
-                            label="Business"
                             options={businesses.map((business) => ({
                                 id: business.id,
                                 name: business.name,
@@ -524,16 +528,15 @@ export default function List({
                                                     {business.name}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {user.pivot.role_id === null
+                                                    {user.role === null
                                                         ? "Admin"
                                                         : user.roles.find(
                                                               (role) =>
                                                                   role.id ===
-                                                                  user.pivot
-                                                                      .role_id
+                                                                  user.role
                                                           ).name}
                                                 </TableCell>
-                                                {user.pivot.role_id !==
+                                                {user.role !==
                                                     null && (
                                                     <TableCell className="text-right">
                                                         <TableActions

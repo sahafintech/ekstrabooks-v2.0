@@ -71,7 +71,7 @@ class User extends Authenticatable implements MustVerifyEmail {
     }
 
     public function getBusinessIdsAttribute(){
-        return BusinessUser::where('user_id', $this->id)->pluck('business_id') ?? [];
+        return BusinessUser::where('user_id', $this->id)->pluck('business_id')->toArray() ?? [];
     }
 
     public function getRoleAttribute(){

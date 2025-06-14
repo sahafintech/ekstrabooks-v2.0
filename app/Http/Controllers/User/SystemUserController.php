@@ -5,6 +5,7 @@ namespace App\Http\Controllers\User;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Business;
+use App\Models\BusinessUser;
 use App\Models\EmailTemplate;
 use App\Models\Invite;
 use App\Models\Role;
@@ -60,20 +61,23 @@ class SystemUserController extends Controller
 			return redirect()->back()->with('error', _lang('No business found'));
 		}
 
+		BusinessUser::where('user_id', $userId)->delete();
+
 		foreach ($businesses as $index => $business) {
-			$business->users()->detach($userId);
-			$business->users()->attach($userId, [
-				'owner_id' => $request->role_id == 'admin' ? $userId : $business->user_id,
-				'role_id' => $request->role_id == 'admin' ? null : $role->id,
-				'is_active' => $index === 0 ? 1 : 0,
-			]);
+			$businessUser = new BusinessUser();
+			$businessUser->user_id = $userId;
+			$businessUser->business_id = $business->id;
+			$businessUser->owner_id = $request->role_id == 'admin' ? $userId : $business->user_id;
+			$businessUser->role_id = $request->role_id == 'admin' ? null : $role->id;
+			$businessUser->is_active = $index === 0 ? 1 : 0;
+			$businessUser->save();
 		}
 
 		// audit log
 		$audit = new AuditLog();
 		$audit->date_changed = date('Y-m-d H:i:s');
 		$audit->changed_by = auth()->user()->id;
-		$audit->event = $business->users->find($userId)->name . ' ' . _lang('Role Changed to') . ' ' . $role->name;
+		$audit->event = User::find($userId)->name . ' ' . _lang('Role Changed to') . ' ' . $role->name;
 		$audit->save();
 
 		return redirect()->back()->with('success', _lang('Role Updated Successfully'));
@@ -203,15 +207,18 @@ class SystemUserController extends Controller
 		}
 		$invite->save();
 
+		BusinessUser::where('user_id', $invite->user_id)->delete();
+
 		//Store Business User
 		foreach ($invite->business_id as $index => $businessId) {
 			$business = Business::withoutGlobalScopes()->find($businessId);
-			$business->users()->detach($invite->user_id);
-			$business->users()->attach($invite->user_id, [
-				'owner_id' => $invite->role_id == 'admin' ? $invite->user_id : $business->user_id,
-				'role_id' => $invite->role_id == 'admin' ? null : $invite->role_id,
-				'is_active' => $index === 0 ? 1 : 0,
-			]);
+			$businessUser = new BusinessUser();
+			$businessUser->user_id = $invite->user_id;
+			$businessUser->business_id = $businessId;
+			$businessUser->owner_id = $business->user_id;
+			$businessUser->role_id = $invite->role_id;
+			$businessUser->is_active = $index === 0 ? 1 : 0;
+			$businessUser->save();
 		}
 
 		DB::commit();
