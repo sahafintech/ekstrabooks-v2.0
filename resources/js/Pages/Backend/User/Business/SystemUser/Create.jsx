@@ -9,7 +9,6 @@ import InputError from "@/Components/InputError";
 import { Button } from "@/Components/ui/button";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
-import { Head } from "@inertiajs/react";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 import { useEffect } from "react";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
@@ -99,8 +98,7 @@ export default function Create({ roles, businesses, businessId }) {
                                     id="role_id"
                                     label="Role"
                                     options={[
-                                        { id: "admin", name: "Admin" },
-                                        ...roles.map((role) => ({
+                                        roles.map((role) => ({
                                             id: role.id,
                                             name: role.name,
                                         })),

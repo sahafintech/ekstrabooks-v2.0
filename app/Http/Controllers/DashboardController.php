@@ -6,9 +6,14 @@ use App\Models\Account;
 use App\Models\BusinessSetting;
 use App\Models\Currency;
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use App\Models\Product;
 use App\Models\Purchase;
+use App\Models\PurchaseItem;
+use App\Models\PurchaseReturnItem;
 use App\Models\Receipt;
+use App\Models\ReceiptItem;
+use App\Models\SalesReturnItem;
 use App\Models\SubscriptionPayment;
 use App\Models\Transaction;
 use App\Models\User;
@@ -858,28 +863,39 @@ class DashboardController extends Controller
 		];
 
 		// Get products with stock management enabled
-		$products = Product::where('stock_management', 1)
-			->where('status', 1)
-			->withSum(['invoice_items' => function ($query) use ($start_date, $end_date) {
-				$query->whereHas('invoice', function ($q) use ($start_date, $end_date) {
-					$q->whereBetween('invoice_date', [$start_date, $end_date]);
-				});
-			}], 'quantity')
-			->withSum(['purchase_items' => function ($query) use ($start_date, $end_date) {
-				$query->whereHas('purchase', function ($q) use ($start_date, $end_date) {
-					$q->whereBetween('purchase_date', [$start_date, $end_date]);
-				});
-			}], 'quantity')
-			->withSum(['sales_return_items' => function ($query) use ($start_date, $end_date) {
-				$query->whereHas('sales_return', function ($q) use ($start_date, $end_date) {
-					$q->whereBetween('return_date', [$start_date, $end_date]);
-				});
-			}], 'quantity')
-			->withSum(['purchase_return_items' => function ($query) use ($start_date, $end_date) {
-				$query->whereHas('purchase_return', function ($q) use ($start_date, $end_date) {
-					$q->whereBetween('return_date', [$start_date, $end_date]);
-				});
-			}], 'quantity')
+		$products = Product::with('category')->where('stock_management', 1)
+			->addSelect([
+				'total_sold_invoices' => InvoiceItem::selectRaw('IFNULL(SUM(quantity), 0)')
+					->whereColumn('product_id', 'products.id')
+					->whereHas('invoice', function ($query) use ($start_date, $end_date) {
+						$query->whereDate('invoice_date', '>=', $start_date)
+							->whereDate('invoice_date', '<=', $end_date);
+					}),
+				'total_sold_receipts' => ReceiptItem::selectRaw('IFNULL(SUM(quantity), 0)')
+					->whereColumn('product_id', 'products.id')
+					->whereHas('receipt', function ($query) use ($start_date, $end_date) {
+						$query->whereDate('receipt_date', '>=', $start_date)
+							->whereDate('receipt_date', '<=', $end_date);
+					}),
+				'total_stock_in' => PurchaseItem::selectRaw('IFNULL(SUM(quantity), 0)')
+					->whereColumn('product_id', 'products.id')
+					->whereHas('purchase', function ($query) use ($start_date, $end_date) {
+						$query->whereDate('purchase_date', '>=', $start_date)
+							->whereDate('purchase_date', '<=', $end_date);
+					}),
+				'total_sales_return' => SalesReturnItem::selectRaw('IFNULL(SUM(quantity), 0)')
+					->whereColumn('product_id', 'products.id')
+					->whereHas('sales_return', function ($query) use ($start_date, $end_date) {
+						$query->whereDate('return_date', '>=', $start_date)
+							->whereDate('return_date', '<=', $end_date);
+					}),
+				'total_purchase_return' => PurchaseReturnItem::selectRaw('IFNULL(SUM(quantity), 0)')
+					->whereColumn('product_id', 'products.id')
+					->whereHas('purchase_return', function ($query) use ($start_date, $end_date) {
+						$query->whereDate('return_date', '>=', $start_date)
+							->whereDate('return_date', '<=', $end_date);
+					}),
+			])
 			->get();
 
 		// Initialize variables with default values
@@ -912,13 +928,13 @@ class DashboardController extends Controller
 			});
 
 			// Calculate Stock In and Stock Out
-			$stock_movements['sales'] = $products->sum('invoice_items_sum_quantity') ?? 0;
-			$stock_movements['purchases'] = $products->sum('purchase_items_sum_quantity') ?? 0;
-			$stock_movements['sales_returns'] = $products->sum('sales_return_items_sum_quantity') ?? 0;
-			$stock_movements['purchase_returns'] = $products->sum('purchase_return_items_sum_quantity') ?? 0;
+			$stock_movements['sales'] = $products->sum('total_sold_invoices') + $products->sum('total_sold_receipts') ?? 0;
+			$stock_movements['purchases'] = $products->sum('total_stock_in') ?? 0;
+			$stock_movements['sales_returns'] = $products->sum('total_sales_return') ?? 0;
+			$stock_movements['purchase_returns'] = $products->sum('total_purchase_return') ?? 0;
 
-			$stock_in = $stock_movements['purchases'] + $stock_movements['sales_returns'];
-			$stock_out = $stock_movements['sales'] + $stock_movements['purchase_returns'];
+			$stock_in = $stock_movements['purchases'] + $stock_movements['sales_returns'] + $stock_movements['purchase_returns'];
+			$stock_out = $stock_movements['sales'] + $stock_movements['sales_returns'] + $stock_movements['purchase_returns'];
 
 			// Calculate Closing Stock
 			$closing_stock = $products->sum('stock');
@@ -930,11 +946,11 @@ class DashboardController extends Controller
 			$stock_turnover_rate = $average_inventory > 0 ? ($stock_out / $average_inventory) * 100 : 0;
 
 			// Get category-wise stock data
-			$category_stock = $products->groupBy('category_id')
+			$category_stock = $products->groupBy('sub_category_id')
 				->map(function ($items) {
 					return [
 						'name' => $items->first()->category->name ?? 'Uncategorized',
-						'value' => $items->sum('invoice_items_sum_quantity') ?? 0
+						'value' => $items->sum('total_sold_invoices') + $items->sum('total_sold_receipts') ?? 0
 					];
 				})
 				->sortByDesc('value')
@@ -942,7 +958,7 @@ class DashboardController extends Controller
 				->take(10);
 
 			// Get top selling products
-			$top_selling_products = $products->sortByDesc('invoice_items_sum_quantity')
+			$top_selling_products = $products->sortByDesc('total_sold_invoices')
 				->take(5)
 				->map(function ($product) {
 					return [
@@ -957,7 +973,7 @@ class DashboardController extends Controller
 				->toArray();
 
 			// Get most purchased products
-			$most_purchased_products = $products->sortByDesc('purchase_items_sum_quantity')->take(5);
+			$most_purchased_products = $products->sortByDesc('total_stock_in')->take(5);
 
 			// Determine aggregation period based on date range
 			$days_diff = (strtotime($end_date) - strtotime($start_date)) / (60 * 60 * 24);

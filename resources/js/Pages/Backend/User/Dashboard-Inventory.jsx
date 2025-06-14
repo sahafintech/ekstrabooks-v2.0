@@ -305,9 +305,9 @@ export default function DashboardInventory({
                         </div>
 
                         {/* Stats Cards */}
-                        <div className="grid auto-rows-min gap-6 md:grid-cols-2 lg:grid-cols-4">
+                        <div className="grid auto-rows-min gap-2 md:grid-cols-2 lg:grid-cols-4">
                             {statsCards.map((stat, i) => (
-                                <div key={i} className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm">
+                                <div key={i} className="flex flex-col gap-1 rounded-lg bg-neutral-100 p-4 shadow-sm">
                                     <div className="text-sm text-muted-foreground">{stat.title}</div>
                                     <div className="text-xl font-semibold">{stat.value}</div>
                                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -319,9 +319,9 @@ export default function DashboardInventory({
                         </div>
 
                         {/* Stock Metrics */}
-                        <div className="grid auto-rows-min gap-6 md:grid-cols-2 lg:grid-cols-4">
+                        <div className="grid auto-rows-min gap-2 md:grid-cols-2 lg:grid-cols-4">
                             {stockMetrics.map((metric, i) => (
-                                <div key={i} className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm">
+                                <div key={i} className="flex flex-col gap-1 rounded-lg bg-neutral-100 p-4 shadow-sm">
                                     <div className="text-sm text-muted-foreground">{metric.title}</div>
                                     <div className="text-xl font-semibold">{metric.value}</div>
                                     <div className="flex items-center gap-1 text-xs text-muted-foreground">

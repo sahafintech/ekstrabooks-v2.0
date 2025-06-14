@@ -259,17 +259,17 @@ Route::group(['middleware' => $initialMiddleware], function () {
 	Route::group(['middleware' => ['permission'], 'prefix' => 'user'], function () {
 
 		//Dashboard Widget
-		Route::get('dashboard/income_widget', 'DashboardController@income_widget')->name('dashboard.income_widget');
-		Route::get('dashboard/expense_widget', 'DashboardController@expense_widget')->name('dashboard.expense_widget');
-		Route::get('dashboard/accounts_receivable_amount_widget', 'DashboardController@accounts_receivable_amount_widget')->name('dashboard.accounts_receivable_amount_widget');
-		Route::get('dashboard/accounts_payable_amount_widget', 'DashboardController@accounts_payable_amount_widget')->name('dashboard.accounts_payable_amount_widget');
-		Route::get('dashboard/cashflow_widget', 'DashboardController@cashflow_widget')->name('dashboard.cashflow_widget');
-		Route::get('dashboard/top_customers_widget', 'DashboardController@top_customers_widget')->name('dashboard.top_customers_widget');
-		Route::get('dashboard/sales_overview_widget', 'DashboardController@sales_overview_widget')->name('dashboard.sales_overview_widget');
-		Route::get('dashboard/sales_value_widget', 'DashboardController@sales_value_widget')->name('dashboard.sales_value_widget');
-		Route::get('dashboard/recent_transaction_widget', 'DashboardController@recent_transaction_widget')->name('dashboard.recent_transaction_widget');
-		Route::get('dashboard/recent_invoices_widget', 'DashboardController@recent_invoices_widget')->name('dashboard.recent_invoices_widget');
-		Route::get('dashboard/receivables_vs_payables_widget', 'DashboardController@receivables_vs_payables_widget')->name('dashboard.receivables_vs_payables_widget');
+		Route::get('dashboard/income_widget', [DashboardController::class, 'income_widget'])->name('dashboard.income_widget');
+		Route::get('dashboard/expense_widget', [DashboardController::class, 'expense_widget'])->name('dashboard.expense_widget');
+		Route::get('dashboard/accounts_receivable_amount_widget', [DashboardController::class, 'accounts_receivable_amount_widget'])->name('dashboard.accounts_receivable_amount_widget');
+		Route::get('dashboard/accounts_payable_amount_widget', [DashboardController::class, 'accounts_payable_amount_widget'])->name('dashboard.accounts_payable_amount_widget');
+		Route::get('dashboard/cashflow_widget', [DashboardController::class, 'cashflow_widget'])->name('dashboard.cashflow_widget');
+		Route::get('dashboard/top_customers_widget', [DashboardController::class, 'top_customers_widget'])->name('dashboard.top_customers_widget');
+		Route::get('dashboard/sales_overview_widget', [DashboardController::class, 'sales_overview_widget'])->name('dashboard.sales_overview_widget');
+		Route::get('dashboard/sales_value_widget', [DashboardController::class, 'sales_value_widget'])->name('dashboard.sales_value_widget');
+		Route::get('dashboard/recent_transaction_widget', [DashboardController::class, 'recent_transaction_widget'])->name('dashboard.recent_transaction_widget');
+		Route::get('dashboard/recent_invoices_widget', [DashboardController::class, 'recent_invoices_widget'])->name('dashboard.recent_invoices_widget');
+		Route::get('dashboard/receivables_vs_payables_widget', [DashboardController::class, 'receivables_vs_payables_widget'])->name('dashboard.receivables_vs_payables_widget');
 
 		//Customers
 		Route::resource('customers', CustomerController::class);
