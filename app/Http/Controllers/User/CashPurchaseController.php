@@ -972,6 +972,7 @@ class CashPurchaseController extends Controller
 		$purchase->withholding_tax = $request->input('withholding_tax') ?? 0;
 		$purchase->benificiary = $request->input('benificiary');
 		$purchase->footer = $request->input('footer');
+		$purchase->paid = $summary['grandTotal'];
 		$purchase->save();
 
 		// delete old attachments
