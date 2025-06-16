@@ -30,7 +30,7 @@ class PurchaseReturnController extends Controller
     public function index(Request $request)
     {
         $search = $request->get('search', '');
-        $perPage = $request->get('per_page', 10);
+        $perPage = $request->get('per_page', 50);
         $sorting = $request->get('sorting', []);
         $sortColumn = $sorting['column'] ?? 'id';
         $sortDirection = $sorting['direction'] ?? 'desc';

@@ -334,7 +334,7 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
     const [selectedPurchaseReturns, setSelectedPurchaseReturns] = useState([]);
     const [isAllSelected, setIsAllSelected] = useState(false);
     const [search, setSearch] = useState(filters.search || "");
-    const [perPage, setPerPage] = useState(meta.per_page || 10);
+    const [perPage, setPerPage] = useState(meta.per_page || 50);
     const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
     const [bulkAction, setBulkAction] = useState("");
     const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
@@ -660,7 +660,7 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                     <div className="p-4">
                         <SummaryCards summary={summary} />
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                            <div className="flex flex-col md:flex-row gap-4">
+                            <div className="flex flex-col md:flex-row gap-2">
                                 <Link href={route("purchase_returns.create")}>
                                     <Button>
                                         <Plus className="w-4 h-4 mr-2" />

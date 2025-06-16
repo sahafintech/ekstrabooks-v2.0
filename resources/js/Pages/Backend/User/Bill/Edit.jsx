@@ -14,6 +14,7 @@ import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/Components/ui/tooltip";
 
 export default function Edit({ vendors = [], products = [], bill, currencies = [], taxes = [], accounts = [], inventory, taxIds, theAttachments, projects = [], cost_codes = [], construction_module }) {
   const [billItems, setBillItems] = useState([]);
@@ -511,22 +512,36 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium">Purchase Items</h3>
                 <div className="flex space-x-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={addBillItem}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Item
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={addBillAccount}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Account
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={addBillItem}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Item
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Use "Add Item" to include physical goods or inventory <br /> items you're purchasing (e.g. lenses, equipment).</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={addBillAccount}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Account
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Use "Add Account" to record service expenses <br /> or non-inventory costs (e.g. shipping fees, professional services).</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
 

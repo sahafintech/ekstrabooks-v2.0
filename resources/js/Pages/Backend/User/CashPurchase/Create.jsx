@@ -14,6 +14,7 @@ import { convertCurrency, formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/Components/ui/tooltip";
 
 export default function Create({ vendors = [], products = [], currencies = [], taxes = [], accounts = [], purchase_title, inventory, base_currency, projects = [], cost_codes = [], construction_module }) {
   const [purchaseItems, setPurchaseItems] = useState([{
@@ -486,22 +487,36 @@ export default function Create({ vendors = [], products = [], currencies = [], t
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium">Purchase Items</h3>
                 <div className="flex space-x-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={addPurchaseItem}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Item
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={addPurchaseAccount}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Account
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={addPurchaseItem}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Item
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Use "Add Item" to include physical goods or inventory <br /> items you're purchasing (e.g. lenses, equipment).</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={addPurchaseAccount}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Account
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Use "Add Account" to record service expenses <br /> or non-inventory costs (e.g. shipping fees, professional services).</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
 
