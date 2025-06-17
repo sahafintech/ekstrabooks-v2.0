@@ -672,6 +672,7 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
             left: 0;
             top: 0;
             width: 100%;
+            border: none;
           }
 
           /* Hide action buttons when printing */

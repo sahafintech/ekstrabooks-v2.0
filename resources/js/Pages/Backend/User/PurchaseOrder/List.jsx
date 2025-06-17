@@ -34,8 +34,6 @@ import {
     Eye,
     Trash2,
     Edit,
-    Check,
-    X,
     ChevronUp,
     ChevronDown,
     ShoppingCart,
@@ -51,6 +49,7 @@ import Modal from "@/Components/Modal";
 import { formatCurrency } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import { Label } from "@/Components/ui/label";
 
 const DeletePurchaseOrderModal = ({ show, onClose, onConfirm, processing }) => (
     <Modal show={show} onClose={onClose}>
@@ -83,7 +82,7 @@ const ConvertToBillModal = ({ show, onClose, onConfirm, processing }) => (
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
-                Are you sure you want to convert this purchase order to a bill?
+                Are you sure you want to convert this purchase order to a credit purchase?
             </h2>
             <div className="mt-6 flex justify-end">
                 <Button
@@ -95,7 +94,7 @@ const ConvertToBillModal = ({ show, onClose, onConfirm, processing }) => (
                     Cancel
                 </Button>
                 <Button type="submit" variant="default" disabled={processing}>
-                    Convert to Bill
+                    Convert to Credit Purchase
                 </Button>
             </div>
         </form>
@@ -107,6 +106,9 @@ const ConvertToCashPurchaseModal = ({
     onClose,
     onConfirm,
     processing,
+    accounts,
+    creditAccountId,
+    setCreditAccountId,
 }) => (
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
@@ -114,6 +116,25 @@ const ConvertToCashPurchaseModal = ({
                 Are you sure you want to convert this purchase order to a cash
                 purchase?
             </h2>
+            <div className="flex flex-1 flex-col gap-4 p-4 mt-4">
+                <div className="grid grid-cols-12 mt-2">
+                    <Label htmlFor="credit_account_id" className="md:col-span-3 col-span-12">
+                        Payment Account *
+                    </Label>
+                    <div className="md:col-span-9 col-span-12 md:mt-0 mt-2">
+                        <SearchableCombobox
+                            options={accounts.map(account => ({
+                                id: account.id,
+                                name: account.account_name
+                            }))}
+                            value={creditAccountId}
+                            onChange={setCreditAccountId}
+                            placeholder="Select payment account"
+                            required
+                        />
+                    </div>
+                </div>
+            </div>
             <div className="mt-6 flex justify-end">
                 <Button
                     type="button"
@@ -314,6 +335,7 @@ export default function List({
     filters = {},
     vendors = [],
     summary = {},
+    accounts = [],
 }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
@@ -330,6 +352,7 @@ export default function List({
         filters.vendor_id || ""
     );
     const [dateRange, setDateRange] = useState(filters.date_range || "");
+    const [creditAccountId, setCreditAccountId] = useState("");
 
     // Delete confirmation modal states
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -452,10 +475,14 @@ export default function List({
                 purchaseOrderToDelete
             ),
             {
+                credit_account_id: creditAccountId
+            },
+            {
                 onSuccess: () => {
                     setShowConvertToCashPurchaseModal(false);
                     setPurchaseOrderToDelete(null);
                     setProcessing(false);
+                    setCreditAccountId("");
                     setSelectedPurchaseOrders((prev) =>
                         prev.filter((id) => id !== purchaseOrderToDelete)
                     );
@@ -906,7 +933,7 @@ export default function List({
                                                                 ),
                                                             },
                                                             {
-                                                                label: "Convert to bill",
+                                                                label: "Convert to Credit Purchase",
                                                                 icon: (
                                                                     <FileUp className="h-4 w-4" />
                                                                 ),
@@ -1045,6 +1072,9 @@ export default function List({
                 onClose={() => setShowConvertToCashPurchaseModal(false)}
                 onConfirm={handleConvertToCashPurchase}
                 processing={processing}
+                accounts={accounts}
+                creditAccountId={creditAccountId}
+                setCreditAccountId={setCreditAccountId}
             />
 
             <DeleteAllPurchaseOrdersModal

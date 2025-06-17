@@ -109,6 +109,7 @@ class PurchaseOrderController extends Controller
 			],
 			'vendors' => $vendors,
 			'summary' => $summary,
+			'accounts' => Account::all(),
 		]);
 	}
 
@@ -368,6 +369,10 @@ class PurchaseOrderController extends Controller
 		$purchase_order = PurchaseOrder::with(['business', 'items', 'taxes', 'vendor'])
 			->where('id', $id)
 			->first();
+
+		if ($purchase_order->status == 1) {
+			return redirect()->route('purchase_orders.index')->with('error', _lang('Purchase Order already converted'));
+		}
 
 		$theAttachments = Attachment::where('ref_id', $id)->where('ref_type', 'purchase order')->get();
 		$accounts = Account::all();
@@ -757,6 +762,11 @@ class PurchaseOrderController extends Controller
 
 	public function convert_to_bill($id)
 	{
+		$purchase_order = PurchaseOrder::find($id);
+		if ($purchase_order->status == 1) {
+			return redirect()->route('purchase_orders.index')->with('error', _lang('Purchase Order already converted'));
+		}
+
 		DB::beginTransaction();
 		try {
 			$purchase_order = PurchaseOrder::find($id);
@@ -768,8 +778,8 @@ class PurchaseOrderController extends Controller
 			$bill->title = $purchase_order->title;
 			$bill->bill_no = get_business_option('purchase_number');
 			$bill->po_so_number = $purchase_order->po_so_number;
-			$bill->purchase_date = Carbon::parse($purchase_order->purchase_date)->format('Y-m-d');
-			$bill->due_date = Carbon::parse($purchase_order->due_date)->format('Y-m-d');
+			$bill->purchase_date = Carbon::createFromFormat(get_date_format(), $purchase_order->order_date)->format('Y-m-d');
+			$bill->due_date = Carbon::createFromFormat(get_date_format(), $purchase_order->order_date)->addDays(15)->format('Y-m-d');
 			$bill->sub_total = $purchase_order->sub_total;
 			$bill->grand_total = $purchase_order->grand_total;
 			$bill->converted_total = $purchase_order->converted_total;
@@ -804,12 +814,14 @@ class PurchaseOrderController extends Controller
 			// Create transactions for each purchase item
 			foreach ($purchase_order->items as $purchaseItem) {
 				$bill->items()->create([
+					'purchase_id' => $bill->id,
 					'product_id' => $purchaseItem->product_id,
+					'product_name' => $purchaseItem->product_name,
+					'description' => $purchaseItem->description,
 					'quantity' => $purchaseItem->quantity,
-					'price' => $purchaseItem->price,
-					'sub_total' => $purchaseItem->sub_total,
-					'taxes' => $purchaseItem->taxes,
-					'total' => $purchaseItem->total,
+					'unit_cost' => $purchaseItem->unit_cost,
+					'sub_total' => ($purchaseItem->unit_cost * $purchaseItem->quantity),
+					'account_id' => $purchaseItem->account_id,
 				]);
 				// Create transaction for the item
 				$transaction = new Transaction();
@@ -901,7 +913,7 @@ class PurchaseOrderController extends Controller
 			return redirect()->route('purchase_orders.index')->with('success', _lang('Converted Successfully'));
 		} catch (\Exception $e) {
 			DB::rollback();
-			return redirect()->route('purchase_orders.index')->with('error', _lang('An error occurred while converting the purchase order'));
+			return redirect()->route('purchase_orders.index')->with('error', _lang('An error occurred while converting the purchase order' . $e->getMessage()));
 		}
 	}
 
@@ -963,10 +975,17 @@ class PurchaseOrderController extends Controller
 		]);
 	}
 
-	public function convert_to_cash_purchase($id)
+	public function convert_to_cash_purchase(Request $request, $id)
 	{
+		$request->validate([
+			'credit_account_id' => 'required|exists:accounts,id',
+		]);
+
 		DB::beginTransaction();
 		$purchase_order = PurchaseOrder::find($id);
+		if ($purchase_order->status == 1) {
+			return redirect()->route('purchase_orders.index')->with('error', _lang('Purchase Order already converted'));
+		}
 		$purchase_order->status = 1;
 		$purchase_order->save();
 
@@ -1014,12 +1033,14 @@ class PurchaseOrderController extends Controller
 		foreach ($purchase_order->items as $purchaseItem) {
 
 			$cash_purchase->items()->create([
+				'purchase_id' => $cash_purchase->id,
 				'product_id' => $purchaseItem->product_id,
+				'product_name' => $purchaseItem->product_name,
+				'description' => $purchaseItem->description,
 				'quantity' => $purchaseItem->quantity,
-				'price' => $purchaseItem->price,
-				'sub_total' => $purchaseItem->sub_total,
-				'taxes' => $purchaseItem->taxes,
-				'total' => $purchaseItem->total,
+				'unit_cost' => $purchaseItem->unit_cost,
+				'sub_total' => ($purchaseItem->unit_cost * $purchaseItem->quantity),
+				'account_id' => $purchaseItem->account_id,
 			]);
 			// Create transaction for the item
 			$transaction = new Transaction();
@@ -1070,7 +1091,7 @@ class PurchaseOrderController extends Controller
 		// Create credit account transaction
 		$transaction = new Transaction();
 		$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
-		$transaction->account_id = request()->input('credit_account_id');
+		$transaction->account_id = $request->credit_account_id;
 		$transaction->dr_cr = 'cr';
 		$transaction->transaction_amount = $cash_purchase->grand_total;
 		$transaction->transaction_currency = $cash_purchase->currency;
