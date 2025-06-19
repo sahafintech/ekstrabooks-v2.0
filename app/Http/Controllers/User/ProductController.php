@@ -373,6 +373,11 @@ class ProductController extends Controller
             $file->move(public_path() . "/uploads/media/", $image);
         }
 
+        $previous_initial_stock = $product->initial_stock ?? 0;
+        $new_initial_stock = $row['initial_stock'] ?? 0;
+
+        $stock_difference = $new_initial_stock - $previous_initial_stock;
+
         $product->name                 = $request->input('name');
         $product->type                 = $request->input('type');
         $product->product_unit_id      = $request->input('product_unit_id');
@@ -389,8 +394,8 @@ class ProductController extends Controller
         $product->expense_account_id   = $request->input('expense_account_id');
         $product->status               = $request->input('status');
         $product->stock_management     = $request->stock_management;
-        $product->stock                = $request->input('initial_stock') ?? 0;
         $product->initial_stock        = $request->input('initial_stock') ?? 0;
+        $product->stock                = $product->stock + $stock_difference;
         $product->sub_category_id      = $request->input('sub_category_id');
         $product->brand_id             = $request->input('brand_id');
         $product->save();
@@ -400,7 +405,7 @@ class ProductController extends Controller
             Transaction::where('ref_id', $id)->where('ref_type', 'product')->delete();
         }
 
-        if ($request->input('initial_stock') > 0) {
+        if ($stock_difference > 0) {
             // delete previous transactions
             Transaction::where('ref_id', $id)->where('ref_type', 'product')->delete();
 
@@ -410,9 +415,9 @@ class ProductController extends Controller
             $transaction->dr_cr       = 'dr';
             $transaction->transaction_currency    = $request->activeBusiness->currency;
             $transaction->currency_rate           = Currency::where('name', $request->activeBusiness->currency)->first()->exchange_rate;
-            $transaction->base_currency_amount    = $product->purchase_cost * $request->input('initial_stock');
-            $transaction->transaction_amount      = $product->purchase_cost * $request->input('initial_stock');
-            $transaction->description = $product->name . ' Opening Stock #' . $request->input('initial_stock');
+            $transaction->base_currency_amount    = $product->purchase_cost * $stock_difference;
+            $transaction->transaction_amount      = $product->purchase_cost * $stock_difference;
+            $transaction->description = $product->name . ' Opening Stock #' . $stock_difference;
             $transaction->ref_id      = $product->id;
             $transaction->ref_type    = 'product';
             $transaction->save();
@@ -423,9 +428,35 @@ class ProductController extends Controller
             $transaction->dr_cr       = 'cr';
             $transaction->transaction_currency    = $request->activeBusiness->currency;
             $transaction->currency_rate           = Currency::where('name', $request->activeBusiness->currency)->first()->exchange_rate;
-            $transaction->base_currency_amount    = $product->purchase_cost * $request->input('initial_stock');
-            $transaction->transaction_amount      = $product->purchase_cost * $request->input('initial_stock');
-            $transaction->description = $product->name . ' Opening Stock #' . $request->input('initial_stock');
+            $transaction->base_currency_amount    = $product->purchase_cost * $stock_difference;
+            $transaction->transaction_amount      = $product->purchase_cost * $stock_difference;
+            $transaction->description = $product->name . ' Opening Stock #' . $stock_difference;
+            $transaction->ref_id      = $product->id;
+            $transaction->ref_type    = 'product';
+            $transaction->save();
+        }else {
+            $transaction              = new Transaction();
+            $transaction->trans_date  = now()->format('Y-m-d H:i:s');
+            $transaction->account_id  = get_account('Inventory')->id;
+            $transaction->dr_cr       = 'cr';
+            $transaction->transaction_currency    = $request->activeBusiness->currency;
+            $transaction->currency_rate           = Currency::where('name', $request->activeBusiness->currency)->first()->exchange_rate;
+            $transaction->base_currency_amount    = $product->purchase_cost * abs($stock_difference);
+            $transaction->transaction_amount      = $product->purchase_cost * abs($stock_difference);
+            $transaction->description = $product->name . ' Opening Stock #' . abs($stock_difference);
+            $transaction->ref_id      = $product->id;
+            $transaction->ref_type    = 'product';
+            $transaction->save();
+
+            $transaction              = new Transaction();
+            $transaction->trans_date  = now()->format('Y-m-d H:i:s');
+            $transaction->account_id  = get_account('Common Shares')->id;
+            $transaction->dr_cr       = 'dr';
+            $transaction->transaction_currency    = $request->activeBusiness->currency;
+            $transaction->currency_rate           = Currency::where('name', $request->activeBusiness->currency)->first()->exchange_rate;
+            $transaction->base_currency_amount    = $product->purchase_cost * abs($stock_difference);
+            $transaction->transaction_amount      = $product->purchase_cost * abs($stock_difference);
+            $transaction->description = $product->name . ' Opening Stock #' . abs($stock_difference);
             $transaction->ref_id      = $product->id;
             $transaction->ref_type    = 'product';
             $transaction->save();

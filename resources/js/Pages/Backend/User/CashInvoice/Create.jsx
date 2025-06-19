@@ -472,7 +472,7 @@ export default function Create({ customers = [], products = [], currencies = [],
                     <div className="md:col-span-2">
                       <Label>Subtotal</Label>
                       <div className="p-2 bg-white rounded mt-2 text-right">
-                        {(item.quantity * item.unit_cost).toFixed(2)}
+                        {formatCurrency({ amount: item.quantity * item.unit_cost, currency: data.currency })}
                       </div>
                     </div>
 
@@ -588,9 +588,9 @@ export default function Create({ customers = [], products = [], currencies = [],
 
             <div className="mt-6 space-y-2">
               <div className="space-y-2">
-                <div className="text-sm">Subtotal: {calculateSubtotal().toFixed(2)}</div>
-                <div className="text-sm">Taxes: {calculateTaxes().toFixed(2)}</div>
-                <div className="text-sm">Discount: {calculateDiscount().toFixed(2)}</div>
+                <div className="text-sm">Subtotal: {Number(calculateSubtotal()).toFixed(2)}</div>
+                <div className="text-sm">Taxes: {Number(calculateTaxes()).toFixed(2)}</div>
+                <div className="text-sm">Discount: {Number(calculateDiscount()).toFixed(2)}</div>
                 {renderTotal()}
               </div>
 

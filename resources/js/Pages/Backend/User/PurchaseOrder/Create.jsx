@@ -9,12 +9,13 @@ import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { convertCurrency, formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/Components/ui/tooltip";
+import Attachment from "@/Components/ui/attachment";
 
 export default function Create({ vendors = [], products = [], currencies = [], taxes = [], accounts = [], purchase_order_title, inventory, base_currency }) {
   const [purchaseOrderItems, setPurchaseOrderItems] = useState([{
@@ -43,7 +44,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     template: "",
     note: "",
     footer: "",
-    attachments: [],
+    attachments: attachments,
     product_id: [],
     product_name: [],
     description: [],
@@ -429,8 +430,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
 
               {purchaseOrderItems.map((item, index) => (
                 <div key={index} className="border rounded-lg p-4 space-y-4 bg-gray-50">
-                  {/* First Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
                     <div>
                       <Label>Product *</Label>
                       <SearchableCombobox
@@ -463,20 +463,23 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                         onChange={(e) => updatePurchaseOrderItem(index, "unit_cost", parseFloat(e.target.value))}
                       />
                     </div>
-                  </div>
 
-                  {/* Second Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
-                    <div className="md:col-span-6">
+                    <div>
                       <Label>Description</Label>
                       <Textarea
                         value={item.description}
-                        onChange={(e) => updatePurchaseOrderItem(index, "description", e.target.value)}
+                        onChange={(e) => {
+                          updatePurchaseOrderItem(index, "description", e.target.value);
+                          // Auto-resize the textarea
+                          e.target.style.height = 'auto';
+                          e.target.style.height = e.target.scrollHeight + 'px';
+                        }}
+                        className="min-h-[30px] resize-none overflow-hidden"
                         rows={1}
                       />
                     </div>
 
-                    <div className="md:col-span-3">
+                    <div>
                       <Label>Subtotal</Label>
                       <div className="p-2 bg-white rounded text-right">
                         {(item.quantity * item.unit_cost).toFixed(2)}
@@ -500,9 +503,8 @@ export default function Create({ vendors = [], products = [], currencies = [], t
 
               {purchaseOrderAccounts.map((accountItem, index) => (
                 <div key={`account-${index}`} className="border rounded-lg p-4 space-y-4 bg-gray-50">
-                  {/* First Row */}
-                  <div className="grid grid-cols-12 gap-2">
-                    <div className="md:col-span-4">
+                  <div className="grid grid-cols-1 md:grid-cols-7 gap-2">
+                    <div>
                       <Label>Account *</Label>
                       <SearchableCombobox
                         options={accounts.map(account => ({
@@ -520,8 +522,8 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                       />
                     </div>
 
-                    <div className="md:col-span-4">
-                      <Label>Product Name *</Label>
+                    <div>
+                      <Label>Item or Service Name *</Label>
                       <Input
                         type="text"
                         value={accountItem.product_name || ""}
@@ -534,27 +536,11 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                             ...updatedAccounts.map(account => account.product_name || "")
                           ]);
                         }}
-                        placeholder="Enter product name"
+                        placeholder="Enter item or service name"
                       />
                     </div>
 
-                    <div className="md:col-span-2">
-                      <Label>Amount *</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={accountItem.unit_cost}
-                        onChange={(e) => {
-                          const updatedAccounts = [...purchaseOrderAccounts];
-                          updatedAccounts[index].unit_cost = parseFloat(e.target.value);
-                          setPurchaseOrderAccounts(updatedAccounts);
-                          setData("unit_cost", updatedAccounts.map(account => account.unit_cost));
-                        }}
-                      />
-                    </div>
-
-                    <div className="md:col-span-2">
+                    <div>
                       <Label>Quantity *</Label>
                       <Input
                         type="number"
@@ -571,11 +557,24 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                         }}
                       />
                     </div>
-                  </div>
 
-                  {/* Second Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
-                    <div className="md:col-span-6">
+                    <div>
+                      <Label>Amount *</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={accountItem.unit_cost}
+                        onChange={(e) => {
+                          const updatedAccounts = [...purchaseOrderAccounts];
+                          updatedAccounts[index].unit_cost = parseFloat(e.target.value);
+                          setPurchaseOrderAccounts(updatedAccounts);
+                          setData("unit_cost", updatedAccounts.map(account => account.unit_cost));
+                        }}
+                      />
+                    </div>
+
+                    <div>
                       <Label>Description</Label>
                       <Textarea
                         value={accountItem.description || ""}
@@ -587,12 +586,15 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                             ...purchaseOrderItems.map(item => item.description),
                             ...updatedAccounts.map(account => account.description)
                           ]);
+                          e.target.style.height = 'auto';
+                          e.target.style.height = e.target.scrollHeight + 'px';
                         }}
+                        className="min-h-[30px] resize-none overflow-hidden"
                         rows={1}
                       />
                     </div>
 
-                    <div className="md:col-span-5">
+                    <div>
                       <Label>Subtotal</Label>
                       <div className="p-2 bg-white rounded mt-1 text-right">
                         {(accountItem.quantity * accountItem.unit_cost).toFixed(2)}
@@ -677,7 +679,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
 
             <div className="grid grid-cols-12 mt-2">
               <Label htmlFor="note" className="md:col-span-2 col-span-12">
-                Note
+                Your message to supplier
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <Textarea
@@ -711,101 +713,13 @@ export default function Create({ vendors = [], products = [], currencies = [], t
               <Label htmlFor="attachments" className="md:col-span-2 col-span-12">
                 Attachments
               </Label>
-              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2 space-y-2">
-                <div className="border rounded-md overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b">
-                      <tr>
-                        <th className="text-left py-2 px-4 font-medium text-gray-700 w-1/3">File Name</th>
-                        <th className="text-left py-2 px-4 font-medium text-gray-700">Attachment</th>
-                        <th className="text-center py-2 px-4 font-medium text-gray-700 w-24">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {attachments.map((item, index) => (
-                        <tr key={`attachment-${index}`} className="border-b last:border-b-0">
-                          <td className="py-3 px-4">
-                            <Input
-                              id={`filename-${index}`}
-                              type="text"
-                              placeholder="Enter file name"
-                              value={item.file_name}
-                              onChange={(e) => {
-                                const newAttachments = [...attachments];
-                                newAttachments[index] = {
-                                  ...newAttachments[index],
-                                  file_name: e.target.value
-                                };
-                                setAttachments(newAttachments);
-                              }}
-                              className="w-full"
-                            />
-                          </td>
-                          <td className="py-3 px-4">
-                            <Input
-                              id={`attachment-${index}`}
-                              type="file"
-                              onChange={(e) => {
-                                const newAttachments = [...attachments];
-                                newAttachments[index] = {
-                                  ...newAttachments[index],
-                                  file: e.target.files[0],
-                                };
-                                setAttachments(newAttachments);
-                              }}
-                              className="w-full"
-                            />
-                            {item.file && (
-                              <div className="text-xs text-gray-500 mt-1 flex items-center justify-between truncate">
-                                <span className="truncate">
-                                  {typeof item.file === 'string'
-                                    ? item.file.split('/').pop()
-                                    : item.file.name}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newAttachments = [...attachments];
-                                    newAttachments[index] = { ...newAttachments[index], file: null };
-                                    setAttachments(newAttachments);
-                                  }}
-                                  className="ml-2 text-red-500 hover:text-red-700"
-                                  title="Remove file"
-                                >
-                                  <X className="w-6 h-6" />
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="text-red-500"
-                              onClick={() => {
-                                const newAttachments = attachments.filter((_, i) => i !== index);
-                                setAttachments(newAttachments);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setAttachments([...attachments, { file: null, file_name: "" }])}
-                  className="mt-2"
-                >
-                  <Plus className="h-4 w-4 mr-2" /> Add Attachment
-                </Button>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2 space-y-2 md:w-1/2 w-full">
+                <Attachment
+                  files={attachments}
+                  onAdd={files => setAttachments(prev => [...prev, ...files])}
+                  onRemove={idx => setAttachments(prev => prev.filter((_, i) => i !== idx))}
+                  maxSize={20}
+                />
                 <InputError message={errors.attachments} className="text-sm" />
               </div>
             </div>

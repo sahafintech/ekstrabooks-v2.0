@@ -279,7 +279,7 @@ class PurchaseOrderController extends Controller
 		if (isset($request->attachments)) {
 			if ($request->attachments != null) {
 				for ($i = 0; $i < count($request->attachments); $i++) {
-					$theFile = $request->file("attachments.$i.file");
+					$theFile = $request->file("attachments.$i");
 					if ($theFile == null) {
 						continue;
 					}
@@ -287,7 +287,7 @@ class PurchaseOrderController extends Controller
 					$theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
 
 					$attachment = new Attachment();
-					$attachment->file_name = $request->attachments[$i]['file_name'];
+					$attachment->file_name = $request->attachments[$i]->getClientOriginalName();
 					$attachment->path = "/uploads/media/attachments/" . $theAttachment;
 					$attachment->ref_type = 'purchase order';
 					$attachment->ref_id = $purchase->id;
@@ -517,10 +517,8 @@ class PurchaseOrderController extends Controller
 		$attachments = Attachment::where('ref_id', $purchase->id)->where('ref_type', 'purchase order')->get(); // Get attachments from the database
 
 		if (isset($request->attachments)) {
-			$incomingFiles = collect($request->attachments)->pluck('file')->toArray();
-
 			foreach ($attachments as $attachment) {
-				if (!in_array($attachment->path, $incomingFiles)) {
+				if (!in_array($attachment->path, $request->attachments)) {
 					$filePath = public_path($attachment->path);
 					if (file_exists($filePath)) {
 						unlink($filePath); // Delete the file
@@ -534,7 +532,7 @@ class PurchaseOrderController extends Controller
 		if (isset($request->attachments)) {
 			if ($request->attachments != null) {
 				for ($i = 0; $i < count($request->attachments); $i++) {
-					$theFile = $request->file("attachments.$i.file");
+					$theFile = $request->file("attachments.$i");
 					if ($theFile == null) {
 						continue;
 					}
@@ -542,7 +540,7 @@ class PurchaseOrderController extends Controller
 					$theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
 
 					$attachment = new Attachment();
-					$attachment->file_name = $request->attachments[$i]['file_name'];
+					$attachment->file_name = $request->attachments[$i]->getClientOriginalName();
 					$attachment->path = "/uploads/media/attachments/" . $theAttachment;
 					$attachment->ref_type = 'purchase order';
 					$attachment->ref_id = $purchase->id;
