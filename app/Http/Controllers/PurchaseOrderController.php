@@ -497,13 +497,14 @@ class PurchaseOrderController extends Controller
 
 		$purchase = PurchaseOrder::where('id', $id)
 			->first();
-		$purchase->vendor_id = $request->input('vendor_id') ?? null;
+		$purchase->vendor_id = $request->input('vendor_id');
 		$purchase->title = $request->input('title');
 		$purchase->order_date = Carbon::parse($request->input('order_date'))->format('Y-m-d');
 		$purchase->sub_total = $summary['subTotal'];
 		$purchase->grand_total = $summary['grandTotal'];
 		$purchase->converted_total = $request->input('converted_total');
 		$purchase->exchange_rate   = $request->input('exchange_rate');
+		$purchase->currency   = $request->input('currency');
 		$purchase->discount = $summary['discountAmount'];
 		$purchase->discount_type = $request->input('discount_type');
 		$purchase->discount_value = $request->input('discount_value') ?? 0;
