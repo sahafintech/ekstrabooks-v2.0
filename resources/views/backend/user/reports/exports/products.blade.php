@@ -50,7 +50,7 @@
             <td>{{ $product->total_stock_in }}</td>
             <td>{{ $product->total_sold_invoices + $product->total_sold_receipts }}</td>
             <td>{{ $product->total_stock_adjustment_added }}</td>
-            <td>{{ $product->total_stock_adjustment_deducted }}</td>
+            <td>{{ abs($product->total_stock_adjustment_deducted) }}</td>
             <td>{{ $product->stock }}</td>
             <td>{{ $product->stock * $product->purchase_cost }}</td>
             <td>{{ $product->income_account_name }}</td>

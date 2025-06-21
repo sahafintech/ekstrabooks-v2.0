@@ -33,13 +33,17 @@ class InventoryAdjustmentImport implements ToCollection, WithHeadingRow, WithVal
             $adjustment->product_id = $product->id;
             $adjustment->quantity_on_hand = $row['quantity_on_hand'];
             $adjustment->adjusted_quantity = $row['adjusted_quantity'];
-            $adjustment->new_quantity_on_hand = floatval($row['quantity_on_hand']) + floatval($row['adjusted_quantity']);
+            if ($row['adjusted_quantity'] >= 0) {
+                $adjustment->new_quantity_on_hand = $row['quantity_on_hand'] + $row['adjusted_quantity'];
+            } else {
+                $adjustment->new_quantity_on_hand = $row['quantity_on_hand'] - abs($row['adjusted_quantity']);
+            }
             $adjustment->description = $row['description'] ?? null;
-            $adjustment->adjustment_type = $row['adjusted_quantity'] > 0 ? 'adds' : 'deducts';
+            $adjustment->adjustment_type = $row['adjusted_quantity'] >= 0 ? 'adds' : 'deducts';
             $adjustment->save();
 
             // Update product stock
-            $product->stock = floatval($row['quantity_on_hand']) + floatval($row['adjusted_quantity']);
+            $product->stock = $adjustment->new_quantity_on_hand;
             $product->save();
 
             $currentTime = Carbon::now();
@@ -51,9 +55,9 @@ class InventoryAdjustmentImport implements ToCollection, WithHeadingRow, WithVal
                 $transaction->dr_cr       = 'cr';
                 $transaction->transaction_currency    = request()->activeBusiness->currency;
                 $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                $transaction->base_currency_amount    = abs($row['adjusted_quantity']) * Product::find($product->id)->purchase_cost;
-                $transaction->transaction_amount      = abs($row['adjusted_quantity']) * Product::find($product->id)->purchase_cost;
-                $transaction->description = Product::find($product->id)->name . ' Inventory Adjustment #' . $row['adjusted_quantity'];
+                $transaction->base_currency_amount    = abs($row['adjusted_quantity']) * $product->purchase_cost;
+                $transaction->transaction_amount      = abs($row['adjusted_quantity']) * $product->purchase_cost;
+                $transaction->description = $product->name . ' Inventory Adjustment #' . $row['adjusted_quantity'];
                 $transaction->ref_id      =  $product->id;
                 $transaction->ref_type    = 'product adjustment';
                 $transaction->save();
@@ -65,9 +69,9 @@ class InventoryAdjustmentImport implements ToCollection, WithHeadingRow, WithVal
                 $transaction->dr_cr       = 'dr';
                 $transaction->transaction_currency    = request()->activeBusiness->currency;
                 $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                $transaction->base_currency_amount    = abs($row['adjusted_quantity']) * Product::find($product->id)->purchase_cost;
-                $transaction->transaction_amount      = abs($row['adjusted_quantity']) * Product::find($product->id)->purchase_cost;
-                $transaction->description = Product::find($product->id)->name . ' Inventory Adjustment #' . $row['adjusted_quantity'];
+                $transaction->base_currency_amount    = abs($row['adjusted_quantity']) * $product->purchase_cost;
+                $transaction->transaction_amount      = abs($row['adjusted_quantity']) * $product->purchase_cost;
+                $transaction->description = $product->name . ' Inventory Adjustment #' . $row['adjusted_quantity'];
                 $transaction->ref_id      =  $product->id;
                 $transaction->ref_type    = 'product adjustment';
                 $transaction->save();
@@ -78,9 +82,9 @@ class InventoryAdjustmentImport implements ToCollection, WithHeadingRow, WithVal
                 $transaction->dr_cr       = 'dr';
                 $transaction->transaction_currency    = request()->activeBusiness->currency;
                 $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                $transaction->base_currency_amount    = abs($row['adjusted_quantity']) * Product::find($product->id)->purchase_cost;
-                $transaction->transaction_amount      = abs($row['adjusted_quantity']) * Product::find($product->id)->purchase_cost;
-                $transaction->description = Product::find($product->id)->name . ' Inventory Adjustment #' . $row['adjusted_quantity'];
+                $transaction->base_currency_amount    = abs($row['adjusted_quantity']) * $product->purchase_cost;
+                $transaction->transaction_amount      = abs($row['adjusted_quantity']) * $product->purchase_cost;
+                $transaction->description = $product->name . ' Inventory Adjustment #' . $row['adjusted_quantity'];
                 $transaction->ref_id      =  $product->id;
                 $transaction->ref_type    = 'product adjustment';
                 $transaction->save();
@@ -92,9 +96,9 @@ class InventoryAdjustmentImport implements ToCollection, WithHeadingRow, WithVal
                 $transaction->dr_cr       = 'cr';
                 $transaction->transaction_currency    = request()->activeBusiness->currency;
                 $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                $transaction->base_currency_amount    = abs($row['adjusted_quantity']) * Product::find($product->id)->purchase_cost;
-                $transaction->transaction_amount      = abs($row['adjusted_quantity']) * Product::find($product->id)->purchase_cost;
-                $transaction->description = Product::find($product->id)->name . ' Inventory Adjustment #' . $row['adjusted_quantity'];
+                $transaction->base_currency_amount    = abs($row['adjusted_quantity']) * $product->purchase_cost;
+                $transaction->transaction_amount      = abs($row['adjusted_quantity']) * $product->purchase_cost;
+                $transaction->description = $product->name . ' Inventory Adjustment #' . $row['adjusted_quantity'];
                 $transaction->ref_id      =  $product->id;
                 $transaction->ref_type    = 'product adjustment';
                 $transaction->save();
