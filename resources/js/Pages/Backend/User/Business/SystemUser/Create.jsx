@@ -97,12 +97,10 @@ export default function Create({ roles, businesses, businessId }) {
                                 <SearchableCombobox
                                     id="role_id"
                                     label="Role"
-                                    options={[
-                                        roles.map((role) => ({
+                                    options={roles.map((role) => ({
                                             id: role.id,
                                             name: role.name,
-                                        })),
-                                    ]}
+                                        }))}
                                     value={data.role_id}
                                     onChange={(value) =>
                                         setData("role_id", value)
