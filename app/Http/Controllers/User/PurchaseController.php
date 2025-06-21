@@ -113,7 +113,7 @@ class PurchaseController extends Controller
 			'total_paid' => $summaryQuery->sum('paid'),
 		];
 
-		$bills = $query->with('vendor')->paginate($perPage)->withQueryString();
+		$bills = $query->with('vendor', 'business')->paginate($perPage)->withQueryString();
 		$vendors = Vendor::all();
 
 		return Inertia::render('Backend/User/Bill/List', [
@@ -317,7 +317,7 @@ class PurchaseController extends Controller
 		if (isset($request->attachments)) {
 			if ($request->attachments != null) {
 				for ($i = 0; $i < count($request->attachments); $i++) {
-					$theFile = $request->file("attachments.$i.file");
+					$theFile = $request->file("attachments.$i");
 					if ($theFile == null) {
 						continue;
 					}
@@ -325,7 +325,7 @@ class PurchaseController extends Controller
 					$theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
 
 					$attachment = new Attachment();
-					$attachment->file_name = $request->attachments[$i]['file_name'];
+					$attachment->file_name = $request->attachments[$i]->getClientOriginalName();
 					$attachment->path = "/uploads/media/attachments/" . $theAttachment;
 					$attachment->ref_type = 'bill invoice';
 					$attachment->ref_id = $purchase->id;
@@ -1191,10 +1191,8 @@ class PurchaseController extends Controller
 		$attachments = Attachment::where('ref_id', $purchase->id)->where('ref_type', 'bill invoice')->get(); // Get attachments from the database
 
 		if (isset($request->attachments)) {
-			$incomingFiles = collect($request->attachments)->pluck('file')->toArray();
-
 			foreach ($attachments as $attachment) {
-				if (!in_array($attachment->path, $incomingFiles)) {
+				if (!in_array($attachment->path, $request->attachments)) {
 					$filePath = public_path($attachment->path);
 					if (file_exists($filePath)) {
 						unlink($filePath); // Delete the file
@@ -1208,7 +1206,7 @@ class PurchaseController extends Controller
 		if (isset($request->attachments)) {
 			if ($request->attachments != null) {
 				for ($i = 0; $i < count($request->attachments); $i++) {
-					$theFile = $request->file("attachments.$i.file");
+					$theFile = $request->file("attachments.$i");
 					if ($theFile == null) {
 						continue;
 					}
@@ -1216,7 +1214,7 @@ class PurchaseController extends Controller
 					$theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
 
 					$attachment = new Attachment();
-					$attachment->file_name = $request->attachments[$i]['file_name'];
+					$attachment->file_name = $request->attachments[$i]->getClientOriginalName();
 					$attachment->path = "/uploads/media/attachments/" . $theAttachment;
 					$attachment->ref_type = 'bill invoice';
 					$attachment->ref_id = $purchase->id;

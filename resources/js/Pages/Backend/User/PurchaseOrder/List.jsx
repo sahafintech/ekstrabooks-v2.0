@@ -908,11 +908,15 @@ export default function List({
                                                     {order.order_date}
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    {formatCurrency({
-                                                        amount: order.grand_total,
-                                                        currency:
-                                                            order.currency,
-                                                    })}
+                                                    {order.grand_total !== order.converted_total ? (
+                                                        <span>
+                                                        {formatCurrency({ amount: order.grand_total, currency: order.business.currency })} ({formatCurrency({ amount: order.converted_total, currency: order.currency })})
+                                                        </span>
+                                                    ) : (
+                                                        <span>
+                                                        {formatCurrency({ amount: order.grand_total, currency: order.business.currency })}
+                                                        </span>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <PurchaseOrderStatusBadge

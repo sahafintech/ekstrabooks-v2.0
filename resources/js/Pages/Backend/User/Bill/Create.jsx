@@ -15,6 +15,7 @@ import DateTimePicker from "@/Components/DateTimePicker";
 import { Plus, Trash2, X } from "lucide-react";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/Components/ui/tooltip";
+import Attachment from "@/Components/ui/attachment";
 
 export default function Create({ vendors = [], products = [], currencies = [], taxes = [], accounts = [], purchase_title, inventory, base_currency, projects = [], cost_codes = [], construction_module }) {
   const [billItems, setBillItems] = useState([{
@@ -49,7 +50,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     template: "",
     note: "",
     footer: "",
-    attachments: [],
+    attachments: attachments,
     product_id: [],
     product_name: [],
     description: [],
@@ -516,8 +517,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
 
               {billItems.map((item, index) => (
                 <div key={index} className="border rounded-lg p-4 space-y-4 bg-gray-50">
-                  {/* First Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <div className={`grid grid-cols-1 md:grid-cols-${construction_module == 1 ? '9' : '6'} gap-2`}>
                     <div>
                       <Label>Product *</Label>
                       <SearchableCombobox
@@ -550,22 +550,24 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                         onChange={(e) => updateInvoiceItem(index, "unit_cost", parseFloat(e.target.value))}
                       />
                     </div>
-                  </div>
 
-                  {/* Second Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
-                    <div className={`${construction_module == 1 ? 'md:col-span-3' : 'md:col-span-5'}`}>
+                    <div>
                       <Label>Description</Label>
                       <Textarea
                         value={item.description}
-                        onChange={(e) => updateInvoiceItem(index, "description", e.target.value)}
+                        onChange={(e) => {
+                          updateInvoiceItem(index, "description", e.target.value);
+                          e.target.style.height = 'auto';
+                          e.target.style.height = e.target.scrollHeight + 'px';
+                        }}
+                        className="min-h-[30px] resize-none overflow-hidden"
                         rows={1}
                       />
                     </div>
 
                     {construction_module == 1 && (
                       <>
-                        <div className="md:col-span-3">
+                        <div>
                           <Label>Project</Label>
                             <SearchableCombobox
                               options={projects.map(project => ({
@@ -577,7 +579,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                               placeholder="Select project"
                             />
                         </div>
-                        <div className="md:col-span-3">
+                        <div>
                           <Label>Project Task</Label>
                             <SearchableCombobox
                               options={projects.find(p => p.id === Number(item.project_id))?.tasks?.map(task => ({
@@ -589,7 +591,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                               placeholder="Select project task"
                             />
                         </div>
-                        <div className="md:col-span-3">
+                        <div>
                           <Label>Cost Code</Label>
                             <SearchableCombobox
                               options={cost_codes.map(cost_code => ({
@@ -604,14 +606,14 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                       </>
                     )}
 
-                    <div className="md:col-span-4">
+                    <div>
                       <Label>Subtotal</Label>
                       <div className="p-2 bg-white rounded mt-2 text-right">
                         {(item.quantity * item.unit_cost).toFixed(2)}
                       </div>
                     </div>
 
-                    <div className={`md:col-span-1 flex items-center justify-center ${construction_module == 1 ? 'mt-8' : ''}`}>
+                    <div className="md:col-span-1 flex items-center justify-center">
                       <Button
                         type="button"
                         variant="ghost"
@@ -628,8 +630,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
 
               {billAccounts.map((accountItem, index) => (
                 <div key={`account-${index}`} className="border rounded-lg p-4 space-y-4 bg-gray-50">
-                  {/* First Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                  <div className={`grid grid-cols-1 md:grid-cols-${construction_module == 1 ? '10' : '7'} gap-2`}>
                     <div>
                       <Label>Account *</Label>
                       <SearchableCombobox
@@ -699,11 +700,8 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                         }}
                       />
                     </div>
-                  </div>
 
-                  {/* Second Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
-                    <div className={`${construction_module == 1 ? 'md:col-span-3' : 'md:col-span-5'}`}>
+                    <div>
                       <Label>Description</Label>
                       <Textarea
                         value={accountItem.description || ""}
@@ -715,14 +713,17 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                             ...billItems.map(item => item.description),
                             ...updatedAccounts.map(account => account.description)
                           ]);
+                          e.target.style.height = 'auto';
+                          e.target.style.height = e.target.scrollHeight + 'px';
                         }}
+                        className="min-h-[30px] resize-none overflow-hidden"
                         rows={1}
                       />
                     </div>
 
                     {construction_module == 1 && (
                       <>
-                        <div className="md:col-span-3">
+                        <div>
                           <Label>Project</Label>
                             <SearchableCombobox
                               options={projects.map(project => ({
@@ -743,7 +744,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                             />
                         </div>
 
-                        <div className="md:col-span-3">
+                        <div>
                           <Label>Project Task</Label>
                             <SearchableCombobox
                               options={projects.find(p => p.id === Number(accountItem.project_id))?.tasks?.map(task => ({
@@ -764,7 +765,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                             />
                         </div>
 
-                        <div className="md:col-span-3">
+                        <div>
                           <Label>Cost Code</Label>
                             <SearchableCombobox
                               options={cost_codes.map(cost_code => ({
@@ -786,14 +787,14 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                         </div>
                       </>
                     )}
-                    <div className="md:col-span-4">
+                    <div>
                       <Label>Subtotal</Label>
                       <div className="p-2 bg-white rounded mt-1 text-right">
                         {(accountItem.quantity * accountItem.unit_cost).toFixed(2)}
                       </div>
                     </div>
 
-                    <div className={`md:col-span-1 flex items-center justify-center ${construction_module == 1 ? 'mt-8' : ''}`}>
+                    <div className="md:col-span-1 flex items-center justify-center">
                       <Button
                         type="button"
                         variant="ghost"
@@ -871,7 +872,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
 
             <div className="grid grid-cols-12 mt-2">
               <Label htmlFor="note" className="md:col-span-2 col-span-12">
-                Note
+                Your message to supplier
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <Textarea
@@ -905,101 +906,13 @@ export default function Create({ vendors = [], products = [], currencies = [], t
               <Label htmlFor="attachments" className="md:col-span-2 col-span-12">
                 Attachments
               </Label>
-              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2 space-y-2">
-                <div className="border rounded-md overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b">
-                      <tr>
-                        <th className="text-left py-2 px-4 font-medium text-gray-700 w-1/3">File Name</th>
-                        <th className="text-left py-2 px-4 font-medium text-gray-700">Attachment</th>
-                        <th className="text-center py-2 px-4 font-medium text-gray-700 w-24">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {attachments.map((item, index) => (
-                        <tr key={`attachment-${index}`} className="border-b last:border-b-0">
-                          <td className="py-3 px-4">
-                            <Input
-                              id={`filename-${index}`}
-                              type="text"
-                              placeholder="Enter file name"
-                              value={item.file_name}
-                              onChange={(e) => {
-                                const newAttachments = [...attachments];
-                                newAttachments[index] = {
-                                  ...newAttachments[index],
-                                  file_name: e.target.value
-                                };
-                                setAttachments(newAttachments);
-                              }}
-                              className="w-full"
-                            />
-                          </td>
-                          <td className="py-3 px-4">
-                            <Input
-                              id={`attachment-${index}`}
-                              type="file"
-                              onChange={(e) => {
-                                const newAttachments = [...attachments];
-                                newAttachments[index] = {
-                                  ...newAttachments[index],
-                                  file: e.target.files[0],
-                                };
-                                setAttachments(newAttachments);
-                              }}
-                              className="w-full"
-                            />
-                            {item.file && (
-                              <div className="text-xs text-gray-500 mt-1 flex items-center justify-between truncate">
-                                <span className="truncate">
-                                  {typeof item.file === 'string'
-                                    ? item.file.split('/').pop()
-                                    : item.file.name}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newAttachments = [...attachments];
-                                    newAttachments[index] = { ...newAttachments[index], file: null };
-                                    setAttachments(newAttachments);
-                                  }}
-                                  className="ml-2 text-red-500 hover:text-red-700"
-                                  title="Remove file"
-                                >
-                                  <X className="w-6 h-6" />
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="text-red-500"
-                              onClick={() => {
-                                const newAttachments = attachments.filter((_, i) => i !== index);
-                                setAttachments(newAttachments);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setAttachments([...attachments, { file: null, file_name: "" }])}
-                  className="mt-2"
-                >
-                  <Plus className="h-4 w-4 mr-2" /> Add Attachment
-                </Button>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2 space-y-2 md:w-1/2 w-full">
+                <Attachment
+                  files={attachments}
+                  onAdd={files => setAttachments(prev => [...prev, ...files])}
+                  onRemove={idx => setAttachments(prev => prev.filter((_, i) => i !== idx))}
+                  maxSize={20}
+                />
                 <InputError message={errors.attachments} className="text-sm" />
               </div>
             </div>

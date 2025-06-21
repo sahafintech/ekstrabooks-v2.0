@@ -24,6 +24,10 @@ use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Models\EmailTemplate;
+use App\Models\PendingTransaction;
+use App\Models\ProjectBudget;
+use App\Models\PurchaseItem;
+use App\Models\PurchaseItemTax;
 
 class PurchaseOrderController extends Controller
 {
@@ -48,7 +52,7 @@ class PurchaseOrderController extends Controller
 		$vendorId = $request->get('vendor_id', '');
 		$dateRange = $request->get('date_range', '');
 
-		$query = PurchaseOrder::with('vendor');
+		$query = PurchaseOrder::with('vendor', 'business');
 
 		// Handle sorting
 		if ($sortColumn === 'vendor.name') {
@@ -759,7 +763,7 @@ class PurchaseOrderController extends Controller
 		return Excel::download(new BillInvoiceExport, 'purchases ' . now()->format('d m Y') . '.xlsx');
 	}
 
-	public function convert_to_bill($id)
+	public function convert_to_bill($id, Request $request)
 	{
 		$purchase_order = PurchaseOrder::find($id);
 		if ($purchase_order->status == 1) {
@@ -812,7 +816,7 @@ class PurchaseOrderController extends Controller
 
 			// Create transactions for each purchase item
 			foreach ($purchase_order->items as $purchaseItem) {
-				$bill->items()->create([
+				$purchaseItem = $bill->items()->save(new PurchaseItem([
 					'purchase_id' => $bill->id,
 					'product_id' => $purchaseItem->product_id,
 					'product_name' => $purchaseItem->product_name,
@@ -821,85 +825,297 @@ class PurchaseOrderController extends Controller
 					'unit_cost' => $purchaseItem->unit_cost,
 					'sub_total' => ($purchaseItem->unit_cost * $purchaseItem->quantity),
 					'account_id' => $purchaseItem->account_id,
-				]);
-				// Create transaction for the item
-				$transaction = new Transaction();
-				$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
-				$transaction->account_id = $purchaseItem->account_id;
-				$transaction->dr_cr = 'dr';
-				$transaction->transaction_amount = $purchaseItem->sub_total;
-				$transaction->transaction_currency = $bill->currency;
-				$transaction->currency_rate = $bill->exchange_rate;
-				$transaction->base_currency_amount = convert_currency($bill->currency, $bill->business->currency, $purchaseItem->sub_total);
-				$transaction->ref_type = 'bill invoice';
-				$transaction->vendor_id = $bill->vendor_id;
-				$transaction->ref_id = $bill->id;
-				$transaction->description = 'Bill Invoice #' . $bill->bill_no;
-				$transaction->save();
-
-				// increase product stock
+					'project_id' => $purchaseItem->project_id,
+					'project_task_id' => $purchaseItem->project_task_id,
+					'cost_code_id' => $purchaseItem->cost_code_id,
+				]));
+	
+				if ($purchaseItem->project_id && $purchaseItem->project_task_id && $purchaseItem->cost_code_id) {
+					$projectBudget = ProjectBudget::where('project_id', $purchaseItem->project_id)->where('project_task_id', $purchaseItem->project_task_id)->where('cost_code_id', $purchaseItem->cost_code_id)->first();
+					if ($projectBudget) {
+						$projectBudget->actual_budget_quantity += $purchaseItem->quantity;
+						$projectBudget->actual_budget_amount += $purchaseItem->sub_total;
+						$projectBudget->save();
+					}
+				}
+	
+				if (isset($request->taxes)) {
+					foreach ($request->taxes as $taxId) {
+						$tax = Tax::find($taxId);
+	
+						$purchaseItem->taxes()->save(new PurchaseItemTax([
+							'purchase_id' => $bill->id,
+							'tax_id' => $taxId,
+							'name' => $tax->name . ' ' . $tax->rate . ' %',
+							'amount' => ($purchaseItem->sub_total / 100) * $tax->rate,
+						]));
+	
+						if (has_permission('bill_invoices.approve') || request()->isOwner) {
+							if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
+								$transaction              = new Transaction();
+								$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $bill->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+								$transaction->account_id  = $tax->account_id;
+								$transaction->dr_cr       = 'cr';
+								$transaction->transaction_currency    = $bill->currency;
+								$transaction->currency_rate = $bill->exchange_rate;
+								$transaction->base_currency_amount = convert_currency($bill->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $bill->currency, (($purchaseItem->sub_total / $bill->exchange_rate) / 100) * $tax->rate));
+								$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $bill->currency, (($purchaseItem->sub_total / $bill->exchange_rate) / 100) * $tax->rate);
+								$transaction->description = _lang('Bill Invoice Tax') . ' #' . $bill->bill_no;
+								$transaction->ref_id      = $bill->id;
+								$transaction->ref_type    = 'bill invoice tax';
+								$transaction->tax_id      = $tax->id;
+								$transaction->project_id = $purchaseItem->project_id;
+								$transaction->project_task_id = $purchaseItem->project_task_id;
+								$transaction->cost_code_id = $purchaseItem->cost_code_id;
+								$transaction->save();
+							} else {
+								$transaction              = new Transaction();
+								$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $bill->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+								$transaction->account_id  = $tax->account_id;
+								$transaction->dr_cr       = 'dr';
+								$transaction->transaction_currency    = $bill->currency;
+								$transaction->currency_rate = $bill->exchange_rate;
+								$transaction->base_currency_amount = convert_currency($bill->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $bill->currency, (($purchaseItem->sub_total / $bill->exchange_rate) / 100) * $tax->rate));
+								$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $bill->currency, (($purchaseItem->sub_total / $bill->exchange_rate) / 100) * $tax->rate);
+								$transaction->description = _lang('Bill Invoice Tax') . ' #' . $bill->bill_no;
+								$transaction->ref_id      = $bill->id;
+								$transaction->ref_type    = 'bill invoice tax';
+								$transaction->tax_id      = $tax->id;
+								$transaction->project_id = $purchaseItem->project_id;
+								$transaction->project_task_id = $purchaseItem->project_task_id;
+								$transaction->cost_code_id = $purchaseItem->cost_code_id;
+								$transaction->save();
+							}
+						} else {
+							if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
+								$transaction              = new PendingTransaction();
+								$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $bill->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+								$transaction->account_id  = $tax->account_id;
+								$transaction->dr_cr       = 'cr';
+								$transaction->transaction_currency    = $bill->currency;
+								$transaction->currency_rate = $bill->exchange_rate;
+								$transaction->base_currency_amount = convert_currency($bill->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $bill->currency, (($purchaseItem->sub_total / $bill->exchange_rate) / 100) * $tax->rate));
+								$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $bill->currency, (($purchaseItem->sub_total / $bill->exchange_rate) / 100) * $tax->rate);
+								$transaction->description = _lang('Bill Invoice Tax') . ' #' . $bill->bill_no;
+								$transaction->ref_id      = $bill->id;
+								$transaction->ref_type    = 'bill invoice tax';
+								$transaction->tax_id      = $tax->id;
+								$transaction->project_id = $purchaseItem->project_id;
+								$transaction->project_task_id = $purchaseItem->project_task_id;
+								$transaction->cost_code_id = $purchaseItem->cost_code_id;
+								$transaction->save();
+							} else {
+								$transaction              = new PendingTransaction();
+								$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $bill->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+								$transaction->account_id  = $tax->account_id;
+								$transaction->dr_cr       = 'dr';
+								$transaction->transaction_currency    = $bill->currency;
+								$transaction->currency_rate = $bill->exchange_rate;
+								$transaction->base_currency_amount = convert_currency($bill->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $bill->currency, (($purchaseItem->sub_total / $bill->exchange_rate) / 100) * $tax->rate));
+								$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $bill->currency, (($purchaseItem->sub_total / $bill->exchange_rate) / 100) * $tax->rate);
+								$transaction->description = _lang('Bill Invoice Tax') . ' #' . $bill->bill_no;
+								$transaction->ref_id      = $bill->id;
+								$transaction->ref_type    = 'bill invoice tax';
+								$transaction->tax_id      = $tax->id;
+								$transaction->project_id = $purchaseItem->project_id;
+								$transaction->project_task_id = $purchaseItem->project_task_id;
+								$transaction->cost_code_id = $purchaseItem->cost_code_id;
+								$transaction->save();
+							}
+						}
+					}
+				}
+	
+				if (has_permission('bill_invoices.approve') || request()->isOwner) {
+	
+					if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
+						$transaction              = new Transaction();
+						$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $bill->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+						$transaction->account_id  = $purchaseItem->account_id;
+						$transaction->dr_cr       = Account::find($purchaseItem->account_id)->dr_cr;
+						$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $bill->currency, ($purchaseItem->sub_total / $bill->exchange_rate) + $purchaseItem->taxes->sum('amount'));
+						$transaction->transaction_currency    = $bill->currency;
+						$transaction->currency_rate = $bill->exchange_rate;
+						$transaction->base_currency_amount = convert_currency($bill->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $bill->currency, ($purchaseItem->sub_total / $bill->exchange_rate) + $purchaseItem->taxes->sum('amount')));
+						$transaction->ref_type    = 'bill invoice';
+						$transaction->vendor_id   = $bill->vendor_id;
+						$transaction->ref_id      = $bill->id;
+						$transaction->description = 'Bill Invoice #' . $bill->bill_no;
+						$transaction->project_id = $purchaseItem->project_id;
+						$transaction->project_task_id = $purchaseItem->project_task_id;
+						$transaction->cost_code_id = $purchaseItem->cost_code_id;
+						$transaction->save();
+					} else {
+						$transaction              = new Transaction();
+						$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $bill->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+						$transaction->account_id  = $purchaseItem->account_id;
+						$transaction->dr_cr       = Account::find($purchaseItem->account_id)->dr_cr;
+						$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $bill->currency, $purchaseItem->sub_total / $bill->exchange_rate);
+						$transaction->transaction_currency    = $bill->currency;
+						$transaction->currency_rate = $bill->exchange_rate;
+						$transaction->base_currency_amount = convert_currency($bill->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $bill->currency, $purchaseItem->sub_total / $bill->exchange_rate));
+						$transaction->ref_type    = 'bill invoice';
+						$transaction->vendor_id   = $bill->vendor_id;
+						$transaction->ref_id      = $bill->id;
+						$transaction->description = 'Bill Invoice #' . $bill->bill_no;
+						$transaction->project_id = $purchaseItem->project_id;
+						$transaction->project_task_id = $purchaseItem->project_task_id;
+						$transaction->cost_code_id = $purchaseItem->cost_code_id;
+						$transaction->save();
+					}
+				} else {
+					if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
+						$transaction              = new PendingTransaction();
+						$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $bill->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+						$transaction->account_id  = $purchaseItem->account_id;
+						$transaction->dr_cr       = Account::find($purchaseItem->account_id)->dr_cr;
+						$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $bill->currency, ($purchaseItem->sub_total / $bill->exchange_rate) + $purchaseItem->taxes->sum('amount'));
+						$transaction->transaction_currency    = $bill->currency;
+						$transaction->currency_rate = $bill->exchange_rate;
+						$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, ($purchaseItem->sub_total / $bill->exchange_rate) + $purchaseItem->taxes->sum('amount')));
+						$transaction->ref_type    = 'bill invoice';
+						$transaction->vendor_id   = $bill->vendor_id;
+						$transaction->ref_id      = $bill->id;
+						$transaction->description = 'Bill Invoice #' . $bill->bill_no;
+						$transaction->project_id = $purchaseItem->project_id;
+						$transaction->project_task_id = $purchaseItem->project_task_id;
+						$transaction->cost_code_id = $purchaseItem->cost_code_id;
+						$transaction->save();
+					} else {
+						$transaction              = new PendingTransaction();
+						$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $bill->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+						$transaction->account_id  = $purchaseItem->account_id;
+						$transaction->dr_cr       = 'dr';
+						$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $bill->currency, $purchaseItem->sub_total / $bill->exchange_rate);
+						$transaction->transaction_currency    = $bill->currency;
+						$transaction->currency_rate = $bill->exchange_rate;
+						$transaction->base_currency_amount = convert_currency($bill->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $bill->currency, $purchaseItem->sub_total / $bill->exchange_rate));
+						$transaction->ref_type    = 'bill invoice';
+						$transaction->vendor_id   = $bill->vendor_id;
+						$transaction->ref_id      = $bill->id;
+						$transaction->description = 'Bill Invoice #' . $bill->bill_no;
+						$transaction->project_id = $purchaseItem->project_id;
+						$transaction->project_task_id = $purchaseItem->project_task_id;
+						$transaction->cost_code_id = $purchaseItem->cost_code_id;
+						$transaction->save();
+					}
+				}
+	
+				// update stock
 				if ($purchaseItem->product->type == 'product' && $purchaseItem->product->stock_management == 1) {
 					$purchaseItem->product->stock = $purchaseItem->product->stock + $purchaseItem->quantity;
 					$purchaseItem->product->save();
 				}
-
-				// Create transactions for taxes if any
-				foreach ($purchaseItem->taxes as $tax) {
-					$bill->taxes()->create([
-						'purchase_id' => $bill->id,
-						'tax_id' => $tax->tax_id,
-						'name' => $tax->name . ' ' . $tax->rate . ' %',
-						'amount' => ($purchaseItem->sub_total / 100) * $tax->rate,
-					]);
-					$transaction = new Transaction();
-					$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
-					$transaction->account_id = $tax->account_id;
-					$transaction->dr_cr = 'dr';
-					$transaction->transaction_amount = $tax->amount;
-					$transaction->transaction_currency = $bill->currency;
+			}
+	
+			//Increment Bill Number
+			BusinessSetting::where('name', 'purchase_number')->increment('value');
+	
+			DB::commit();
+	
+			if (has_permission('bill_invoices.approve') || request()->isOwner) {
+				if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
+					$transaction              = new Transaction();
+					$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $bill->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+					$transaction->account_id  = get_account('Accounts Payable')->id;
+					$transaction->dr_cr       = 'cr';
+					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $bill->currency, $bill->grand_total - $bill->taxes->sum('amount'));
+					$transaction->transaction_currency    = $bill->currency;
 					$transaction->currency_rate = $bill->exchange_rate;
-					$transaction->base_currency_amount = convert_currency($bill->currency, $bill->business->currency, $tax->amount);
-					$transaction->description = _lang('Bill Invoice Tax') . ' #' . $bill->bill_no;
-					$transaction->ref_id = $bill->id;
-					$transaction->ref_type = 'bill invoice tax';
-					$transaction->tax_id = $tax->tax_id;
+					$transaction->base_currency_amount = convert_currency($bill->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $bill->currency, $bill->grand_total - $bill->taxes->sum('amount')));
+					$transaction->ref_type    = 'bill invoice';
+					$transaction->vendor_id   = $bill->vendor_id;
+					$transaction->ref_id      = $bill->id;
+					$transaction->description = 'Bill Invoice Payable #' . $bill->bill_no;
+					$transaction->project_id = $purchaseItem->project_id;
+					$transaction->project_task_id = $purchaseItem->project_task_id;
+					$transaction->cost_code_id = $purchaseItem->cost_code_id;
+					$transaction->save();
+				} else {
+					$transaction              = new Transaction();
+					$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $bill->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+					$transaction->account_id  = get_account('Accounts Payable')->id;
+					$transaction->dr_cr       = 'cr';
+					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $bill->currency, $bill->grand_total);
+					$transaction->transaction_currency    = $bill->currency;
+					$transaction->currency_rate = $bill->exchange_rate;
+					$transaction->base_currency_amount = convert_currency($bill->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $bill->currency, $bill->grand_total));
+					$transaction->ref_type    = 'bill invoice';
+					$transaction->vendor_id   = $bill->vendor_id;
+					$transaction->ref_id      = $bill->id;
+					$transaction->description = 'Bill Invoice Payable #' . $bill->bill_no;
+					$transaction->project_id = $purchaseItem->project_id;
+					$transaction->project_task_id = $purchaseItem->project_task_id;
+					$transaction->cost_code_id = $purchaseItem->cost_code_id;
+					$transaction->save();
+				}
+	
+				if ($bill->discount_value > 0) {
+					$transaction              = new Transaction();
+					$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $bill->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+					$transaction->account_id  = get_account('Purchase Discount Allowed')->id;
+					$transaction->dr_cr       = 'cr';
+					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $bill->currency, $bill->discount);
+					$transaction->transaction_currency    = $bill->currency;
+					$transaction->currency_rate           = $bill->exchange_rate;
+					$transaction->base_currency_amount    = convert_currency($bill->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $bill->currency, $bill->discount));
+					$transaction->description = _lang('Bill Invoice Discount') . ' #' . $bill->bill_no;
+					$transaction->ref_id      = $bill->id;
+					$transaction->ref_type    = 'bill invoice';
+					$transaction->vendor_id   = $bill->vendor_id;
+					$transaction->project_id = $purchaseItem->project_id;
+					$transaction->save();
+				}
+			} else {
+				if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
+					$transaction              = new PendingTransaction();
+					$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $bill->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+					$transaction->account_id  = get_account('Accounts Payable')->id;
+					$transaction->dr_cr       = 'cr';
+					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $bill->currency, $bill->grand_total - $bill->taxes->sum('amount'));
+					$transaction->transaction_currency    = $bill->currency;
+					$transaction->currency_rate = $bill->exchange_rate;
+					$transaction->base_currency_amount = convert_currency($bill->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $bill->currency, $bill->grand_total - $bill->taxes->sum('amount')));
+					$transaction->ref_type    = 'bill invoice';
+					$transaction->vendor_id   = $bill->vendor_id;
+					$transaction->ref_id      = $bill->id;
+					$transaction->description = 'Bill Invoice Payable #' . $bill->bill_no;
+					$transaction->project_id = $purchaseItem->project_id;
+					$transaction->save();
+				} else {
+					$transaction              = new PendingTransaction();
+					$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $bill->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+					$transaction->account_id  = get_account('Accounts Payable')->id;
+					$transaction->dr_cr       = 'cr';
+					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $bill->currency, $bill->grand_total);
+					$transaction->transaction_currency    = $bill->currency;
+					$transaction->currency_rate = $bill->exchange_rate;
+					$transaction->base_currency_amount = convert_currency($bill->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $bill->currency, $bill->grand_total));
+					$transaction->ref_type    = 'bill invoice';
+					$transaction->vendor_id   = $bill->vendor_id;
+					$transaction->ref_id      = $bill->id;
+					$transaction->description = 'Bill Invoice Payable #' . $bill->bill_no;
+					$transaction->project_id = $purchaseItem->project_id;
+					$transaction->save();
+				}
+	
+				if ($bill->discount_value > 0) {
+					$transaction              = new PendingTransaction();
+					$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $bill->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+					$transaction->account_id  = get_account('Purchase Discount Allowed')->id;
+					$transaction->dr_cr       = 'cr';
+					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $bill->currency, $bill->discount);
+					$transaction->transaction_currency    = $bill->currency;
+					$transaction->currency_rate           = $bill->exchange_rate;
+					$transaction->base_currency_amount    = convert_currency($bill->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $bill->currency, $bill->discount));
+					$transaction->description = _lang('Bill Invoice Discount') . ' #' . $bill->bill_no;
+					$transaction->ref_id      = $bill->id;
+					$transaction->ref_type    = 'bill invoice';
+					$transaction->vendor_id   = $bill->vendor_id;
+					$transaction->project_id = $purchaseItem->project_id;
 					$transaction->save();
 				}
 			}
-
-			// Create accounts payable transaction
-			$transaction = new Transaction();
-			$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
-			$transaction->account_id = get_account('Accounts Payable')->id;
-			$transaction->dr_cr = 'cr';
-			$transaction->transaction_amount = $bill->grand_total;
-			$transaction->transaction_currency = $bill->currency;
-			$transaction->currency_rate = $bill->exchange_rate;
-			$transaction->base_currency_amount = convert_currency($bill->currency, $bill->business->currency, $bill->grand_total);
-			$transaction->ref_type = 'bill invoice';
-			$transaction->vendor_id = $bill->vendor_id;
-			$transaction->ref_id = $bill->id;
-			$transaction->description = 'Bill Invoice Payable #' . $bill->bill_no;
-			$transaction->save();
-
-			// Create discount transaction if applicable
-			if ($bill->discount > 0) {
-				$transaction = new Transaction();
-				$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
-				$transaction->account_id = get_account('Purchase Discount Allowed')->id;
-				$transaction->dr_cr = 'cr';
-				$transaction->transaction_amount = $bill->discount;
-				$transaction->transaction_currency = $bill->currency;
-				$transaction->currency_rate = $bill->exchange_rate;
-				$transaction->base_currency_amount = convert_currency($bill->currency, $bill->business->currency, $bill->discount);
-				$transaction->description = _lang('Bill Invoice Discount') . ' #' . $bill->bill_no;
-				$transaction->ref_id = $bill->id;
-				$transaction->ref_type = 'bill invoice';
-				$transaction->vendor_id = $bill->vendor_id;
-				$transaction->save();
-			}
-
-			$bill->save();
 
 			// audit log
 			$audit = new AuditLog();
@@ -993,8 +1209,8 @@ class PurchaseOrderController extends Controller
 		$cash_purchase->title = $purchase_order->title;
 		$cash_purchase->bill_no = get_business_option('purchase_number');
 		$cash_purchase->po_so_number = $purchase_order->po_so_number;
-		$cash_purchase->purchase_date = Carbon::parse($purchase_order->purchase_date)->format('Y-m-d');
-		$cash_purchase->due_date = Carbon::parse($purchase_order->purchase_date)->format('Y-m-d');
+		$cash_purchase->purchase_date = Carbon::createFromFormat(get_date_format(), $purchase_order->order_date)->format('Y-m-d');
+		$cash_purchase->due_date = Carbon::createFromFormat(get_date_format(), $purchase_order->order_date)->format('Y-m-d');
 		$cash_purchase->sub_total = $purchase_order->sub_total;
 		$cash_purchase->grand_total = $purchase_order->grand_total;
 		$cash_purchase->converted_total = $purchase_order->converted_total;
@@ -1029,9 +1245,8 @@ class PurchaseOrderController extends Controller
 		$currentTime = Carbon::now();
 
 		// Create transactions for each purchase item
-		foreach ($purchase_order->items as $purchaseItem) {
-
-			$cash_purchase->items()->create([
+		foreach ($purchase_order->items as $i => $purchaseItem) {
+			$cash_purchase->items()->save(new PurchaseItem([
 				'purchase_id' => $cash_purchase->id,
 				'product_id' => $purchaseItem->product_id,
 				'product_name' => $purchaseItem->product_name,
@@ -1040,85 +1255,294 @@ class PurchaseOrderController extends Controller
 				'unit_cost' => $purchaseItem->unit_cost,
 				'sub_total' => ($purchaseItem->unit_cost * $purchaseItem->quantity),
 				'account_id' => $purchaseItem->account_id,
-			]);
-			// Create transaction for the item
-			$transaction = new Transaction();
-			$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
-			$transaction->account_id = $purchaseItem->account_id;
-			$transaction->dr_cr = 'dr';
-			$transaction->transaction_amount = $purchaseItem->sub_total;
-			$transaction->transaction_currency = $cash_purchase->currency;
-			$transaction->currency_rate = $cash_purchase->exchange_rate;
-			$transaction->base_currency_amount = convert_currency($cash_purchase->currency, $cash_purchase->business->currency, $purchaseItem->sub_total);
-			$transaction->ref_type = 'cash purchase';
-			$transaction->vendor_id = $cash_purchase->vendor_id;
-			$transaction->ref_id = $cash_purchase->id;
-			$transaction->description = 'Cash Purchase #' . $cash_purchase->bill_no;
-			$transaction->save();
+				'project_id' => $purchaseItem->project_id,
+				'project_task_id' => $purchaseItem->project_task_id,
+				'cost_code_id' => $purchaseItem->cost_code_id,
+			]));
 
-			// increase product stock
-			if ($purchaseItem->product->type == 'product' && $purchaseItem->product->stock_management == 1) {
-				$purchaseItem->product->stock += $purchaseItem->quantity;
-				$purchaseItem->product->save();
+			if ($purchaseItem->project_id && $purchaseItem->project_task_id && $purchaseItem->cost_code_id) {
+				$projectBudget = ProjectBudget::where('project_id', $purchaseItem->project_id)->where('project_task_id', $purchaseItem->project_task_id)->where('cost_code_id', $purchaseItem->cost_code_id)->first();
+				if ($projectBudget) {
+					$projectBudget->actual_budget_quantity += $purchaseItem->quantity;
+					$projectBudget->actual_budget_amount += $purchaseItem->sub_total;
+					$projectBudget->save();
+				}
 			}
 
-			// Create transactions for taxes if any
-			foreach ($purchaseItem->taxes as $tax) {
 
-				$cash_purchase->taxes()->create([
-					'purchase_id' => $cash_purchase->id,
-					'tax_id' => $tax->tax_id,
-					'name' => $tax->name . ' ' . $tax->rate . ' %',
-					'amount' => ($purchaseItem->sub_total / 100) * $tax->rate,
-				]);
-				$transaction = new Transaction();
-				$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
-				$transaction->account_id = $tax->tax->account_id;
-				$transaction->dr_cr = 'dr';
-				$transaction->transaction_amount = $tax->amount;
-				$transaction->transaction_currency = $cash_purchase->currency;
+			if (isset($purchaseItem->taxes)) {
+				foreach ($purchaseItem->taxes as $taxId) {
+					$tax = Tax::find($taxId);
+
+					$cash_purchase->taxes()->save(new PurchaseItemTax([
+						'purchase_id' => $cash_purchase->id,
+						'tax_id' => $taxId,
+						'name' => $tax->name . ' ' . $tax->rate . ' %',
+						'amount' => ($purchaseItem->sub_total / 100) * $tax->rate,
+					]));
+
+					if (has_permission('cash_purchases.approve') || request()->isOwner) {
+						if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
+							$transaction              = new Transaction();
+							$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $cash_purchase->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+							$transaction->account_id  = $tax->account_id;
+							$transaction->dr_cr       = 'cr';
+							$transaction->transaction_currency    = $cash_purchase->currency;
+							$transaction->currency_rate = $cash_purchase->exchange_rate;
+							$transaction->base_currency_amount = convert_currency($cash_purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $cash_purchase->currency, (($purchaseItem->sub_total / $cash_purchase->exchange_rate) / 100) * $tax->rate));
+							$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $cash_purchase->currency, (($purchaseItem->sub_total / $cash_purchase->exchange_rate) / 100) * $tax->rate);
+							$transaction->description = _lang('Cash Purchase Tax') . ' #' . $cash_purchase->bill_no;
+							$transaction->ref_id      = $cash_purchase->id;
+							$transaction->ref_type    = 'cash purchase tax';
+							$transaction->tax_id      = $tax->id;
+							$transaction->project_id = $purchaseItem->project_id;
+							$transaction->project_task_id = $purchaseItem->project_task_id;
+							$transaction->cost_code_id = $purchaseItem->cost_code_id;
+							$transaction->save();
+						} else {
+							$transaction              = new Transaction();
+							$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $cash_purchase->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+							$transaction->account_id  = $tax->account_id;
+							$transaction->dr_cr       = 'dr';
+							$transaction->transaction_currency    = $request->currency;
+							$transaction->currency_rate = $cash_purchase->exchange_rate;
+							$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseItem->sub_total / $cash_purchase->exchange_rate) / 100) * $tax->rate));
+							$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseItem->sub_total / $cash_purchase->exchange_rate) / 100) * $tax->rate);
+							$transaction->description = _lang('Cash Purchase Tax') . ' #' . $cash_purchase->bill_no;
+							$transaction->ref_id      = $cash_purchase->id;
+							$transaction->ref_type    = 'cash purchase tax';
+							$transaction->tax_id      = $tax->id;
+							$transaction->project_id = $purchaseItem->project_id;
+							$transaction->project_task_id = $purchaseItem->project_task_id;
+							$transaction->cost_code_id = $purchaseItem->cost_code_id;
+							$transaction->save();
+						}
+					} else {
+						if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
+							$transaction              = new PendingTransaction();
+							$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $cash_purchase->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+							$transaction->account_id  = $tax->account_id;
+							$transaction->dr_cr       = 'cr';
+							$transaction->transaction_currency    = $cash_purchase->currency;
+							$transaction->currency_rate = $cash_purchase->exchange_rate;
+							$transaction->base_currency_amount = convert_currency($cash_purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $cash_purchase->currency, (($purchaseItem->sub_total / $cash_purchase->exchange_rate) / 100) * $tax->rate));
+							$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $cash_purchase->currency, (($purchaseItem->sub_total / $cash_purchase->exchange_rate) / 100) * $tax->rate);
+							$transaction->description = _lang('Cash Purchase Tax') . ' #' . $cash_purchase->bill_no;
+							$transaction->ref_id      = $cash_purchase->id;
+							$transaction->ref_type    = 'cash purchase tax';
+							$transaction->tax_id      = $tax->id;
+							$transaction->project_id = $purchaseItem->project_id;
+							$transaction->project_task_id = $purchaseItem->project_task_id;
+							$transaction->cost_code_id = $purchaseItem->cost_code_id;
+							$transaction->save();
+						} else {
+							$transaction              = new PendingTransaction();
+							$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $cash_purchase->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+							$transaction->account_id  = $tax->account_id;
+							$transaction->dr_cr       = 'dr';
+							$transaction->transaction_currency    = $cash_purchase->currency;
+							$transaction->currency_rate = $cash_purchase->exchange_rate;
+							$transaction->base_currency_amount = convert_currency($cash_purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $cash_purchase->currency, (($purchaseItem->sub_total / $cash_purchase->exchange_rate) / 100) * $tax->rate));
+							$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $cash_purchase->currency, (($purchaseItem->sub_total / $cash_purchase->exchange_rate) / 100) * $tax->rate);
+							$transaction->description = _lang('Cash Purchase Tax') . ' #' . $cash_purchase->bill_no;
+							$transaction->ref_id      = $cash_purchase->id;
+							$transaction->ref_type    = 'cash purchase tax';
+							$transaction->tax_id      = $tax->id;
+							$transaction->project_id = $purchaseItem->project_id;
+							$transaction->project_task_id = $purchaseItem->project_task_id;
+							$transaction->cost_code_id = $purchaseItem->cost_code_id;
+							$transaction->save();
+						}
+					}
+				}
+			}
+
+			if (has_permission('cash_purchases.approve') || request()->isOwner) {
+
+				if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
+					$transaction              = new Transaction();
+					$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $cash_purchase->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+					$transaction->account_id  = $purchaseItem->account_id;
+					$transaction->dr_cr       = 'dr';
+					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $cash_purchase->currency, ($purchaseItem->sub_total / $cash_purchase->exchange_rate) + $purchaseItem->taxes->sum('amount'));
+					$transaction->transaction_currency    = $cash_purchase->currency;
+					$transaction->currency_rate = $cash_purchase->exchange_rate;
+					$transaction->base_currency_amount = convert_currency($cash_purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $cash_purchase->currency, ($purchaseItem->sub_total / $cash_purchase->exchange_rate) + $purchaseItem->taxes->sum('amount')));
+					$transaction->ref_type    = 'cash purchase';
+					$transaction->vendor_id   = $cash_purchase->vendor_id;
+					$transaction->ref_id      = $cash_purchase->id;
+					$transaction->description = 'Cash Purchase #' . $cash_purchase->bill_no;
+					$transaction->project_id = $purchaseItem->project_id;
+					$transaction->project_task_id = $purchaseItem->project_task_id;
+					$transaction->cost_code_id = $purchaseItem->cost_code_id;
+					$transaction->save();
+				} else {
+					$transaction              = new Transaction();
+					$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $cash_purchase->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+					$transaction->account_id  = $purchaseItem->account_id;
+					$transaction->dr_cr       = 'dr';
+					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $cash_purchase->currency, $purchaseItem->sub_total / $cash_purchase->exchange_rate);
+					$transaction->transaction_currency    = $cash_purchase->currency;
+					$transaction->currency_rate = $cash_purchase->exchange_rate;
+					$transaction->base_currency_amount = convert_currency($cash_purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $cash_purchase->currency, $purchaseItem->sub_total / $cash_purchase->exchange_rate));
+					$transaction->ref_type    = 'cash purchase';
+					$transaction->vendor_id   = $cash_purchase->vendor_id;
+					$transaction->ref_id      = $cash_purchase->id;
+					$transaction->description = 'Cash Purchase #' . $cash_purchase->bill_no;
+					$transaction->project_id = $purchaseItem->project_id;
+					$transaction->project_task_id = $purchaseItem->project_task_id;
+					$transaction->cost_code_id = $purchaseItem->cost_code_id;
+					$transaction->save();
+				}
+			} else {
+				if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
+					$transaction              = new PendingTransaction();
+					$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $cash_purchase->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+					$transaction->account_id  = $purchaseItem->account_id;
+					$transaction->dr_cr       = 'dr';
+					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $cash_purchase->currency, ($purchaseItem->sub_total / $cash_purchase->exchange_rate) + $purchaseItem->taxes->sum('amount'));
+					$transaction->transaction_currency    = $cash_purchase->currency;
+					$transaction->currency_rate = $cash_purchase->exchange_rate;
+					$transaction->base_currency_amount = convert_currency($cash_purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $cash_purchase->currency, ($purchaseItem->sub_total / $cash_purchase->exchange_rate) + $purchaseItem->taxes->sum('amount')));
+					$transaction->ref_type    = 'cash purchase';
+					$transaction->vendor_id   = $cash_purchase->vendor_id;
+					$transaction->ref_id      = $cash_purchase->id;
+					$transaction->description = 'Cash Purchase #' . $cash_purchase->bill_no;
+					$transaction->project_id = $purchaseItem->project_id;
+					$transaction->project_task_id = $purchaseItem->project_task_id;
+					$transaction->cost_code_id = $purchaseItem->cost_code_id;
+					$transaction->save();
+				} else {
+					$transaction              = new PendingTransaction();
+					$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $cash_purchase->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+					$transaction->account_id  = $purchaseItem->account_id;
+					$transaction->dr_cr       = 'dr';
+					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $cash_purchase->currency, $purchaseItem->sub_total / $cash_purchase->exchange_rate);
+					$transaction->transaction_currency    = $cash_purchase->currency;
+					$transaction->currency_rate = $cash_purchase->exchange_rate;
+					$transaction->base_currency_amount = convert_currency($cash_purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $cash_purchase->currency, $purchaseItem->sub_total / $cash_purchase->exchange_rate));
+					$transaction->ref_type    = 'cash purchase';
+					$transaction->vendor_id   = $cash_purchase->vendor_id;
+					$transaction->ref_id      = $cash_purchase->id;
+					$transaction->description = 'Cash Purchase #' . $cash_purchase->bill_no;
+					$transaction->project_id = $purchaseItem->project_id;
+					$transaction->project_task_id = $purchaseItem->project_task_id;
+					$transaction->cost_code_id = $purchaseItem->cost_code_id;
+					$transaction->save();
+				}
+			}
+
+			// update stock
+			if ($purchaseItem->product->type == 'product' && $purchaseItem->product->stock_management == 1) {
+				$purchaseItem->product->stock = $purchaseItem->product->stock + $purchaseItem->quantity;
+				$purchaseItem->product->save();
+			}
+		}
+
+		//Increment Bill Number
+		BusinessSetting::where('name', 'purchase_number')->increment('value');
+
+		DB::commit();
+
+		if (has_permission('cash_purchases.approve') || request()->isOwner) {
+			if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
+				$transaction              = new Transaction();
+				$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $cash_purchase->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+				$transaction->account_id  = $request->input('credit_account_id');
+				$transaction->dr_cr       = 'cr';
+				$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $cash_purchase->currency, $cash_purchase->grand_total - $cash_purchase->taxes->sum('amount'));
+				$transaction->transaction_currency    = $cash_purchase->currency;
 				$transaction->currency_rate = $cash_purchase->exchange_rate;
-				$transaction->base_currency_amount = convert_currency($cash_purchase->currency, $cash_purchase->business->currency, $tax->amount);
-				$transaction->description = _lang('Cash Purchase Tax') . ' #' . $cash_purchase->bill_no;
-				$transaction->ref_id = $cash_purchase->id;
-				$transaction->ref_type = 'cash purchase tax';
-				$transaction->tax_id = $tax->tax_id;
+				$transaction->base_currency_amount = convert_currency($cash_purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $cash_purchase->currency, $cash_purchase->grand_total - $cash_purchase->taxes->sum('amount')));
+				$transaction->ref_type    = 'cash purchase payment';
+				$transaction->ref_id      = $cash_purchase->id;
+				$transaction->description = 'Cash Purchase #' . $cash_purchase->bill_no;
+				$transaction->vendor_id   = $cash_purchase->vendor_id;
+				$transaction->project_id = $cash_purchase->items->first()->project_id;
+				$transaction->save();
+			} else {
+				$transaction              = new Transaction();
+				$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $cash_purchase->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+				$transaction->account_id  = $request->input('credit_account_id');
+				$transaction->dr_cr       = 'cr';
+				$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $cash_purchase->currency, $cash_purchase->grand_total);
+				$transaction->transaction_currency    = $cash_purchase->currency;
+				$transaction->currency_rate = $cash_purchase->exchange_rate;
+				$transaction->base_currency_amount = convert_currency($cash_purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $cash_purchase->currency, $cash_purchase->grand_total));
+				$transaction->ref_type    = 'cash purchase payment';
+				$transaction->ref_id      = $cash_purchase->id;
+				$transaction->description = 'Cash Purchase #' . $cash_purchase->bill_no;
+				$transaction->vendor_id   = $cash_purchase->vendor_id;
+				$transaction->project_id = $cash_purchase->items->first()->project_id;
+				$transaction->save();
+			}
+
+			if ($request->input('discount_value') > 0) {
+				$transaction              = new Transaction();
+				$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $cash_purchase->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+				$transaction->account_id  = get_account('Purchase Discount Allowed')->id;
+				$transaction->dr_cr       = 'cr';
+				$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $cash_purchase->currency, $cash_purchase->discount_amount);
+				$transaction->transaction_currency    = $cash_purchase->currency;
+				$transaction->currency_rate           = $cash_purchase->exchange_rate;
+				$transaction->base_currency_amount    = convert_currency($cash_purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $cash_purchase->currency, $cash_purchase->discount_amount));
+				$transaction->description = _lang('Bill Invoice Discount') . ' #' . $cash_purchase->bill_no;
+				$transaction->ref_id      = $cash_purchase->id;
+				$transaction->ref_type    = 'cash purchase';
+				$transaction->vendor_id   = $cash_purchase->vendor_id;
+				$transaction->project_id = $cash_purchase->items->first()->project_id;
+				$transaction->save();
+			}
+		} else {
+			if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
+				$transaction              = new PendingTransaction();
+				$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $cash_purchase->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+				$transaction->account_id  = $request->input('credit_account_id');
+				$transaction->dr_cr       = 'cr';
+				$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $cash_purchase->currency, $cash_purchase->grand_total - $cash_purchase->taxes->sum('amount'));
+				$transaction->transaction_currency    = $cash_purchase->currency;
+				$transaction->currency_rate = $cash_purchase->exchange_rate;
+				$transaction->base_currency_amount = convert_currency($cash_purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $cash_purchase->currency, $cash_purchase->grand_total - $cash_purchase->taxes->sum('amount')));
+				$transaction->ref_type    = 'cash purchase payment';
+				$transaction->ref_id      = $cash_purchase->id;
+				$transaction->description = 'Cash Purchase #' . $cash_purchase->bill_no;
+				$transaction->vendor_id   = $cash_purchase->vendor_id;
+				$transaction->project_id = $cash_purchase->items->first()->project_id;
+				$transaction->save();
+			} else {
+				$transaction              = new PendingTransaction();
+				$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $cash_purchase->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+				$transaction->account_id  = $request->input('credit_account_id');
+				$transaction->dr_cr       = 'cr';
+				$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $cash_purchase->currency, $cash_purchase->grand_total);
+				$transaction->transaction_currency    = $cash_purchase->currency;
+				$transaction->currency_rate = $cash_purchase->exchange_rate;
+				$transaction->base_currency_amount = convert_currency($cash_purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $cash_purchase->currency, $cash_purchase->grand_total));
+				$transaction->ref_type    = 'cash purchase payment';
+				$transaction->ref_id      = $cash_purchase->id;
+				$transaction->description = 'Cash Purchase #' . $cash_purchase->bill_no;
+				$transaction->vendor_id   = $cash_purchase->vendor_id;
+				$transaction->project_id = $cash_purchase->items->first()->project_id;
+				$transaction->save();
+			}
+
+			if ($request->input('discount_value') > 0) {
+				$transaction              = new PendingTransaction();
+				$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $cash_purchase->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+				$transaction->account_id  = get_account('Purchase Discount Allowed')->id;
+				$transaction->dr_cr       = 'cr';
+				$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $cash_purchase->currency, $cash_purchase->discount_amount);
+				$transaction->transaction_currency    = $cash_purchase->currency;
+				$transaction->currency_rate           = $cash_purchase->exchange_rate;
+				$transaction->base_currency_amount    = convert_currency($cash_purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $cash_purchase->currency, $cash_purchase->discount_amount));
+				$transaction->description = _lang('Bill Invoice Discount') . ' #' . $cash_purchase->bill_no;
+				$transaction->ref_id      = $cash_purchase->id;
+				$transaction->ref_type    = 'cash purchase';
+				$transaction->vendor_id   = $cash_purchase->vendor_id;
+				$transaction->project_id = $cash_purchase->items->first()->project_id;
 				$transaction->save();
 			}
 		}
-
-		// Create credit account transaction
-		$transaction = new Transaction();
-		$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
-		$transaction->account_id = $request->credit_account_id;
-		$transaction->dr_cr = 'cr';
-		$transaction->transaction_amount = $cash_purchase->grand_total;
-		$transaction->transaction_currency = $cash_purchase->currency;
-		$transaction->currency_rate = $cash_purchase->exchange_rate;
-		$transaction->base_currency_amount = convert_currency($cash_purchase->currency, $cash_purchase->business->currency, $cash_purchase->grand_total);
-		$transaction->ref_type = 'cash purchase payment';
-		$transaction->ref_id = $cash_purchase->id;
-		$transaction->description = 'Cash Purchase #' . $cash_purchase->bill_no;
-		$transaction->save();
-
-		// Create discount transaction if applicable
-		if ($cash_purchase->discount > 0) {
-			$transaction = new Transaction();
-			$transaction->trans_date = $currentTime->format('Y-m-d H:i:s');
-			$transaction->account_id = get_account('Purchase Discount Allowed')->id;
-			$transaction->dr_cr = 'cr';
-			$transaction->transaction_amount = $cash_purchase->discount;
-			$transaction->transaction_currency = $cash_purchase->currency;
-			$transaction->currency_rate = $cash_purchase->exchange_rate;
-			$transaction->base_currency_amount = convert_currency($cash_purchase->currency, $cash_purchase->business->currency, $cash_purchase->discount);
-			$transaction->description = _lang('Cash Purchase Discount') . ' #' . $cash_purchase->bill_no;
-			$transaction->ref_id = $cash_purchase->id;
-			$transaction->ref_type = 'cash purchase';
-			$transaction->vendor_id = $cash_purchase->vendor_id;
-			$transaction->save();
-		}
-
-		$cash_purchase->save();
 
 		// audit log
 		$audit = new AuditLog();

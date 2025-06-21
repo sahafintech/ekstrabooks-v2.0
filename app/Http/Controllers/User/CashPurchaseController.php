@@ -48,7 +48,7 @@ class CashPurchaseController extends Controller
 		session(['cash_purchases_approval_status' => $status]);
 		session(['cash_purchases_vendor_id' => $vendorId]);
 
-		$query = Purchase::with('vendor')
+		$query = Purchase::with('vendor', 'business')
 			->where('cash', 1);
 
 		if ($sortColumn === 'vendor.name') {
@@ -360,7 +360,7 @@ class CashPurchaseController extends Controller
 		if (isset($request->attachments)) {
 			if ($request->attachments != null) {
 				for ($i = 0; $i < count($request->attachments); $i++) {
-					$theFile = $request->file("attachments.$i.file");
+					$theFile = $request->file("attachments.$i");
 					if ($theFile == null) {
 						continue;
 					}
@@ -368,7 +368,7 @@ class CashPurchaseController extends Controller
 					$theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
 
 					$attachment = new Attachment();
-					$attachment->file_name = $request->attachments[$i]['file_name'];
+					$attachment->file_name = $request->attachments[$i]->getClientOriginalName();
 					$attachment->path = "/uploads/media/attachments/" . $theAttachment;
 					$attachment->ref_type = 'cash purchase';
 					$attachment->ref_id = $purchase->id;
@@ -979,10 +979,8 @@ class CashPurchaseController extends Controller
 		$attachments = Attachment::where('ref_id', $purchase->id)->where('ref_type', 'cash purchase')->get(); // Get attachments from the database
 
 		if (isset($request->attachments)) {
-			$incomingFiles = collect($request->attachments)->pluck('file')->toArray();
-
 			foreach ($attachments as $attachment) {
-				if (!in_array($attachment->path, $incomingFiles)) {
+				if (!in_array($attachment->path, $request->attachments)) {
 					$filePath = public_path($attachment->path);
 					if (file_exists($filePath)) {
 						unlink($filePath); // Delete the file
@@ -996,7 +994,7 @@ class CashPurchaseController extends Controller
 		if (isset($request->attachments)) {
 			if ($request->attachments != null) {
 				for ($i = 0; $i < count($request->attachments); $i++) {
-					$theFile = $request->file("attachments.$i.file");
+					$theFile = $request->file("attachments.$i");
 					if ($theFile == null) {
 						continue;
 					}
@@ -1004,7 +1002,7 @@ class CashPurchaseController extends Controller
 					$theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
 
 					$attachment = new Attachment();
-					$attachment->file_name = $request->attachments[$i]['file_name'];
+					$attachment->file_name = $request->attachments[$i]->getClientOriginalName();
 					$attachment->path = "/uploads/media/attachments/" . $theAttachment;
 					$attachment->ref_type = 'cash purchase';
 					$attachment->ref_id = $purchase->id;
