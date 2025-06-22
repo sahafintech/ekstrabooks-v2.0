@@ -609,6 +609,8 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('find_currency/{name}', [InvoiceController::class, 'find_currency'])->name("invoices.find_currency");
 		Route::get('customer/get_invoices/{id}', [InvoiceController::class, 'get_invoices'])->name('customer.get_invoices');
 		Route::get('prescription_products/{id}', [PrescriptionController::class, 'find_prescription_products'])->name('prescriptions.find_prescription_products');
+		Route::post('prescription_products/{id}/cancel', [PrescriptionController::class, 'cancel_prescription_products'])->name('prescriptions.cancel_prescription_products');
+		Route::post('prescription_products/{id}/send_to_pos', [PrescriptionController::class, 'send_to_pos'])->name('prescriptions.send_to_pos');
 		Route::get('products/findProduct/{id}', [ProductController::class, 'findProduct'])->name("products.find_product");
 		Route::get('products/getProducts/{type}', [ProductController::class, 'getProducts']);
 		Route::get('products/search_product/{search_term}', [ProductController::class, 'search_product'])->name('products.search_product');

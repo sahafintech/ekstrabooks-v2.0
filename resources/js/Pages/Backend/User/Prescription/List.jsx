@@ -132,6 +132,33 @@ const ChangeStatusModal = ({ show, onClose, onConfirm, processing, currentStatus
   );
 };
 
+// Send to POS Confirmation Modal Component
+const SendToPosModal = ({ show, onClose, onConfirm, processing }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to send this prescription to POS?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          disabled={processing}
+        >
+          Send to POS
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
 const PrescriptionStatusBadge = ({ status }) => {
   const statusMap = {
       0: {
@@ -179,6 +206,11 @@ export default function List({ prescriptions = [], meta = {}, filters = {} }) {
   // Change Status modal states
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [prescriptionToUpdate, setPrescriptionToUpdate] = useState(null);
+
+  // Send to POS modal states
+  const [showSendToPosModal, setShowSendToPosModal] = useState(false);
+  const [prescriptionToSendToPos, setPrescriptionToSendToPos] = useState(null);
+  const [sendToPosProcessing, setSendToPosProcessing] = useState(false);
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -385,6 +417,31 @@ export default function List({ prescriptions = [], meta = {}, filters = {} }) {
     );
   };
 
+  const handleSendToPos = (id) => {
+    setPrescriptionToSendToPos(id);
+    setShowSendToPosModal(true);
+  };
+
+  const handleSendToPosConfirm = (e) => {
+    e.preventDefault();
+    setSendToPosProcessing(true);
+
+    router.post(route('prescriptions.send_to_pos', prescriptionToSendToPos), {
+      onSuccess: () => {
+        setShowSendToPosModal(false);
+        setPrescriptionToSendToPos(null);
+        setSendToPosProcessing(false);
+        toast({
+          title: "Success",
+          description: "Prescription sent to POS successfully",
+        });
+      },
+      onError: () => {
+        setSendToPosProcessing(false);
+      }
+    });
+  };
+
   return (
     <AuthenticatedLayout>
       <Toaster />
@@ -516,6 +573,11 @@ export default function List({ prescriptions = [], meta = {}, filters = {} }) {
                                 onClick: () => handleStatusChange(prescription.id),
                               },
                               {
+                                label: "Send To POS",
+                                icon: <Edit className="h-4 w-4" />,
+                                onClick: () => handleSendToPos(prescription.id),
+                              },
+                              {
                                 label: "Delete",
                                 icon: <Trash className="h-4 w-4" />,
                                 onClick: () => handleDeleteConfirm(prescription.id),
@@ -604,6 +666,13 @@ export default function List({ prescriptions = [], meta = {}, filters = {} }) {
         onConfirm={handleStatusUpdate}
         processing={processing}
         currentStatus={prescriptionToUpdate?.status}
+      />
+
+      <SendToPosModal
+        show={showSendToPosModal}
+        onClose={() => setShowSendToPosModal(false)}
+        onConfirm={handleSendToPosConfirm}
+        processing={sendToPosProcessing}
       />
 
     </AuthenticatedLayout>

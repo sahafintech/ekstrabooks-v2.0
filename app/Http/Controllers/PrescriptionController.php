@@ -336,4 +336,25 @@ class PrescriptionController extends Controller
     {
         return PrescriptionProduct::where('id', $id)->with('items', 'customer')->first();
     }
+
+    public function cancel_prescription_products($id)
+    {
+        $prescription_products = PrescriptionProduct::where('id', $id)->with('items', 'customer')->first();
+        $prescription_products->status = 1;
+        $prescription_products->save();
+
+        return redirect()->back()->with('success', 'Prescription products cancelled successfully');
+    }
+
+    public function send_to_pos($id)
+    {
+        $prescription = Prescription::where('id', $id)->first();
+        $prescription_products = PrescriptionProduct::where('prescription_id', $prescription->id)->with('items', 'customer')->get();
+        foreach ($prescription_products as $prescription_product) {
+            $prescription_product->status = 0;
+            $prescription_product->save();
+        }
+
+        return redirect()->back()->with('success', 'Prescription products sent to POS successfully');
+    }
 }

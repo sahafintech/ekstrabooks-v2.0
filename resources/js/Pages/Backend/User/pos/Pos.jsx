@@ -8,7 +8,7 @@ import { Input } from "@/Components/ui/input";
 import Modal from "@/Components/Modal";
 import { ScrollArea } from "@/Components/ui/scroll-area";
 import { Link, usePage } from "@inertiajs/react";
-import { Trash2 } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useForm } from "@inertiajs/react";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
@@ -527,6 +527,15 @@ export default function POS({ products, categories, currencies, accounts, custom
     }));
   };
 
+  // Function to cancel/remove prescription product
+  const cancelPrescriptionProduct = (prescriptionProductId) => {
+    if (confirm('Are you sure you want to cancel this prescription product?')) {
+      post(route("prescriptions.cancel_prescription_products", { id: prescriptionProductId }), {
+        preserveScroll: true,
+      });
+    }
+  };
+
   return (
     // Full screen height layout in a flex column
     <div className="h-screen flex flex-col">
@@ -1040,15 +1049,24 @@ export default function POS({ products, categories, currencies, accounts, custom
                                   {formatCurrency({ amount: total, currency: prescProduct.currency || baseCurrency.name })}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                  <Button
-                                    variant="ghost"
-                                    className="text-green-600 hover:text-green-800"
-                                    onClick={() => loadPrescriptionItems(prescProduct)}
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                  </Button>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      className="text-green-600 hover:text-green-800"
+                                      onClick={() => loadPrescriptionItems(prescProduct)}
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                      </svg>
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      className="text-red-600 hover:text-red-800"
+                                      onClick={() => cancelPrescriptionProduct(prescProduct.id)}
+                                    >
+                                      <X className="h-5 w-5" />
+                                    </Button>
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -1114,7 +1132,7 @@ export default function POS({ products, categories, currencies, accounts, custom
                   <div key={item.id} className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] items-center border-b py-2 gap-2">
                     <div className="flex flex-col">
                       <span className="truncate" title={item.name}>{item.name}</span>
-                      {item.unit_cost == 0 && <span className="text-red-500 text-xs">Are you sure this product/service is Zero ?</span>}
+                      {item.unit_cost == 0 && <span className="text-red-500 text-xs">Are you sure this product/service is Zero ?</span>}
                     </div>
                     <div className="relative">
                       <Input
