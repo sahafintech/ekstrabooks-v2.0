@@ -461,6 +461,9 @@ class JournalController extends Controller
                 $transaction->cost_code_id = $request->journal_entries[$i]['cost_code_id'] ?? NULL;
                 $transaction->quantity = $request->journal_entries[$i]['quantity'] ?? 0;
                 $transaction->save();
+
+                $journal->status = 0;
+                $journal->save();
             }
 
             DB::commit();
