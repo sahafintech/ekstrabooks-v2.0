@@ -1243,12 +1243,10 @@ class PurchaseController extends Controller
 			$purchase_item->delete();
 
 			// delete transaction
-			$transaction = Transaction::where('ref_id', $purchase->id)->where('ref_type', 'bill invoice')
-				->where('account_id', $purchase_item->account_id)
-				->first();
+			$transaction = Transaction::where('ref_id', $purchase->id)->where('ref_type', 'bill invoice')->get();
 
-			if ($transaction != null) {
-				$transaction->delete();
+			foreach ($transaction as $t) {
+				$t->delete();
 			}
 
 			// delete pending transaction
