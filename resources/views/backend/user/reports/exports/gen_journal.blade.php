@@ -32,7 +32,8 @@
         <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Date') }}</td>
         <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Account') }}</td>
         <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Description') }}</td>
-        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Type') }}</td>
+        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Ref Type') }}</td>
+        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Ref ID') }}</td>
         <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Name') }}</td>
         <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Transaction Currency') }}</td>
         <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Transaction Amount[debit]') }}</td>
@@ -53,8 +54,25 @@
             <td>
                 @if($transaction->ref_type == 'receipt')
                 cash invoice
+                @elseif($transaction->ref_type == 'bill invoice')
+                credit purchase
+                @elseif($transaction->ref_type == 'bill payment')
+                credit purchase payment
                 @else
                 {{ $transaction->ref_type }}
+                @endif
+            </td>
+            <td>
+                @if($transaction->ref_type == 'receipt')
+                {{ $transaction->receipt->receipt_number }}
+                @elseif($transaction->ref_type == 'bill invoice')
+                {{ $transaction->purchase->purchase_number }}
+                @elseif($transaction->ref_type == 'bill payment')
+                {{ $transaction->purchase->purchase_number }}
+                @elseif($transaction->ref_type == 'journal')
+                {{ $transaction->journal->journal_number }}
+                @else
+                {{ $transaction->ref_id }}
                 @endif
             </td>
             <td>
@@ -100,6 +118,7 @@
         @endforeach
         <tr>
             <td style="background-color: lightgray; font-size: 12px;"><b>{{ _lang('Total') }}</b></td>
+            <td style="background-color: lightgray;"></td>
             <td style="background-color: lightgray;"></td>
             <td style="background-color: lightgray;"></td>
             <td style="background-color: lightgray;"></td>

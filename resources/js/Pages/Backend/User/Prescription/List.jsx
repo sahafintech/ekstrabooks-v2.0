@@ -210,7 +210,6 @@ export default function List({ prescriptions = [], meta = {}, filters = {} }) {
   // Send to POS modal states
   const [showSendToPosModal, setShowSendToPosModal] = useState(false);
   const [prescriptionToSendToPos, setPrescriptionToSendToPos] = useState(null);
-  const [sendToPosProcessing, setSendToPosProcessing] = useState(false);
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -424,20 +423,20 @@ export default function List({ prescriptions = [], meta = {}, filters = {} }) {
 
   const handleSendToPosConfirm = (e) => {
     e.preventDefault();
-    setSendToPosProcessing(true);
+    setProcessing(true);
 
     router.post(route('prescriptions.send_to_pos', prescriptionToSendToPos), {
       onSuccess: () => {
         setShowSendToPosModal(false);
         setPrescriptionToSendToPos(null);
-        setSendToPosProcessing(false);
+        setProcessing(false);
         toast({
           title: "Success",
           description: "Prescription sent to POS successfully",
         });
       },
       onError: () => {
-        setSendToPosProcessing(false);
+        setProcessing(false);
       }
     });
   };
@@ -672,7 +671,7 @@ export default function List({ prescriptions = [], meta = {}, filters = {} }) {
         show={showSendToPosModal}
         onClose={() => setShowSendToPosModal(false)}
         onConfirm={handleSendToPosConfirm}
-        processing={sendToPosProcessing}
+        processing={processing}
       />
 
     </AuthenticatedLayout>

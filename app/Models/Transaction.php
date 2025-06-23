@@ -56,6 +56,16 @@ class Transaction extends Model
         return $this->belongsTo(Purchase::class, 'ref_id')->withDefault();
     }
 
+    public function receipt()
+    {
+        return $this->belongsTo(Receipt::class, 'ref_id')->withDefault();
+    }
+
+    public function journal()
+    {
+        return $this->belongsTo(Journal::class, 'ref_id')->withDefault();
+    }
+
     public function payslips()
     {
         return $this->hasMany(Payroll::class, 'transaction_id');
@@ -245,9 +255,9 @@ class Transaction extends Model
 
     public function nameWIthTax() {
         if($this->ref_type === 'invoice tax' || $this->ref_type === 'd invoice tax') {
-            return $this->tax->name . ' (' . Invoice::find($this->ref_id)?->customer?->name . ')';
+            return $this->tax->name . ' (' . $this->invoice?->customer?->name . ')';
         }else if($this->ref_type === 'receipt tax') {
-            return $this->tax->name . ' (' . Receipt::find($this->ref_id)?->customer?->name . ')';
+            return $this->tax->name . ' (' . $this->receipt?->customer?->name . ')';
         }
         
         return $this->tax->name;

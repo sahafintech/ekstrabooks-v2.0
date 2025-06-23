@@ -31,7 +31,16 @@ class GenJournalExport implements FromView, WithTitle, WithColumnFormatting
         $date1 = $this->date1;
         $date2 = $this->date2;
 
-        $data['report_data'] = Transaction::with('account')
+        $data['report_data'] = Transaction::with([
+            'account',
+            'customer',
+            'vendor',
+            'employee',
+            'tax',
+            'invoice.customer',
+            'receipt.customer',
+            'journal',
+        ])
             ->whereRaw("date(transactions.trans_date) >= '$date1' AND date(transactions.trans_date) <= '$date2'")
             ->get();
 
@@ -49,11 +58,11 @@ class GenJournalExport implements FromView, WithTitle, WithColumnFormatting
     public function columnFormats(): array
     {
         return [
-            'E' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
             'H' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
-            'J' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
-            'F' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
+            'I' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
+            'M' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
             'K' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
+            'N' => NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1,
         ];
     }
 }
