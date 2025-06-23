@@ -101,7 +101,7 @@ class JournalImport implements ToCollection, WithHeadingRow, WithCalculatedFormu
                 }
             }
 
-            if(has_permission('journals.approve') || request()->isOwner == true) {
+            if(has_permission('journals.bulk_approve') || request()->isOwner == true) {
                 if ($row['debit'] > 0) {
                     Transaction::create([
                         'trans_date'                  => Carbon::parse($date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s'),

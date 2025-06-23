@@ -796,13 +796,13 @@ class PurchaseOrderController extends Controller
 			$bill->template = $purchase_order->template;
 			$bill->note = $purchase_order->note;
 			$bill->footer = $purchase_order->footer;
-			if (has_permission('bill_invoices.approve') || request()->isOwner) {
+			if (has_permission('bill_invoices.bulk_approve') || request()->isOwner) {
 				$bill->approval_status = 1;
 			} else {
 				$bill->approval_status = 0;
 			}
 			$bill->created_by = auth()->user()->id;
-			if (has_permission('bill_invoices.approve') || request()->isOwner) {
+			if (has_permission('bill_invoices.bulk_approve') || request()->isOwner) {
 				$bill->approved_by = auth()->user()->id;
 			} else {
 				$bill->approved_by = null;
@@ -850,7 +850,7 @@ class PurchaseOrderController extends Controller
 							'amount' => ($purchaseItem->sub_total / 100) * $tax->rate,
 						]));
 	
-						if (has_permission('bill_invoices.approve') || request()->isOwner) {
+						if (has_permission('bill_invoices.bulk_approve') || request()->isOwner) {
 							if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
 								$transaction              = new Transaction();
 								$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $bill->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
@@ -926,7 +926,7 @@ class PurchaseOrderController extends Controller
 					}
 				}
 	
-				if (has_permission('bill_invoices.approve') || request()->isOwner) {
+				if (has_permission('bill_invoices.bulk_approve') || request()->isOwner) {
 	
 					if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
 						$transaction              = new Transaction();
@@ -1013,7 +1013,7 @@ class PurchaseOrderController extends Controller
 	
 			DB::commit();
 	
-			if (has_permission('bill_invoices.approve') || request()->isOwner) {
+			if (has_permission('bill_invoices.bulk_approve') || request()->isOwner) {
 				if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
 					$transaction              = new Transaction();
 					$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $bill->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
@@ -1225,13 +1225,13 @@ class PurchaseOrderController extends Controller
 		$cash_purchase->template = $purchase_order->template;
 		$cash_purchase->note = $purchase_order->note;
 		$cash_purchase->footer = $purchase_order->footer;
-		if (has_permission('cash_purchases.approve') || request()->isOwner) {
+		if (has_permission('cash_purchases.bulk_approve') || request()->isOwner) {
 			$cash_purchase->approval_status = 1;
 		} else {
 			$cash_purchase->approval_status = 0;
 		}
 		$cash_purchase->created_by = auth()->user()->id;
-		if (has_permission('cash_purchases.approve') || request()->isOwner) {
+		if (has_permission('cash_purchases.bulk_approve') || request()->isOwner) {
 			$cash_purchase->approved_by = auth()->user()->id;
 		} else {
 			$cash_purchase->approved_by = null;
@@ -1281,7 +1281,7 @@ class PurchaseOrderController extends Controller
 						'amount' => ($purchaseItem->sub_total / 100) * $tax->rate,
 					]));
 
-					if (has_permission('cash_purchases.approve') || request()->isOwner) {
+					if (has_permission('cash_purchases.bulk_approve') || request()->isOwner) {
 						if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
 							$transaction              = new Transaction();
 							$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $cash_purchase->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
@@ -1357,7 +1357,7 @@ class PurchaseOrderController extends Controller
 				}
 			}
 
-			if (has_permission('cash_purchases.approve') || request()->isOwner) {
+			if (has_permission('cash_purchases.bulk_approve') || request()->isOwner) {
 
 				if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
 					$transaction              = new Transaction();
@@ -1444,7 +1444,7 @@ class PurchaseOrderController extends Controller
 
 		DB::commit();
 
-		if (has_permission('cash_purchases.approve') || request()->isOwner) {
+		if (has_permission('cash_purchases.bulk_approve') || request()->isOwner) {
 			if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
 				$transaction              = new Transaction();
 				$transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $cash_purchase->purchase_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');

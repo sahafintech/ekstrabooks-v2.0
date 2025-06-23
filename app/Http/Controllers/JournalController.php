@@ -179,7 +179,7 @@ class JournalController extends Controller
         $journal->user_id = auth()->user()->id;
         $journal->business_id = request()->activeBusiness->id;
         $journal->created_by = auth()->user()->id;
-        if (has_permission('journals.approve') || request()->isOwner == true) {
+        if (has_permission('journals.bulk_approve') || request()->isOwner == true) {
             $journal->status = 1;
         } else {
             $journal->status = 0;
@@ -209,7 +209,7 @@ class JournalController extends Controller
                 }
             }
 
-            if (has_permission('journals.approve') || request()->isOwner == true) {
+            if (has_permission('journals.bulk_approve') || request()->isOwner == true) {
                 $transaction                              = new Transaction();
                 $transaction->trans_date                  = Carbon::parse($request->journal_entries[$i]['date'])->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
                 $transaction->account_id  = $request->journal_entries[$i]['account_id'];
@@ -400,7 +400,7 @@ class JournalController extends Controller
                 }
             }
 
-            if (has_permission('journals.approve') || (request()->isOwner == true && $journal->status == 1)) {
+            if (has_permission('journals.bulk_approve') || (request()->isOwner == true && $journal->status == 1)) {
                 $transaction                              = new Transaction();
                 $transaction->trans_date                  = Carbon::parse($request->journal_entries[$i]['date'])->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
                 $transaction->account_id  = $request->journal_entries[$i]['account_id'];
