@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('project_tasks', function (Blueprint $table) {
             $table->id();
-            $table->string('task_code')->unique();
+            $table->string('task_code');
             $table->string('description');
             $table->foreignId('project_id')->constrained('projects');
             $table->string('status');
@@ -25,6 +25,8 @@ return new class extends Migration
             $table->bigInteger('deleted_by')->nullable();
             $table->softDeletes();
             $table->timestamps();
+
+            $table->unique(['project_id', 'task_code']);
         });
     }
 
