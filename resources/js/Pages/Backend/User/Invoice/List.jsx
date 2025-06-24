@@ -641,7 +641,8 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
                       />
                     </TableHead>
                     <TableHead className="cursor-pointer" onClick={() => handleSort("invoice_number")}>Invoice # {renderSortIcon("invoice_number")}</TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("customer.name")}>Customer {renderSortIcon("customer.name")}</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("customer.name")}>Customer (Provider) {renderSortIcon("customer.name")}</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("client.name")}>Client {renderSortIcon("client.name")}</TableHead>
                     <TableHead className="cursor-pointer" onClick={() => handleSort("invoice_date")}>Date {renderSortIcon("invoice_date")}</TableHead>
                     <TableHead className="cursor-pointer" onClick={() => handleSort("due_date")}>Due Date {renderSortIcon("due_date")}</TableHead>
                     <TableHead className="cursor-pointer text-right" onClick={() => handleSort("grand_total")}>Total {renderSortIcon("grand_total")}</TableHead>
@@ -663,6 +664,7 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
                         </TableCell>
                         <TableCell>{invoice.invoice_number}</TableCell>
                         <TableCell>{invoice.customer ? invoice.customer.name : "-"}</TableCell>
+                        <TableCell>{invoice.client ? invoice.client.name : "-"}</TableCell>
                         <TableCell>{invoice.invoice_date}</TableCell>
                         <TableCell>{invoice.due_date}</TableCell>
                         <TableCell className="text-right">

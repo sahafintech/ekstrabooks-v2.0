@@ -29,6 +29,7 @@ export default function Create({ customers = [], products = [], currencies = [],
 
   const { data, setData, post, processing, errors, reset } = useForm({
     customer_id: "",
+    client_id: "",
     title: invoice_title,
     invoice_number: "",
     order_number: "",
@@ -279,7 +280,7 @@ export default function Create({ customers = [], products = [], currencies = [],
           <form onSubmit={submit}>
             <div className="grid grid-cols-12 mt-2">
               <Label htmlFor="customer_id" className="md:col-span-2 col-span-12">
-                Customer *
+                Customer (Provider) *
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <div className="md:w-1/2 w-full">
@@ -294,6 +295,26 @@ export default function Create({ customers = [], products = [], currencies = [],
                   />
                 </div>
                 <InputError message={errors.customer_id} className="text-sm" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-12 mt-2">
+              <Label htmlFor="customer_id" className="md:col-span-2 col-span-12">
+                Client
+              </Label>
+              <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                <div className="md:w-1/2 w-full">
+                  <SearchableCombobox
+                    options={customers.map(customer => ({
+                      id: customer.id,
+                      name: customer.name
+                    }))}
+                    value={data.client_id}
+                    onChange={(value) => setData("client_id", value)}
+                    placeholder="Select client"
+                  />
+                </div>
+                <InputError message={errors.client_id} className="text-sm" />
               </div>
             </div>
 

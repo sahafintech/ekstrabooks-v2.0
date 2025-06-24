@@ -60,7 +60,7 @@ class InvoiceController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Invoice::with('customer')
+        $query = Invoice::with('customer', 'client')
             ->where('is_deffered', 0);
 
         // Apply search if provided
@@ -70,6 +70,9 @@ class InvoiceController extends Controller
                 $q->whereHas('customer', function ($q2) use ($search) {
                     $q2->where('name', 'like', "%{$search}%");
                 })
+                    ->orWhereHas('client', function ($q2) use ($search) {
+                        $q2->where('name', 'like', "%{$search}%");
+                    })
                     ->orWhere('invoice_number', 'like', "%{$search}%")
                     ->orWhere('order_number', 'like', "%{$search}%");
             });
@@ -102,6 +105,10 @@ class InvoiceController extends Controller
         $sortDirection = $sorting['direction'] ?? 'desc';
         if ($sortColumn === 'customer.name') {
             $query->join('customers', 'invoices.customer_id', '=', 'customers.id')
+                ->orderBy('customers.name', $sortDirection)
+                ->select('invoices.*');
+        } else if ($sortColumn === 'client.name') {
+            $query->join('customers', 'invoices.client_id', '=', 'customers.id')
                 ->orderBy('customers.name', $sortDirection)
                 ->select('invoices.*');
         } else {
@@ -297,6 +304,7 @@ class InvoiceController extends Controller
 
         $invoice                  = new Invoice();
         $invoice->customer_id     = $request->input('customer_id');
+        $invoice->client_id       = $request->input('client_id');
         $invoice->title           = $request->input('title');
         $invoice->invoice_number  = get_business_option('invoice_number');
         $invoice->order_number    = $request->input('order_number');
@@ -765,6 +773,7 @@ class InvoiceController extends Controller
             ->where('is_recurring', 0)
             ->first();
         $invoice->customer_id     = $request->input('customer_id');
+        $invoice->client_id       = $request->input('client_id');
         $invoice->title           = $request->input('title');
         $invoice->order_number    = $request->input('order_number');
         $invoice->invoice_date    = Carbon::parse($request->input('invoice_date'))->format('Y-m-d');
