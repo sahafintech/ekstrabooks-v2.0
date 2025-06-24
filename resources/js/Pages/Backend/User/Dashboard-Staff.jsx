@@ -411,7 +411,7 @@ export default function DashboardStaff({
                                         </div>
                                     )}
 
-                                    {permissionList?.some(p => p.permission === "dashboard.cash_flow_widget") && (
+                                    {permissionList?.some(p => p.permission === "dashboard.cashflow_widget") && (
                                         <div className="flex flex-col gap-2 rounded-lg bg-background p-4 shadow-sm">
                                             <div>
                                                 <div className="text-lg font-semibold">
