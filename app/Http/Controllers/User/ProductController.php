@@ -15,9 +15,10 @@ use App\Models\SubCategory;
 use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
-use Validator;
 
 class ProductController extends Controller
 {
@@ -234,7 +235,7 @@ class ProductController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::user()->id;
         $audit->event = 'New Product Created - ' . $product->name;
         $audit->save();
 
@@ -374,7 +375,7 @@ class ProductController extends Controller
         }
 
         $previous_initial_stock = $product->initial_stock ?? 0;
-        $new_initial_stock = $row['initial_stock'] ?? 0;
+        $new_initial_stock = $request->input('initial_stock') ?? 0;
 
         $stock_difference = $new_initial_stock - $previous_initial_stock;
 
@@ -394,78 +395,83 @@ class ProductController extends Controller
         $product->expense_account_id   = $request->input('expense_account_id');
         $product->status               = $request->input('status');
         $product->stock_management     = $request->stock_management;
-        $product->initial_stock        = $request->input('initial_stock') ?? 0;
-        $product->stock                = $product->stock + $stock_difference;
+        $product->initial_stock        = $new_initial_stock;
+        
+        // Update current stock based on the difference in initial stock
+        if($stock_difference != 0) {
+            $product->stock = $product->stock + $stock_difference;
+        }
+        
         $product->sub_category_id      = $request->input('sub_category_id');
         $product->brand_id             = $request->input('brand_id');
         $product->save();
 
-        if ($request->input('initial_stock') == 0) {
-            // delete previous transactions
-            Transaction::where('ref_id', $id)->where('ref_type', 'product')->delete();
-        }
-
-        if ($stock_difference > 0) {
-            // delete previous transactions
+        // Handle transactions for initial stock changes
+        if ($stock_difference != 0) {
+            // Delete previous initial stock transactions
             Transaction::where('ref_id', $id)->where('ref_type', 'product')->delete();
 
-            $transaction              = new Transaction();
-            $transaction->trans_date  = now()->format('Y-m-d H:i:s');
-            $transaction->account_id  = get_account('Inventory')->id;
-            $transaction->dr_cr       = 'dr';
-            $transaction->transaction_currency    = $request->activeBusiness->currency;
-            $transaction->currency_rate           = Currency::where('name', $request->activeBusiness->currency)->first()->exchange_rate;
-            $transaction->base_currency_amount    = $product->purchase_cost * $stock_difference;
-            $transaction->transaction_amount      = $product->purchase_cost * $stock_difference;
-            $transaction->description = $product->name . ' Opening Stock #' . $stock_difference;
-            $transaction->ref_id      = $product->id;
-            $transaction->ref_type    = 'product';
-            $transaction->save();
+            if ($stock_difference > 0) {
+                // Add stock - Debit Inventory, Credit Common Shares
+                $transaction              = new Transaction();
+                $transaction->trans_date  = now()->format('Y-m-d H:i:s');
+                $transaction->account_id  = get_account('Inventory')->id;
+                $transaction->dr_cr       = 'dr';
+                $transaction->transaction_currency    = $request->activeBusiness->currency;
+                $transaction->currency_rate           = Currency::where('name', $request->activeBusiness->currency)->first()->exchange_rate;
+                $transaction->base_currency_amount    = $product->purchase_cost * $stock_difference;
+                $transaction->transaction_amount      = $product->purchase_cost * $stock_difference;
+                $transaction->description = $product->name . ' Opening Stock Adjustment +' . $stock_difference;
+                $transaction->ref_id      = $product->id;
+                $transaction->ref_type    = 'product';
+                $transaction->save();
 
-            $transaction              = new Transaction();
-            $transaction->trans_date  = now()->format('Y-m-d H:i:s');
-            $transaction->account_id  = get_account('Common Shares')->id;
-            $transaction->dr_cr       = 'cr';
-            $transaction->transaction_currency    = $request->activeBusiness->currency;
-            $transaction->currency_rate           = Currency::where('name', $request->activeBusiness->currency)->first()->exchange_rate;
-            $transaction->base_currency_amount    = $product->purchase_cost * $stock_difference;
-            $transaction->transaction_amount      = $product->purchase_cost * $stock_difference;
-            $transaction->description = $product->name . ' Opening Stock #' . $stock_difference;
-            $transaction->ref_id      = $product->id;
-            $transaction->ref_type    = 'product';
-            $transaction->save();
-        }else {
-            $transaction              = new Transaction();
-            $transaction->trans_date  = now()->format('Y-m-d H:i:s');
-            $transaction->account_id  = get_account('Inventory')->id;
-            $transaction->dr_cr       = 'cr';
-            $transaction->transaction_currency    = $request->activeBusiness->currency;
-            $transaction->currency_rate           = Currency::where('name', $request->activeBusiness->currency)->first()->exchange_rate;
-            $transaction->base_currency_amount    = $product->purchase_cost * abs($stock_difference);
-            $transaction->transaction_amount      = $product->purchase_cost * abs($stock_difference);
-            $transaction->description = $product->name . ' Opening Stock #' . abs($stock_difference);
-            $transaction->ref_id      = $product->id;
-            $transaction->ref_type    = 'product';
-            $transaction->save();
+                $transaction              = new Transaction();
+                $transaction->trans_date  = now()->format('Y-m-d H:i:s');
+                $transaction->account_id  = get_account('Common Shares')->id;
+                $transaction->dr_cr       = 'cr';
+                $transaction->transaction_currency    = $request->activeBusiness->currency;
+                $transaction->currency_rate           = Currency::where('name', $request->activeBusiness->currency)->first()->exchange_rate;
+                $transaction->base_currency_amount    = $product->purchase_cost * $stock_difference;
+                $transaction->transaction_amount      = $product->purchase_cost * $stock_difference;
+                $transaction->description = $product->name . ' Opening Stock Adjustment +' . $stock_difference;
+                $transaction->ref_id      = $product->id;
+                $transaction->ref_type    = 'product';
+                $transaction->save();
+            } else {
+                // Reduce stock - Credit Inventory, Debit Common Shares
+                $transaction              = new Transaction();
+                $transaction->trans_date  = now()->format('Y-m-d H:i:s');
+                $transaction->account_id  = get_account('Inventory')->id;
+                $transaction->dr_cr       = 'cr';
+                $transaction->transaction_currency    = $request->activeBusiness->currency;
+                $transaction->currency_rate           = Currency::where('name', $request->activeBusiness->currency)->first()->exchange_rate;
+                $transaction->base_currency_amount    = $product->purchase_cost * abs($stock_difference);
+                $transaction->transaction_amount      = $product->purchase_cost * abs($stock_difference);
+                $transaction->description = $product->name . ' Opening Stock Adjustment -' . abs($stock_difference);
+                $transaction->ref_id      = $product->id;
+                $transaction->ref_type    = 'product';
+                $transaction->save();
 
-            $transaction              = new Transaction();
-            $transaction->trans_date  = now()->format('Y-m-d H:i:s');
-            $transaction->account_id  = get_account('Common Shares')->id;
-            $transaction->dr_cr       = 'dr';
-            $transaction->transaction_currency    = $request->activeBusiness->currency;
-            $transaction->currency_rate           = Currency::where('name', $request->activeBusiness->currency)->first()->exchange_rate;
-            $transaction->base_currency_amount    = $product->purchase_cost * abs($stock_difference);
-            $transaction->transaction_amount      = $product->purchase_cost * abs($stock_difference);
-            $transaction->description = $product->name . ' Opening Stock #' . abs($stock_difference);
-            $transaction->ref_id      = $product->id;
-            $transaction->ref_type    = 'product';
-            $transaction->save();
+                $transaction              = new Transaction();
+                $transaction->trans_date  = now()->format('Y-m-d H:i:s');
+                $transaction->account_id  = get_account('Common Shares')->id;
+                $transaction->dr_cr       = 'dr';
+                $transaction->transaction_currency    = $request->activeBusiness->currency;
+                $transaction->currency_rate           = Currency::where('name', $request->activeBusiness->currency)->first()->exchange_rate;
+                $transaction->base_currency_amount    = $product->purchase_cost * abs($stock_difference);
+                $transaction->transaction_amount      = $product->purchase_cost * abs($stock_difference);
+                $transaction->description = $product->name . ' Opening Stock Adjustment -' . abs($stock_difference);
+                $transaction->ref_id      = $product->id;
+                $transaction->ref_type    = 'product';
+                $transaction->save();
+            }
         }
 
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::user()->id;
         $audit->event = 'Product Updated - ' . $product->name;
         $audit->save();
 
@@ -502,7 +508,7 @@ class ProductController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::user()->id;
         $audit->event = 'Product Deleted - ' . $product->name;
         $audit->save();
 
@@ -533,7 +539,7 @@ class ProductController extends Controller
             // audit log
             $audit = new AuditLog();
             $audit->date_changed = date('Y-m-d H:i:s');
-            $audit->changed_by = auth()->user()->id;
+            $audit->changed_by = Auth::user()->id;
             $audit->event = 'Products Imported - ' . $request->file('products_file')->getClientOriginalName();
             $audit->save();
         } catch (\Exception $e) {
@@ -548,7 +554,7 @@ class ProductController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::user()->id;
         $audit->event = 'Products Exported';
         $audit->save();
 
@@ -563,7 +569,7 @@ class ProductController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::user()->id;
         $audit->event = 'Products Deleted - ' . count($products) . ' Products';
         $audit->save();
 

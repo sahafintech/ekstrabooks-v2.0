@@ -124,8 +124,7 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
                     'selling_price' => $row['selling_price'] ?? 0,
                     'descriptions' => $row['descriptions'],
                     'stock_management' => $row['stock_management'],
-                    'initial_stock' => $row['initial_stock'] ?? 0,
-                    'stock' => $product->stock + max($stock_difference, 0),
+                    'initial_stock' => $new_initial_stock,
                     'allow_for_selling' => $row['allow_for_selling'],
                     'income_account_id' => get_account($row['income_account_name'])->id,
                     'allow_for_purchasing' => $row['allow_for_purchasing'],
@@ -138,32 +137,72 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
                     'sub_category_id' => SubCategory::where('name', $row['sub_category'])->first()->id ?? null,
                 ]);
 
-                if ($stock_difference > 0) {
-                    $transaction              = new Transaction();
-                    $transaction->trans_date  = now()->format('Y-m-d H:i:s');
-                    $transaction->account_id  = get_account('Inventory')->id;
-                    $transaction->dr_cr       = 'dr';
-                    $transaction->transaction_currency    = request()->activeBusiness->currency;
-                    $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                    $transaction->base_currency_amount    = $product->purchase_cost * $stock_difference;
-                    $transaction->transaction_amount      = $product->purchase_cost * $stock_difference;
-                    $transaction->description = $product->name . ' Addition Stock #' . $stock_difference;
-                    $transaction->ref_id      = $product->id;
-                    $transaction->ref_type    = 'product';
-                    $transaction->save();
+                // Update current stock based on the difference in initial stock
+                if($stock_difference != 0) {
+                    $product->stock = $product->stock + $stock_difference;
+                    $product->save();
+                }
 
-                    $transaction              = new Transaction();
-                    $transaction->trans_date  = now()->format('Y-m-d H:i:s');
-                    $transaction->account_id  = get_account('Common Shares')->id;
-                    $transaction->dr_cr       = 'cr';
-                    $transaction->transaction_currency    = request()->activeBusiness->currency;
-                    $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                    $transaction->base_currency_amount    = $product->purchase_cost * $stock_difference;
-                    $transaction->transaction_amount      = $product->purchase_cost * $stock_difference;
-                    $transaction->description = $product->name . ' Addition Stock #' . $stock_difference;
-                    $transaction->ref_id      = $product->id;
-                    $transaction->ref_type    = 'product';
-                    $transaction->save();
+                // Handle transactions for initial stock changes
+                if ($stock_difference != 0) {
+                    // Delete previous initial stock transactions
+                    Transaction::where('ref_id', $product->id)->where('ref_type', 'product')->delete();
+
+                    if ($stock_difference > 0) {
+                        // Add stock - Debit Inventory, Credit Common Shares
+                        $transaction              = new Transaction();
+                        $transaction->trans_date  = now()->format('Y-m-d H:i:s');
+                        $transaction->account_id  = get_account('Inventory')->id;
+                        $transaction->dr_cr       = 'dr';
+                        $transaction->transaction_currency    = request()->activeBusiness->currency;
+                        $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
+                        $transaction->base_currency_amount    = $product->purchase_cost * $stock_difference;
+                        $transaction->transaction_amount      = $product->purchase_cost * $stock_difference;
+                        $transaction->description = $product->name . ' Opening Stock Adjustment +' . $stock_difference;
+                        $transaction->ref_id      = $product->id;
+                        $transaction->ref_type    = 'product';
+                        $transaction->save();
+
+                        $transaction              = new Transaction();
+                        $transaction->trans_date  = now()->format('Y-m-d H:i:s');
+                        $transaction->account_id  = get_account('Common Shares')->id;
+                        $transaction->dr_cr       = 'cr';
+                        $transaction->transaction_currency    = request()->activeBusiness->currency;
+                        $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
+                        $transaction->base_currency_amount    = $product->purchase_cost * $stock_difference;
+                        $transaction->transaction_amount      = $product->purchase_cost * $stock_difference;
+                        $transaction->description = $product->name . ' Opening Stock Adjustment +' . $stock_difference;
+                        $transaction->ref_id      = $product->id;
+                        $transaction->ref_type    = 'product';
+                        $transaction->save();
+                    } else {
+                        // Reduce stock - Credit Inventory, Debit Common Shares
+                        $transaction              = new Transaction();
+                        $transaction->trans_date  = now()->format('Y-m-d H:i:s');
+                        $transaction->account_id  = get_account('Inventory')->id;
+                        $transaction->dr_cr       = 'cr';
+                        $transaction->transaction_currency    = request()->activeBusiness->currency;
+                        $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
+                        $transaction->base_currency_amount    = $product->purchase_cost * abs($stock_difference);
+                        $transaction->transaction_amount      = $product->purchase_cost * abs($stock_difference);
+                        $transaction->description = $product->name . ' Opening Stock Adjustment -' . abs($stock_difference);
+                        $transaction->ref_id      = $product->id;
+                        $transaction->ref_type    = 'product';
+                        $transaction->save();
+
+                        $transaction              = new Transaction();
+                        $transaction->trans_date  = now()->format('Y-m-d H:i:s');
+                        $transaction->account_id  = get_account('Common Shares')->id;
+                        $transaction->dr_cr       = 'dr';
+                        $transaction->transaction_currency    = request()->activeBusiness->currency;
+                        $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
+                        $transaction->base_currency_amount    = $product->purchase_cost * abs($stock_difference);
+                        $transaction->transaction_amount      = $product->purchase_cost * abs($stock_difference);
+                        $transaction->description = $product->name . ' Opening Stock Adjustment -' . abs($stock_difference);
+                        $transaction->ref_id      = $product->id;
+                        $transaction->ref_type    = 'product';
+                        $transaction->save();
+                    }
                 }
             }
         }
