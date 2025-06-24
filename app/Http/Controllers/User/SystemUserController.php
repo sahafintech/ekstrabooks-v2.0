@@ -225,13 +225,6 @@ class SystemUserController extends Controller
 
 		Auth::login($user, true);
 
-		// audit log
-		$audit = new AuditLog();
-		$audit->date_changed = date('Y-m-d H:i:s');
-		$audit->changed_by = auth()->user()->id;
-		$audit->event = 'Invitation Accepted by ' . $user->name;
-		$audit->save();
-
 		if ($user->password == NULL) {
 			return redirect()->route('profile.change_password')->with('success', _lang('Invitation Accepted. Please create your password for further login'));
 		} else {
