@@ -90,7 +90,7 @@ class ProjectController extends Controller
         $query->orderBy($sortColumn, $sortDirection);
 
         // Get projects with pagination
-        $projects = $query->paginate($per_page)->withQueryString();
+        $projects = $query->paginate($per_page)->appends($request->query());
 
         // Return Inertia view
         return Inertia::render('Backend/User/Construction/Project/List', [
@@ -99,8 +99,6 @@ class ProjectController extends Controller
                 'current_page' => $projects->currentPage(),
                 'from' => $projects->firstItem(),
                 'last_page' => $projects->lastPage(),
-                'links' => $projects->linkCollection(),
-                'path' => $projects->path(),
                 'per_page' => $projects->perPage(),
                 'to' => $projects->lastItem(),
                 'total' => $projects->total(),
@@ -217,6 +215,25 @@ class ProjectController extends Controller
         $transactions = Transaction::where('project_id', $id)->with('account')->get();
         $change_orders = ChangeOrder::where('project_id', $id)->with('project', 'project_task', 'cost_code')->get();
         $accounts = Account::all();
+        
+        // Calculate summary cards data
+        $total_tasks = $project->tasks()->count();
+        $completed_tasks = $project->tasks()->where(function($query) {
+            $query->where('status', 'Completed')
+                  ->orWhere('completed_percent', 100);
+        })->count();
+        
+        // Calculate original budget (sum of original_budgeted_amount from project_budgets)
+        $original_budget = $project->budgets()->sum('original_budgeted_amount');
+        
+        // Calculate actual budget (sum of actual_budget_amount from project_budgets)
+        $actual_budget = $project->budgets()->sum('actual_budget_amount');
+        
+        // Add summary data to project object
+        $project->total_tasks = $total_tasks;
+        $project->completed_tasks = $completed_tasks;
+        $project->budget = $original_budget;
+        $project->actual_budget = $actual_budget;
         
         return Inertia::render('Backend/User/Construction/Project/View', [
             'project' => $project,

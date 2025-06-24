@@ -25,6 +25,7 @@ class ProjectImport implements ToCollection, WithHeadingRow, WithValidation, Ski
         foreach($rows as $row) {
             $start_date = $row['start_date'] ? Date::excelToDateTimeObject($row['start_date'])->format('Y-m-d') : null;
             $end_date = $row['end_date'] ? Date::excelToDateTimeObject($row['end_date'])->format('Y-m-d') : null;
+            $completion_date = $row['completion_date'] ? Date::excelToDateTimeObject($row['completion_date'])->format('Y-m-d') : null;
 
             $project = new Project();
             $project->project_code = $row['project_code'];
@@ -36,7 +37,7 @@ class ProjectImport implements ToCollection, WithHeadingRow, WithValidation, Ski
             $project->end_date = $end_date;
             $project->status = $row['status'];
             $project->priority = $row['priority'];
-            $project->completion_date = $row['completion_date'];
+            $project->completion_date = $completion_date;
             $project->project_currency = $row['project_currency'];
             $project->description = $row['description'];
             $project->created_by = Auth::id();
@@ -54,8 +55,8 @@ class ProjectImport implements ToCollection, WithHeadingRow, WithValidation, Ski
             '*.project_manager' => 'nullable|exists:employees,name',
             '*.start_date' => 'nullable',
             '*.end_date' => 'nullable',
-            '*.status' => 'nullable',
-            '*.priority' => 'nullable',
+            '*.status' => 'nullable|in:Planning,In Progress,Completed,On Hold,Cancelled,Archived',
+            '*.priority' => 'nullable|in:Low,Medium,High',
             '*.completion_date' => 'nullable',
             '*.project_currency' => 'required',
             '*.description' => 'nullable',
