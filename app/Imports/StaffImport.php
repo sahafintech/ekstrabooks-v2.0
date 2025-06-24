@@ -75,7 +75,7 @@ class StaffImport implements ToCollection, WithHeadingRow, WithValidation, Skips
             'base_salary'   => 'required',
             'working_hours' => 'required',
             'time_sheet_based' => 'required|in:0,1',
-            'max_overtime_hours' => 'required',
+            'max_overtime_hours' => 'nullable',
             'joining_date'  => 'required',
             'end_date'      => 'nullable',
             'bank_name'     => 'nullable',

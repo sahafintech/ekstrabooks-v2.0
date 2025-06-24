@@ -104,11 +104,11 @@ const ImportStaffModal = ({ show, onClose, onSubmit, processing }) => (
             <label className="block font-medium text-sm text-gray-700">
               Staff File
             </label>
-            <Link href="/uploads/media/default/sample_staff.xlsx">
-              <Button variant="secondary" size="sm">
+            <a href="/uploads/media/default/sample_staffs.xlsx" download>
+              <Button variant="secondary" size="sm" type="button">
                 Use This Sample File
               </Button>
-            </Link>
+            </a>
           </div>
           <input type="file" className="w-full dropify" name="staff_file" required />
         </div>
