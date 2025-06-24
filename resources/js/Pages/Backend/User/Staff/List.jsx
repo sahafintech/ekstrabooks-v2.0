@@ -110,7 +110,7 @@ const ImportStaffModal = ({ show, onClose, onSubmit, processing }) => (
               </Button>
             </a>
           </div>
-          <input type="file" className="w-full dropify" name="staff_file" required />
+          <input type="file" className="w-full dropify" name="staffs_file" required />
         </div>
         <div className="col-span-12 mt-4">
           <ul className="space-y-3 text-sm">
