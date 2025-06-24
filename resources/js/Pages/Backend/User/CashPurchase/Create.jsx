@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
 import DateTimePicker from "@/Components/DateTimePicker";
-import { convertCurrency, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
@@ -239,7 +239,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     const total = calculateTotal();
     const convertedTotal = total;
     setData('converted_total', convertedTotal);
-  }, [data.currency, purchaseItems, data.discount_type, data.discount_value, exchangeRate]);
+  }, [data.currency, data.discount_type, data.discount_value, exchangeRate, purchaseItems, purchaseAccounts]);
 
   const renderTotal = () => {
     const total = calculateTotal();
