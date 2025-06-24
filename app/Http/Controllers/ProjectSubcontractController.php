@@ -885,11 +885,9 @@ class ProjectSubcontractController extends Controller
             $projectSubcontractTask->forceDelete();
 
             // delete transaction
-            $transaction = Transaction::where('ref_id', $projectSubcontract->id)->where('ref_type', 'project subcontract')
-                ->where('account_id', $projectSubcontractTask->account_id)
-                ->first();
+            $transactions = Transaction::where('ref_id', $projectSubcontract->id)->where('ref_type', 'project subcontract')->get();
 
-            if ($transaction != null) {
+            foreach ($transactions as $transaction) {
                 $transaction->delete();
             }
 
