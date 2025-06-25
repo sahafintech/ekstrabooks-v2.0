@@ -55,16 +55,17 @@ export default function AccountStatement({
 
     const handleSearch = (e) => {
         e.preventDefault();
+        const value = e.target.value;
+        setSearch(value);
         router.get(
-            route("accounts.account_statement", account.id),
-            {
-                search: search,
-                per_page: perPage,
-                page: 1,
-            },
-            { preserveState: true }
-        );
-        setCurrentPage(1);
+          route("accounts.account_statement", account.id),
+          { 
+            search: value, 
+            page: 1, 
+            per_page: perPage, 
+            date1: data.date1,
+            date2: data.date2,
+        }, { preserveState: true });
     };
 
     const handleGenerate = (e) => {
@@ -328,12 +329,9 @@ export default function AccountStatement({
                                     <Input
                                         placeholder="Search..."
                                         value={search}
-                                        onChange={(e) =>
-                                            setSearch(e.target.value)
-                                        }
+                                        onChange={(e) => handleSearch(e)}
                                         className="w-full md:w-80"
                                     />
-                                    <Button type="submit">Search</Button>
                                 </form>
                             </div>
                         </div>

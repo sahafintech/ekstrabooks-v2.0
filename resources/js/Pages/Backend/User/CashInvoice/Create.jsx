@@ -422,8 +422,7 @@ export default function Create({ customers = [], products = [], currencies = [],
 
               {receiptItems.map((item, index) => (
                 <div key={index} className="border rounded-lg p-4 space-y-4 bg-gray-50">
-                  {/* First Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
                     <div>
                       <Label>Product *</Label>
                       <SearchableCombobox
@@ -456,22 +455,24 @@ export default function Create({ customers = [], products = [], currencies = [],
                         onChange={(e) => updateReceiptItem(index, "unit_cost", parseFloat(e.target.value))}
                       />
                     </div>
-                  </div>
 
-                  {/* Second Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
-                    <div className="md:col-span-6">
+                    <div>
                       <Label>Description</Label>
                       <Textarea
                         value={item.description}
-                        onChange={(e) => updateReceiptItem(index, "description", e.target.value)}
+                        onChange={(e) => {
+                          updateReceiptItem(index, "description", e.target.value);
+                          e.target.style.height = 'auto';
+                          e.target.style.height = e.target.scrollHeight + 'px';
+                        }}
+                        className="min-h-[30px] resize-none overflow-hidden"
                         rows={1}
                       />
                     </div>
 
-                    <div className="md:col-span-2">
+                    <div>
                       <Label>Subtotal</Label>
-                      <div className="p-2 bg-white rounded mt-2 text-right">
+                      <div className="p-2 bg-white rounded text-right">
                         {formatCurrency({ amount: item.quantity * item.unit_cost, currency: data.currency })}
                       </div>
                     </div>
