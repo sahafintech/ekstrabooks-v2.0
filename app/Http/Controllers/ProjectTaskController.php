@@ -58,6 +58,8 @@ class ProjectTaskController extends Controller
             'description'     => 'nullable',
             'status'            => 'required',
             'completed_percent' => 'required',
+            'start_date'        => 'required|date',
+            'end_date'          => 'required|date',
         ]);
 
         if ($validator->fails()) {
@@ -70,6 +72,8 @@ class ProjectTaskController extends Controller
         $project_task->status            = $request->input('status');
         $project_task->completed_percent = $request->input('completed_percent');
         $project_task->project_id        = $request->input('project_id');
+        $project_task->start_date        = $request->input('start_date');
+        $project_task->end_date          = $request->input('end_date');
         $project_task->created_by     = Auth::id();
         $project_task->save();
 
@@ -97,6 +101,8 @@ class ProjectTaskController extends Controller
             'description'     => 'nullable',
             'status'            => 'required',
             'completed_percent' => 'required',
+            'start_date'        => 'required|date',
+            'end_date'          => 'required|date',
         ]);
 
         if ($validator->fails()) {
@@ -109,6 +115,8 @@ class ProjectTaskController extends Controller
         $project_task->description   = $request->input('description');
         $project_task->status            = $request->input('status');
         $project_task->completed_percent = $request->input('completed_percent');
+        $project_task->start_date        = $request->input('start_date');
+        $project_task->end_date          = $request->input('end_date');
         $project_task->updated_by    = Auth::id();
         $project_task->save();
 

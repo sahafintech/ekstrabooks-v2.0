@@ -16,6 +16,8 @@ return new class extends Migration
             $table->string('task_code');
             $table->string('description');
             $table->foreignId('project_id')->constrained('projects');
+            $table->date('start_date')->nullable();
+            $table->date('end_date')->nullable();
             $table->string('status');
             $table->float('completed_percent')->default(0);
             $table->foreignId('business_id')->constrained('business');

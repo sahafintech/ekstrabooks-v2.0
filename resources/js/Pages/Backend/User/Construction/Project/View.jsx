@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Head, Link, router } from "@inertiajs/react";
+import { router } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import PageHeader from "@/Components/PageHeader";
@@ -13,12 +13,17 @@ import {
     Receipt,
     Users,
     CheckCircle,
+    GanttChart,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import TaskList from "./TaskList";
 import BudgetList from "./BudgetList";
 import TransactionsList from "./TransactionsList";
 import ChangeOrders from "./ChangeOrders";
+import GanttChartComponent from "./GanttChartComponent";
+import { Gantt } from "wx-react-gantt";
+import { Willow } from "wx-react-gantt";
+import "wx-react-gantt/dist/gantt.css";
 // Summary Cards Component
 const SummaryCards = ({ project = {} }) => {
     const cards = [
@@ -290,6 +295,13 @@ export default function View({ project, activeTab, cost_codes, unit_of_measures,
                                     <FileText className="h-4 w-4" />
                                     Compliance
                                 </TabsTrigger>
+                                <TabsTrigger
+                                    value="gannt-chart"
+                                    className="flex items-center gap-2"
+                                >
+                                    <GanttChart className="h-4 w-4" />
+                                    Gannt Chart
+                                </TabsTrigger>
                             </TabsList>
 
                             <TabsContent value="tasks">
@@ -333,6 +345,12 @@ export default function View({ project, activeTab, cost_codes, unit_of_measures,
                                         here.
                                     </p>
                                 </div>
+                            </TabsContent>
+
+                            <TabsContent value="gannt-chart">
+                                <Willow>
+                                    <GanttChartComponent project={project} />
+                                </Willow>
                             </TabsContent>
                         </Tabs>
                     </div>

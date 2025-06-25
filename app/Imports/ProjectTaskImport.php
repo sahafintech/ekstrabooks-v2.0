@@ -9,6 +9,7 @@ use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
 use Illuminate\Support\Facades\Auth;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
 
 class ProjectTaskImport implements ToCollection, WithHeadingRow, WithValidation, SkipsEmptyRows
 {
@@ -26,8 +27,13 @@ class ProjectTaskImport implements ToCollection, WithHeadingRow, WithValidation,
     public function collection(Collection $rows)
     {
         foreach($rows as $row) {
+            $start_date = $row['start_date'] ? Date::excelToDateTimeObject($row['start_date'])->format('Y-m-d') : null;
+            $end_date = $row['end_date'] ? Date::excelToDateTimeObject($row['end_date'])->format('Y-m-d') : null;
+            
             $project_task = new ProjectTask();
             $project_task->task_code = $row['task_code'];
+            $project_task->start_date = $start_date;
+            $project_task->end_date = $end_date;
             $project_task->description = $row['description'];
             $project_task->status = $row['status'];
             $project_task->completed_percent = $row['completed_percent'];
@@ -44,6 +50,8 @@ class ProjectTaskImport implements ToCollection, WithHeadingRow, WithValidation,
             '*.description' => 'nullable',
             '*.status' => 'required',
             '*.completed_percent' => 'required',
+            '*.start_date' => 'nullable|date',
+            '*.end_date' => 'nullable|date',
         ];
     }
 }

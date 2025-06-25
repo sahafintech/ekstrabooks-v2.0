@@ -49,6 +49,7 @@ import TableActions from "@/Components/shared/TableActions";
 import Modal from "@/Components/Modal";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
+import DateTimePicker from "@/Components/DateTimePicker";
 
 // Delete Confirmation Modal Component
 const DeleteTaskModal = ({ show, onClose, onConfirm, processing }) => (
@@ -302,6 +303,30 @@ const CreateTaskDialog = ({
                                 </p>
                             )}
                         </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="start_date">Start Date</Label>
+                            <DateTimePicker
+                                value={form.start_date}
+                                onChange={(date) => setForm({ ...form, start_date: date })}
+                            />
+                            {errors.start_date && (
+                                <p className="text-sm text-red-500">
+                                    {errors.start_date}
+                                </p>
+                            )}
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="end_date">End Date</Label>
+                            <DateTimePicker
+                                value={form.end_date}
+                                onChange={(date) => setForm({ ...form, end_date: date })}
+                            />
+                            {errors.end_date && (
+                                <p className="text-sm text-red-500">
+                                    {errors.end_date}
+                                </p>
+                            )}
+                        </div>
                     </div>
                     <div className="mt-6 flex justify-end">
                         <Button
@@ -425,6 +450,30 @@ const EditTaskDialog = ({
                                 </p>
                             )}
                         </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="start_date">Start Date</Label>
+                            <DateTimePicker
+                                value={form.start_date}
+                                onChange={(date) => setForm({ ...form, start_date: date })}
+                            />
+                            {errors.start_date && (
+                                <p className="text-sm text-red-500">
+                                    {errors.start_date}
+                                </p>
+                            )}
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="end_date">End Date</Label>
+                            <DateTimePicker
+                                value={form.end_date}
+                                onChange={(date) => setForm({ ...form, end_date: date })}
+                            />
+                            {errors.end_date && (
+                                <p className="text-sm text-red-500">
+                                    {errors.end_date}
+                                </p>
+                            )}
+                        </div>
                     </div>
                     <div className="mt-6 flex justify-end">
                         <Button
@@ -469,6 +518,8 @@ export default function TaskList({
         description: "",
         status: "Pending",
         completed_percent: 0,
+        start_date: "",
+        end_date: "",
         project_id: project.id,
     });
 
@@ -496,7 +547,11 @@ export default function TaskList({
                     task.status.toLowerCase().includes(searchLower) ||
                     task.completed_percent.toString().includes(searchLower) ||
                     (task.description &&
-                        task.description.toLowerCase().includes(searchLower))
+                        task.description.toLowerCase().includes(searchLower)) ||
+                    (task.start_date &&
+                        task.start_date.toLowerCase().includes(searchLower)) ||
+                    (task.end_date &&
+                        task.end_date.toLowerCase().includes(searchLower))
             );
         }
 
@@ -738,6 +793,8 @@ export default function TaskList({
             status: "Pending",
             project_id: project.id,
             completed_percent: 0,
+            start_date: "",
+            end_date: "",
         });
         setErrors({});
         setIsCreateDialogOpen(true);
@@ -757,6 +814,8 @@ export default function TaskList({
                     status: "Pending",
                     project_id: project.id,
                     completed_percent: 0,
+                    start_date: "",
+                    end_date: "",
                 });
                 setProcessing(false);
             },
@@ -775,6 +834,8 @@ export default function TaskList({
             description: task.description,
             status: task.status,
             completed_percent: task.completed_percent,
+            start_date: task.start_date,
+            end_date: task.end_date,
             project_id: project.id,
         });
         setErrors({});
@@ -952,6 +1013,24 @@ export default function TaskList({
                                     </TableHead>
                                     <TableHead
                                         className="cursor-pointer"
+                                        onClick={() =>
+                                            handleSort("start_date")
+                                        }
+                                    >
+                                        Start Date{" "}
+                                        {renderSortIcon("start_date")}
+                                    </TableHead>
+                                    <TableHead
+                                        className="cursor-pointer"
+                                        onClick={() =>
+                                            handleSort("end_date")
+                                        }
+                                    >
+                                        End Date{" "}
+                                        {renderSortIcon("end_date")}
+                                    </TableHead>
+                                    <TableHead
+                                        className="cursor-pointer"
                                         onClick={() => handleSort("status")}
                                     >
                                         Status {renderSortIcon("status")}
@@ -992,6 +1071,12 @@ export default function TaskList({
                                             </TableCell>
                                             <TableCell>
                                                 {task.description || "-"}
+                                            </TableCell>
+                                            <TableCell>
+                                                {task.start_date || "-"}
+                                            </TableCell>
+                                            <TableCell>
+                                                {task.end_date || "-"}
                                             </TableCell>
                                             <TableCell>
                                                 <TaskStatusBadge

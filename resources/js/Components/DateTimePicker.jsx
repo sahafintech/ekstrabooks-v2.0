@@ -52,6 +52,10 @@ export default function DateTimePicker({
                     }}
                     onChange={(selectedDates) => {
                         if (isRange) {
+                            if (selectedDates.length === 0) {
+                                // Range was cleared/deselected
+                                return onChange(null);
+                            }
                             if (selectedDates.length !== 2) return; // wait until both dates are selected
                             if (selectedDates.some((d) => !d || isNaN(d))) {
                                 return onChange(null);
