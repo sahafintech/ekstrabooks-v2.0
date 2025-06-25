@@ -231,7 +231,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     const total = calculateTotal();
     const convertedTotal = total;
     setData('converted_total', convertedTotal);
-  }, [data.currency, billItems, data.discount_type, data.discount_value, exchangeRate]);
+  }, [data.currency, billItems, data.discount_type, data.discount_value, exchangeRate, billItems, billAccounts]);
 
   const renderTotal = () => {
     const total = calculateTotal();
