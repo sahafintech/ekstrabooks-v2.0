@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "@inertiajs/react";
 import { Label } from "@/Components/ui/label";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
@@ -9,25 +9,29 @@ import InputError from "@/Components/InputError";
 import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
-import { Calendar } from "@/Components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/Components/ui/popover";
-import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
 import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/Components/ui/table";
 import DateTimePicker from "@/Components/DateTimePicker";
+import Attachment from "@/Components/ui/attachment";
 
-export default function Edit({ payment, customers = [], accounts, methods }) {
+export default function Edit({ payment, customers = [], accounts, methods, theAttachments }) {
+
+    const [attachments, setAttachments] = useState([]);
+
     const { data, setData, post, processing, errors, reset } = useForm({
         customer_id: payment.customer_id,
         trans_date: parseDateObject(payment.date),
         account_id: payment.account_id,
         method: payment.payment_method,
         reference: payment.reference,
-        attachment: payment.attachment,
+        attachments: [],
         invoices: [],
         _method: "PUT"
     });
+
+    useEffect(() => {
+        setData("attachments", attachments);
+    }, [attachments, setData]);
 
     // Populate invoices from the payment prop on mount/update.
     useEffect(() => {
@@ -38,7 +42,12 @@ export default function Edit({ payment, customers = [], accounts, methods }) {
             }));
             setData("invoices", initialInvoices);
         }
-    }, [payment, setData]);
+
+        theAttachments.forEach(attachment => {
+            const row = attachment.path;
+            (attachments).push(row);
+        });
+    }, [payment, setData, theAttachments]);
 
     // Update the amount for a given invoice in the form state.
     const handleAmountChange = (id, value) => {
@@ -231,23 +240,19 @@ export default function Edit({ payment, customers = [], accounts, methods }) {
                             </Table>
                         </div>
 
-                        {/* Attachment Input */}
-                        <div className="grid grid-cols-12 mt-5">
-                            <Label htmlFor="attachment" className="md:col-span-2 col-span-12">
-                                Attachment
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label htmlFor="attachments" className="md:col-span-2 col-span-12">
+                                Attachments
                             </Label>
-                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                                <Input
-                                    id="attachment"
-                                    type="file"
-                                    onChange={(e) => {
-                                        if (e.target.files && e.target.files[0]) {
-                                            setData("attachment", e.target.files[0]);
-                                        }
-                                    }}
-                                    className="md:w-1/2 w-full"
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2 space-y-2 md:w-1/2 w-full">
+                                <Attachment
+                                    files={attachments}
+                                    onAdd={files => setAttachments(prev => [...prev, ...files])}
+                                    onRemove={idx => setAttachments(prev => prev.filter((_, i) => i !== idx))}
+                                    databaseAttachments={theAttachments}
+                                    maxSize={20}
                                 />
-                                <InputError message={errors.attachment} className="text-sm" />
+                                <InputError message={errors.attachments} className="text-sm" />
                             </div>
                         </div>
 

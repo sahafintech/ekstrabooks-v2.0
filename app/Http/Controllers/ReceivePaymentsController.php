@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Account;
+use App\Models\Attachment;
 use App\Models\AuditLog;
 use App\Models\Business;
 use App\Models\Customer;
@@ -112,7 +113,6 @@ class ReceivePaymentsController extends Controller
             'account_id' => 'required',
             'method'     => 'nullable',
             'customer_id' => 'required',
-            'attachment' => 'nullable|mimes:jpeg,JPEG,png,PNG,jpg,doc,pdf,docx,zip',
         ]);
 
         if ($validator->fails()) {
@@ -192,12 +192,26 @@ class ReceivePaymentsController extends Controller
         $payment->type = 'offline';
         $payment->save();
 
-        $attachment = '';
-        if ($request->hasfile('attachment')) {
-            $file       = $request->file('attachment');
-            $attachment = rand() . time() . $file->getClientOriginalName();
-            $file->move(public_path() . "/uploads/media/", $attachment);
-        }
+        // if attachments then upload
+		if (isset($request->attachments)) {
+			if ($request->attachments != null) {
+				for ($i = 0; $i < count($request->attachments); $i++) {
+					$theFile = $request->file("attachments.$i");
+					if ($theFile == null) {
+						continue;
+					}
+					$theAttachment = rand() . time() . $theFile->getClientOriginalName();
+					$theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
+
+					$attachment = new Attachment();
+					$attachment->file_name = $request->attachments[$i]->getClientOriginalName();
+					$attachment->path = "/uploads/media/attachments/" . $theAttachment;
+					$attachment->ref_type = 'receive payment';
+					$attachment->ref_id = $payment->id;
+					$attachment->save();
+				}
+			}
+		}
 
         $currentTime = Carbon::now();
 
@@ -278,7 +292,6 @@ class ReceivePaymentsController extends Controller
             'account_id' => 'required',
             'method'     => 'nullable',
             'customer_id' => 'required',
-            'attachment' => 'nullable|mimes:jpeg,JPEG,png,PNG,jpg,doc,pdf,docx,zip',
         ]);
 
         if ($validator->fails()) {
@@ -362,12 +375,41 @@ class ReceivePaymentsController extends Controller
         $payment->type = 'offline';
         $payment->save();
 
-        $attachment = '';
-        if ($request->hasfile('attachment')) {
-            $file       = $request->file('attachment');
-            $attachment = rand() . time() . $file->getClientOriginalName();
-            $file->move(public_path() . "/uploads/media/", $attachment);
-        }
+        // delete old attachments
+		$attachments = Attachment::where('ref_id', $payment->id)->where('ref_type', 'receive payment')->get(); // Get attachments from the database
+
+        if (isset($request->attachments)) {
+			foreach ($attachments as $attachment) {
+				if (!in_array($attachment->path, $request->attachments)) {
+					$filePath = public_path($attachment->path);
+					if (file_exists($filePath)) {
+						unlink($filePath); // Delete the file
+					}
+					$attachment->delete(); // Delete the database record
+				}
+			}
+		}
+
+		// if attachments then upload
+		if (isset($request->attachments)) {
+			if ($request->attachments != null) {
+				for ($i = 0; $i < count($request->attachments); $i++) {
+					$theFile = $request->file("attachments.$i");
+					if ($theFile == null) {
+						continue;
+					}
+					$theAttachment = rand() . time() . $theFile->getClientOriginalName();
+					$theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
+
+					$attachment = new Attachment();
+					$attachment->file_name = $request->attachments[$i]->getClientOriginalName();
+					$attachment->path = "/uploads/media/attachments/" . $theAttachment;
+					$attachment->ref_type = 'receive payment';
+					$attachment->ref_id = $payment->id;
+					$attachment->save();
+				}
+			}
+		}
 
         $currentTime = Carbon::now();
 
@@ -466,12 +508,14 @@ class ReceivePaymentsController extends Controller
                 ->orWhere('account_type', 'Cash');
         })->get();
         $methods = TransactionMethod::all();
+        $theAttachment = Attachment::where('ref_id', $payment->id)->where('ref_type', 'receive payment')->get();
 
         return Inertia::render('Backend/User/ReceivePayment/Edit', [
             'customers' => $customers,
             'accounts' => $accounts,
             'methods' => $methods,
             'payment' => $payment,
+            'theAttachments' => $theAttachment,
         ]);
     }
 
@@ -512,7 +556,17 @@ class ReceivePaymentsController extends Controller
 
         foreach ($transaction as $trans) {
             $trans->delete();
-        }
+        
+        
+        // delete attachments
+		$attachments = Attachment::where('ref_id', $payment->id)->where('ref_type', 'receive payment')->get();
+		foreach ($attachments as $attachment) {
+			$filePath = public_path($attachment->path);
+			if (file_exists($filePath)) {
+				unlink($filePath);
+			}
+			$attachment->delete();
+		}}
 
         $payment->delete();
 
@@ -523,10 +577,12 @@ class ReceivePaymentsController extends Controller
     {
         $payment = ReceivePayment::where('id', $id)->with('invoices', 'customer', 'business')->first();
         $decimalPlace = get_business_option('decimal_place', 2);
+        $attachment = Attachment::where('ref_id', $payment->id)->where('ref_type', 'receive payment')->get();
 
         return Inertia::render('Backend/User/ReceivePayment/View', [
             'payment' => $payment,
-            'decimalPlace' => $decimalPlace
+            'decimalPlace' => $decimalPlace,
+            'attachments' => $attachment,
         ]);
     }
 

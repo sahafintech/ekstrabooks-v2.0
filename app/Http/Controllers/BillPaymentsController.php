@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Account;
+use App\Models\Attachment;
 use App\Models\AuditLog;
 use App\Models\BillPayment;
 use App\Models\Purchase;
@@ -112,7 +113,6 @@ class BillPaymentsController extends Controller
             'account_id' => 'required',
             'method'     => 'nullable',
             'vendor_id' => 'required',
-            'attachment' => 'nullable|mimes:jpeg,JPEG,png,PNG,jpg,doc,pdf,docx,zip',
         ]);
 
         if ($validator->fails()) {
@@ -155,12 +155,26 @@ class BillPaymentsController extends Controller
         $payment->reference = $request->reference;
         $payment->save();
 
-        $attachment = '';
-        if ($request->hasfile('attachment')) {
-            $file       = $request->file('attachment');
-            $attachment = rand() . time() . $file->getClientOriginalName();
-            $file->move(public_path() . "/uploads/media/", $attachment);
-        }
+        // if attachments then upload
+		if (isset($request->attachments)) {
+			if ($request->attachments != null) {
+				for ($i = 0; $i < count($request->attachments); $i++) {
+					$theFile = $request->file("attachments.$i");
+					if ($theFile == null) {
+						continue;
+					}
+					$theAttachment = rand() . time() . $theFile->getClientOriginalName();
+					$theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
+
+					$attachment = new Attachment();
+					$attachment->file_name = $request->attachments[$i]->getClientOriginalName();
+					$attachment->path = "/uploads/media/attachments/" . $theAttachment;
+					$attachment->ref_type = 'bill payment';
+					$attachment->ref_id = $payment->id;
+					$attachment->save();
+				}
+			}
+		}
 
         $currentTime = Carbon::now();
 
@@ -239,12 +253,14 @@ class BillPaymentsController extends Controller
                 ->orWhere('account_type', 'Cash');
         })->get();
         $methods = TransactionMethod::all();
+        $theAttachment = Attachment::where('ref_id', $payment->id)->where('ref_type', 'bill payment')->get();
 
         return Inertia::render('Backend/User/BillPayment/Edit', [
             'vendors' => $vendors,
             'accounts' => $accounts,
             'methods' => $methods,
             'payment' => $payment,
+            'theAttachments' => $theAttachment,
         ]);
     }
 
@@ -255,7 +271,6 @@ class BillPaymentsController extends Controller
             'account_id' => 'required',
             'method'     => 'nullable',
             'vendor_id'  => 'required',
-            'attachment' => 'nullable|mimes:jpeg,JPEG,png,PNG,jpg,doc,pdf,docx,zip',
         ]);
 
         if ($validator->fails()) {
@@ -297,12 +312,41 @@ class BillPaymentsController extends Controller
         $payment->reference = $request->reference;
         $payment->save();
 
-        $attachment = '';
-        if ($request->hasfile('attachment')) {
-            $file = $request->file('attachment');
-            $attachment = rand() . time() . $file->getClientOriginalName();
-            $file->move(public_path() . "/uploads/media/", $attachment);
-        }
+        // delete old attachments
+		$attachments = Attachment::where('ref_id', $payment->id)->where('ref_type', 'bill payment')->get(); // Get attachments from the database
+
+        if (isset($request->attachments)) {
+			foreach ($attachments as $attachment) {
+				if (!in_array($attachment->path, $request->attachments)) {
+					$filePath = public_path($attachment->path);
+					if (file_exists($filePath)) {
+						unlink($filePath); // Delete the file
+					}
+					$attachment->delete(); // Delete the database record
+				}
+			}
+		}
+
+		// if attachments then upload
+		if (isset($request->attachments)) {
+			if ($request->attachments != null) {
+				for ($i = 0; $i < count($request->attachments); $i++) {
+					$theFile = $request->file("attachments.$i");
+					if ($theFile == null) {
+						continue;
+					}
+					$theAttachment = rand() . time() . $theFile->getClientOriginalName();
+					$theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
+
+					$attachment = new Attachment();
+					$attachment->file_name = $request->attachments[$i]->getClientOriginalName();
+					$attachment->path = "/uploads/media/attachments/" . $theAttachment;
+					$attachment->ref_type = 'bill payment';
+					$attachment->ref_id = $payment->id;
+					$attachment->save();
+				}
+			}
+		}
 
         $currentTime = Carbon::now();
 
@@ -468,12 +512,22 @@ class BillPaymentsController extends Controller
             $purchase_payment->delete();
         }
 
+        // delete attachments
+		$attachments = Attachment::where('ref_id', $payment->id)->where('ref_type', 'bill payment')->get();
+		foreach ($attachments as $attachment) {
+			$filePath = public_path($attachment->path);
+			if (file_exists($filePath)) {
+				unlink($filePath);
+			}
+			$attachment->delete();
+		}
+
         $payment->delete();
 
         return redirect()->route('bill_payments.index')->with('success', _lang('Payment Deleted Successfully'));
     }
 
-    public function bulk_estroy(Request $request)
+    public function bulk_destroy(Request $request)
     {
         foreach ($request->ids as $id) {
             $payment = BillPayment::find($id);
@@ -508,6 +562,16 @@ class BillPaymentsController extends Controller
                 $purchase_payment->delete();
             }
 
+            // delete attachments
+            $attachments = Attachment::where('ref_id', $payment->id)->where('ref_type', 'bill payment')->get();
+            foreach ($attachments as $attachment) {
+                $filePath = public_path($attachment->path);
+                if (file_exists($filePath)) {
+                    unlink($filePath);
+                }
+                $attachment->delete();
+            }
+
             $payment->delete();
         }
 
@@ -518,10 +582,12 @@ class BillPaymentsController extends Controller
     {
         $payment = BillPayment::where('id', $id)->with('purchases', 'vendor', 'business')->first();
         $decimalPlace = get_business_option('decimal_place', 2);
+        $attachments = Attachment::where('ref_id', $id)->where('ref_type', 'bill payment')->get();
 
         return Inertia::render('Backend/User/BillPayment/View', [
             'payment' => $payment,
-            'decimalPlace' => $decimalPlace
+            'decimalPlace' => $decimalPlace,
+            'attachments' => $attachments
         ]);
     }
 

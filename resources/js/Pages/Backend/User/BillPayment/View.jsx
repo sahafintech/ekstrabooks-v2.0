@@ -19,7 +19,8 @@ import {
     Edit,
     Facebook,
     MessageCircle,
-    Copy
+    Copy,
+    PaperclipIcon
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -28,12 +29,13 @@ import { QRCodeSVG } from 'qrcode.react';
 import Modal from "@/Components/Modal";
 import { Input } from "@/Components/ui/input";
 
-export default function View({ payment, decimalPlace }) {
+export default function View({ payment, decimalPlace, attachments }) {
     const [isLoading, setIsLoading] = useState({
         print: false,
         pdf: false
     });
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [isAttachmentsModalOpen, setIsAttachmentsModalOpen] = useState(false);
     const [shareLink, setShareLink] = useState('');
 
     const handlePrint = () => {
@@ -136,6 +138,17 @@ export default function View({ payment, decimalPlace }) {
                     />
 
                     <div className="flex items-center justify-end space-x-2 mb-4">
+                        {attachments && attachments.length > 0 && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setIsAttachmentsModalOpen(true)}
+                                className="flex items-center"
+                            >
+                                <PaperclipIcon className="mr-2 h-4 w-4" />
+                                Attachments ({attachments.length})
+                            </Button>
+                        )}
+
                         <Button
                             variant="outline"
                             onClick={handlePrint}
@@ -176,6 +189,63 @@ export default function View({ payment, decimalPlace }) {
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
+
+                    {/* Attachments Modal */}
+                    <Modal
+                        show={isAttachmentsModalOpen}
+                        onClose={() => setIsAttachmentsModalOpen(false)}
+                        maxWidth="4xl"
+                    >
+                        <div className="mb-6">
+                            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                                Payment Attachments
+                            </h2>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                View and download files attached to this payment
+                            </p>
+                        </div>
+
+                        <div className="overflow-hidden border rounded-md">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>File Name</TableHead>
+                                        <TableHead>Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {attachments.map((attachment, index) => (
+                                        <TableRow key={index}>
+                                            <TableCell className="font-medium">
+                                                {attachment.file_name}
+                                            </TableCell>
+                                            <TableCell>
+                                                <a
+                                                    href={`${attachment.path}`}
+                                                    target="_blank"
+                                                    className="text-blue-600 hover:text-blue-800 hover:underline flex items-center"
+                                                    download
+                                                >
+                                                    <DownloadIcon className="h-4 w-4 mr-1" />
+                                                    Download
+                                                </a>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+
+                        <div className="mt-6 flex justify-end">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsAttachmentsModalOpen(false)}
+                            >
+                                Close
+                            </Button>
+                        </div>
+                    </Modal>
 
                     {/* Share Modal */}
                     <Modal
@@ -237,7 +307,7 @@ export default function View({ payment, decimalPlace }) {
                         </div>
                     </Modal>
 
-                    <div className="print-container">
+                    <div className="print-container lg:w-[210mm] min-h-[297mm] mx-auto rounded-md border p-4">
                         <div className="p-6 sm:p-8">
                             {/* Invoice Header */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -351,6 +421,7 @@ export default function View({ payment, decimalPlace }) {
             left: 0;
             top: 0;
             width: 100%;
+            border: none;
           }
 
           /* Hide action buttons when printing */

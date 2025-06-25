@@ -15,10 +15,12 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { Checkbox } from "@/Components/ui/checkbox";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { formatCurrency } from "@/lib/utils";
+import Attachment from "@/Components/ui/attachment";
 
 export default function Create({ vendors = [], accounts, methods }) {
     const [invoices, setInvoices] = useState([]);
     const [selectedInvoices, setSelectedInvoices] = useState([]);
+    const [attachments, setAttachments] = useState([]);
 
     const { data, setData, post, processing, errors, reset } = useForm({
         vendor_id: "",
@@ -26,10 +28,14 @@ export default function Create({ vendors = [], accounts, methods }) {
         account_id: "",
         method: "",
         reference: "",
-        attachment: null,
+        attachments: attachments,
         // This field will store only the selected invoices and their amounts
         invoices: [],
     });
+
+    useEffect(() => {
+        setData("attachments", attachments);
+    }, [attachments, setData]);
 
     // Fetch invoices when a supplier is selected
     useEffect(() => {
@@ -290,19 +296,18 @@ export default function Create({ vendors = [], accounts, methods }) {
                             </Table>
                         </div>
 
-                        {/* Attachment Input */}
-                        <div className="grid grid-cols-12 mt-5">
-                            <Label htmlFor="attachment" className="md:col-span-2 col-span-12">
-                                Attachment
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label htmlFor="attachments" className="md:col-span-2 col-span-12">
+                                Attachments
                             </Label>
-                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                                <Input
-                                    id="attachment"
-                                    type="file"
-                                    onChange={(e) => setData("attachment", e.target.files[0])}
-                                    className="md:w-1/2 w-full"
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2 space-y-2 md:w-1/2 w-full">
+                                <Attachment
+                                    files={attachments}
+                                    onAdd={files => setAttachments(prev => [...prev, ...files])}
+                                    onRemove={idx => setAttachments(prev => prev.filter((_, i) => i !== idx))}
+                                    maxSize={20}
                                 />
-                                <InputError message={errors.attachment} className="text-sm" />
+                                <InputError message={errors.attachments} className="text-sm" />
                             </div>
                         </div>
 
