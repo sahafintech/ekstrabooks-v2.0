@@ -200,7 +200,6 @@ class BillPaymentsController extends Controller
             $transaction->base_currency_amount = convert_currency($purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $purchase->currency, $request->invoices[$i]['amount']));
             $transaction->reference   = $request->reference;
             $transaction->description = _lang('Bill Invoice Payment') . ' #' . $purchase->bill_no;
-            $transaction->attachment  = $attachment;
             $transaction->ref_id      = $request->invoices[$i]['invoice_id'] . ',' . $payment->id;
             $transaction->ref_type    = 'bill payment';
             $transaction->vendor_id = $request->vendor_id;
@@ -217,7 +216,6 @@ class BillPaymentsController extends Controller
             $transaction->base_currency_amount = convert_currency($purchase->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $purchase->currency, $request->invoices[$i]['amount']));
             $transaction->reference   = $request->reference;
             $transaction->description = _lang('Bill Invoice Payment') . ' #' . $purchase->bill_no;
-            $transaction->attachment  = $attachment;
             $transaction->ref_id      = $request->invoices[$i]['invoice_id'] . ',' . $payment->id;
             $transaction->ref_type    = 'bill payment';
             $transaction->vendor_id = $request->vendor_id;
@@ -391,7 +389,6 @@ class BillPaymentsController extends Controller
                 $currentTime,
                 'cr',
                 $request->account_id,
-                $attachment,
                 $invoice
             );
 
@@ -403,7 +400,6 @@ class BillPaymentsController extends Controller
                 $currentTime,
                 'dr',
                 get_account('Accounts Payable')->id,
-                $attachment,
                 $invoice
             );
 
@@ -443,7 +439,7 @@ class BillPaymentsController extends Controller
         }
     }
 
-    private function createTransaction($request, $purchase, $payment, $currentTime, $dr_cr, $account_id, $attachment, $invoice)
+    private function createTransaction($request, $purchase, $payment, $currentTime, $dr_cr, $account_id, $invoice)
     {
         $transaction = new Transaction();
         $transaction->trans_date = Carbon::parse($request->trans_date)
@@ -470,7 +466,6 @@ class BillPaymentsController extends Controller
         );
         $transaction->reference = $request->reference;
         $transaction->description = _lang('Bill Invoice Payment') . ' #' . $purchase->bill_no;
-        $transaction->attachment = $attachment;
         $transaction->ref_id = $invoice['invoice_id'] . ',' . $payment->id;
         $transaction->ref_type = 'bill payment';
         $transaction->vendor_id = $request->vendor_id;

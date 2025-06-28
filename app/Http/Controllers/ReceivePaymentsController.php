@@ -241,7 +241,6 @@ class ReceivePaymentsController extends Controller
             $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->invoices[$i]['amount']));
             $transaction->reference   = $request->reference;
             $transaction->description = _lang('Credit Invoice Payment') . ' #' . $invoice->invoice_number;
-            $transaction->attachment  = $attachment;
             $transaction->ref_id      = $request->invoices[$i]['invoice_id'] . ',' . $payment->id;
             $transaction->ref_type    = 'invoice payment';
             $transaction->customer_id = $request->customer_id;
@@ -258,7 +257,6 @@ class ReceivePaymentsController extends Controller
             $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->invoices[$i]['amount']));
             $transaction->reference   = $request->reference;
             $transaction->description = _lang('Credit Invoice Payment') . ' #' . $invoice->invoice_number;
-            $transaction->attachment  = $attachment;
             $transaction->ref_id      = $request->invoices[$i]['invoice_id'] . ',' . $payment->id;
             $transaction->ref_type    = 'invoice payment';
             $transaction->customer_id = $request->customer_id;
@@ -455,7 +453,6 @@ class ReceivePaymentsController extends Controller
             $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->invoices[$i]['amount']));
             $transaction->reference   = $request->reference;
             $transaction->description = _lang('Credit Invoice Payment') . ' #' . $invoice->invoice_number;
-            $transaction->attachment  = $attachment;
             $transaction->ref_id      = $request->invoices[$i]['invoice_id'] . ',' . $payment->id;
             $transaction->ref_type    = 'invoice payment';
             $transaction->customer_id = $request->customer_id;
@@ -472,7 +469,6 @@ class ReceivePaymentsController extends Controller
             $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $request->invoices[$i]['amount']));
             $transaction->reference   = $request->reference;
             $transaction->description = _lang('Credit Invoice Payment') . ' #' . $invoice->invoice_number;
-            $transaction->attachment  = $attachment;
             $transaction->ref_id      = $request->invoices[$i]['invoice_id'] . ',' . $payment->id;
             $transaction->ref_type    = 'invoice payment';
             $transaction->customer_id = $request->customer_id;
