@@ -472,12 +472,10 @@ class DefferedInvoiceController extends Controller
             $subTotal = ($subTotal + $line_total);
 
             //Calculate Taxes
-            if (isset($request->tax_amount)) {
-                foreach ($request->tax_amount as $index => $amount) {
-                    if ($amount == 0) {
-                        continue;
-                    }
-                    $tax         = Tax::find($index);
+            if (isset($request->taxes)) {
+                for ($j = 0; $j < count($request->taxes); $j++) {
+                    $taxId       = $request->taxes[$j];
+                    $tax         = Tax::find($taxId);
                     $product_tax = ($line_total / 100) * $tax->rate;
                     $taxAmount += $product_tax;
                 }
@@ -485,9 +483,9 @@ class DefferedInvoiceController extends Controller
 
             //Calculate Discount
             if ($request->discount_type == '0') {
-                $discountAmount = ($subTotal / 100) * $request->discount_value;
+                $discountAmount = ($subTotal / 100) * $request->discount_value ?? 0;
             } else if ($request->discount_type == '1') {
-                $discountAmount = $request->discount_value;
+                $discountAmount = $request->discount_value ?? 0;
             }
         }
 
@@ -605,11 +603,9 @@ class DefferedInvoiceController extends Controller
                     $attachment->delete();
                 }
                 $invoice->delete();
-                return redirect()->route('deffered_invoices.index')->with('success', _lang('Deleted Successfully'));
-            } else {
-                return redirect()->route('deffered_invoices.index')->with('error', _lang('Something going wrong, Please try again'));
             }
         }
+        return redirect()->route('deffered_invoices.index')->with('success', _lang('Deleted Successfully'));
     }
 
     public function edit($id)
