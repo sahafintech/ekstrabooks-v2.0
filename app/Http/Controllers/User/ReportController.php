@@ -737,7 +737,7 @@ class ReportController extends Controller
 		$date1 = $request->date1 ?? Carbon::now()->startOfMonth()->format('Y-m-d');
 		$date2 = $request->date2 ?? Carbon::now()->format('Y-m-d');
 		$search = $request->search ?? '';
-		$per_page = $request->per_page ?? 10;
+		$per_page = $request->per_page ?? 50;
 
 		// Session storage (keep for backwards compatibility)
 		session(['start_date' => $date1]);
@@ -756,8 +756,7 @@ class ReportController extends Controller
 		}])
 			->whereHas('transactions', function ($query) use ($date1, $date2) {
 				$query->whereDate('trans_date', '>=', $date1)
-					->whereDate('trans_date', '<=', $date2)
-					->orderBy('trans_date', 'desc');
+					->whereDate('trans_date', '<=', $date2);
 			})
 			->withSum(['transactions as cr_amount' => function ($query) use ($date1, $date2) {
 				$query->where('dr_cr', 'cr')
@@ -770,8 +769,16 @@ class ReportController extends Controller
 					->whereDate('trans_date', '<=', $date2);
 			}], 'base_currency_amount');
 
-		// Get accounts
-		$accounts = $accounts_query->get();
+		// Apply search filter if provided
+		if (!empty($search)) {
+			$accounts_query->where(function ($query) use ($search) {
+				$query->where('account_name', 'like', '%' . $search . '%')
+					->orWhere('account_code', 'like', '%' . $search . '%');
+			});
+		}
+
+		// Paginate accounts
+		$accounts = $accounts_query->paginate($per_page);
 
 		// Process data array - flat list of accounts
 		$data_array = [];
@@ -833,37 +840,15 @@ class ReportController extends Controller
 			$grand_total_credit += $credit_amount;
 		}
 
-		// Apply search filter if provided
-		if (!empty($search)) {
-			$data_array = array_filter($data_array, function ($account) use ($search) {
-				return stripos($account['account_name'], $search) !== false ||
-					stripos($account['account_number'], $search) !== false;
-			});
-
-			// Re-index the array to ensure consistent numeric keys.
-			$data_array = array_values($data_array);
-		}
-
 		// Get currency information
 		$currency = request()->activeBusiness->currency;
-
-		// Create paginator from filtered array
-		$page = request('page', 1);
-		$total = count($data_array);
-		$paginator = new LengthAwarePaginator(
-			array_slice($data_array, ($page - 1) * $per_page, $per_page),
-			$total,
-			$per_page,
-			$page,
-			['path' => request()->url(), 'query' => request()->query()]
-		);
 
 		// Get business information
 		$business_name = request()->activeBusiness->name;
 
 		// Return Inertia render with data
 		return Inertia::render('Backend/User/Reports/Ledger', [
-			'report_data' => $paginator->items(),
+			'report_data' => $data_array,
 			'currency' => $currency,
 			'grand_total_debit' => $grand_total_debit,
 			'grand_total_credit' => $grand_total_credit,
@@ -871,17 +856,18 @@ class ReportController extends Controller
 			'business_name' => $business_name,
 			'date1' => $date1,
 			'date2' => $date2,
-			'pagination' => [
-				'current_page' => $paginator->currentPage(),
-				'last_page' => $paginator->lastPage(),
-				'from' => $paginator->firstItem(),
-				'path' => $paginator->path(),
-				'per_page' => $paginator->perPage(),
-				'to' => $paginator->lastItem(),
-				'total' => $paginator->total(),
-			],
 			'filters' => [
 				'search' => $search,
+			],
+			'meta' => [
+				'current_page' => $accounts->currentPage(),
+				'last_page' => $accounts->lastPage(),
+				'from' => $accounts->firstItem(),
+				'links' => $accounts->linkCollection(),
+				'path' => $accounts->path(),
+				'per_page' => $accounts->perPage(),
+				'to' => $accounts->lastItem(),
+				'total' => $accounts->total(),
 			],
 		]);
 	}

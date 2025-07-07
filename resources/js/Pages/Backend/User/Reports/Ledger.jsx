@@ -24,6 +24,7 @@ import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
 import { formatAmount, parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 export default function Ledger({
     report_data,
@@ -38,10 +39,9 @@ export default function Ledger({
     grand_total_balance
 }) {
     const [search, setSearch] = useState(filters.search || "");
-    const [perPage, setPerPage] = useState(10);
+    const [perPage, setPerPage] = useState(50);
     const [currentPage, setCurrentPage] = useState(1);
-
-
+    const [expandedAccounts, setExpandedAccounts] = useState(new Set());
 
     const { data, setData, post, processing } = useForm({
         date1: parseDateObject(date1),
@@ -55,7 +55,13 @@ export default function Ledger({
 
         router.get(
             route("reports.ledger"),
-            { search: value, page: 1, per_page: perPage },
+            { 
+                search: value, 
+                page: 1, 
+                per_page: perPage,
+                date1: data.date1,
+                date2: data.date2
+            },
             { preserveState: true }
         );
     };
@@ -81,7 +87,13 @@ export default function Ledger({
         setPerPage(value);
         router.get(
             route("reports.ledger"),
-            { search, page: 1, per_page: value },
+            { 
+                search, 
+                page: 1, 
+                per_page: value,
+                date1: data.date1,
+                date2: data.date2
+            },
             { preserveState: true }
         );
     };
@@ -90,12 +102,39 @@ export default function Ledger({
         setCurrentPage(page);
         router.get(
             route("reports.ledger"),
-            { search, page, per_page: perPage },
+            { 
+                search, 
+                page, 
+                per_page: perPage,
+                date1: data.date1,
+                date2: data.date2
+            },
             { preserveState: true }
         );
     };
 
+    const toggleAccountExpansion = (accountId) => {
+        const newExpanded = new Set(expandedAccounts);
+        if (newExpanded.has(accountId)) {
+            newExpanded.delete(accountId);
+        } else {
+            newExpanded.add(accountId);
+        }
+        setExpandedAccounts(newExpanded);
+    };
 
+    const isAccountExpanded = (accountId) => {
+        return expandedAccounts.has(accountId);
+    };
+
+    const expandAllAccounts = () => {
+        const allAccountIds = report_data.map(account => account.id);
+        setExpandedAccounts(new Set(allAccountIds));
+    };
+
+    const collapseAllAccounts = () => {
+        setExpandedAccounts(new Set());
+    };
 
     const renderPageNumbers = () => {
         const totalPages = meta.last_page;
@@ -328,6 +367,16 @@ export default function Ledger({
                                 <a download href={route('reports.ledger_export')}>
                                     <Button variant="outline">Export</Button>
                                 </a>
+                                {report_data.length > 0 && (
+                                    <>
+                                        <Button variant="outline" onClick={expandAllAccounts}>
+                                            Expand All
+                                        </Button>
+                                        <Button variant="outline" onClick={collapseAllAccounts}>
+                                            Collapse All
+                                        </Button>
+                                    </>
+                                )}
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-sm text-gray-500">Show</span>
@@ -360,8 +409,29 @@ export default function Ledger({
                                                 </TableRow>
                                                 <TableRow>
                                                     <TableCell className="bg-gray-100 !text-[10px]">
-                                                        <div className="font-medium">
-                                                            {account.account_number} - {account.account_name}
+                                                        <div className="flex items-center gap-2">
+                                                            {account.transactions.length > 0 && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => toggleAccountExpansion(account.id)}
+                                                                    className="h-6 w-6 p-0 hover:bg-gray-200"
+                                                                >
+                                                                    {isAccountExpanded(account.id) ? (
+                                                                        <ChevronDown className="h-4 w-4" />
+                                                                    ) : (
+                                                                        <ChevronRight className="h-4 w-4" />
+                                                                    )}
+                                                                </Button>
+                                                            )}
+                                                            <div className="font-medium">
+                                                                {account.account_number} - {account.account_name}
+                                                                {account.transactions.length > 0 && (
+                                                                    <span className="ml-2 text-xs text-gray-500">
+                                                                        ({account.transactions.length} transactions)
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="text-right bg-gray-100 !text-[10px]">{formatAmount(account.debit_amount)}</TableCell>
@@ -369,7 +439,7 @@ export default function Ledger({
                                                     <TableCell className="text-right bg-gray-100 !text-[10px]">{formatAmount(account.balance)}</TableCell>
                                                 </TableRow>
 
-                                                {account.transactions.length > 0 && (
+                                                {account.transactions.length > 0 && isAccountExpanded(account.id) && (
                                                     <TableRow>
                                                         <TableCell colSpan={4} className="p-0">
                                                             <div className="pl-8 pb-4">

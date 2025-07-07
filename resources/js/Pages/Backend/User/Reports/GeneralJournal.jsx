@@ -60,7 +60,14 @@ export default function GeneralJournal({
 
         router.get(
             route("reports.journal"),
-            { search: value, page: 1, per_page: perPage, sorting },
+            { 
+                date1: data.date1, 
+                date2: data.date2, 
+                search: value, 
+                page: 1, 
+                per_page: perPage, 
+                sorting 
+            },
             { preserveState: true }
         );
     };
@@ -87,7 +94,14 @@ export default function GeneralJournal({
         setPerPage(value);
         router.get(
             route("reports.journal"),
-            { search, page: 1, per_page: value, sorting },
+            { 
+                date1: data.date1, 
+                date2: data.date2, 
+                search, 
+                page: 1, 
+                per_page: value, 
+                sorting 
+            },
             { preserveState: true }
         );
     };
@@ -96,7 +110,14 @@ export default function GeneralJournal({
         setCurrentPage(page);
         router.get(
             route("reports.journal"),
-            { search, page, per_page: perPage, sorting },
+            { 
+                date1: data.date1, 
+                date2: data.date2, 
+                search, 
+                page, 
+                per_page: perPage, 
+                sorting 
+            },
             { preserveState: true }
         );
     };
@@ -109,7 +130,14 @@ export default function GeneralJournal({
         setSorting({ column, direction });
         router.get(
             route("reports.journal"),
-            { ...filters, sorting: { column, direction } },
+            { 
+                date1: data.date1, 
+                date2: data.date2, 
+                search, 
+                per_page: perPage, 
+                page: currentPage, 
+                sorting: { column, direction } 
+            },
             { preserveState: true }
         );
     };
