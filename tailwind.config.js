@@ -15,7 +15,7 @@ export default {
     	extend: {
     		fontFamily: {
     			sans: [
-    				'Zoho Puvi',
+    				'Instrument Sans',
                     ...defaultTheme.fontFamily.sans
                 ]
     		},
