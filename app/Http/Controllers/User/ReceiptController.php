@@ -15,7 +15,6 @@ use App\Models\HoldPosInvoice;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\InvoiceItemTax;
-use App\Models\Prescription;
 use App\Models\PrescriptionProduct;
 use App\Models\PrescriptionProductItem;
 use App\Models\Product;
@@ -931,7 +930,7 @@ class ReceiptController extends Controller
         if (package()->pos != 1) {
             return back()->with('error', _lang('Sorry, This module is not available in your current package !'));
         }
-        $products = Product::where('status', 1)->where('allow_for_selling', 1)->where('stock_management', 1)->get();
+        $products = Product::where('status', 1)->where('allow_for_selling', 1)->get();
         $categories = SubCategory::all();
         $currencies = Currency::all();
         $accounts = Account::where('account_type', 'cash')->orWhere('account_type', 'bank')->get();
