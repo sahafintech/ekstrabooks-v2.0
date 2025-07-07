@@ -146,6 +146,7 @@ export function parseDateObject(dateString) {
     // First try parsing with the business's date format
     const parsedDate = parse(dateString, dateFormat, new Date());
     if (!isNaN(parsedDate)) {
+      parsedDate.setHours(12, 0, 0, 0); // Fix timezone offset issues
       return parsedDate;
     }
 
