@@ -10,6 +10,8 @@ import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
 import { parseDateObject } from "@/lib/utils";
+import { useState, useEffect } from "react";
+import DatePicker from "@/Components/DatePicker";
 import DateTimePicker from "@/Components/DateTimePicker";
 
 export default function Edit({
@@ -18,6 +20,7 @@ export default function Edit({
     currencies = [],
     accountTypes = [],
 }) {
+    const [showCurrency, setShowCurrency] = useState(false);
 
     const { data, setData, put, processing, errors } = useForm({
         account_code: account.account_code,
@@ -29,6 +32,18 @@ export default function Edit({
         description: account.description,
         opening_balance: openingBalance,
     });
+
+    // Handle account type change to determine if currency should be shown
+    useEffect(() => {
+        const isBankOrCash =
+            data.account_type === "Bank" || data.account_type === "Cash";
+        setShowCurrency(isBankOrCash);
+
+        // Reset currency if not bank or cash
+        if (!isBankOrCash) {
+            setData("currency", "");
+        }
+    }, [data.account_type]);
 
     const submit = (e) => {
         e.preventDefault();
@@ -137,36 +152,38 @@ export default function Edit({
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-12 mt-2">
-                            <Label
-                                htmlFor="currency"
-                                className="md:col-span-2 col-span-12"
-                            >
-                                Currency
-                            </Label>
-                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                                <div className="md:w-1/2 w-full">
-                                    <SearchableCombobox
-                                        className="mt-1"
-                                        options={currencies.map((currency) => ({
-                                            id: currency.name,
-                                            value: currency.name,
-                                            label: currency.name,
-                                            name: `${currency.name} - ${currency.description} (${currency.exchange_rate})`,
-                                        }))}
-                                        value={data.currency}
-                                        onChange={(selectedValue) => {
-                                            setData("currency", selectedValue);
-                                        }}
-                                        placeholder="Select currency"
+                        {showCurrency && (
+                            <div className="grid grid-cols-12 mt-2">
+                                <Label
+                                    htmlFor="currency"
+                                    className="md:col-span-2 col-span-12"
+                                >
+                                    Currency
+                                </Label>
+                                <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                    <div className="md:w-1/2 w-full">
+                                        <SearchableCombobox
+                                            className="mt-1"
+                                            options={currencies.map((currency) => ({
+                                                id: currency.name,
+                                                value: currency.name,
+                                                label: currency.name,
+                                                name: `${currency.name} - ${currency.description} (${currency.exchange_rate})`,
+                                            }))}
+                                            value={data.currency}
+                                            onChange={(selectedValue) => {
+                                                setData("currency", selectedValue);
+                                            }}
+                                            placeholder="Select currency"
+                                        />
+                                    </div>
+                                    <InputError
+                                        message={errors.currency}
+                                        className="text-sm"
                                     />
                                 </div>
-                                <InputError
-                                    message={errors.currency}
-                                    className="text-sm"
-                                />
                             </div>
-                        </div>
+                        )}
 
                         <div className="grid grid-cols-12 mt-2">
                             <Label

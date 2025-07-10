@@ -2302,6 +2302,27 @@ class ReportController extends Controller
 				}], 'base_currency_amount')
 				->get();
 
+			$report_data['tax_expenses'] = Account::where('account_type', 'Other Tax Expenses')
+				->whereHas('transactions', function ($query) use ($date1, $date2) {
+					$query->whereDate('trans_date', '>=', $date1)
+						->whereDate('trans_date', '<=', $date2);
+				})
+				->with(['transactions' => function ($query) use ($date1, $date2) {
+					$query->whereDate('trans_date', '>=', $date1)
+						->whereDate('trans_date', '<=', $date2);
+				}])
+				->withSum(['transactions as dr_amount' => function ($query) use ($date1, $date2) {
+					$query->where('dr_cr', 'dr')
+						->whereDate('trans_date', '>=', $date1)
+						->whereDate('trans_date', '<=', $date2);
+				}], 'base_currency_amount')
+				->withSum(['transactions as cr_amount' => function ($query) use ($date1, $date2) {
+					$query->where('dr_cr', 'cr')
+						->whereDate('trans_date', '>=', $date1)
+						->whereDate('trans_date', '<=', $date2);
+				}], 'base_currency_amount')
+				->get();
+
 			return Inertia::render('Backend/User/Reports/IncomeStatement', [
 				'report_data' => $report_data,
 				'date1' => $date1,
@@ -2386,6 +2407,27 @@ class ReportController extends Controller
 				->get();
 
 			$report_data['other_expenses'] = Account::where('account_type', 'Other Expenses')
+				->whereHas('transactions', function ($query) use ($date1, $date2) {
+					$query->whereDate('trans_date', '>=', $date1)
+						->whereDate('trans_date', '<=', $date2);
+				})
+				->with(['transactions' => function ($query) use ($date1, $date2) {
+					$query->whereDate('trans_date', '>=', $date1)
+						->whereDate('trans_date', '<=', $date2);
+				}])
+				->withSum(['transactions as dr_amount' => function ($query) use ($date1, $date2) {
+					$query->where('dr_cr', 'dr')
+						->whereDate('trans_date', '>=', $date1)
+						->whereDate('trans_date', '<=', $date2);
+				}], 'base_currency_amount')
+				->withSum(['transactions as cr_amount' => function ($query) use ($date1, $date2) {
+					$query->where('dr_cr', 'cr')
+						->whereDate('trans_date', '>=', $date1)
+						->whereDate('trans_date', '<=', $date2);
+				}], 'base_currency_amount')
+				->get();
+
+			$report_data['tax_expenses'] = Account::where('account_type', 'Other Tax Expenses')
 				->whereHas('transactions', function ($query) use ($date1, $date2) {
 					$query->whereDate('trans_date', '>=', $date1)
 						->whereDate('trans_date', '<=', $date2);
@@ -3350,19 +3392,17 @@ class ReportController extends Controller
 								->whereDate('receipt_date', '<=', $date2);
 						}),
 
-					'sub_total_invoices' => InvoiceItem::selectRaw('SUM(sub_total)')
-						->whereColumn('product_id', 'products.id')
-						->whereHas('invoice', function ($query) use ($date1, $date2) {
-							$query->whereDate('invoice_date', '>=', $date1)
-								->whereDate('invoice_date', '<=', $date2);
-						}),
+					'sub_total_invoices' => InvoiceItem::selectRaw('SUM(invoice_items.sub_total / invoices.exchange_rate)')
+						->join('invoices', 'invoices.id', '=', 'invoice_items.invoice_id')
+						->whereColumn('invoice_items.product_id', 'products.id')
+						->whereDate('invoices.invoice_date', '>=', $date1)
+						->whereDate('invoices.invoice_date', '<=', $date2),
 
-					'sub_total_receipts' => ReceiptItem::selectRaw('SUM(sub_total)')
-						->whereColumn('product_id', 'products.id')
-						->whereHas('receipt', function ($query) use ($date1, $date2) {
-							$query->whereDate('receipt_date', '>=', $date1)
-								->whereDate('receipt_date', '<=', $date2);
-						}),
+					'sub_total_receipts' => ReceiptItem::selectRaw('SUM(receipt_items.sub_total / receipts.exchange_rate)')
+						->join('receipts', 'receipts.id', '=', 'receipt_items.receipt_id')
+						->whereColumn('receipt_items.product_id', 'products.id')
+						->whereDate('receipts.receipt_date', '>=', $date1)
+						->whereDate('receipts.receipt_date', '<=', $date2),
 				])
 				->get()
 				->map(function ($product) {
@@ -3517,19 +3557,17 @@ class ReportController extends Controller
 									->whereDate('receipt_date', '<=', $date2);
 							}),
 
-						'sub_total_invoices' => InvoiceItem::selectRaw('SUM(sub_total)')
-							->whereColumn('product_id', 'products.id')
-							->whereHas('invoice', function ($query) use ($date1, $date2) {
-								$query->whereDate('invoice_date', '>=', $date1)
-									->whereDate('invoice_date', '<=', $date2);
-							}),
+						'sub_total_invoices' => InvoiceItem::selectRaw('SUM(invoice_items.sub_total / invoices.exchange_rate)')
+							->join('invoices', 'invoices.id', '=', 'invoice_items.invoice_id')
+							->whereColumn('invoice_items.product_id', 'products.id')
+							->whereDate('invoices.invoice_date', '>=', $date1)
+							->whereDate('invoices.invoice_date', '<=', $date2),
 
-						'sub_total_receipts' => ReceiptItem::selectRaw('SUM(sub_total)')
-							->whereColumn('product_id', 'products.id')
-							->whereHas('receipt', function ($query) use ($date1, $date2) {
-								$query->whereDate('receipt_date', '>=', $date1)
-									->whereDate('receipt_date', '<=', $date2);
-							}),
+						'sub_total_receipts' => ReceiptItem::selectRaw('SUM(receipt_items.sub_total / receipts.exchange_rate)')
+							->join('receipts', 'receipts.id', '=', 'receipt_items.receipt_id')
+							->whereColumn('receipt_items.product_id', 'products.id')
+							->whereDate('receipts.receipt_date', '>=', $date1)
+							->whereDate('receipts.receipt_date', '<=', $date2),
 					])
 					->get()
 					->map(function ($product) {
@@ -3666,19 +3704,17 @@ class ReportController extends Controller
 									->whereDate('receipt_date', '<=', $date2);
 							}),
 
-						'sub_total_invoices' => InvoiceItem::selectRaw('SUM(sub_total)')
-							->whereColumn('product_id', 'products.id')
-							->whereHas('invoice', function ($query) use ($date1, $date2) {
-								$query->whereDate('invoice_date', '>=', $date1)
-									->whereDate('invoice_date', '<=', $date2);
-							}),
+						'sub_total_invoices' => InvoiceItem::selectRaw('SUM(invoice_items.sub_total / invoices.exchange_rate)')
+							->join('invoices', 'invoices.id', '=', 'invoice_items.invoice_id')
+							->whereColumn('invoice_items.product_id', 'products.id')
+							->whereDate('invoices.invoice_date', '>=', $date1)
+							->whereDate('invoices.invoice_date', '<=', $date2),
 
-						'sub_total_receipts' => ReceiptItem::selectRaw('SUM(sub_total)')
-							->whereColumn('product_id', 'products.id')
-							->whereHas('receipt', function ($query) use ($date1, $date2) {
-								$query->whereDate('receipt_date', '>=', $date1)
-									->whereDate('receipt_date', '<=', $date2);
-							}),
+						'sub_total_receipts' => ReceiptItem::selectRaw('SUM(receipt_items.sub_total / receipts.exchange_rate)')
+							->join('receipts', 'receipts.id', '=', 'receipt_items.receipt_id')
+							->whereColumn('receipt_items.product_id', 'products.id')
+							->whereDate('receipts.receipt_date', '>=', $date1)
+							->whereDate('receipts.receipt_date', '<=', $date2),
 					])
 					->where('sub_categories.name', $sub_category)
 					->get()

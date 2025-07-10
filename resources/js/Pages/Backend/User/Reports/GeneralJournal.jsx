@@ -26,6 +26,43 @@ import { formatAmount, formatCurrency, parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { ChevronUp, ChevronDown } from "lucide-react";
 
+const printStyles = `
+  @media print {
+        body * {
+            visibility: hidden;
+        }
+
+        #printable-area, #printable-area * {
+            visibility: visible;
+        }
+
+        #printable-area {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            border: none;
+            height: 100%;
+        }
+
+        .group.peer.hidden.text-sidebar-foreground {
+            display: none !important;
+        }
+
+        @page {
+            size: auto;
+            margin: 10mm;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+        }
+    }
+`;
+
 export default function GeneralJournal({
     transactions,
     date1,
@@ -210,122 +247,7 @@ export default function GeneralJournal({
     };
 
     const handlePrint = () => {
-        // Create a new window for printing
-        const printWindow = window.open("", "_blank", "width=800,height=600");
-
-        // Generate CSS for the print window
-        const style = `
-            <style>
-                body { font-family: Arial, sans-serif; }
-                table { width: 100%; border-collapse: collapse; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f2f2f2; }
-                h2, h1 { text-align: center; margin-bottom: 20px; }
-                text-right { text-align: right; }
-                .total-row { font-weight: bold; background-color: #f9f9f9; }
-            </style>
-        `;
-
-        // Start building the HTML content for the print window
-        let printContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>General Journal</title>
-                ${style}
-            </head>
-            <body>
-                <h1>${business_name}</h1>
-                <h2>General Journal (${data.date1} - ${data.date2})</h2>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Account</th>
-                            <th>Description</th>
-                            <th>Type</th>
-                            <th>Name</th>
-                            <th>Transaction Currency</th>
-                            <th>Transaction Amount[Debit]</th>
-                            <th>Transaction Amount[Credit]</th>
-                            <th>Currency Rate</th>
-                            <th>Base Currency</th>
-                            <th>Base Amount[Debit]</th>
-                            <th>Base Amount[Credit]</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
-
-        // Add table rows from transactions data
-        if (transactions.length > 0) {
-            transactions.forEach((transaction) => {
-                printContent += `
-                    <tr>
-                        <td>${transaction.trans_date || "N/A"}</td>
-                        <td>${transaction.account.account_name || "N/A"}</td>
-                        <td>${transaction.description || "N/A"}</td>
-                        <td>${
-                            transaction.ref_type === "receipt"
-                                ? "cash invoice"
-                                : transaction.ref_type || "N/A"
-                        }</td>
-                        <td>${transaction.payee_name || "N/A"}</td>
-                        <td>${transaction.transaction_currency || "N/A"}</td>
-                        <td>${
-                            transaction.dr_cr === "dr"
-                                ? transaction.transaction_amount
-                                : 0
-                        }</td>
-                        <td>${
-                            transaction.dr_cr === "cr"
-                                ? transaction.transaction_amount
-                                : 0
-                        }</td>
-                        <td>${transaction.currency_rate || "N/A"}</td>
-                        <td>${base_currency}</td>
-                        <td>${
-                            transaction.dr_cr === "dr"
-                                ? transaction.base_currency_amount
-                                : 0
-                        }</td>
-                        <td>${
-                            transaction.dr_cr === "cr"
-                                ? transaction.base_currency_amount
-                                : 0
-                        }</td>
-                    </tr>
-                `;
-            });
-        } else {
-            printContent += `
-                <tr>
-                    <td colspan="12" style="text-align: center;">No transactions found.</td>
-                </tr>
-            `;
-        }
-
-        // Complete the HTML content
-        printContent += `
-                    </tbody>
-                </table>
-            </body>
-            </html>
-        `;
-
-        // Write the content to the print window and trigger print
-        printWindow.document.open();
-        printWindow.document.write(printContent);
-        printWindow.document.close();
-
-        // Wait for content to load before printing
-        setTimeout(() => {
-            printWindow.print();
-            // Close the window after printing (optional, can be commented out if you want to keep it open)
-            printWindow.onafterprint = function () {
-                printWindow.close();
-            };
-        }, 300);
+        window.print();
     };
 
     return (
@@ -333,6 +255,7 @@ export default function GeneralJournal({
             <Toaster />
             <SidebarInset>
                 <div className="main-content">
+                    <style dangerouslySetInnerHTML={{ __html: printStyles }} />
                     <PageHeader
                         page="General Journal"
                         subpage="List"
@@ -421,7 +344,7 @@ export default function GeneralJournal({
                             </div>
                         </div>
 
-                        <div className="rounded-md border printable-table">
+                        <div className="rounded-md border" id="printable-area">
                             <ReportTable>
                                 <TableHeader>
                                     <TableRow>

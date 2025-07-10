@@ -9,6 +9,43 @@ import { formatCurrency, parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { format } from "date-fns";
 
+const printStyles = `
+  @media print {
+        body * {
+            visibility: hidden;
+        }
+
+        #printable-area, #printable-area * {
+            visibility: visible;
+        }
+
+        #printable-area {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            border: none;
+            height: 100%;
+        }
+
+        .group.peer.hidden.text-sidebar-foreground {
+            display: none !important;
+        }
+
+        @page {
+            size: auto;
+            margin: 10mm;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+        }
+    }
+`;
+
 const SectionHeading = ({ children }) => (
     <tr>
         <td colSpan="2" className="text-left font-bold text-sm uppercase py-1 underline">{children}</td>
@@ -52,6 +89,13 @@ export default function IncomeStatement({ report_data, date1, date2, business_na
         }, 0);
     };
 
+    const getTotalTaxExpenses = () => {
+        if (!report_data.tax_expenses || report_data.tax_expenses.length === 0) return 0;
+        return report_data.tax_expenses.reduce((total, account) => {
+            return total + (account.dr_amount - account.cr_amount);
+        }, 0);
+    };
+
     // Calculate critical financial metrics
     const totalIncome = getTotalIncome();
     const totalCostOfSales = getTotalCostOfSales();
@@ -59,7 +103,9 @@ export default function IncomeStatement({ report_data, date1, date2, business_na
     const totalDirectExpenses = getTotalDirectExpenses();
     const operatingProfit = grossProfit - totalDirectExpenses;
     const totalOtherExpenses = getTotalOtherExpenses();
-    const netProfit = operatingProfit - totalOtherExpenses;
+    const netProfitBeforeTax = operatingProfit - totalOtherExpenses;
+    const taxExpenses = getTotalTaxExpenses();
+    const netProfitAfterTax = netProfitBeforeTax - taxExpenses;
 
     // Simplified rendering approach for the income statement based on the image format
 
@@ -86,164 +132,14 @@ export default function IncomeStatement({ report_data, date1, date2, business_na
     };
 
     const handlePrint = () => {
-        // Create a new window for printing
-        const printWindow = window.open('', '_blank', 'width=800,height=600');
-
-        // Generate CSS for the print window
-        const style = `
-            <style>
-                @page {
-                    size: A4;
-                    margin: 0;
-                }
-                body { 
-                    font-family: Arial, sans-serif; 
-                    margin: 0;
-                    padding: 20px;
-                    width: 210mm;
-                    min-height: 297mm;
-                    margin: 0 auto;
-                }
-                table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-                td { padding: 4px 8px; text-align: left; }
-                .text-right { text-align: right; }
-                .uppercase { text-transform: uppercase; }
-                .section-heading { font-weight: medium; text-decoration: underline; text-transform: uppercase; }
-                .total-row { font-weight: bold; border-top: 1px solid #000; }
-                h1, h2 { text-align: center; margin-bottom: 20px; }
-                .currency { text-align: right; }
-            </style>
-        `;
-
-        // Start building the HTML content for the print window
-        let printContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Income Statement</title>
-                ${style}
-            </head>
-            <body>
-                <h1>${business_name}</h1>
-                <h2>Income Statement (${data.date1} - ${data.date2})</h2>
-                <table>
-                    <tbody>
-                        <tr>
-                            <td colspan="2" class="section-heading">SALES AND INCOME</td>
-                        </tr>
-        `;
-
-        // Add Sales and Income rows
-        if (report_data.sales_and_income && report_data.sales_and_income.length > 0) {
-            report_data.sales_and_income.forEach(account => {
-                const amount = account.cr_amount - account.dr_amount;
-                printContent += `
-                    <tr>
-                        <td>${account.account_name}</td>
-                        <td class="text-right">${formatCurrency({ amount })}</td>
-                    </tr>
-                `;
-            });
-        }
-
-        // Add Cost of Sale section
-        printContent += `
-            <tr>
-                <td colspan="2" class="section-heading">COST OF SALE</td>
-            </tr>
-        `;
-
-        // Add Cost of Sale rows
-        if (report_data.cost_of_sale && report_data.cost_of_sale.length > 0) {
-            report_data.cost_of_sale.forEach(account => {
-                const amount = account.dr_amount - account.cr_amount;
-                printContent += `
-                    <tr>
-                        <td>${account.account_name}</td>
-                        <td class="text-right">${formatCurrency({ amount })}</td>
-                    </tr>
-                `;
-            });
-        }
-
-        // Add Gross Profit row
-        printContent += `
-            <tr class="total-row">
-                <td class="text-right">Gross Profit</td>
-                <td class="text-right">${formatCurrency({ amount: grossProfit })}</td>
-            </tr>
-        `;
-
-        // Add Other Expenses section
-        printContent += `
-            <tr>
-                <td colspan="2" class="section-heading">OTHER EXPENSES</td>
-            </tr>
-        `;
-
-        // Add Other Expenses rows
-        if (report_data.other_expenses && report_data.other_expenses.length > 0) {
-            report_data.other_expenses.forEach(account => {
-                const amount = account.dr_amount - account.cr_amount;
-                printContent += `
-                    <tr>
-                        <td>${account.account_name}</td>
-                        <td class="text-right">${formatCurrency({ amount })}</td>
-                    </tr>
-                `;
-            });
-        }
-
-        // Add Direct Expenses if available
-        if (report_data.direct_expenses && report_data.direct_expenses.length > 0) {
-            printContent += `
-                <tr>
-                    <td colspan="2" class="section-heading">DIRECT EXPENSES</td>
-                </tr>
-            `;
-
-            report_data.direct_expenses.forEach(account => {
-                const amount = account.dr_amount - account.cr_amount;
-                printContent += `
-                    <tr>
-                        <td>${account.account_name}</td>
-                        <td class="text-right">${formatCurrency({ amount })}</td>
-                    </tr>
-                `;
-            });
-        }
-
-        // Add Net Income row
-        printContent += `
-            <tr class="total-row">
-                <td class="text-right">Net Income</td>
-                <td class="text-right">${formatCurrency({ amount: netProfit })}</td>
-            </tr>
-            </tbody>
-            </table>
-            </body>
-            </html>
-        `;
-
-        // Write the content to the print window and trigger print
-        printWindow.document.open();
-        printWindow.document.write(printContent);
-        printWindow.document.close();
-
-        // Wait for content to load before printing
-        setTimeout(() => {
-            printWindow.print();
-            // Close the window after printing (optional)
-            printWindow.onafterprint = function () {
-                printWindow.close();
-            };
-        }, 500);
+        window.print();
     };
 
     return (
         <AuthenticatedLayout>
             <SidebarInset>
                 <div className="main-content">
+                    <style dangerouslySetInnerHTML={{ __html: printStyles }} />
                     <PageHeader
                         page="Reports"
                         subpage="Income Statement"
@@ -282,7 +178,7 @@ export default function IncomeStatement({ report_data, date1, date2, business_na
                             </div>
 
                             <div className="flex items-center justify-center">
-                                <div className="rounded-md border printable-table mt-4 p-4 w-full lg:w-[210mm] min-h-[297mm] mx-auto bg-white">
+                                <div id="printable-area" className="rounded-md border mt-4 p-4 w-full lg:w-[210mm] min-h-[297mm] mx-auto bg-white">
                                     <div className="text-center p-4">
                                         <h1 className="text-lg">{business_name}</h1>
                                         <h2 className="font-bold">Income Statement</h2>
@@ -304,6 +200,13 @@ export default function IncomeStatement({ report_data, date1, date2, business_na
                                                 </tr>
                                             ))}
 
+                                            <SectionTotal
+                                                label="Net Sales"
+                                                value={formatCurrency({ amount: totalIncome })}
+                                                underlined={true}
+                                                bold={true}
+                                            />
+
                                             {/* COST OF SALE SECTION */}
                                             <SectionHeading>COST OF SALE</SectionHeading>
 
@@ -313,6 +216,15 @@ export default function IncomeStatement({ report_data, date1, date2, business_na
                                                     <td className="text-right py-1">{formatCurrency({ amount: account.dr_amount - account.cr_amount })}</td>
                                                 </tr>
                                             ))}
+
+                                            <SectionTotal
+                                                label="Net Cost of Sale"
+                                                value={formatCurrency({ amount: totalCostOfSales })}
+                                                underlined={true}
+                                                bold={true}
+                                            />
+                                            
+                                            <div className="mt-4"></div>
 
                                             <SectionTotal
                                                 label="Gross Profit"
@@ -344,10 +256,48 @@ export default function IncomeStatement({ report_data, date1, date2, business_na
                                                 </>
                                             )}
 
-                                            {/* NET INCOME */}
                                             <SectionTotal
-                                                label="Net Income"
-                                                value={formatCurrency({ amount: netProfit })}
+                                                label="Total Expenses"
+                                                value={formatCurrency({ amount: totalDirectExpenses + totalOtherExpenses })}
+                                                underlined={true}
+                                                bold={true}
+                                            />
+
+                                            <div className="mt-4"></div>
+
+                                            {/* NET INCOME BEFORE TAX */}
+                                            <SectionTotal
+                                                label="Net Income Before Tax"
+                                                value={formatCurrency({ amount: netProfitBeforeTax })}
+                                                underlined={true}
+                                                bold={true}
+                                            />
+
+                                            {/* TAX EXPENSES */}
+                                            {report_data.tax_expenses && report_data.tax_expenses.length > 0 && (
+                                                <>
+                                                    <SectionHeading>TAX EXPENSES</SectionHeading>
+                                                    {report_data.tax_expenses.map(account => (
+                                                        <tr key={account.id}>
+                                                            <td className="py-1">{account.account_name}</td>
+                                                            <td className="text-right py-1">{formatCurrency({ amount: account.dr_amount - account.cr_amount })}</td>
+                                                        </tr>
+                                                    ))}
+                                                </>
+                                            )}
+
+                                            <SectionTotal
+                                                label="Total Tax Expenses"
+                                                value={formatCurrency({ amount: taxExpenses })}
+                                                underlined={true}
+                                                bold={true}
+                                            />
+
+                                            <div className="mt-4"></div>
+
+                                            <SectionTotal
+                                                label="Net Income After Tax"
+                                                value={formatCurrency({ amount: netProfitAfterTax })}
                                                 underlined={true}
                                                 bold={true}
                                             />

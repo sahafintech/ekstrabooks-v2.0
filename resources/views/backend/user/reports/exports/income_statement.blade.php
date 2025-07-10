@@ -1,10 +1,48 @@
 @if(isset($report_data))
+@php
+// Helper variables for calculations
+$currency = request()->activeBusiness->currency;
+$businessName = request()->activeBusiness->name;
+
+// Sales and Income calculations
+$salesAndIncome = $report_data['sales_and_income'] ?? collect();
+$netSales = $salesAndIncome->sum('cr_amount') - $salesAndIncome->sum('dr_amount');
+
+// Cost of Sale calculations
+$costOfSale = $report_data['cost_of_sale'] ?? collect();
+$netCostOfSale = $costOfSale->sum('dr_amount') - $costOfSale->sum('cr_amount');
+
+// Expense calculations
+$directExpenses = $report_data['direct_expenses'] ?? collect();
+$otherExpenses = $report_data['other_expenses'] ?? collect();
+$taxExpenses = $report_data['tax_expenses'] ?? collect();
+
+$totalDirectExpenses = $directExpenses->sum('dr_amount') - $directExpenses->sum('cr_amount');
+$totalOtherExpenses = $otherExpenses->sum('dr_amount') - $otherExpenses->sum('cr_amount');
+$totalTaxExpenses = $taxExpenses->sum('dr_amount') - $taxExpenses->sum('cr_amount');
+$totalExpenses = $totalDirectExpenses + $totalOtherExpenses;
+
+// Income calculations
+$grossIncome = $netSales - $netCostOfSale;
+$netIncomeBeforeTax = $grossIncome - $totalExpenses;
+$netIncomeAfterTax = $netIncomeBeforeTax - $totalTaxExpenses;
+
+// Helper function to calculate account amount
+function calculateAccountAmount($account, $isDiscount = false) {
+$drAmount = $account->transactions->where('dr_cr', 'dr')->sum('base_currency_amount');
+$crAmount = $account->transactions->where('dr_cr', 'cr')->sum('base_currency_amount');
+return $isDiscount ? $drAmount - $crAmount : $crAmount - $drAmount;
+}
+@endphp
+
+{{-- Header Section --}}
 <table>
     <tr>
         <td></td>
         <td style="text-align: center; font-size: 12px;">
-            <b>{{ request()->activeBusiness->name }}</b>
+            <b>{{ $businessName }}</b>
         </td>
+    </tr>
     <tr>
         <td></td>
         <td style="text-align: center; font-size: 12px;">
@@ -20,158 +58,194 @@
     <tr>
         <td style="background-color: lightgray; font-size: 12px;">Account Name</td>
         <td style="background-color: lightgray; font-size: 12px;">Base Currency</td>
-        <td style="background-color: lightgray; font-size: 12px;">
-            Base Currency Amount
-        </td>
+        <td style="background-color: lightgray; font-size: 12px;">Base Currency Amount</td>
     </tr>
 </table>
-@if(count($report_data['sales_and_income']) > 0)
+
+{{-- Sales and Income Section --}}
+@if($salesAndIncome->count() > 0)
 <table>
     <tr>
-        <td>
-            <b>Sales And Income</b>
-        </td>
+        <td><b>Sales And Income</b></td>
     </tr>
     <tbody>
-        @foreach($report_data['sales_and_income'] as $index => $account)
+        @foreach($salesAndIncome as $account)
         <tr>
             <td>{{ $account->account_name }}</td>
-            <td>{{ request()->activeBusiness->currency }}</td>
+            <td>{{ $currency }}</td>
             <td>
-                @if($account->account_name == 'Sales Discount Allowed')
-                {{ $account->transactions->where('dr_cr', 'dr')->sum('base_currency_amount') - $account->transactions->where('dr_cr', 'cr')->sum('base_currency_amount') }}
-                @else
-                {{ $account->transactions->where('dr_cr', 'cr')->sum('base_currency_amount') - $account->transactions->where('dr_cr', 'dr')->sum('base_currency_amount') }}
-                @endif
+                @php
+                $isSalesDiscount = $account->account_name == 'Sales Discount Allowed';
+                $amount = calculateAccountAmount($account, $isSalesDiscount);
+                @endphp
+                {{ $amount }}
             </td>
         </tr>
         @endforeach
 
-        @if(count($report_data['cost_of_sale']) == 0)
         <tr>
-            <td style="background-color: lightgray; font-size: 12px;">
-                <b>Gross Income</b>
-            </td>
-            <td style="background-color: lightgray; font-size: 12px;">{{ request()->activeBusiness->currency }}</td>
-            <td style="background-color: lightgray;">
-                <b>{{ $report_data['sales_and_income']->sum('cr_amount') - $report_data['sales_and_income']->sum('dr_amount')) - ($report_data['cost_of_sale']->sum('dr_amount') - $report_data['cost_of_sale']->sum('cr_amount') }}</b>
-            </td>
+            <td style="background-color: lightgray; font-size: 12px;"><b>Net Sales</b></td>
+            <td style="background-color: lightgray; font-size: 12px;">{{ $currency }}</td>
+            <td style="background-color: lightgray;"><b>{{ $netSales }}</b></td>
         </tr>
+
+        {{-- Show Gross Income if no Cost of Sale --}}
+        @if($costOfSale->count() == 0)
         <tr>
-            <td style="background-color: lightgray; font-size: 12px;">
-                <b>Net Income</b>
-            </td>
-            <td style="background-color: lightgray;">{{ request()->activeBusiness->currency }}</td>
-            <td style="background-color: lightgray; font-size: 12px;">
-                <b>{{ ($report_data['sales_and_income']->sum('cr_amount') - $report_data['sales_and_income']->sum('dr_amount')) - ($report_data['cost_of_sale']->sum('dr_amount') - $report_data['cost_of_sale']->sum('cr_amount'))) - ((($report_data['direct_expenses']->sum('dr_amount') - $report_data['direct_expenses']->sum('cr_amount'))) + (($report_data['other_expenses']->sum('dr_amount') - $report_data['other_expenses']->sum('cr_amount'))) }}</b>
-            </td>
+            <td style="background-color: lightgray; font-size: 12px;"><b>Gross Income</b></td>
+            <td style="background-color: lightgray; font-size: 12px;">{{ $currency }}</td>
+            <td style="background-color: lightgray;"><b>{{ $grossIncome }}</b></td>
         </tr>
         @endif
     </tbody>
 </table>
 @endif
-@if(count($report_data['cost_of_sale']) > 0)
+
+{{-- Cost of Sale Section --}}
+@if($costOfSale->count() > 0)
 <table>
     <tr>
-        <td>
-            <b>Cost Of Sale</b>
-        </td>
+        <td><b>Cost Of Sale</b></td>
     </tr>
     <tbody>
-        @foreach($report_data['cost_of_sale'] as $index => $account)
+        @foreach($costOfSale as $account)
         <tr>
             <td>{{ $account->account_name }}</td>
-            <td>{{ request()->activeBusiness->currency }}</td>
+            <td>{{ $currency }}</td>
             <td>
-                @if($account->account_name == 'Purchase Discount Allowed')
-                {{ $account->transactions->where('dr_cr', 'cr')->sum('base_currency_amount') - $account->transactions->where('dr_cr', 'dr')->sum('base_currency_amount') }}
-                @else
-                {{ $account->transactions->where('dr_cr', 'dr')->sum('base_currency_amount') - $account->transactions->where('dr_cr', 'cr')->sum('base_currency_amount') }}
-                @endif
-            </td>
-        </tr>
-        @endforeach
-        <tr>
-            <td style="background-color: lightgray; font-size: 12px;">
-                <b>Gross Income</b>
-            </td>
-            <td style="background-color: lightgray;">{{ request()->activeBusiness->currency }}</td>
-            <td style="background-color: lightgray; font-size: 12px;">
-                <b>{{ ($report_data['sales_and_income']->sum('cr_amount') - $report_data['sales_and_income']->sum('dr_amount')) - ($report_data['cost_of_sale']->sum('dr_amount') - $report_data['cost_of_sale']->sum('cr_amount')) }}</b>
-            </td>
-        </tr>
-
-        @if(count($report_data['direct_expenses']) == 0)
-        <tr>
-            <td style="background-color: lightgray; font-size: 12px;">
-                <b>Net Income</b>
-            </td>
-            <td style="background-color: lightgray;">{{ request()->activeBusiness->currency }}</td>
-            <td style="background-color: lightgray; font-size: 12px;">
-                <b>{{ (($report_data['sales_and_income']->sum('cr_amount') - $report_data['sales_and_income']->sum('dr_amount')) - ($report_data['cost_of_sale']->sum('dr_amount') - $report_data['cost_of_sale']->sum('cr_amount'))) - ((($report_data['direct_expenses']->sum('dr_amount') - $report_data['direct_expenses']->sum('cr_amount'))) + (($report_data['other_expenses']->sum('dr_amount') - $report_data['other_expenses']->sum('cr_amount')))) }}</b>
-            </td>
-        </tr>
-        @endif
-    </tbody>
-</table>
-@endif
-@if(count($report_data['direct_expenses']) > 0)
-<table>
-    <tbody>
-        <tr>
-            <td>
-                <b>Direct Expenses</b>
-            </td>
-        </tr>
-        @foreach($report_data['direct_expenses'] as $index => $account)
-        <tr>
-            <td>{{ $account->account_name }}</td>
-            <td>{{ request()->activeBusiness->currency }}</td>
-            <td>
-                {{ $account->transactions->where('dr_cr', 'dr')->sum('base_currency_amount') - $account->transactions->where('dr_cr', 'cr')->sum('base_currency_amount') }}
+                @php
+                $isPurchaseDiscount = $account->account_name == 'Purchase Discount Allowed';
+                $amount = calculateAccountAmount($account, !$isPurchaseDiscount);
+                @endphp
+                {{ $amount }}
             </td>
         </tr>
         @endforeach
 
-        @if(count($report_data['other_expenses']) == 0)
         <tr>
-            <td style="background-color: lightgray; font-size: 12px;">
-                <b>Net Income</b>
-            </td>
-            <td style="background-color: lightgray;">{{ request()->activeBusiness->currency }}</td>
-            <td style="background-color: lightgray; font-size: 12px;">
-                <b>{{ (($report_data['sales_and_income']->sum('cr_amount') - $report_data['sales_and_income']->sum('dr_amount')) - ($report_data['cost_of_sale']->sum('dr_amount') - $report_data['cost_of_sale']->sum('cr_amount'))) - ((($report_data['direct_expenses']->sum('dr_amount') - $report_data['direct_expenses']->sum('cr_amount'))) + (($report_data['other_expenses']->sum('dr_amount') - $report_data['other_expenses']->sum('cr_amount')))) }}</b>
-            </td>
+            <td style="background-color: lightgray; font-size: 12px;"><b>Net Cost Of Sale</b></td>
+            <td style="background-color: lightgray;">{{ $currency }}</td>
+            <td style="background-color: lightgray; font-size: 12px;"><b>{{ $netCostOfSale }}</b></td>
         </tr>
-        @endif
+
+        <tr>
+            <td style="background-color: lightgray; font-size: 12px;"><b>Gross Income</b></td>
+            <td style="background-color: lightgray;">{{ $currency }}</td>
+            <td style="background-color: lightgray; font-size: 12px;"><b>{{ $grossIncome }}</b></td>
+        </tr>
     </tbody>
 </table>
 @endif
-@if(count($report_data['other_expenses']) > 0)
+
+{{-- Direct Expenses Section --}}
+@if($directExpenses->count() > 0)
 <table>
     <tbody>
         <tr>
-            <td>
-                <b>Other Expenses</b>
-            </td>
+            <td><b>Direct Expenses</b></td>
         </tr>
-        @foreach($report_data['other_expenses'] as $index => $account)
+        @foreach($directExpenses as $account)
         <tr>
             <td>{{ $account->account_name }}</td>
-            <td>{{ request()->activeBusiness->currency }}</td>
+            <td>{{ $currency }}</td>
             <td>
-                {{ $account->transactions->where('dr_cr', 'dr')->sum('base_currency_amount') - $account->transactions->where('dr_cr', 'cr')->sum('base_currency_amount') }}
+                @php
+                $amount = calculateAccountAmount($account, true);
+                @endphp
+                {{ $amount }}
             </td>
         </tr>
         @endforeach
+    </tbody>
+</table>
+@endif
+
+{{-- Other Expenses Section --}}
+@if($otherExpenses->count() > 0)
+<table>
+    <tbody>
         <tr>
-            <td style="background-color: lightgray; font-size: 12px;">
-                <b>Net Income</b>
+            <td><b>Other Expenses</b></td>
+        </tr>
+        @foreach($otherExpenses as $account)
+        <tr>
+            <td>{{ $account->account_name }}</td>
+            <td>{{ $currency }}</td>
+            <td>
+                @php
+                $amount = calculateAccountAmount($account, true);
+                @endphp
+                {{ $amount }}
             </td>
-            <td style="background-color: lightgray;">{{ request()->activeBusiness->currency }}</td>
-            <td style="background-color: lightgray; font-size: 12px;">
-                <b>{{ (($report_data['sales_and_income']->sum('cr_amount') - $report_data['sales_and_income']->sum('dr_amount')) - ($report_data['cost_of_sale']->sum('dr_amount') - $report_data['cost_of_sale']->sum('cr_amount'))) - ((($report_data['direct_expenses']->sum('dr_amount') - $report_data['direct_expenses']->sum('cr_amount'))) + (($report_data['other_expenses']->sum('dr_amount') - $report_data['other_expenses']->sum('cr_amount')))) }}</b>
-            </td>
+        </tr>
+        @endforeach
+    </tbody>
+</table>
+@endif
+
+{{-- Total Expenses Section --}}
+@if($directExpenses->count() > 0 || $otherExpenses->count() > 0)
+<table>
+    <tbody>
+        <tr>
+            <td style="background-color: lightgray; font-size: 12px;"><b>Total Expenses</b></td>
+            <td style="background-color: lightgray;">{{ $currency }}</td>
+            <td style="background-color: lightgray; font-size: 12px;"><b>{{ $totalExpenses }}</b></td>
+        </tr>
+    </tbody>
+</table>
+@endif
+
+<table>
+    <tbody>
+        <tr>
+            <td style="background-color: lightgray; font-size: 12px;"><b>Net Income Before Tax</b></td>
+            <td style="background-color: lightgray;">{{ $currency }}</td>
+            <td style="background-color: lightgray; font-size: 12px;"><b>{{ $netIncomeBeforeTax }}</b></td>
+        </tr>
+    </tbody>
+</table>
+
+
+{{-- Tax Expenses Section --}}
+@if($taxExpenses->count() > 0)
+<table>
+    <tbody>
+        <tr>
+            <td><b>Tax Expenses</b></td>
+        </tr>
+        @foreach($taxExpenses as $account)
+        <tr>
+            <td>{{ $account->account_name }}</td>
+            <td>{{ $currency }}</td>
+            <td>{{ calculateAccountAmount($account, true) }}</td>
+        </tr>
+        @endforeach
+    </tbody>
+</table>
+@endif
+
+{{-- Tax Expenses Section --}}
+@if($taxExpenses->count() > 0)
+<table>
+    <tbody>
+        <tr>
+            <td style="background-color: lightgray; font-size: 12px;"><b>Total Tax Expenses</b></td>
+            <td style="background-color: lightgray;">{{ $currency }}</td>
+            <td style="background-color: lightgray; font-size: 12px;"><b>{{ $totalTaxExpenses }}</b></td>
+        </tr>
+    </tbody>
+</table>
+@endif
+
+{{-- Net Income Section --}}
+@if($directExpenses->count() > 0 || $otherExpenses->count() > 0 || ($grossIncome != 0 && $costOfSale->count() == 0))
+<table>
+    <tbody>
+        <tr>
+            <td style="background-color: lightgray; font-size: 12px;"><b>Net Income After Tax</b></td>
+            <td style="background-color: lightgray;">{{ $currency }}</td>
+            <td style="background-color: lightgray; font-size: 12px;"><b>{{ $netIncomeAfterTax }}</b></td>
         </tr>
     </tbody>
 </table>

@@ -9,6 +9,43 @@ import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { Label } from "@/Components/ui/label";
 import DateTimePicker from "@/Components/DateTimePicker";
 
+const printStyles = `
+  @media print {
+        body * {
+            visibility: hidden;
+        }
+
+        #printable-area, #printable-area * {
+            visibility: visible;
+        }
+
+        #printable-area {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            border: none;
+            height: 100%;
+        }
+
+        .group.peer.hidden.text-sidebar-foreground {
+            display: none !important;
+        }
+
+        @page {
+            size: auto;
+            margin: 10mm;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+        }
+    }
+`;
+
 export default function BalanceSheet({ report_data, date2, business_name }) {
     // Calculate summary values for assets
     const getTotalAssets = () => {
@@ -84,247 +121,14 @@ export default function BalanceSheet({ report_data, date2, business_name }) {
     };
 
     const handlePrint = () => {
-        // Create a new window for printing
-        const printWindow = window.open('', '_blank', 'width=800,height=600');
-
-        // Generate CSS for the print window
-        const style = `
-            <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                h1 { text-align: center; margin-bottom: 20px; }
-                .logo { text-align: center; margin-bottom: 20px; }
-                .company-details { text-align: center; margin-bottom: 30px; }
-                .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-                table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-                td { padding: 5px 2px; }
-                .border-top { border-top: 1px solid #000; }
-                .border-bottom { border-bottom: 1px solid #000; }
-                .text-right { text-align: right; }
-                .total-row td { font-weight: bold; }
-                .section-title { font-weight: bold; text-decoration: underline; margin: 15px 0 10px 0; }
-                .section-container { margin-bottom: 25px; }
-                .balanced { color: green; }
-                .unbalanced { color: red; }
-                
-                /* Make it responsive on smaller screens */
-                @media (max-width: 768px) {
-                    .grid-container {
-                        display: grid;
-                        grid-template-columns: 1fr;
-                        gap: 20px;
-                    }
-                }
-            </style>
-        `;
-
-        // Start building the HTML content for the print window
-        let printContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Balance Sheet</title>
-                ${style}
-            </head>
-            <body>
-                <h1>${business_name}</h1>
-                <h2>Balance Sheet (as of ${format(new Date(data.date2), "PPP")})</h2>
-                
-                <div class="grid-container">
-                    <!-- Left Column - Assets -->
-                    <div class="column">
-                        <!-- Fixed Assets -->
-                        <div class="section">
-                            <h3>FIXED ASSETS</h3>
-                            <table>
-                                <tbody>
-        `;
-
-        // Add Fixed Assets
-        if (report_data.fixed_asset && report_data.fixed_asset.length > 0) {
-            report_data.fixed_asset.forEach(asset => {
-                const balance = asset.dr_amount - asset.cr_amount;
-                printContent += `
-                    <tr>
-                        <td>${asset.account_name}</td>
-                        <td class="text-right">${formatCurrency({ amount: balance })}</td>
-                    </tr>
-                `;
-            });
-
-            // Fixed Assets Total
-            const fixedAssetsTotal = report_data.fixed_asset.reduce((sum, asset) =>
-                sum + (asset.dr_amount - asset.cr_amount), 0);
-
-            printContent += `
-                    <tr class="total-row">
-                        <td>Total Of Fixed Assets</td>
-                        <td class="text-right border-top">${formatCurrency({ amount: fixedAssetsTotal })}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- Current Assets -->
-        <div class="section">
-            <h3>CURRENT ASSETS</h3>
-            <table>
-                <tbody>
-            `;
-        }
-
-        // Add Current Assets
-        if (report_data.current_asset && report_data.current_asset.length > 0) {
-            report_data.current_asset.forEach(asset => {
-                const balance = asset.dr_amount - asset.cr_amount;
-                printContent += `
-                    <tr>
-                        <td>${asset.account_name}</td>
-                        <td class="text-right">${formatCurrency({ amount: balance })}</td>
-                    </tr>
-                `;
-            });
-
-            // Current Assets Total
-            const currentAssetsTotal = report_data.current_asset.reduce((sum, asset) =>
-                sum + (asset.dr_amount - asset.cr_amount), 0);
-
-            printContent += `
-                    <tr class="total-row">
-                        <td>Total Of Current Assets</td>
-                        <td class="text-right border-top">${formatCurrency({ amount: currentAssetsTotal })}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- Total Assets -->
-        <table>
-            <tbody>
-                <tr class="total-row">
-                    <td>TOTAL OF ASSETS</td>
-                    <td class="text-right border-top border-bottom">${formatCurrency({ amount: totalAssets })}</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    
-    <!-- Right Column - Liabilities and Equity -->
-    <div class="column">
-        <!-- Current Liability -->
-        <div class="section">
-            <h3>CURRENT LIABILITY</h3>
-            <table>
-                <tbody>
-            `;
-        }
-
-        // Add Current Liabilities
-        if (report_data.current_liability && report_data.current_liability.length > 0) {
-            report_data.current_liability.forEach(liability => {
-                const balance = liability.cr_amount - liability.dr_amount;
-                printContent += `
-                    <tr>
-                        <td>${liability.account_name}</td>
-                        <td class="text-right">${formatCurrency({ amount: balance })}</td>
-                    </tr>
-                `;
-            });
-
-            // Current Liabilities Total
-            const currentLiabilitiesTotal = report_data.current_liability.reduce((sum, liability) =>
-                sum + (liability.cr_amount - liability.dr_amount), 0);
-
-            printContent += `
-                    <tr class="total-row">
-                        <td>Total Of Current Liability</td>
-                        <td class="text-right border-top">${formatCurrency({ amount: currentLiabilitiesTotal })}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- Equity -->
-        <div class="section">
-            <h3>EQUITY</h3>
-            <table>
-                <tbody>
-            `;
-        }
-
-        // Add Equity
-        if (report_data.equity && report_data.equity.length > 0) {
-            report_data.equity.forEach(equity => {
-                const balance = equity.cr_amount - equity.dr_amount;
-                printContent += `
-                    <tr>
-                        <td>${equity.account_name}</td>
-                        <td class="text-right">${formatCurrency({ amount: balance })}</td>
-                    </tr>
-                `;
-            });
-
-            // Equity Total
-            const equityTotal = report_data.equity.reduce((sum, equity) =>
-                sum + (equity.cr_amount - equity.dr_amount), 0);
-
-            printContent += `
-                    <tr class="total-row">
-                        <td>Total Of Equity</td>
-                        <td class="text-right border-top">${formatCurrency({ amount: equityTotal })}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- Total Liability & Equity -->
-        <table>
-            <tbody>
-                <tr class="total-row">
-                    <td>TOTAL OF LIABILITY & EQUITY</td>
-                    <td class="text-right border-top border-bottom">${formatCurrency({ amount: liabilitiesPlusEquity })}</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- Balance Check -->
-${`
-<div style="margin-top: 20px;">
-    <span style="font-weight: bold; margin-right: 20px;">DIFFERENCE:</span>
-    <span style="font-weight: bold;" class="${isBalanced ? 'balanced' : 'unbalanced'}">
-        ${formatCurrency({ amount: totalAssets - liabilitiesPlusEquity })}
-    </span>
-</div>`}
-            `;
-
-            // Complete the HTML content
-            printContent += `
-            </body>
-            </html>
-        `;
-
-            // Write the content to the print window and trigger print
-            printWindow.document.open();
-            printWindow.document.write(printContent);
-            printWindow.document.close();
-
-            // Wait for content to load before printing
-            setTimeout(() => {
-                printWindow.print();
-                // Close the window after printing (optional)
-                printWindow.onafterprint = function () {
-                    printWindow.close();
-                };
-            }, 500);
-        };
-
-    }
+        window.print();
+    };
 
     return (
         <AuthenticatedLayout>
             <SidebarInset>
                 <div className="main-content">
+                    <style dangerouslySetInnerHTML={{ __html: printStyles }} />
                     <PageHeader
                         page="Reports"
                         subpage="Balance Sheet"
@@ -355,7 +159,7 @@ ${`
                             <Button variant="outline" onClick={handleExport}>Export</Button>
                         </div>
 
-                        <div className="rounded-md border printable-table p-4 mt-4 w-full lg:w-[210mm] min-h-[297mm] mx-auto bg-white">
+                        <div id="printable-area" className="rounded-md border p-4 mt-4 w-full lg:w-[210mm] min-h-[297mm] mx-auto bg-white">
                             {/* Simple 2-column grid layout */}
                             <div className="text-center p-4">
                                 <h1 className="text-lg">{business_name}</h1>

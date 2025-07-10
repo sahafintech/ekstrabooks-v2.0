@@ -253,14 +253,32 @@ class ProductController extends Controller
         $activeTab = request()->get('tab', 'details');
         $product = Product::with(['income_account', 'expense_account', 'product_unit', 'brand', 'category'])
             ->withSum('invoice_items', 'quantity')
-            ->withSum('invoice_items', 'sub_total')
             ->withSum('purchase_items', 'quantity')
-            ->withSum('purchase_items', 'sub_total')
             ->withSum('sales_return_items', 'quantity')
             ->withSum('purchase_return_items', 'quantity')
             ->withSum('receipt_items', 'quantity')
-            ->withSum('receipt_items', 'sub_total')
             ->find($id);
+
+        // Calculate currency-converted totals manually
+        $invoiceItemsTotal = $product->invoice_items()
+            ->join('invoices', 'invoices.id', '=', 'invoice_items.invoice_id')
+            ->selectRaw('SUM(invoice_items.sub_total / invoices.exchange_rate) as total')
+            ->value('total') ?? 0;
+
+        $purchaseItemsTotal = $product->purchase_items()
+            ->join('purchases', 'purchases.id', '=', 'purchase_items.purchase_id')
+            ->selectRaw('SUM(purchase_items.sub_total / purchases.exchange_rate) as total')
+            ->value('total') ?? 0;
+
+        $receiptItemsTotal = $product->receipt_items()
+            ->join('receipts', 'receipts.id', '=', 'receipt_items.receipt_id')
+            ->selectRaw('SUM(receipt_items.sub_total / receipts.exchange_rate) as total')
+            ->value('total') ?? 0;
+
+        // Add the converted totals to the product object
+        $product->invoice_items_sum_sub_total = $invoiceItemsTotal;
+        $product->purchase_items_sum_sub_total = $purchaseItemsTotal;
+        $product->receipt_items_sum_sub_total = $receiptItemsTotal;
 
         $transactions = $product->getAllTransactions();
         $suppliers = $product->getSuppliers();

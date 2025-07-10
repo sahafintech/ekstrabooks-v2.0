@@ -119,6 +119,27 @@ class IncomeStatementExport implements FromView, WithTitle, WithColumnFormatting
             }], 'base_currency_amount')
             ->get();
 
+        $data['report_data']['tax_expenses'] = Account::where('account_type', 'Other Tax Expenses')
+            ->whereHas('transactions', function ($query) use ($date1, $date2) {
+                $query->whereDate('trans_date', '>=', $date1)
+                    ->whereDate('trans_date', '<=', $date2);
+            })
+            ->with(['transactions' => function ($query) use ($date1, $date2) {
+                $query->whereDate('trans_date', '>=', $date1)
+                    ->whereDate('trans_date', '<=', $date2);
+            }])
+            ->withSum(['transactions as dr_amount' => function ($query) use ($date1, $date2) {
+                $query->where('dr_cr', 'dr')
+                    ->whereDate('trans_date', '>=', $date1)
+                    ->whereDate('trans_date', '<=', $date2);
+            }], 'base_currency_amount')
+            ->withSum(['transactions as cr_amount' => function ($query) use ($date1, $date2) {
+                $query->where('dr_cr', 'cr')
+                    ->whereDate('trans_date', '>=', $date1)
+                    ->whereDate('trans_date', '<=', $date2);
+            }], 'base_currency_amount')
+            ->get();
+
         $data['date1'] = Carbon::parse($date1);
         $data['date2'] = Carbon::parse($date2);
 
