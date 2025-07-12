@@ -610,7 +610,13 @@ class DefferedInvoiceController extends Controller
 
     public function edit($id)
     {
-        $invoice = Invoice::where('id', $id)->with('deffered_earnings', 'items', 'taxes')->first();
+        $invoice = Invoice::where('id', $id)->with('deffered_earnings', 'items', 'taxes')
+        ->where('status', '!=', 2)
+        ->first();
+
+        if ($invoice == null) {
+            return back()->with('error', _lang('This invoice is already paid'));
+        }
 
         $theAttachments = Attachment::where('ref_id', $id)->where('ref_type', 'invoice')->get();
         $customers = Customer::all();
