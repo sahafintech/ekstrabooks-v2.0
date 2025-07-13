@@ -22,6 +22,7 @@ import {
     Facebook,
     MessageCircle,
     Copy,
+    PaperclipIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -87,6 +88,7 @@ export default function View({purchase_order,attachments,email_templates}) {
     });
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [isAttachmentsModalOpen, setIsAttachmentsModalOpen] = useState(false);
     const [shareLink, setShareLink] = useState('');
 
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -239,6 +241,16 @@ export default function View({purchase_order,attachments,email_templates}) {
                     />
 
                     <div className="flex items-center justify-end space-x-2 mb-4">
+                        {attachments && attachments.length > 0 && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setIsAttachmentsModalOpen(true)}
+                                className="flex items-center"
+                            >
+                                <PaperclipIcon className="mr-2 h-4 w-4" />
+                                Attachments ({attachments.length})
+                            </Button>
+                        )}
                         <Button
                             variant="outline"
                             onClick={handlePrint}
@@ -407,6 +419,63 @@ export default function View({purchase_order,attachments,email_templates}) {
                                 </Button>
                             </div>
                         </form>
+                    </Modal>
+
+                    {/* Attachments Modal */}
+                    <Modal
+                        show={isAttachmentsModalOpen}
+                        onClose={() => setIsAttachmentsModalOpen(false)}
+                        maxWidth="4xl"
+                    >
+                        <div className="mb-6">
+                            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                                Purchase Order Attachments
+                            </h2>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                View and download files attached to this purchase order
+                            </p>
+                        </div>
+
+                        <div className="overflow-hidden border rounded-md">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>File Name</TableHead>
+                                        <TableHead>Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {attachments.map((attachment, index) => (
+                                        <TableRow key={index}>
+                                            <TableCell className="font-medium">
+                                                {attachment.file_name}
+                                            </TableCell>
+                                            <TableCell>
+                                                <a
+                                                    href={`${attachment.path}`}
+                                                    target="_blank"
+                                                    className="text-blue-600 hover:text-blue-800 hover:underline flex items-center"
+                                                    download
+                                                >
+                                                    <DownloadIcon className="h-4 w-4 mr-1" />
+                                                    Download
+                                                </a>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+
+                        <div className="mt-6 flex justify-end">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsAttachmentsModalOpen(false)}
+                            >
+                                Close
+                            </Button>
+                        </div>
                     </Modal>
 
                     {/* Share Modal */}
@@ -723,81 +792,6 @@ export default function View({purchase_order,attachments,email_templates}) {
                                             </p>
                                         </div>
                                     )}
-                                </div>
-                            )}
-
-                            {/* Attachments - hidden when printing */}
-                            {attachments && attachments.length > 0 && (
-                                <div className="mt-8 print:hidden">
-                                    <h3 className="font-medium mb-4">
-                                        Attachments:
-                                    </h3>
-                                    <div className="overflow-hidden border rounded-md">
-                                        <table className="min-w-full divide-y divide-gray-200">
-                                            <thead className="bg-gray-50">
-                                                <tr>
-                                                    <th
-                                                        scope="col"
-                                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                                    >
-                                                        File Name
-                                                    </th>
-                                                    <th
-                                                        scope="col"
-                                                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                                    >
-                                                        File
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="bg-white divide-y divide-gray-200">
-                                                {attachments.map(
-                                                    (attachment, index) => (
-                                                        <tr
-                                                            key={index}
-                                                            className={
-                                                                index % 2 === 0
-                                                                    ? ""
-                                                                    : "bg-gray-50"
-                                                            }
-                                                        >
-                                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                                {
-                                                                    attachment.file_name
-                                                                }
-                                                            </td>
-                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                                <a
-                                                                    href={`${attachment.path}`}
-                                                                    target="_blank"
-                                                                    className="text-blue-600 hover:text-blue-800 hover:underline flex items-center"
-                                                                    download
-                                                                >
-                                                                    <svg
-                                                                        xmlns="http://www.w3.org/2000/svg"
-                                                                        className="h-4 w-4 mr-1"
-                                                                        fill="none"
-                                                                        viewBox="0 0 24 24"
-                                                                        stroke="currentColor"
-                                                                    >
-                                                                        <path
-                                                                            strokeLinecap="round"
-                                                                            strokeLinejoin="round"
-                                                                            strokeWidth={
-                                                                                2
-                                                                            }
-                                                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                                                                        />
-                                                                    </svg>
-                                                                    Download
-                                                                </a>
-                                                            </td>
-                                                        </tr>
-                                                    )
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
                                 </div>
                             )}
                         </div>

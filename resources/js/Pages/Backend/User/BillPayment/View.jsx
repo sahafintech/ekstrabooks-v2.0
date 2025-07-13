@@ -236,10 +236,10 @@ export default function View({ payment, decimalPlace, attachments }) {
                     >
                         <div className="mb-6">
                             <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                                Payment Attachments
+                                Bill Payment Attachments
                             </h2>
                             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                View and download files attached to this payment
+                                View and download files attached to this bill payment
                             </p>
                         </div>
 
