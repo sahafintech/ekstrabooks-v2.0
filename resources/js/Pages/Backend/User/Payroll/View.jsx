@@ -10,24 +10,39 @@ import { Download, Edit, Printer } from "lucide-react";
 import { Badge } from "@/Components/ui/badge";
 import { toast } from "sonner";
 
-// Add print styles
 const printStyles = `
-    @media print {
+  @media print {
         body * {
             visibility: hidden;
         }
-        .print-container,
-        .print-container * {
+
+        #printable-area, #printable-area * {
             visibility: visible;
         }
-        .print-container {
+
+        #printable-area {
             position: absolute;
-            left: 0;
             top: 0;
+            left: 0;
             width: 100%;
+            margin: 0;
+            padding: 0;
+            border: none;
+            height: 100%;
         }
-        .no-print {
+
+        .group.peer.hidden.text-sidebar-foreground {
             display: none !important;
+        }
+
+        @page {
+            size: auto;
+            margin: 10mm;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
         }
     }
 `;
@@ -86,7 +101,7 @@ export default function View({
             const html2canvas = (await import("html2canvas")).default;
             const { jsPDF } = await import("jspdf");
 
-            const content = document.querySelector(".print-container");
+            const content = document.querySelector("#printable-area");
             if (!content) {
                 throw new Error("Content element not found");
             }
@@ -178,7 +193,7 @@ export default function View({
                     </div>
 
                     {/* Payslip Card */}
-                    <div className="rounded-md border printable-table p-4 mt-4 w-full lg:w-[210mm] min-h-[297mm] mx-auto bg-white print-container">
+                    <div id="printable-area" className="rounded-md border p-4 mt-4 w-full lg:w-[210mm] min-h-[297mm] mx-auto bg-white">
                         {/* Header */}
                         <div className="text-center p-4">
                             <h1 className="text-lg font-bold">PAYSLIP</h1>

@@ -28,6 +28,43 @@ import { QRCodeSVG } from 'qrcode.react';
 import Modal from "@/Components/Modal";
 import { Input } from "@/Components/ui/input";
 
+const printStyles = `
+  @media print {
+        body * {
+            visibility: hidden;
+        }
+
+        #printable-area, #printable-area * {
+            visibility: visible;
+        }
+
+        #printable-area {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            border: none;
+            height: 100%;
+        }
+
+        .group.peer.hidden.text-sidebar-foreground {
+            display: none !important;
+        }
+
+        @page {
+            size: auto;
+            margin: 10mm;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+        }
+    }
+`;
+
 export default function View({ purchase_return, attachments, decimalPlace }) {
     const [isLoading, setIsLoading] = useState({
         print: false,
@@ -52,7 +89,7 @@ export default function View({ purchase_return, attachments, decimalPlace }) {
             const { jsPDF } = await import('jspdf');
 
             // Get the content element
-            const content = document.querySelector('.print-container');
+            const content = document.querySelector('#printable-area');
             
             // Create a canvas from the content
             const canvas = await html2canvas(content, {
@@ -128,6 +165,7 @@ export default function View({ purchase_return, attachments, decimalPlace }) {
     return (
         <AuthenticatedLayout>
             <SidebarInset>
+                <style dangerouslySetInnerHTML={{ __html: printStyles }} />
                 <div className="space-y-4">
                     <PageHeader
                         page="Purchase Returns"
@@ -237,10 +275,10 @@ export default function View({ purchase_return, attachments, decimalPlace }) {
                         </div>
                     </Modal>
 
-                    <div className="print-container">
+                    <div id="printable-area" className="lg:w-[210mm] min-h-[297mm] mx-auto rounded-md border p-4">
                         <div className="p-6 sm:p-8">
                             {/* Purchase Return Header */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
                                 <div>
                                     {purchase_return.business.logo && (
                                         <div className="mb-3">
@@ -260,13 +298,13 @@ export default function View({ purchase_return, attachments, decimalPlace }) {
                                         <p>{purchase_return.business.phone}</p>
                                     </div>
                                 </div>
-                                <div className="md:text-right">
+                                <div className="sm:text-right">
                                     <h1 className="text-2xl font-bold">{purchase_return.title}</h1>
                                     <div className="mt-2 text-sm">
                                         <p><span className="font-medium">Purchase Return #:</span> {purchase_return.return_number}</p>
                                         <p><span className="font-medium">Purchase Return Date:</span> {purchase_return.return_date}</p>
                                     </div>
-                                    <div className="mt-4 md:flex md:justify-end">
+                                    <div className="mt-4 sm:flex sm:justify-end">
                                         <QRCodeSVG 
                                             value={route('purchase_returns.show_public_purchase_return', purchase_return.short_code)}
                                             size={100}
@@ -402,32 +440,6 @@ export default function View({ purchase_return, attachments, decimalPlace }) {
                     </div>
                 </div>
             </SidebarInset>
-
-            {/* Print Styles */}
-            <style jsx global>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          .print-container,
-          .print-container * {
-            visibility: visible;
-          }
-          .print-container {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-          }
-
-          /* Hide action buttons when printing */
-          button,
-          .dropdown,
-          .flex.space-x-2 {
-            display: none !important;
-          }
-        }
-      `}</style>
         </AuthenticatedLayout>
     );
 }

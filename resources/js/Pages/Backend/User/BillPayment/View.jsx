@@ -29,6 +29,43 @@ import { QRCodeSVG } from 'qrcode.react';
 import Modal from "@/Components/Modal";
 import { Input } from "@/Components/ui/input";
 
+const printStyles = `
+  @media print {
+        body * {
+            visibility: hidden;
+        }
+
+        #printable-area, #printable-area * {
+            visibility: visible;
+        }
+
+        #printable-area {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            border: none;
+            height: 100%;
+        }
+
+        .group.peer.hidden.text-sidebar-foreground {
+            display: none !important;
+        }
+
+        @page {
+            size: auto;
+            margin: 10mm;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+        }
+    }
+`;
+
 export default function View({ payment, decimalPlace, attachments }) {
     const [isLoading, setIsLoading] = useState({
         print: false,
@@ -54,7 +91,7 @@ export default function View({ payment, decimalPlace, attachments }) {
             const { jsPDF } = await import('jspdf');
 
             // Get the content element
-            const content = document.querySelector('.print-container');
+            const content = document.querySelector('#printable-area');
             
             // Create a canvas from the content
             const canvas = await html2canvas(content, {
@@ -130,6 +167,7 @@ export default function View({ payment, decimalPlace, attachments }) {
     return (
         <AuthenticatedLayout>
             <SidebarInset>
+                <style dangerouslySetInnerHTML={{ __html: printStyles }} />
                 <div className="space-y-4">
                     <PageHeader
                         page="Bill Payments"
@@ -307,10 +345,10 @@ export default function View({ payment, decimalPlace, attachments }) {
                         </div>
                     </Modal>
 
-                    <div className="print-container lg:w-[210mm] min-h-[297mm] mx-auto rounded-md border p-4">
+                    <div id="printable-area" className="lg:w-[210mm] min-h-[297mm] mx-auto rounded-md border p-4">
                         <div className="p-6 sm:p-8">
                             {/* Invoice Header */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
                                 <div>
                                     {payment.business.logo && (
                                         <div className="mb-3">
@@ -330,7 +368,7 @@ export default function View({ payment, decimalPlace, attachments }) {
                                         <p>{payment.business.phone}</p>
                                     </div>
                                 </div>
-                                <div className="md:text-right">
+                                <div className="sm:text-right">
                                     <h1 className="text-2xl font-bold">Payment Voucher</h1>
                                     <div className="mt-2 text-sm">
                                         <p><span className="font-medium">Payment #:</span> {payment.id}</p>
@@ -338,7 +376,7 @@ export default function View({ payment, decimalPlace, attachments }) {
                                         <p><span className="font-medium">Payment Method:</span> {payment.method}</p>
                                         <p><span className="font-medium">Payment Type:</span> {payment.type}</p>
                                     </div>
-                                    <div className="mt-4 md:flex md:justify-end">
+                                    <div className="mt-4 sm:flex sm:justify-end">
                                         <QRCodeSVG 
                                             value={route('bill_payments.show_public_bill_payment', payment.id)}
                                             size={100}
@@ -405,33 +443,6 @@ export default function View({ payment, decimalPlace, attachments }) {
                     </div>
                 </div>
             </SidebarInset>
-
-            {/* Print Styles */}
-            <style jsx global>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          .print-container,
-          .print-container * {
-            visibility: visible;
-          }
-          .print-container {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            border: none;
-          }
-
-          /* Hide action buttons when printing */
-          button,
-          .dropdown,
-          .flex.space-x-2 {
-            display: none !important;
-          }
-        }
-      `}</style>
         </AuthenticatedLayout>
     );
 }
