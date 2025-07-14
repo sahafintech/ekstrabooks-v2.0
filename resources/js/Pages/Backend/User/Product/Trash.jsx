@@ -26,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { Edit, EyeIcon, FileDown, FileUp, MoreVertical, Plus, Trash, ChevronUp, ChevronDown, Package, DollarSign, AlertCircle, TrendingUp, Trash2 } from "lucide-react";
+import { EyeIcon, FileDown, FileUp, MoreVertical, Plus, Trash, ChevronUp, ChevronDown, Package, DollarSign, TrendingUp, Trash2, RotateCcw } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -116,6 +116,34 @@ const DeleteProductModal = ({ show, onClose, onConfirm, processing }) => (
   </Modal>
 );
 
+// Restore Confirmation Modal Component
+const RestoreProductModal = ({ show, onClose, onConfirm, processing }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to restore this product?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Restore
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
 // Bulk Delete Confirmation Modal Component
 const DeleteAllProductsModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
@@ -134,10 +162,38 @@ const DeleteAllProductsModal = ({ show, onClose, onConfirm, processing, count })
         </Button>
         <Button
           type="submit"
-          variant="destructive"
+          variant="default"
           disabled={processing}
         >
           Delete Selected
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+// Bulk Restore Confirmation Modal Component
+const RestoreAllProductsModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to restore {count} selected product{count !== 1 ? 's' : ''}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Restore Selected
         </Button>
       </div>
     </form>
@@ -208,7 +264,7 @@ const ImportProductsModal = ({ show, onClose, onSubmit, processing }) => (
   </Modal>
 );
 
-export default function List({ products = [], meta = {}, filters = {}, summary = {}, trashed_products = 0 }) {
+export default function TrashList({ products = [], meta = {}, filters = {}, summary = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedProducts, setSelectedProducts] = useState([]);
@@ -225,6 +281,9 @@ export default function List({ products = [], meta = {}, filters = {}, summary =
   const [showImportModal, setShowImportModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
+  const [productToRestore, setProductToRestore] = useState(null);
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [showRestoreAllModal, setShowRestoreAllModal] = useState(false);
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -309,6 +368,8 @@ export default function List({ products = [], meta = {}, filters = {}, summary =
 
     if (bulkAction === "delete") {
       setShowDeleteAllModal(true);
+    } else if (bulkAction === "restore") {
+      setShowRestoreAllModal(true);
     }
   };
 
@@ -321,11 +382,47 @@ export default function List({ products = [], meta = {}, filters = {}, summary =
     e.preventDefault();
     setProcessing(true);
 
-    router.delete(route('products.destroy', productToDelete), {
+    router.delete(route('products.permanent_destroy', productToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
         setProductToDelete(null);
         setProcessing(false);
+        setSelectedProducts([]);
+        setIsAllSelected(false);
+      },
+      onError: () => {
+        setProcessing(false);
+      }
+    });
+  };
+
+  const handleRestoreConfirm = (id) => {
+    setProductToRestore(id);
+    setShowRestoreModal(true);
+  };
+
+  const resetModalStates = () => {
+    setShowDeleteModal(false);
+    setShowDeleteAllModal(false);
+    setShowRestoreModal(false);
+    setShowRestoreAllModal(false);
+    setShowImportModal(false);
+    setProductToDelete(null);
+    setProductToRestore(null);
+    setProcessing(false);
+  };
+
+  const handleRestore = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+
+    router.post(route('products.restore', productToRestore), {
+      onSuccess: () => {
+        setShowRestoreModal(false);
+        setProductToRestore(null);
+        setProcessing(false);
+        setSelectedProducts([]);
+        setIsAllSelected(false);
       },
       onError: () => {
         setProcessing(false);
@@ -337,7 +434,7 @@ export default function List({ products = [], meta = {}, filters = {}, summary =
     e.preventDefault();
     setProcessing(true);
 
-    router.post(route('products.bulk_destroy'),
+    router.post(route('products.bulk_permanent_destroy'),
       {
         ids: selectedProducts,
       },
@@ -347,6 +444,30 @@ export default function List({ products = [], meta = {}, filters = {}, summary =
           setSelectedProducts([]);
           setIsAllSelected(false);
           setProcessing(false);
+          setBulkAction("");
+        },
+        onError: () => {
+          setProcessing(false);
+        }
+      }
+    );
+  };
+
+  const handleBulkRestore = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+
+    router.post(route('products.bulk_restore'),
+      {
+        ids: selectedProducts,
+      },
+      {
+        onSuccess: () => {
+          setShowRestoreAllModal(false);
+          setSelectedProducts([]);
+          setIsAllSelected(false);
+          setProcessing(false);
+          setBulkAction("");
         },
         onError: () => {
           setProcessing(false);
@@ -364,6 +485,8 @@ export default function List({ products = [], meta = {}, filters = {}, summary =
       onSuccess: () => {
         setShowImportModal(false);
         setProcessing(false);
+        // Reset the form
+        e.target.reset();
       },
       onError: () => {
         setProcessing(false);
@@ -450,7 +573,7 @@ export default function List({ products = [], meta = {}, filters = {}, summary =
         <div className="main-content">
           <PageHeader
             page="Products"
-            subpage="List"
+            subpage="Trash"
             url="products.index"
           />
           <div className="p-4">
@@ -481,9 +604,9 @@ export default function List({ products = [], meta = {}, filters = {}, summary =
                 <Link href={route("products.trash")}>
                   <Button variant="outline" className="relative">
                     <Trash2 className="h-8 w-8" />
-                    {trashed_products > 0 && (
+                    {summary.total_products > 0 && (
                       <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                        {trashed_products}
+                        {summary.total_products}
                       </span>
                     )}
                   </Button>
@@ -507,6 +630,7 @@ export default function List({ products = [], meta = {}, filters = {}, summary =
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="delete">Delete Selected</SelectItem>
+                    <SelectItem value="restore">Restore Selected</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button onClick={handleBulkAction} variant="outline">
@@ -580,12 +704,12 @@ export default function List({ products = [], meta = {}, filters = {}, summary =
                                 href: route("products.show", product.id),
                               },
                               {
-                                label: "Edit",
-                                icon: <Edit className="h-4 w-4" />,
-                                href: route("products.edit", product.id),
+                                label: "Restore",
+                                icon: <RotateCcw className="h-4 w-4" />,
+                                onClick: () => handleRestoreConfirm(product.id),
                               },
                               {
-                                label: "Delete",
+                                label: "Permanent Delete",
                                 icon: <Trash className="h-4 w-4" />,
                                 onClick: () => handleDeleteConfirm(product.id),
                                 destructive: true,
@@ -654,23 +778,38 @@ export default function List({ products = [], meta = {}, filters = {}, summary =
 
       <DeleteProductModal
         show={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
+        onClose={resetModalStates}
         onConfirm={handleDelete}
         processing={processing}
       />
 
       <DeleteAllProductsModal
         show={showDeleteAllModal}
-        onClose={() => setShowDeleteAllModal(false)}
+        onClose={resetModalStates}
         onConfirm={handleDeleteAll}
+        processing={processing}
+        count={selectedProducts.length}
+      />
+
+      <RestoreAllProductsModal
+        show={showRestoreAllModal}
+        onClose={resetModalStates}
+        onConfirm={handleBulkRestore}
         processing={processing}
         count={selectedProducts.length}
       />
 
       <ImportProductsModal
         show={showImportModal}
-        onClose={() => setShowImportModal(false)}
+        onClose={resetModalStates}
         onSubmit={handleImport}
+        processing={processing}
+      />
+
+      <RestoreProductModal
+        show={showRestoreModal}
+        onClose={resetModalStates}
+        onConfirm={handleRestore}
         processing={processing}
       />
     </AuthenticatedLayout>

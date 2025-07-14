@@ -11,9 +11,10 @@ use App\Models\Vendor;
 use App\Traits\MultiTenant;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Product extends Model {
-    use MultiTenant;
+    use MultiTenant, SoftDeletes;
     /**
      * The table associated with the model.
      *
@@ -21,7 +22,7 @@ class Product extends Model {
      */
     protected $table = 'products';
 
-    protected $fillable = ['name', 'type', 'product_unit_id', 'purchase_cost', 'selling_price', 'image', 'descriptions', 'stock_management', 'initial_stock', 'stock', 'allow_for_selling', 'allow_for_purchasing', 'status', 'income_account_id', 'sub_category_id', 'brand_id', 'expense_account_id', 'code', 'expiry_date', 'user_id', 'business_id', 'created_user_id', 'updated_user_id'];
+    protected $fillable = ['name', 'type', 'product_unit_id', 'purchase_cost', 'selling_price', 'image', 'descriptions', 'stock_management', 'initial_stock', 'stock', 'allow_for_selling', 'allow_for_purchasing', 'status', 'income_account_id', 'sub_category_id', 'brand_id', 'expense_account_id', 'code', 'expiry_date', 'user_id', 'business_id', 'created_user_id', 'updated_user_id', 'deleted_user_id'];
 
     public function scopeActive($query) {
         return $query->where('status', 1);

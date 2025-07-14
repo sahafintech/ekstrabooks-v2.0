@@ -33,6 +33,8 @@ return new class extends Migration {
             $table->bigInteger('business_id')->unsigned();
             $table->bigInteger('created_user_id')->nullable();
             $table->bigInteger('updated_user_id')->nullable();
+            $table->bigInteger('deleted_user_id')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('income_account_id')->references('id')->on('accounts')->restrictOnDelete();

@@ -98,6 +98,73 @@ class ProductController extends Controller
                 'sorting' => $sorting,
             ],
             'summary' => $summary,
+            'trashed_products' => Product::onlyTrashed()->count(),
+            ]);
+    }
+
+    public function trash(Request $request)
+    {
+        $per_page = $request->get('per_page', 50);
+        $search = $request->get('search', '');
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        $query = Product::orderBy($sortColumn, $sortDirection)->onlyTrashed();
+
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('selling_price', 'like', "%{$search}%")
+                    ->orWhere('purchase_cost', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%");
+            });
+        }
+
+        // Get vendors with pagination
+        $products = $query->paginate($per_page)->withQueryString();
+
+        // Get summary statistics for all products
+        $allProducts = Product::query()->onlyTrashed();
+        if (!empty($search)) {
+            $allProducts->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('selling_price', 'like', "%{$search}%")
+                    ->orWhere('purchase_cost', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%");
+            });
+        }
+        $allProducts = $allProducts->get();
+
+        $summary = [
+            'total_products' => $allProducts->count(),
+            'active_products' => $allProducts->where('status', 1)->count(),
+            'total_stock' => $allProducts->sum('stock'),
+            'total_value' => $allProducts->sum(function ($product) {
+                return $product->stock * $product->purchase_cost;
+            }),
+        ];
+
+        // Return Inertia view
+        return Inertia::render('Backend/User/Product/Trash', [
+            'products' => $products->items(),
+            'meta' => [
+                'current_page' => $products->currentPage(),
+                'from' => $products->firstItem(),
+                'last_page' => $products->lastPage(),
+                'links' => $products->linkCollection(),
+                'path' => $products->path(),
+                'per_page' => $products->perPage(),
+                'to' => $products->lastItem(),
+                'total' => $products->total(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $sorting,
+            ],
+            'summary' => $summary,
         ]);
     }
 
@@ -251,7 +318,7 @@ class ProductController extends Controller
     public function show($id)
     {
         $activeTab = request()->get('tab', 'details');
-        $product = Product::with(['income_account', 'expense_account', 'product_unit', 'brand', 'category'])
+        $product = Product::withTrashed()->with(['income_account', 'expense_account', 'product_unit', 'brand', 'category'])
             ->withSum('invoice_items', 'quantity')
             ->withSum('purchase_items', 'quantity')
             ->withSum('sales_return_items', 'quantity')
@@ -536,13 +603,55 @@ class ProductController extends Controller
             $transaction->delete();
         }
 
+        $product->delete();
+        return redirect()->route('products.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    public function permanent_destroy($id)
+    {
+        $product = Product::onlyTrashed()->find($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::user()->id;
+        $audit->event = 'Product Permanent Deleted - ' . $product->name;
+        $audit->save();
+
+        // delete transactions
+        $transactions = Transaction::where('ref_id', $id)->where('ref_type', 'product')->get();
+        foreach ($transactions as $transaction) {
+            $transaction->forceDelete();
+        }
+
         // delete product image
         if (file_exists(public_path() . '/uploads/media/' . $product->image && $product->image != 'default.png')) {
             unlink(public_path() . '/uploads/media/' . $product->image);
         }
 
-        $product->delete();
-        return redirect()->route('products.index')->with('success', _lang('Deleted Successfully'));
+        $product->forceDelete();
+        return redirect()->route('products.trash')->with('success', _lang('Permanent Deleted Successfully'));
+    }
+
+    public function restore($id)
+    {
+        $product = Product::onlyTrashed()->find($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::user()->id;
+        $audit->event = 'Product Restored - ' . $product->name;
+        $audit->save();
+
+        //  restore transactions
+        $transactions = Transaction::onlyTrashed()->where('ref_id', $id)->where('ref_type', 'product')->get();
+        foreach ($transactions as $transaction) {
+            $transaction->restore();
+        }
+
+        $product->restore();
+        return redirect()->route('products.trash')->with('success', _lang('Restored Successfully'));
     }
 
     public function import_products(Request $request)
@@ -592,10 +701,6 @@ class ProductController extends Controller
         $audit->save();
 
         foreach ($products as $product) {
-            // delete product image
-            if (file_exists(public_path() . '/uploads/media/' . $product->image && $product->image != 'default.png')) {
-                unlink(public_path() . '/uploads/media/' . $product->image);
-            }
 
             // delete transactions
             $transactions = Transaction::where('ref_id', $product->id)->where('ref_type', 'product')->get();
@@ -607,6 +712,62 @@ class ProductController extends Controller
         }
 
         return redirect()->route('products.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    public function bulk_restore(Request $request)
+    {
+
+        $products = Product::onlyTrashed()->whereIn('id', $request->ids)->get();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::user()->id;
+        $audit->event = 'Products Restored - ' . count($products) . ' Products';
+        $audit->save();
+
+        foreach ($products as $product) {
+
+            // restore transactions
+            $transactions = Transaction::onlyTrashed()->where('ref_id', $product->id)->where('ref_type', 'product')->get();
+            foreach ($transactions as $transaction) {
+                $transaction->restore();
+            }
+
+            $product->restore();
+        }
+
+        return redirect()->route('products.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    public function bulk_permanent_destroy(Request $request)
+    {
+
+        $products = Product::whereIn('id', $request->ids)->get();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::user()->id;
+        $audit->event = 'Products Permanent Deleted - ' . count($products) . ' Products';
+        $audit->save();
+
+        foreach ($products as $product) {
+            // delete product image
+            if (file_exists(public_path() . '/uploads/media/' . $product->image && $product->image != 'default.png')) {
+                unlink(public_path() . '/uploads/media/' . $product->image);
+            }
+
+            // delete transactions
+            $transactions = Transaction::onlyTrashed()->where('ref_id', $product->id)->where('ref_type', 'product')->get();
+            foreach ($transactions as $transaction) {
+                $transaction->forceDelete();
+            }
+
+            $product->forceDelete();
+        }
+
+        return redirect()->route('products.trash')->with('success', _lang('Permanent Deleted Successfully'));
     }
 
     public function search_product(Request $request)
