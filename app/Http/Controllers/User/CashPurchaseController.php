@@ -1526,7 +1526,8 @@ class CashPurchaseController extends Controller
 		$transactions = Transaction::where('ref_id', $bill->id)
 			->where(function ($query) {
 				$query->where('ref_type', 'cash purchase')
-					->orWhere('ref_type', 'cash purchase tax');
+					->orWhere('ref_type', 'cash purchase tax')
+					->orWhere('ref_type', 'cash purchase payment');
 			})
 			->get();
 
@@ -1541,7 +1542,8 @@ class CashPurchaseController extends Controller
 		$transactions = PendingTransaction::where('ref_id', $bill->id)
 			->where(function ($query) {
 				$query->where('ref_type', 'cash purchase')
-					->orWhere('ref_type', 'cash purchase tax');
+					->orWhere('ref_type', 'cash purchase tax')
+					->orWhere('ref_type', 'cash purchase payment');
 			})
 			->get();
 
@@ -1606,7 +1608,8 @@ class CashPurchaseController extends Controller
 			$transactions = Transaction::where('ref_id', $bill->id)
 				->where(function ($query) {
 					$query->where('ref_type', 'cash purchase')
-						->orWhere('ref_type', 'cash purchase tax');
+						->orWhere('ref_type', 'cash purchase tax')
+						->orWhere('ref_type', 'cash purchase payment');
 				})
 				->get();
 
@@ -1621,7 +1624,8 @@ class CashPurchaseController extends Controller
 			$transactions = PendingTransaction::where('ref_id', $bill->id)
 				->where(function ($query) {
 					$query->where('ref_type', 'cash purchase')
-						->orWhere('ref_type', 'cash purchase tax');
+						->orWhere('ref_type', 'cash purchase tax')
+						->orWhere('ref_type', 'cash purchase payment');
 				})
 				->get();
 
@@ -1649,8 +1653,8 @@ class CashPurchaseController extends Controller
 			}
 
 			$bill->delete();
-			return redirect()->route('cash_purchases.index')->with('success', _lang('Deleted Successfully'));
 		}
+		return redirect()->route('cash_purchases.index')->with('success', _lang('Deleted Successfully'));
 	}
 
 	public function send_email(Request $request, $id)
@@ -1704,7 +1708,13 @@ class CashPurchaseController extends Controller
 			$bill->save();
 
 			// select from pending transactions and insert into transactions
-			$transactions = PendingTransaction::where('ref_id', $bill->id)->get();
+			$transactions = PendingTransaction::where('ref_id', $bill->id)
+				->where(function ($query) {
+					$query->where('ref_type', 'cash purchase')
+						->orWhere('ref_type', 'cash purchase tax')
+						->orWhere('ref_type', 'cash purchase payment');
+				})
+			->get();
 
 			foreach ($transactions as $transaction) {
 				// Create a new Transaction instance and replicate data from pending
@@ -1713,7 +1723,7 @@ class CashPurchaseController extends Controller
 				$new_transaction->save();
 
 				// Delete the pending transaction
-				$transaction->delete();
+				$transaction->forceDelete();
 			}
 
 
@@ -1744,7 +1754,8 @@ class CashPurchaseController extends Controller
 			$transactions = Transaction::where('ref_id', $bill->id)
 				->where(function ($query) {
 					$query->where('ref_type', 'cash purchase')
-						->orWhere('ref_type', 'cash purchase tax');
+						->orWhere('ref_type', 'cash purchase tax')
+						->orWhere('ref_type', 'cash purchase payment');
 				})
 				->get();
 
@@ -1753,13 +1764,13 @@ class CashPurchaseController extends Controller
 				$new_transaction->setTable('pending_transactions');
 				$new_transaction->save();
 
-				$transaction->delete();
+				$transaction->forceDelete();
 			}
 
 			// bill invoice payment
 			$transaction = Transaction::where('ref_id', $bill->id)->where('ref_type', 'cash purchase payment')->get();
 			foreach ($transaction as $data) {
-				$data->delete();
+				$data->forceDelete();
 			}
 
 

@@ -6,12 +6,12 @@ use App\Traits\MultiTenant;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PendingTransaction extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes, MultiTenant;
 
-    use MultiTenant;
     /**
      * The table associated with the model.
      *
@@ -20,7 +20,7 @@ class PendingTransaction extends Model
 
     protected $table = 'pending_transactions';
 
-    protected $fillable = ['trans_date', 'account_id', 'dr_cr', 'type', 'transaction_amount', 'currency_rate', 'transaction_currency', 'base_currency_amount', 'transaction_method', 'reference', 'description', 'attachment', 'ref_id', 'ref_type', 'customer_id', 'vendor_id', 'user_id', 'business_id', 'created_user_id', 'updated_user_id'];
+    protected $fillable = ['trans_date', 'account_id', 'dr_cr', 'type', 'transaction_amount', 'currency_rate', 'transaction_currency', 'base_currency_amount', 'transaction_method', 'reference', 'description', 'attachment', 'ref_id', 'ref_type', 'customer_id', 'vendor_id', 'user_id', 'business_id', 'created_user_id', 'updated_user_id', 'deleted_user_id'];
 
     public function account()   
     {
