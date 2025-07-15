@@ -287,9 +287,14 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('product_units', ProductUnitController::class)->except('show');
 		Route::post('product_units/bulk_destroy', [ProductUnitController::class, 'bulk_destroy'])->name('product_units.bulk_destroy');
 		Route::get('products/export', [ProductController::class, 'product_export'])->name('products.export');
-		Route::resource('products', ProductController::class);
 		Route::post('import_products', [ProductController::class, 'import_products'])->name('products.import');
 		Route::post('products/bulk_destroy', [ProductController::class, 'bulk_destroy'])->name('products.bulk_destroy');
+		Route::get('products/trash', [ProductController::class, 'trash'])->name('products.trash');
+		Route::post('products/{id}/restore', [ProductController::class, 'restore'])->name('products.restore');
+		Route::post('products/bulk_restore', [ProductController::class, 'bulk_restore'])->name('products.bulk_restore');
+		Route::post('products/bulk_permanent_destroy', [ProductController::class, 'bulk_permanent_destroy'])->name('products.bulk_permanent_destroy');
+		Route::delete('products/{id}/permanent_destroy', [ProductController::class, 'permanent_destroy'])->name('products.permanent_destroy');
+		Route::resource('products', ProductController::class);
 
 		// categories
 		Route::resource('sub_categories', SubCategoryController::class);
