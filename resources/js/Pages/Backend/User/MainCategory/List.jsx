@@ -20,12 +20,13 @@ import {
   SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { Edit, EyeIcon, Plus, Trash, ChevronUp, ChevronDown } from "lucide-react";
+import { Edit, Plus, Trash, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
+import { Link } from "@inertiajs/react";
 
 // Delete Confirmation Modal Component
 const DeleteMainCategoryModal = ({ show, onClose, onConfirm, processing }) => (
@@ -151,7 +152,7 @@ const CategoryFormModal = ({ show, onClose, onSubmit, processing, category = nul
   );
 };
 
-export default function List({ categories = [], meta = {}, filters = {} }) {
+export default function List({ categories = [], meta = {}, filters = {}, trashed_categories = 0 }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedMainCategories, setSelectedMainCategories] = useState([]);
@@ -410,11 +411,21 @@ export default function List({ categories = [], meta = {}, filters = {} }) {
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex flex-col md:flex-row gap-2">
                 <Button onClick={() => setShowCreateModal(true)}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Main Category
                 </Button>
+                <Link href={route("main_categories.trash")}>
+                  <Button variant="outline" className="relative">
+                    <Trash2 className="h-8 w-8" />
+                    {trashed_categories > 0 && (
+                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
+                        {trashed_categories}
+                      </span>
+                    )}
+                  </Button>
+                </Link>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input
@@ -495,11 +506,6 @@ export default function List({ categories = [], meta = {}, filters = {} }) {
                         <TableCell className="text-right">
                           <TableActions
                             actions={[
-                              {
-                                label: "View",
-                                icon: <EyeIcon className="h-4 w-4" />,
-                                href: route("main_categories.show", category.id),
-                              },
                               {
                                 label: "Edit",
                                 icon: <Edit className="h-4 w-4" />,

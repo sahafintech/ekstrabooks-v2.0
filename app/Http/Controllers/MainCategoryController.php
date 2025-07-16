@@ -49,6 +49,49 @@ class MainCategoryController extends Controller
                 'columnFilters' => $request->get('columnFilters', []),
                 'sorting' => $request->get('sorting', []),
             ],
+            'trashed_categories' => MainCategory::onlyTrashed()->count(),
+        ]);
+    }
+
+    public function trash(Request $request)
+    {
+        $per_page = $request->get('per_page', 50);
+        $search = $request->get('search', '');
+
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        $query = MainCategory::onlyTrashed()->orderBy($sortColumn, $sortDirection);
+
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%");
+            });
+        }
+
+        // Get vendors with pagination
+        $categories = $query->paginate($per_page)->withQueryString();
+
+        // Return Inertia view
+        return Inertia::render('Backend/User/MainCategory/Trash', [
+            'categories' => $categories->items(),
+            'meta' => [
+                'current_page' => $categories->currentPage(),
+                'from' => $categories->firstItem(),
+                'last_page' => $categories->lastPage(),
+                'links' => $categories->linkCollection(),
+                'path' => $categories->path(),
+                'per_page' => $categories->perPage(),
+                'to' => $categories->lastItem(),
+                'total' => $categories->total(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $request->get('sorting', []),
+            ],
         ]);
     }
 
@@ -85,12 +128,6 @@ class MainCategoryController extends Controller
     {
         $category = MainCategory::find($id);
 
-        // delete image if exists and not default
-        $image_path = public_path() . "/uploads/media/" . $category->image;
-        if (file_exists($image_path) && $category->image !== 'default.png') {
-            unlink($image_path);
-        }
-
         $category->delete();
 
         // audit log
@@ -101,6 +138,44 @@ class MainCategoryController extends Controller
         $audit->save();
 
         return redirect()->route('main_categories.index')->with('success', _lang('Main Category Deleted'));
+    }
+
+    public function permanent_destroy($id)
+    {
+        $category = MainCategory::onlyTrashed()->find($id);
+
+        // delete image if exists and not default
+        $image_path = public_path() . "/uploads/media/" . $category->image;
+        if (file_exists($image_path) && $category->image !== 'default.png') {
+            unlink($image_path);
+        }
+
+        $category->forceDelete();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Category Permanently Deleted: ' . $category->name;
+        $audit->save();
+
+        return redirect()->route('main_categories.trash')->with('success', _lang('Main Category Permanently Deleted'));
+    }
+
+    public function restore($id)
+    {
+        $category = MainCategory::onlyTrashed()->find($id);
+
+        $category->restore();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Category Restored: ' . $category->name;
+        $audit->save();
+
+        return redirect()->route('main_categories.trash')->with('success', _lang('Main Category Restored'));
     }
 
     public function update(Request $request, $id)
@@ -150,11 +225,6 @@ class MainCategoryController extends Controller
             $category = MainCategory::find($id);
 
             if ($category) {
-                // delete image if exists and not default
-                $image_path = public_path() . "/uploads/media/" . $category->image;
-                if (file_exists($image_path) && $category->image !== 'default.png') {
-                    unlink($image_path);
-                }
 
                 $category->delete();
                 $deleted[] = $id;
@@ -169,6 +239,62 @@ class MainCategoryController extends Controller
         }
 
         return redirect()->route('main_categories.index')->with('success', _lang('Main Categories Deleted'));
+    }
+    
+    public function bulk_permanent_destroy(Request $request)
+    {
+        $ids = $request->ids;
+
+        $deleted = [];
+
+        foreach ($ids as $id) {
+            $category = MainCategory::onlyTrashed()->find($id);
+
+            if ($category) {
+                // delete image if exists and not default
+                $image_path = public_path() . "/uploads/media/" . $category->image;
+                if (file_exists($image_path) && $category->image !== 'default.png') {
+                    unlink($image_path);
+                }
+
+                $category->forceDelete();
+                $deleted[] = $id;
+
+                // audit log
+                $audit = new AuditLog();
+                $audit->date_changed = date('Y-m-d H:i:s');
+                $audit->changed_by = auth()->user()->id;
+                $audit->event = 'Category Permanently Deleted: ' . $category->name;
+                $audit->save();
+            }
+        }
+
+        return redirect()->route('main_categories.trash')->with('success', _lang('Main Categories Permanently Deleted'));
+    }
+
+    public function bulk_restore(Request $request)
+    {
+        $ids = $request->ids;
+
+        $deleted = [];
+
+        foreach ($ids as $id) {
+            $category = MainCategory::onlyTrashed()->find($id);
+
+            if ($category) {
+                $category->restore();
+                $deleted[] = $id;
+
+                // audit log
+                $audit = new AuditLog();
+                $audit->date_changed = date('Y-m-d H:i:s');
+                $audit->changed_by = auth()->user()->id;
+                $audit->event = 'Category Restored: ' . $category->name;
+                $audit->save();
+            }
+        }
+
+        return redirect()->route('main_categories.trash')->with('success', _lang('Main Categories Restored'));
     }
 
     public function getSubCategories(Request $request)

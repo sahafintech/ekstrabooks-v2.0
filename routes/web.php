@@ -298,7 +298,12 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 		// categories
 		Route::resource('sub_categories', SubCategoryController::class);
-		Route::post('sub_categories/bulk_destroy', [SubCategoryController::class, 'bulk_destroy'])->name('sub_categories.bulk_destroy');
+
+		Route::get('main_categories/trash', [MainCategoryController::class, 'trash'])->name('main_categories.trash');
+		Route::post('main_categories/{id}/restore', [MainCategoryController::class, 'restore'])->name('main_categories.restore');
+		Route::post('main_categories/bulk_restore', [MainCategoryController::class, 'bulk_restore'])->name('main_categories.bulk_restore');
+		Route::post('main_categories/bulk_permanent_destroy', [MainCategoryController::class, 'bulk_permanent_destroy'])->name('main_categories.bulk_permanent_destroy');
+		Route::delete('main_categories/{id}/permanent_destroy', [MainCategoryController::class, 'permanent_destroy'])->name('main_categories.permanent_destroy');
 		Route::resource('main_categories', MainCategoryController::class);
 		Route::post('main_categories/bulk_destroy', [MainCategoryController::class, 'bulk_destroy'])->name('main_categories.bulk_destroy');
 

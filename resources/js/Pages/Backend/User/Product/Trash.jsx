@@ -579,38 +579,10 @@ export default function TrashList({ products = [], meta = {}, filters = {}, summ
           <div className="p-4">
             <SummaryCards summary={summary} />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-2">
-                <Link href={route("products.create")}>
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Product
-                  </Button>
-                </Link>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="secondary">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setShowImportModal(true)}>
-                      <FileUp className="mr-2 h-4 w-4" /> Import
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={exportProducts}>
-                      <FileDown className="mr-2 h-4 w-4" /> Export
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Link href={route("products.trash")}>
-                  <Button variant="outline" className="relative">
-                    <Trash2 className="h-8 w-8" />
-                    {summary.total_products > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                        {summary.total_products}
-                      </span>
-                    )}
-                  </Button>
-                </Link>
+              <div>
+                <div className="text-red-500">
+                  Total trashed products: {meta.total}
+                </div>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input
