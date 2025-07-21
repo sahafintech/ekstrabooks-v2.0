@@ -257,7 +257,7 @@ export default function View({ receipt, attachments, decimalPlace }) {
                                     </h2>
                                     <div className="mt-2 text-sm">
                                         <p>{receipt.business.address}</p>
-                                        <p>{receipt.business.email}</p>
+                                        <p>{receipt.business.business_email}</p>
                                         <p>{receipt.business.phone}</p>
                                     </div>
                                 </div>

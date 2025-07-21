@@ -21,6 +21,7 @@ export default function Edit({ business_types = [], currencies = [], countries =
         reg_no: business.reg_no,
         vat_id: business.vat_id,
         email: business.email,
+        business_email: business.business_email,
         phone: business.phone,
         country: business.country,
         contract_no: business.contract_no,
@@ -102,8 +103,25 @@ export default function Edit({ business_types = [], currencies = [], countries =
                         </div>
 
                         <div className="grid grid-cols-12 mt-2">
+                            <Label htmlFor="business_email" className="md:col-span-2 col-span-12">
+                                Business Email *
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                <Input
+                                    id="business_email"
+                                    type="email"
+                                    value={data.business_email}
+                                    onChange={(e) => setData("business_email", e.target.value)}
+                                    className="md:w-1/2 w-full"
+                                    required
+                                />
+                                <InputError message={errors.business_email} className="text-sm" />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-12 mt-2">
                             <Label htmlFor="email" className="md:col-span-2 col-span-12">
-                                Email *
+                                Operation Email *
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                 <Input

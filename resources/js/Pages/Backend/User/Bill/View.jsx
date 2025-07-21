@@ -570,7 +570,7 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
                                     </h2>
                                     <div className="mt-2 text-sm">
                                         <p>{bill.business.address}</p>
-                                        <p>{bill.business.email}</p>
+                                        <p>{bill.business.business_email}</p>
                                         <p>{bill.business.phone}</p>
                                     </div>
                                 </div>

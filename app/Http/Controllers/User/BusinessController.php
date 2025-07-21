@@ -144,7 +144,8 @@ class BusinessController extends Controller
             'logo'             => 'nullable|image|max:2048',
             'status'           => 'required',
             'default'          => 'required',
-            'email'            => 'required'
+            'email'            => 'required',
+            'business_email'   => 'required'
         ]);
 
         if ($validator->fails()) {
@@ -169,6 +170,7 @@ class BusinessController extends Controller
         $business->user_id          = auth()->id();
         $business->business_type_id = $request->input('business_type_id');
         $business->email            = $request->input('email');
+        $business->business_email   = $request->input('business_email');
         $business->phone            = $request->input('phone');
         $business->country          = $request->input('country');
         $business->currency         = $request->input('currency');
@@ -359,6 +361,7 @@ class BusinessController extends Controller
         $business->vat_id           = $request->input('vat_id');
         $business->business_type_id = $request->input('business_type_id');
         $business->email            = $request->input('email');
+        $business->business_email   = $request->input('business_email');
         $business->phone            = $request->input('phone');
         $business->country          = $request->input('country');
         $business->zip              = $request->input('zip');
