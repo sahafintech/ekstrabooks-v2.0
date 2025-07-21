@@ -1,10 +1,8 @@
-import { Head, Link, useForm, usePage } from "@inertiajs/react";
+import { Head, Link, router } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset, SidebarSeparator } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
 import { formatCurrency } from "@/lib/utils";
-import { Toaster } from "@/Components/ui/toaster";
-import { useToast } from "@/hooks/use-toast";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -14,7 +12,6 @@ import {
 import PageHeader from "@/Components/PageHeader";
 import {
     PrinterIcon,
-    MailIcon,
     DownloadIcon,
     MoreVertical,
     ShareIcon,
@@ -23,7 +20,8 @@ import {
     MessageCircle,
     Copy,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { toast } from "sonner";
 import {
     Table,
     TableBody,
@@ -32,93 +30,17 @@ import {
     TableHead,
     TableCell,
 } from "@/Components/ui/table";
+import { QRCodeSVG } from "qrcode.react";
 import Modal from "@/Components/Modal";
 import { Input } from "@/Components/ui/input";
-import { Label } from "@/Components/ui/label";
-import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
-import InputError from "@/Components/InputError";
-import RichTextEditor from "@/Components/RichTextEditor";
-import { QRCodeSVG } from "qrcode.react";
 
-const printStyles = `
-@media print {
-      body * {
-          visibility: hidden;
-      }
-
-      #printable-area, #printable-area * {
-          visibility: visible;
-      }
-
-      #printable-area {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          margin: 0;
-          padding: 0;
-          border: none;
-          height: 100%;
-      }
-
-      .group.peer.hidden.text-sidebar-foreground {
-          display: none !important;
-      }
-
-      @page {
-          size: auto;
-          margin: 10mm;
-      }
-
-      body {
-          margin: 0;
-          padding: 0;
-      }
-  }
-`;
-
-
-
-export default function View({
-    invoice,
-    attachments,
-    decimalPlace,
-    email_templates,
-}) {
-    const { flash = {} } = usePage().props;
-    const { toast } = useToast();
+export default function View({ receipt, attachments, decimalPlace }) {
     const [isLoading, setIsLoading] = useState({
         print: false,
-        email: false,
         pdf: false,
     });
-    const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [shareLink, setShareLink] = useState("");
-
-    const { data, setData, post, processing, errors, reset } = useForm({
-        email: invoice?.customer?.email || "",
-        subject: "",
-        message: "",
-        template: "",
-    });
-
-    useEffect(() => {
-        if (flash && flash.success) {
-            toast({
-                title: "Success",
-                description: flash.success,
-            });
-        }
-
-        if (flash && flash.error) {
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: flash.error,
-            });
-        }
-    }, [flash, toast]);
 
     const handlePrint = () => {
         setIsLoading((prev) => ({ ...prev, print: true }));
@@ -126,30 +48,6 @@ export default function View({
             window.print();
             setIsLoading((prev) => ({ ...prev, print: false }));
         }, 300);
-    };
-
-    const handleEmailInvoice = () => {
-        setIsEmailModalOpen(true);
-    };
-
-    const handleEmailSubmit = (e) => {
-        e.preventDefault();
-        post(route("invoices.send_email", invoice.id), {
-            preserveScroll: true,
-            onSuccess: () => {
-                setIsEmailModalOpen(false);
-                reset();
-            },
-        });
-    };
-
-    const handleTemplateChange = (templateSlug) => {
-        const template = email_templates.find((t) => t.slug === templateSlug);
-        if (template) {
-            setData("template", templateSlug);
-            setData("subject", template.subject);
-            setData("message", template.email_body);
-        }
     };
 
     const handleDownloadPDF = async () => {
@@ -160,7 +58,7 @@ export default function View({
             const { jsPDF } = await import("jspdf");
 
             // Get the content element
-            const content = document.querySelector("#printable-area");
+            const content = document.querySelector(".print-container");
 
             // Create a canvas from the content
             const canvas = await html2canvas(content, {
@@ -204,35 +102,31 @@ export default function View({
             }
 
             // Save the PDF
-            pdf.save(`Invoice_${invoice.invoice_number}.pdf`);
+            pdf.save(`Cash_Invoice_${receipt.receipt_number}.pdf`);
         } catch (error) {
             console.error("Error generating PDF:", error);
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Failed to generate PDF. Please try again.",
-            });
+            toast.error("Failed to generate PDF. Please try again.");
         } finally {
             setIsLoading((prev) => ({ ...prev, pdf: false }));
         }
     };
 
     const handleShareLink = () => {
-        const link = route("invoices.show_public_invoice", invoice.short_code);
+        const link = route(
+            "cash_invoices.show_public_cash_invoice",
+            receipt.short_code
+        );
         setShareLink(link);
         setIsShareModalOpen(true);
     };
 
     const handleCopyLink = () => {
         navigator.clipboard.writeText(shareLink);
-        toast({
-            title: "Success",
-            description: "Link copied to clipboard",
-        });
+        toast.success("Link copied to clipboard");
     };
 
     const handleWhatsAppShare = () => {
-        const text = `Check out this invoice: ${shareLink}`;
+        const text = `Check out this cash invoice: ${shareLink}`;
         window.open(
             `https://wa.me/?text=${encodeURIComponent(text)}`,
             "_blank"
@@ -250,15 +144,12 @@ export default function View({
 
     return (
         <AuthenticatedLayout>
-            <Toaster />
-
             <SidebarInset>
-                <style dangerouslySetInnerHTML={{ __html: printStyles }} />
                 <div className="space-y-4">
                     <PageHeader
-                        page="Invoices"
-                        subpage={`Invoice #${invoice.invoice_number}`}
-                        url="invoices.index"
+                        page="Cash Invoices"
+                        subpage={`Cash Invoice #${receipt.receipt_number}`}
+                        url="receipts.index"
                     />
 
                     <div className="flex items-center justify-end space-x-2 mb-4">
@@ -270,16 +161,6 @@ export default function View({
                         >
                             <PrinterIcon className="mr-2 h-4 w-4" />
                             {isLoading.print ? "Printing..." : "Print"}
-                        </Button>
-
-                        <Button
-                            variant="outline"
-                            onClick={handleEmailInvoice}
-                            disabled={isLoading.email}
-                            className="flex items-center"
-                        >
-                            <MailIcon className="mr-2 h-4 w-4" />
-                            {isLoading.email ? "Sending..." : "Email"}
                         </Button>
 
                         <Button
@@ -306,258 +187,78 @@ export default function View({
                                 <DropdownMenuItem asChild>
                                     <Link
                                         href={route(
-                                            "invoices.edit",
-                                            invoice.id
+                                            "receipts.edit",
+                                            receipt.id
                                         )}
                                         className="flex items-center"
                                     >
                                         <Edit className="mr-2 h-4 w-4" />
-                                        <span>Edit Invoice</span>
+                                        <span>Edit Cash Invoice</span>
                                     </Link>
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
 
-                    {/* Email Modal */}
-                    <Modal
-                        show={isEmailModalOpen}
-                        onClose={() => setIsEmailModalOpen(false)}
-                        maxWidth="3xl"
-                    >
-                        <div className="mb-6">
-                            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                                Send Invoice Email
-                            </h2>
-                        </div>
-
-                        <form
-                            onSubmit={handleEmailSubmit}
-                            className="space-y-4"
-                        >
-                            <div className="grid gap-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="email">
-                                        Recipient Email
-                                    </Label>
-                                    <Input
-                                        id="email"
-                                        type="email"
-                                        value={data.email}
-                                        onChange={(e) =>
-                                            setData("email", e.target.value)
-                                        }
-                                        required
-                                    />
-                                    <InputError
-                                        message={errors.email}
-                                        className="text-sm"
-                                    />
-                                </div>
-
-                                <div className="grid gap-2">
-                                    <Label htmlFor="template">
-                                        Email Template
-                                    </Label>
-                                    <SearchableCombobox
-                                        options={email_templates?.map(
-                                            (template) => ({
-                                                id: template.slug,
-                                                name: template.name,
-                                            })
-                                        )}
-                                        value={data.template}
-                                        onChange={handleTemplateChange}
-                                        placeholder="Select a template"
-                                        emptyMessage="No templates found"
-                                    />
-                                    <InputError
-                                        message={errors.template}
-                                        className="text-sm"
-                                    />
-                                </div>
-
-                                <div className="grid gap-2">
-                                    <Label htmlFor="subject">Subject</Label>
-                                    <Input
-                                        id="subject"
-                                        value={data.subject}
-                                        onChange={(e) =>
-                                            setData("subject", e.target.value)
-                                        }
-                                        required
-                                    />
-                                    <InputError
-                                        message={errors.subject}
-                                        className="text-sm"
-                                    />
-                                </div>
-
-                                {/* Add Shortcode display here */}
-                                <div className="grid gap-2">
-                                    <Label>Shortcode</Label>
-                                    <div className="bg-gray-100 text-xs font-mono p-3 rounded border">
-                                        {
-                                            "{{customerName}} {{invoiceNumber}} {{invoiceDate}} {{dueDate}} {{dueAmount}} {{invoiceLink}}"
-                                        }
-                                    </div>
-                                </div>
-
-                                <div className="grid gap-2">
-                                    <Label htmlFor="message">Message</Label>
-                                    <RichTextEditor
-                                        value={data.message}
-                                        onChange={(content) =>
-                                            setData("message", content)
-                                        }
-                                        height={250}
-                                    />
-                                    <InputError
-                                        message={errors.message}
-                                        className="text-sm"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="mt-6 flex justify-end space-x-3">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setIsEmailModalOpen(false)}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button type="submit" disabled={processing}>
-                                    {processing ? "Sending..." : "Send Email"}
-                                </Button>
-                            </div>
-                        </form>
-                    </Modal>
-
-                    {/* Share Modal */}
-                    <Modal
-                        show={isShareModalOpen}
-                        onClose={() => setIsShareModalOpen(false)}
-                        maxWidth="2xl"
-                    >
-                        <div className="mb-6">
-                            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                                Share Invoice
-                            </h2>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div className="flex items-center space-x-2">
-                                <Input
-                                    value={shareLink}
-                                    readOnly
-                                    className="flex-1"
-                                />
-                                <Button
-                                    variant="outline"
-                                    onClick={handleCopyLink}
-                                    className="flex items-center"
-                                >
-                                    <Copy className="mr-2 h-4 w-4" />
-                                    Copy
-                                </Button>
-                            </div>
-
-                            <div className="flex justify-center space-x-4 pt-4">
-                                <Button
-                                    variant="outline"
-                                    onClick={handleWhatsAppShare}
-                                    className="flex items-center"
-                                >
-                                    <MessageCircle className="mr-2 h-4 w-4" />
-                                    WhatsApp
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    onClick={handleFacebookShare}
-                                    className="flex items-center"
-                                >
-                                    <Facebook className="mr-2 h-4 w-4" />
-                                    Facebook
-                                </Button>
-                            </div>
-                        </div>
-
-                        <div className="mt-6 flex justify-end">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setIsShareModalOpen(false)}
-                            >
-                                Close
-                            </Button>
-                        </div>
-                    </Modal>
-
-                    <div id="printable-area" className="lg:w-[210mm] min-h-[297mm] mx-auto rounded-md border p-4">
+                    <div className="print-container">
                         <div className="p-6 sm:p-8">
                             {/* Invoice Header */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                                 <div>
-                                    {invoice.business.logo && (
+                                    {receipt.business.logo && (
                                         <div className="mb-3">
                                             <img
-                                                src={`/uploads/media/${invoice.business.logo}`}
+                                                src={`/uploads/media/${receipt.business.logo}`}
                                                 alt="Business Logo"
                                                 className="max-h-32 object-contain"
                                             />
                                         </div>
                                     )}
                                     <h2 className="text-2xl font-bold text-primary">
-                                        {invoice.business.business_name}
+                                        {receipt.business.business_name}
                                     </h2>
                                     <div className="mt-2 text-sm">
-                                        <p>{invoice.business.address}</p>
-                                        <p>{invoice.business.business_email}</p>
-                                        <p>{invoice.business.phone}</p>
+                                        <p>{receipt.business.address}</p>
+                                        <p>{receipt.business.email}</p>
+                                        <p>{receipt.business.phone}</p>
                                     </div>
                                 </div>
-                                <div className="sm:text-right">
+                                <div className="md:text-right">
                                     <h1 className="text-2xl font-bold">
-                                        {invoice.title}
+                                        {receipt.title}
                                     </h1>
                                     <div className="mt-2 text-sm">
                                         <p>
                                             <span className="font-medium">
                                                 Invoice #:
                                             </span>{" "}
-                                            {invoice.invoice_number}
+                                            {receipt.receipt_number}
                                         </p>
                                         <p>
                                             <span className="font-medium">
                                                 Invoice Date:
                                             </span>{" "}
-                                            {invoice.invoice_date}
+                                            {receipt.receipt_date}
                                         </p>
-                                        <p>
-                                            <span className="font-medium">
-                                                Due Date:
-                                            </span>{" "}
-                                            {invoice.due_date}
-                                        </p>
-                                        {invoice.order_number && (
+                                        {receipt.order_number && (
                                             <p>
                                                 <span className="font-medium">
                                                     Order Number:
                                                 </span>{" "}
-                                                {invoice.order_number}
+                                                {receipt.order_number}
                                             </p>
                                         )}
                                     </div>
-                                    <div className="mt-4 sm:flex sm:justify-end">
+                                    <div className="mt-4 md:flex md:justify-end">
                                         <QRCodeSVG
                                             value={route(
-                                                "invoices.show_public_invoice",
-                                                invoice.short_code
+                                                "cash_invoices.show_public_cash_invoice",
+                                                receipt.short_code
                                             )}
                                             size={100}
                                             level="H"
                                             includeMargin={true}
+                                            margin={10}
                                             className="print:block"
                                         />
                                     </div>
@@ -573,17 +274,16 @@ export default function View({
                                 </h3>
                                 <div className="text-sm">
                                     <p className="font-medium">
-                                        {invoice.customer?.name}
+                                        {receipt.customer?.name}
                                     </p>
-                                    {invoice.customer?.company_name && (
-                                        <p>{invoice.customer?.company_name}</p>
+                                    {receipt.customer?.company_name && (
+                                        <p>{receipt.customer?.company_name}</p>
                                     )}
-                                    <p>{invoice.customer?.address}</p>
-                                    <p>{invoice.customer?.email}</p>
-                                    <p>{invoice.customer?.mobile}</p>
+                                    <p>{receipt.customer?.address}</p>
+                                    <p>{receipt.customer?.email}</p>
+                                    <p>{receipt.customer?.mobile}</p>
                                 </div>
-
-                                {invoice.project_id !== null && (
+                                {receipt.project_id !== null && (
                                     <>
                                         <h3 className="font-medium text-lg my-2">
                                             Project:
@@ -591,19 +291,19 @@ export default function View({
                                         <div className="text-sm">
                                             <p>
                                                 Project Name:{" "}
-                                                {invoice.project.project_name}
+                                                {receipt.project.project_name}
                                             </p>
                                             <p>
                                                 Project Code:{" "}
-                                                {invoice.project.project_code}
+                                                {receipt.project.project_code}
                                             </p>
                                             <p>
                                                 Start Date:{" "}
-                                                {invoice.project.start_date}
+                                                {receipt.project.start_date}
                                             </p>
                                             <p>
                                                 End Date:{" "}
-                                                {invoice.project.end_date}
+                                                {receipt.project.end_date}
                                             </p>
                                         </div>
                                     </>
@@ -629,7 +329,7 @@ export default function View({
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {invoice.items.map((item, index) => (
+                                        {receipt.items.map((item, index) => (
                                             <TableRow key={index}>
                                                 <TableCell className="font-medium">
                                                     {item.product_name}
@@ -643,7 +343,7 @@ export default function View({
                                                 <TableCell className="text-right">
                                                     {formatCurrency(
                                                         item.unit_cost,
-                                                        invoice.currency,
+                                                        receipt.currency,
                                                         decimalPlace
                                                     )}
                                                 </TableCell>
@@ -651,7 +351,7 @@ export default function View({
                                                     {formatCurrency(
                                                         item.quantity *
                                                             item.unit_cost,
-                                                        invoice.currency,
+                                                        receipt.currency,
                                                         decimalPlace
                                                     )}
                                                 </TableCell>
@@ -661,7 +361,7 @@ export default function View({
                                 </Table>
                             </div>
 
-                            {/* Invoice Summary */}
+                            {/* Cash Invoice Summary */}
                             <div className="flex justify-end">
                                 <div className="w-full md:w-1/2 lg:w-1/3 space-y-2">
                                     <div className="flex justify-between py-2 border-t">
@@ -670,15 +370,15 @@ export default function View({
                                         </span>
                                         <span>
                                             {formatCurrency(
-                                                invoice.sub_total,
-                                                invoice.business.currency,
+                                                receipt.sub_total,
+                                                receipt.business.currency,
                                                 decimalPlace
                                             )}
                                         </span>
                                     </div>
 
                                     {/* Tax details */}
-                                    {invoice.taxes.map((tax, index) => (
+                                    {receipt.taxes.map((tax, index) => (
                                         <div
                                             key={index}
                                             className="flex justify-between py-2"
@@ -687,7 +387,7 @@ export default function View({
                                             <span>
                                                 {formatCurrency(
                                                     tax.amount,
-                                                    invoice.business.currency,
+                                                    receipt.currency,
                                                     decimalPlace
                                                 )}
                                             </span>
@@ -695,14 +395,14 @@ export default function View({
                                     ))}
 
                                     {/* Discount */}
-                                    {invoice.discount > 0 && (
+                                    {receipt.discount > 0 && (
                                         <div className="flex justify-between py-2">
                                             <span>Discount</span>
                                             <span>
                                                 -
                                                 {formatCurrency(
-                                                    invoice.discount,
-                                                    invoice.business.currency,
+                                                    receipt.discount,
+                                                    receipt.currency,
                                                     decimalPlace
                                                 )}
                                             </span>
@@ -714,23 +414,23 @@ export default function View({
                                         <span>Total:</span>
                                         <span>
                                             {formatCurrency(
-                                                invoice.grand_total,
-                                                invoice.business.currency,
+                                                receipt.grand_total,
+                                                receipt.currency,
                                                 decimalPlace
                                             )}
                                         </span>
                                     </div>
 
                                     {/* Base currency equivalent if different currency */}
-                                    {invoice.currency !==
-                                        invoice.business.currency && (
+                                    {receipt.currency !==
+                                        receipt.business.currency && (
                                         <div className="flex justify-between py-2 text-gray-500 text-sm">
                                             <span>Exchange Rate:</span>
                                             <span>
-                                                1 {invoice.business.currency} ={" "}
+                                                1 {receipt.business.currency} ={" "}
                                                 {formatCurrency(
-                                                    invoice.exchange_rate,
-                                                    invoice.currency,
+                                                    receipt.exchange_rate,
+                                                    receipt.currency,
                                                     decimalPlace
                                                 )}
                                             </span>
@@ -738,14 +438,14 @@ export default function View({
                                     )}
 
                                     {/* Base currency equivalent total */}
-                                    {invoice.currency !==
-                                        invoice.business.currency && (
+                                    {receipt.currency !==
+                                        receipt.business.currency && (
                                         <div className="flex justify-between py-2 text-sm text-gray-600">
                                             <span>Equivalent to:</span>
                                             <span>
                                                 {formatCurrency(
-                                                    invoice.converted_total,
-                                                    invoice.currency,
+                                                    receipt.converted_total,
+                                                    receipt.currency,
                                                     decimalPlace
                                                 )}
                                             </span>
@@ -755,26 +455,26 @@ export default function View({
                             </div>
 
                             {/* Notes & Terms */}
-                            {(invoice.note || invoice.footer) && (
+                            {(receipt.note || receipt.footer) && (
                                 <div className="mt-8 space-y-4">
-                                    {invoice.note && (
+                                    {receipt.note && (
                                         <div>
                                             <h3 className="font-medium mb-1">
                                                 Notes:
                                             </h3>
                                             <p className="text-sm">
-                                                {invoice.note}
+                                                {receipt.note}
                                             </p>
                                         </div>
                                     )}
 
-                                    {invoice.footer && (
+                                    {receipt.footer && (
                                         <div>
                                             <h3 className="font-medium mb-1">
                                                 Terms & Conditions:
                                             </h3>
                                             <p className="text-sm">
-                                                {invoice.footer}
+                                                {receipt.footer}
                                             </p>
                                         </div>
                                     )}
@@ -827,6 +527,88 @@ export default function View({
                     </div>
                 </div>
             </SidebarInset>
+
+            {/* Share Modal */}
+            <Modal
+                show={isShareModalOpen}
+                onClose={() => setIsShareModalOpen(false)}
+                maxWidth="2xl"
+            >
+                <div className="mb-6">
+                    <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                        Share Cash Invoice
+                    </h2>
+                </div>
+
+                <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                        <Input value={shareLink} readOnly className="flex-1" />
+                        <Button
+                            variant="outline"
+                            onClick={handleCopyLink}
+                            className="flex items-center"
+                        >
+                            <Copy className="mr-2 h-4 w-4" />
+                            Copy
+                        </Button>
+                    </div>
+
+                    <div className="flex justify-center space-x-4 pt-4">
+                        <Button
+                            variant="outline"
+                            onClick={handleWhatsAppShare}
+                            className="flex items-center"
+                        >
+                            <MessageCircle className="mr-2 h-4 w-4" />
+                            WhatsApp
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={handleFacebookShare}
+                            className="flex items-center"
+                        >
+                            <Facebook className="mr-2 h-4 w-4" />
+                            Facebook
+                        </Button>
+                    </div>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsShareModalOpen(false)}
+                    >
+                        Close
+                    </Button>
+                </div>
+            </Modal>
+
+            {/* Print Styles */}
+            <style jsx global>{`
+                @media print {
+                    body * {
+                        visibility: hidden;
+                    }
+                    .print-container,
+                    .print-container * {
+                        visibility: visible;
+                    }
+                    .print-container {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                    }
+
+                    /* Hide action buttons when printing */
+                    button,
+                    .dropdown,
+                    .flex.space-x-2 {
+                        display: none !important;
+                    }
+                }
+            `}</style>
         </AuthenticatedLayout>
     );
 }

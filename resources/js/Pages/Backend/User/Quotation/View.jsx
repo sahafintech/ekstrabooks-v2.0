@@ -253,7 +253,7 @@ export default function View({ quotation, decimalPlace }) {
                                     </h2>
                                     <div className="mt-2 text-sm">
                                         <p>{quotation.business.address}</p>
-                                        <p>{quotation.business.email}</p>
+                                        <p>{quotation.business.business_email}</p>
                                         <p>{quotation.business.phone}</p>
                                     </div>
                                 </div>

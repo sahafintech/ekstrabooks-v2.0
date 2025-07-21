@@ -193,7 +193,7 @@ export default function View({ payment, decimalPlace, attachments }) {
                                     </h2>
                                     <div className="mt-2 text-sm">
                                         <p>{payment.business.address}</p>
-                                        <p>{payment.business.email}</p>
+                                        <p>{payment.business.business_email}</p>
                                         <p>{payment.business.phone}</p>
                                     </div>
                                 </div>

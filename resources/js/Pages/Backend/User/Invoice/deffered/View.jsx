@@ -575,7 +575,7 @@ export default function View({
                                     </h2>
                                     <div className="mt-2 text-sm">
                                         <p>{invoice.business.address}</p>
-                                        <p>{invoice.business.email}</p>
+                                        <p>{invoice.business.business_email}</p>
                                         <p>{invoice.business.phone}</p>
                                     </div>
                                 </div>

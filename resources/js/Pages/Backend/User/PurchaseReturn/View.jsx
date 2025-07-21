@@ -294,7 +294,7 @@ export default function View({ purchase_return, attachments, decimalPlace }) {
                                     </h2>
                                     <div className="mt-2 text-sm">
                                         <p>{purchase_return.business.address}</p>
-                                        <p>{purchase_return.business.email}</p>
+                                        <p>{purchase_return.business.business_email}</p>
                                         <p>{purchase_return.business.phone}</p>
                                     </div>
                                 </div>

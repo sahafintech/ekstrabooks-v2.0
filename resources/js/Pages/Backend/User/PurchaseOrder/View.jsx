@@ -557,7 +557,7 @@ export default function View({purchase_order,attachments,email_templates}) {
                                     </h2>
                                     <div className="mt-2 text-sm">
                                         <p>{purchase_order.business.address}</p>
-                                        <p>{purchase_order.business.email}</p>
+                                        <p>{purchase_order.business.business_email}</p>
                                         <p>{purchase_order.business.phone}</p>
                                     </div>
                                 </div>
