@@ -1031,21 +1031,18 @@ class CashPurchaseController extends Controller
 			$purchase_item->delete();
 
 			// delete transaction
-			$transaction = Transaction::where('ref_id', $purchase->id)->where('ref_type', 'cash purchase')
-				->where('account_id', $purchase_item->account_id)
-				->first();
+			$transaction = Transaction::where('ref_id', $purchase->id)->whereIn('ref_type', ['cash purchase', 'cash purchase payment', 'cash purchase tax'])->get();
 
-			if ($transaction != null) {
-				$transaction->delete();
+			foreach ($transaction as $t) {
+				$t->delete();
 			}
 
 			// delete pending transaction
-			$pending_transaction = PendingTransaction::where('ref_id', $purchase->id)->where('ref_type', 'cash purchase')
-				->where('account_id', $purchase_item->account_id)
-				->first();
+			$pending_transaction = PendingTransaction::where('ref_id', $purchase->id)->whereIn('ref_type', ['cash purchase', 'cash purchase payment', 'cash purchase tax'])
+			->get();
 
-			if ($pending_transaction != null) {
-				$pending_transaction->delete();
+			foreach ($pending_transaction as $t) {
+				$t->delete();
 			}
 		}
 
