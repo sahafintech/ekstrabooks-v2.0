@@ -1082,6 +1082,7 @@ class DefferedInvoiceController extends Controller
     {
         $invoice = Invoice::with([
             'business',
+            'business.bank_accounts',
             'items',
             'deffered_earnings',
             'customer',

@@ -45,6 +45,8 @@ const printStyles = `
 @media print {
       body * {
           visibility: hidden;
+          -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
       }
 
       #printable-area, #printable-area * {
@@ -611,18 +613,34 @@ export default function View({
                                             {invoice.due_date}
                                         </p>
                                     </div>
-                                    <div className="mt-4 sm:flex sm:justify-end">
-                                        <QRCodeSVG
-                                            value={route(
-                                                "deffered_invoices.show_public_deffered_invoice",
-                                                invoice.short_code
-                                            )}
-                                            size={100}
-                                            level="H"
-                                            includeMargin={true}
-                                            className="print:block"
-                                        />
                                     </div>
+                            </div>
+                            <div className="mt-4 grid grid-cols-2 sm:grid-cols-2 gap-4">
+                                {/* bank details */}
+                                <div>
+                                    <h3 className="font-medium text-lg mb-2">
+                                        Bank Details:
+                                    </h3>
+                                    {invoice.business.bank_accounts.map((bank) => (
+                                        <div key={bank.id} className="text-sm bg-gray-100 p-2 rounded-md m-1">
+                                            <p>Bank Name: <strong>{bank.bank_name}</strong></p>
+                                            <p>Account Number: <strong>{bank.account_number}</strong></p>
+                                            <p>Account Name: <strong>{bank.account_name}</strong></p>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex justify-end">
+                                    <QRCodeSVG
+                                    value={route(
+                                        "deffered_invoices.show_public_deffered_invoice",
+                                        invoice.short_code
+                                    )}
+                                    size={100}
+                                    level="H"
+                                    includeMargin={true}
+                                        margin={10}
+                                        className="print:block"
+                                    />
                                 </div>
                             </div>
 

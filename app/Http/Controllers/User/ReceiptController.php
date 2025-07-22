@@ -183,15 +183,12 @@ class ReceiptController extends Controller
 
     public function show($id)
     {
-        $receipt = Receipt::with(['business', 'items', 'taxes', 'customer', 'project'])
+        $receipt = Receipt::with(['business', 'business.bank_accounts', 'items', 'taxes', 'customer', 'project'])
             ->where('id', $id)
             ->first();
 
-        $business = Business::find($receipt->business_id);
-
         return Inertia::render('Backend/User/CashInvoice/View', [
             'receipt' => $receipt,
-            'business' => $business
         ]);
     }
 

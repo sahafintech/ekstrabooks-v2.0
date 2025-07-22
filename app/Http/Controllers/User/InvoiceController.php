@@ -519,6 +519,7 @@ class InvoiceController extends Controller
     {
         $invoice = Invoice::with([
             'business',
+            'business.bank_accounts',
             'items',
             'customer',
             'taxes',
