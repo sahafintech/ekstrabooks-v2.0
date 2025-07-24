@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Head, Link, router, usePage } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -20,13 +20,12 @@ import {
   SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { Edit, EyeIcon, Plus, Trash, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+import { Trash, ChevronUp, ChevronDown, RotateCcw } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
-import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 
 // Delete Confirmation Modal Component
 const DeleteSubCategoryModal = ({ show, onClose, onConfirm, processing }) => (
@@ -50,6 +49,34 @@ const DeleteSubCategoryModal = ({ show, onClose, onConfirm, processing }) => (
           disabled={processing}
         >
           Delete
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+// Restore Confirmation Modal Component
+const RestoreSubCategoryModal = ({ show, onClose, onConfirm, processing }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to restore this sub category?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Restore
         </Button>
       </div>
     </form>
@@ -84,106 +111,35 @@ const DeleteAllSubCategoriesModal = ({ show, onClose, onConfirm, processing, cou
   </Modal>
 );
 
-const CategoryFormModal = ({ show, onClose, onSubmit, processing, category = null, mainCategories = [] }) => {
-  // Initialize with the correct value from the category object, or empty string if creating new
-  const [selectedMainCategory, setSelectedMainCategory] = useState(category?.main_category_id || "");
+// Bulk Restore Confirmation Modal Component
+const RestoreAllSubCategoriesModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to restore {count} selected sub categories{count !== 1 ? 's' : ''}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Restore Selected
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
 
-  // Update the selected main category when the category prop changes (for edit mode)
-  useEffect(() => {
-    if (category) {
-      setSelectedMainCategory(category.main_category_id);
-    } else {
-      setSelectedMainCategory("");
-    }
-  }, [category]);
-
-  return (
-    <Modal show={show} onClose={onClose}>
-      <form onSubmit={onSubmit} encType="multipart/form-data">
-        <div className="ti-modal-header">
-          <h3 className="text-lg font-bold">
-            {category ? "Edit Subcategory" : "Create New Subcategory"}
-          </h3>
-        </div>
-        <div className="mt-4">
-          <div className="mb-4">
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-              Subcategory Name <span className="text-red-500">*</span>
-            </label>
-            <Input
-              type="text"
-              id="name"
-              name="name"
-              defaultValue={category?.name || ""}
-              required
-              className="mt-1"
-            />
-          </div>
-
-          <div className="mb-4">
-            <label htmlFor="main_category_id" className="block text-sm font-medium text-gray-700">
-              Main Category <span className="text-red-500">*</span>
-            </label>
-            <SearchableCombobox
-              options={mainCategories.map(category => ({
-                id: category.id,
-                name: category.name
-              }))}
-              value={selectedMainCategory}
-              onChange={(value) => setSelectedMainCategory(value)}
-              placeholder="Select main category"
-            />
-            <input
-              type="hidden"
-              name="main_category_id"
-              value={selectedMainCategory}
-            />
-          </div>
-
-          <div className="mb-4">
-            <label htmlFor="image" className="block text-sm font-medium text-gray-700">
-              Image
-            </label>
-            <Input
-              type="file"
-              id="image"
-              name="image"
-              className="mt-1"
-            />
-            {category?.image && category.image !== 'default.png' && (
-              <div className="mt-2">
-                <p className="text-sm text-gray-500">Current Image:</p>
-                <img
-                  src={`/uploads/media/${category.image}`}
-                  alt={category.name}
-                  className="mt-1 h-20 w-auto object-contain"
-                />
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="mt-6 flex justify-end">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={onClose}
-            className="mr-3"
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            disabled={processing}
-          >
-            {category ? "Update Subcategory" : "Create Subcategory"}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-};
-
-export default function List({ categories = [], meta = {}, filters = {}, mainCategories, trashed_categories = 0 }) {
+export default function TrashList({ categories = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedSubCategories, setSelectedSubCategories] = useState([]);
@@ -193,15 +149,15 @@ export default function List({ categories = [], meta = {}, filters = {}, mainCat
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
   const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
+  const [subCategoryToDelete, setSubCategoryToDelete] = useState(null);
+  const [subCategoryToRestore, setSubCategoryToRestore] = useState(null);
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
-  const [subCategoryToDelete, setSubCategoryToDelete] = useState(null);
+  const [showRestoreAllModal, setShowRestoreAllModal] = useState(false);
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState(null);
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -286,6 +242,8 @@ export default function List({ categories = [], meta = {}, filters = {}, mainCat
 
     if (bulkAction === "delete") {
       setShowDeleteAllModal(true);
+    } else if (bulkAction === "restore") {
+      setShowRestoreAllModal(true);
     }
   };
 
@@ -294,42 +252,20 @@ export default function List({ categories = [], meta = {}, filters = {}, mainCat
     setShowDeleteModal(true);
   };
 
-  // Handle create category
-  const handleCreate = (e) => {
+  const handleRestoreConfirm = (id) => {
+    setSubCategoryToRestore(id);
+    setShowRestoreModal(true);
+  };
+
+  const handleRestore = (e) => {
     e.preventDefault();
     setProcessing(true);
 
-    const formData = new FormData(e.target);
-
-    router.post(route('sub_categories.store'), formData, {
+    router.post(route('sub_categories.restore', subCategoryToRestore), {
       onSuccess: () => {
-        setShowCreateModal(false);
+        setShowRestoreModal(false);
+        setSubCategoryToRestore(null);
         setProcessing(false);
-      },
-      onError: () => {
-        setProcessing(false);
-      }
-    });
-  };
-
-  // Handle edit category
-  const handleShowEditModal = (category) => {
-    setSelectedCategory(category);
-    setShowEditModal(true);
-  };
-
-  const handleUpdate = (e) => {
-    e.preventDefault();
-    setProcessing(true);
-
-    const formData = new FormData(e.target);
-    formData.append('_method', 'PUT'); // Add method spoofing for Laravel
-
-    router.post(route('sub_categories.update', selectedCategory.id), formData, {
-      onSuccess: () => {
-        setShowEditModal(false);
-        setProcessing(false);
-        setSelectedCategory(null);
       },
       onError: () => {
         setProcessing(false);
@@ -341,7 +277,7 @@ export default function List({ categories = [], meta = {}, filters = {}, mainCat
     e.preventDefault();
     setProcessing(true);
 
-    router.delete(route('sub_categories.destroy', subCategoryToDelete), {
+    router.delete(route('sub_categories.permanent_destroy', subCategoryToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
         setSubCategoryToDelete(null);
@@ -357,13 +293,35 @@ export default function List({ categories = [], meta = {}, filters = {}, mainCat
     e.preventDefault();
     setProcessing(true);
 
-    router.post(route('sub_categories.bulk_destroy'),
+    router.post(route('sub_categories.bulk_permanent_destroy'),
       {
         ids: selectedSubCategories
       },
       {
         onSuccess: () => {
           setShowDeleteAllModal(false);
+          setSelectedSubCategories([]);
+          setIsAllSelected(false);
+          setProcessing(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
+      }
+    );
+  };
+
+  const handleRestoreAll = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+
+    router.post(route('sub_categories.bulk_restore'),
+      {
+        ids: selectedSubCategories
+      },
+      {
+        onSuccess: () => {
+          setShowRestoreAllModal(false);
           setSelectedSubCategories([]);
           setIsAllSelected(false);
           setProcessing(false);
@@ -430,6 +388,28 @@ export default function List({ categories = [], meta = {}, filters = {}, mainCat
     return pages;
   };
 
+  const handleCloseDeleteModal = () => {
+    setShowDeleteModal(false);
+    setProcessing(false);
+    setSubCategoryToDelete(null);
+  };
+
+  const handleCloseRestoreModal = () => {
+    setShowRestoreModal(false);
+    setProcessing(false);
+    setSubCategoryToRestore(null);
+  };
+
+  const handleCloseDeleteAllModal = () => {
+    setShowDeleteAllModal(false);
+    setProcessing(false);
+  };
+
+  const handleCloseRestoreAllModal = () => {
+    setShowRestoreAllModal(false);
+    setProcessing(false);
+  };
+
   return (
     <AuthenticatedLayout>
       <Toaster />
@@ -442,25 +422,14 @@ export default function List({ categories = [], meta = {}, filters = {}, mainCat
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-2">
-                <Button onClick={() => setShowCreateModal(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Sub Category
-                </Button>
-                <Link href={route("sub_categories.trash")}>
-                  <Button variant="outline" className="relative">
-                    <Trash2 className="h-8 w-8" />
-                    {trashed_categories > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                        {trashed_categories}
-                      </span>
-                    )}
-                  </Button>
-                </Link>
+              <div>
+                <div className="text-red-500">
+                  Total trashed categories: {meta.total}
+                </div>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input
-                  placeholder="Search sub categories..."
+                  placeholder="Search trashed sub categories..."
                   value={search}
                   onChange={(e) => handleSearch(e)}
                   className="w-full md:w-80"
@@ -475,7 +444,8 @@ export default function List({ categories = [], meta = {}, filters = {}, mainCat
                     <SelectValue placeholder="Bulk actions" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="delete">Delete Selected</SelectItem>
+                    <SelectItem value="delete">Permanently Delete Selected</SelectItem>
+                    <SelectItem value="restore">Restore Selected</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button onClick={handleBulkAction} variant="outline">
@@ -540,17 +510,12 @@ export default function List({ categories = [], meta = {}, filters = {}, mainCat
                           <TableActions
                             actions={[
                               {
-                                label: "View",
-                                icon: <EyeIcon className="h-4 w-4" />,
-                                href: route("sub_categories.show", category.id),
+                                label: "Restore",
+                                icon: <RotateCcw className="h-4 w-4" />,
+                                onClick: () => handleRestoreConfirm(category.id)
                               },
                               {
-                                label: "Edit",
-                                icon: <Edit className="h-4 w-4" />,
-                                onClick: () => handleShowEditModal(category)
-                              },
-                              {
-                                label: "Delete",
+                                label: "Permanently Delete",
                                 icon: <Trash className="h-4 w-4" />,
                                 onClick: () => handleDeleteConfirm(category.id),
                                 destructive: true,
@@ -619,34 +584,32 @@ export default function List({ categories = [], meta = {}, filters = {}, mainCat
 
       <DeleteSubCategoryModal
         show={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
+        onClose={handleCloseDeleteModal}
         onConfirm={handleDelete}
         processing={processing}
       />
 
       <DeleteAllSubCategoriesModal
         show={showDeleteAllModal}
-        onClose={() => setShowDeleteAllModal(false)}
+        onClose={handleCloseDeleteAllModal}
         onConfirm={handleDeleteAll}
         processing={processing}
         count={selectedSubCategories.length}
       />
 
-      <CategoryFormModal
-        show={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSubmit={handleCreate}
+      <RestoreAllSubCategoriesModal
+        show={showRestoreAllModal}
+        onClose={handleCloseRestoreAllModal}
+        onConfirm={handleRestoreAll}
         processing={processing}
-        mainCategories={mainCategories || []}
+        count={selectedSubCategories.length}
       />
 
-      <CategoryFormModal
-        show={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        onSubmit={handleUpdate}
+      <RestoreSubCategoryModal
+        show={showRestoreModal}
+        onClose={handleCloseRestoreModal}
+        onConfirm={handleRestore}
         processing={processing}
-        category={selectedCategory}
-        mainCategories={mainCategories || []}
       />
 
     </AuthenticatedLayout>
