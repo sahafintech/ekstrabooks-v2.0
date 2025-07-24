@@ -1034,7 +1034,7 @@ class CashPurchaseController extends Controller
 			$transaction = Transaction::where('ref_id', $purchase->id)->whereIn('ref_type', ['cash purchase', 'cash purchase payment', 'cash purchase tax'])->get();
 
 			foreach ($transaction as $t) {
-				$t->delete();
+				$t->forceDelete();
 			}
 
 			// delete pending transaction
@@ -1042,7 +1042,7 @@ class CashPurchaseController extends Controller
 			->get();
 
 			foreach ($pending_transaction as $t) {
-				$t->delete();
+				$t->forceDelete();
 			}
 		}
 

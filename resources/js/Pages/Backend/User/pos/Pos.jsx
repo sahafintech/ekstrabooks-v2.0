@@ -519,21 +519,12 @@ export default function POS({ products, categories, currencies, accounts, custom
   const updateItemQuantity = (itemId, newQuantity) => {
     if (newQuantity < 1) return; // Prevent quantity below 1
 
-    // Update cartItems
-    const updatedCartItems = cartItems.map(item => {
+    setCartItems(cartItems.map(item => {
       if (item.id === itemId) {
         return { ...item, quantity: newQuantity };
       }
       return item;
-    });
-    setCartItems(updatedCartItems);
-
-    // Update form data quantity array to match cartItems
-    const updatedQuantities = data.product_id.map((pid, idx) => {
-      const cartItem = updatedCartItems.find(item => item.id === pid);
-      return cartItem ? cartItem.quantity : data.quantity[idx];
-    });
-    setData('quantity', updatedQuantities);
+    }));
   };
 
   // Function to cancel/remove prescription product

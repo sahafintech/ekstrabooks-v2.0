@@ -1246,14 +1246,14 @@ class PurchaseController extends Controller
 			$transaction = Transaction::where('ref_id', $purchase->id)->whereIn('ref_type', ['bill invoice', 'bill invoice tax', 'bill invoice payment', 'bill invoice tax payment'])->get();
 
 			foreach ($transaction as $t) {
-				$t->delete();
+				$t->forceDelete();
 			}
 
 			// delete pending transaction
 			$pending_transaction = PendingTransaction::where('ref_id', $purchase->id)->whereIn('ref_type', ['bill invoice', 'bill invoice tax', 'bill invoice payment', 'bill invoice tax payment'])->get();
 
 			foreach ($pending_transaction as $t) {
-				$t->delete();
+				$t->forceDelete();
 			}
 		}
 
@@ -1687,7 +1687,7 @@ class PurchaseController extends Controller
 				$new_transaction->save();
 
 				// Delete the pending transaction
-				$transaction->delete();
+				$transaction->forceDelete();
 			}
 
 
@@ -1727,7 +1727,7 @@ class PurchaseController extends Controller
 				$new_transaction->setTable('pending_transactions');
 				$new_transaction->save();
 
-				$transaction->delete();
+				$transaction->forceDelete();
 			}
 
 			// audit log

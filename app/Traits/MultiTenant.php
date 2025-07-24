@@ -57,24 +57,24 @@ trait MultiTenant
                 }
             });
 
-            static::deleting(function ($model) use ($activeBusiness, $user) {
-                if (Schema::hasColumn($model->table, 'deleted_user_id')) {
-                    $model->deleted_user_id = $user->id;
-                }
-                if (request()->has('activeBusiness')) {
-                    if (Schema::hasColumn($model->table, 'business_id')) {
-                        $model->business_id = $activeBusiness->id;
-                    }
-                    if (Schema::hasColumn($model->table, 'user_id')) {
-                        $model->user_id = $activeBusiness->user_id;
-                    }
-                }
+            // static::deleting(function ($model) use ($activeBusiness, $user) {
+            //     if (Schema::hasColumn($model->table, 'deleted_user_id')) {
+            //         $model->deleted_user_id = $user->id;
+            //     }
+            //     if (request()->has('activeBusiness')) {
+            //         if (Schema::hasColumn($model->table, 'business_id')) {
+            //             $model->business_id = $activeBusiness->id;
+            //         }
+            //         if (Schema::hasColumn($model->table, 'user_id')) {
+            //             $model->user_id = $activeBusiness->user_id;
+            //         }
+            //     }
         
-                // Force save if it's a soft delete (only safe when not force deleting)
-                if (!$model->isForceDeleting()) {
-                    $model->save();
-                }
-            });                   
+            //     // Force save if it's a soft delete (only safe when not force deleting)
+            //     if (!$model->isForceDeleting()) {
+            //         $model->save();
+            //     }
+            // });                   
 
             static::addGlobalScope('business_id', function (Builder $builder) use ($activeBusiness, $table, $user) {
                 if ($user->user_type != 'admin') {
