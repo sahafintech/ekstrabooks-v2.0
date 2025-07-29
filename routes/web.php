@@ -313,8 +313,13 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('main_categories/bulk_destroy', [MainCategoryController::class, 'bulk_destroy'])->name('main_categories.bulk_destroy');
 
 		// brands
-		Route::resource('brands', BrandsController::class);
 		Route::post('brands/bulk_destroy', [BrandsController::class, 'bulk_destroy'])->name('brands.bulk_destroy');
+		Route::get('brands/trash', [BrandsController::class, 'trash'])->name('brands.trash');
+		Route::post('brands/{id}/restore', [BrandsController::class, 'restore'])->name('brands.restore');
+		Route::post('brands/bulk_restore', [BrandsController::class, 'bulk_restore'])->name('brands.bulk_restore');
+		Route::post('brands/bulk_permanent_destroy', [BrandsController::class, 'bulk_permanent_destroy'])->name('brands.bulk_permanent_destroy');
+		Route::delete('brands/{id}/permanent_destroy', [BrandsController::class, 'permanent_destroy'])->name('brands.permanent_destroy');
+		Route::resource('brands', BrandsController::class);
 
 		// Inventory Adjustment Import (MUST BE BEFORE RESOURCE ROUTE)
 		Route::post('import_adjustments', [InventoryAdjustmentController::class, 'import_adjustments'])->name('inventory_adjustments.import');

@@ -19,81 +19,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/Components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { EyeIcon, FileDown, FileUp, MoreVertical, Plus, Trash, ChevronUp, ChevronDown, Package, DollarSign, TrendingUp, Trash2, RotateCcw } from "lucide-react";
+import { Trash, ChevronUp, ChevronDown, RotateCcw } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
-import { formatCurrency } from "@/lib/utils";
-
-// Summary Cards Component
-const SummaryCards = ({ summary = {} }) => {
-  const cards = [
-    {
-      title: "Total Products",
-      value: summary.total_products || 0,
-      description: "Total number of products",
-      icon: Package,
-      iconColor: "text-blue-500"
-    },
-    {
-      title: "Active Products",
-      value: summary.active_products || 0,
-      description: "Products that are active",
-      icon: TrendingUp,
-      iconColor: "text-green-500"
-    },
-    {
-      title: "Total Stock",
-      value: summary.total_stock || 0,
-      description: "Total items in stock",
-      icon: Package,
-      iconColor: "text-purple-500"
-    },
-    {
-      title: "Total Value",
-      value: formatCurrency({ amount: summary.total_value || 0 }),
-      description: "Total value of inventory",
-      icon: DollarSign,
-      iconColor: "text-orange-500"
-    }
-  ];
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-      {cards.map((card, index) => (
-        <div key={index} className="bg-gray-100 rounded-lg shadow-sm p-4">
-          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <h3 className="text-lg font-medium">
-              {card.title}
-            </h3>
-            <card.icon className={`h-8 w-8 ${card.iconColor}`} />
-          </div>
-          <div className="text-2xl font-bold">{card.value}
-            <p className="text-xs text-muted-foreground">
-              {card.description}
-            </p>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
 
 // Delete Confirmation Modal Component
-const DeleteProductModal = ({ show, onClose, onConfirm, processing }) => (
+const DeleteBrandModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to delete this product?
+        Are you sure you want to permanently delete this brand?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -109,7 +48,7 @@ const DeleteProductModal = ({ show, onClose, onConfirm, processing }) => (
           variant="destructive"
           disabled={processing}
         >
-          Delete
+          Permanently Delete
         </Button>
       </div>
     </form>
@@ -117,11 +56,11 @@ const DeleteProductModal = ({ show, onClose, onConfirm, processing }) => (
 );
 
 // Restore Confirmation Modal Component
-const RestoreProductModal = ({ show, onClose, onConfirm, processing }) => (
+const RestoreBrandModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to restore this product?
+        Are you sure you want to restore this brand?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -145,11 +84,11 @@ const RestoreProductModal = ({ show, onClose, onConfirm, processing }) => (
 );
 
 // Bulk Delete Confirmation Modal Component
-const DeleteAllProductsModal = ({ show, onClose, onConfirm, processing, count }) => (
+const DeleteAllBrandsModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to delete {count} selected product{count !== 1 ? 's' : ''}?
+        Are you sure you want to delete {count} selected brands{count !== 1 ? 's' : ''}?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -162,7 +101,7 @@ const DeleteAllProductsModal = ({ show, onClose, onConfirm, processing, count })
         </Button>
         <Button
           type="submit"
-          variant="default"
+          variant="destructive"
           disabled={processing}
         >
           Delete Selected
@@ -172,12 +111,12 @@ const DeleteAllProductsModal = ({ show, onClose, onConfirm, processing, count })
   </Modal>
 );
 
-// Bulk Restore Confirmation Modal Component
-const RestoreAllProductsModal = ({ show, onClose, onConfirm, processing, count }) => (
+// Bulk Delete Confirmation Modal Component
+const RestoreAllBrandsModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to restore {count} selected product{count !== 1 ? 's' : ''}?
+        Are you sure you want to restore {count} selected brands{count !== 1 ? 's' : ''}?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -200,74 +139,11 @@ const RestoreAllProductsModal = ({ show, onClose, onConfirm, processing, count }
   </Modal>
 );
 
-// Import Products Modal Component
-const ImportProductsModal = ({ show, onClose, onSubmit, processing }) => (
-  <Modal show={show} onClose={onClose} maxWidth="3xl">
-    <form onSubmit={onSubmit}>
-      <div className="ti-modal-header">
-        <h3 className="text-lg font-bold">Import Products</h3>
-      </div>
-      <div className="ti-modal-body grid grid-cols-12">
-        <div className="col-span-12">
-          <div className="flex items-center justify-between">
-            <label className="block font-medium text-sm text-gray-700">
-              Products File
-            </label>
-            <a href="/uploads/media/default/sample_items.xlsx" download>
-              <Button variant="secondary" size="sm" type="button">
-                Use This Sample File
-              </Button>
-            </a>
-          </div>
-          <input type="file" className="w-full dropify" name="products_file" required />
-        </div>
-        <div className="col-span-12 mt-4">
-          <ul className="space-y-3 text-sm">
-            <li className="flex space-x-3">
-              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
-              <span className="text-gray-800 dark:text-white/70">
-                Maximum File Size: 1 MB
-              </span>
-            </li>
-            <li className="flex space-x-3">
-              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
-              <span className="text-gray-800 dark:text-white/70">
-                File format Supported: CSV, TSV, XLS
-              </span>
-            </li>
-            <li className="flex space-x-3">
-              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
-              <span className="text-gray-800 dark:text-white/70">
-                Make sure the format of the import file matches our sample file by comparing them.
-              </span>
-            </li>
-          </ul>
-        </div>
-      </div>
-      <div className="mt-6 flex justify-end">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={onClose}
-          className="mr-3"
-        >
-          Close
-        </Button>
-        <Button
-          type="submit"
-          disabled={processing}
-        >
-          Import
-        </Button>
-      </div>
-    </form>
-  </Modal>
-);
 
-export default function TrashList({ products = [], meta = {}, filters = {}, summary = {} }) {
+export default function TrashList({ brands = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
-  const [selectedProducts, setSelectedProducts] = useState([]);
+  const [selectedBrands, setSelectedBrands] = useState([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
   const [perPage, setPerPage] = useState(meta.per_page || 50);
@@ -278,11 +154,11 @@ export default function TrashList({ products = [], meta = {}, filters = {}, summ
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [productToDelete, setProductToDelete] = useState(null);
+  const [brandToDelete, setBrandToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
-  const [productToRestore, setProductToRestore] = useState(null);
+  const [selectedBrand, setSelectedBrand] = useState(null);
   const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [brandToRestore, setBrandToRestore] = useState(null);
   const [showRestoreAllModal, setShowRestoreAllModal] = useState(false);
 
   useEffect(() => {
@@ -304,20 +180,20 @@ export default function TrashList({ products = [], meta = {}, filters = {}, summ
 
   const toggleSelectAll = () => {
     if (isAllSelected) {
-      setSelectedProducts([]);
+      setSelectedBrands([]);
     } else {
-      setSelectedProducts(products.map((product) => product.id));
+      setSelectedBrands(brands.map((brand) => brand.id));
     }
     setIsAllSelected(!isAllSelected);
   };
 
-  const toggleSelectProduct = (id) => {
-    if (selectedProducts.includes(id)) {
-      setSelectedProducts(selectedProducts.filter((productId) => productId !== id));
+  const toggleSelectBrand = (id) => {
+    if (selectedBrands.includes(id)) {
+      setSelectedBrands(selectedBrands.filter((brandId) => brandId !== id));
       setIsAllSelected(false);
     } else {
-      setSelectedProducts([...selectedProducts, id]);
-      if (selectedProducts.length + 1 === products.length) {
+      setSelectedBrands([...selectedBrands, id]);
+      if (selectedBrands.length + 1 === brands.length) {
         setIsAllSelected(true);
       }
     }
@@ -329,7 +205,7 @@ export default function TrashList({ products = [], meta = {}, filters = {}, summ
     setSearch(value);
 
     router.get(
-      route("products.index"),
+      route("brands.trash"),
       { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
@@ -339,7 +215,7 @@ export default function TrashList({ products = [], meta = {}, filters = {}, summ
   const handlePerPageChange = (value) => {
     setPerPage(value);
     router.get(
-      route("products.index"),
+      route("brands.trash"),
       { search, page: 1, per_page: value },
       { preserveState: true }
     );
@@ -348,7 +224,7 @@ export default function TrashList({ products = [], meta = {}, filters = {}, summ
   const handlePageChange = (page) => {
     setCurrentPage(page);
     router.get(
-      route("products.index"),
+      route("brands.trash"),
       { search, page, per_page: perPage },
       { preserveState: true }
     );
@@ -357,24 +233,29 @@ export default function TrashList({ products = [], meta = {}, filters = {}, summ
   const handleBulkAction = () => {
     if (bulkAction === "") return;
 
-    if (selectedProducts.length === 0) {
+    if (selectedBrands.length === 0) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Please select at least one product",
+        description: "Please select at least one brand",
       });
       return;
     }
 
     if (bulkAction === "delete") {
       setShowDeleteAllModal(true);
-    } else if (bulkAction === "restore") {
+    }else if (bulkAction === "restore") {
       setShowRestoreAllModal(true);
     }
   };
 
+  const handleRestoreConfirm = (id) => {
+    setBrandToRestore(id);
+    setShowRestoreModal(true);
+  };
+
   const handleDeleteConfirm = (id) => {
-    setProductToDelete(id);
+    setBrandToDelete(id);
     setShowDeleteModal(true);
   };
 
@@ -382,12 +263,12 @@ export default function TrashList({ products = [], meta = {}, filters = {}, summ
     e.preventDefault();
     setProcessing(true);
 
-    router.delete(route('products.permanent_destroy', productToDelete), {
+    router.delete(route('brands.permanent_destroy', brandToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
-        setProductToDelete(null);
+        setBrandToDelete(null);
         setProcessing(false);
-        setSelectedProducts([]);
+        setSelectedBrands([]);
         setIsAllSelected(false);
       },
       onError: () => {
@@ -396,32 +277,17 @@ export default function TrashList({ products = [], meta = {}, filters = {}, summ
     });
   };
 
-  const handleRestoreConfirm = (id) => {
-    setProductToRestore(id);
-    setShowRestoreModal(true);
-  };
-
-  const resetModalStates = () => {
-    setShowDeleteModal(false);
-    setShowDeleteAllModal(false);
-    setShowRestoreModal(false);
-    setShowRestoreAllModal(false);
-    setShowImportModal(false);
-    setProductToDelete(null);
-    setProductToRestore(null);
-    setProcessing(false);
-  };
-
   const handleRestore = (e) => {
     e.preventDefault();
     setProcessing(true);
 
-    router.post(route('products.restore', productToRestore), {
+    router.post(route('brands.restore', brandToRestore), {
       onSuccess: () => {
+        console.log('Restore successful');
         setShowRestoreModal(false);
-        setProductToRestore(null);
+        setBrandToRestore(null);
         setProcessing(false);
-        setSelectedProducts([]);
+        setSelectedBrands([]);
         setIsAllSelected(false);
       },
       onError: () => {
@@ -434,14 +300,14 @@ export default function TrashList({ products = [], meta = {}, filters = {}, summ
     e.preventDefault();
     setProcessing(true);
 
-    router.post(route('products.bulk_permanent_destroy'),
+    router.post(route('brands.bulk_permanent_destroy'),
       {
-        ids: selectedProducts,
+        ids: selectedBrands
       },
       {
         onSuccess: () => {
           setShowDeleteAllModal(false);
-          setSelectedProducts([]);
+          setSelectedBrands([]);
           setIsAllSelected(false);
           setProcessing(false);
           setBulkAction("");
@@ -453,45 +319,26 @@ export default function TrashList({ products = [], meta = {}, filters = {}, summ
     );
   };
 
-  const handleBulkRestore = (e) => {
+  const handleRestoreAll = (e) => {
     e.preventDefault();
     setProcessing(true);
 
-    router.post(route('products.bulk_restore'),
+    router.post(route('brands.bulk_restore'),
       {
-        ids: selectedProducts,
+        ids: selectedBrands
       },
       {
         onSuccess: () => {
           setShowRestoreAllModal(false);
-          setSelectedProducts([]);
+          setSelectedBrands([]);
           setIsAllSelected(false);
           setProcessing(false);
-          setBulkAction("");
         },
         onError: () => {
           setProcessing(false);
         }
       }
     );
-  };
-
-  const handleImport = (e) => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    setProcessing(true);
-
-    router.post(route('products.import'), formData, {
-      onSuccess: () => {
-        setShowImportModal(false);
-        setProcessing(false);
-        // Reset the form
-        e.target.reset();
-      },
-      onError: () => {
-        setProcessing(false);
-      }
-    });
   };
 
   const handleSort = (column) => {
@@ -501,7 +348,7 @@ export default function TrashList({ products = [], meta = {}, filters = {}, summ
     }
     setSorting({ column, direction });
     router.get(
-      route("products.index"),
+      route("brands.trash"),
       { ...filters, sorting: { column, direction }, page: 1, per_page: perPage },
       { preserveState: true }
     );
@@ -549,44 +396,26 @@ export default function TrashList({ products = [], meta = {}, filters = {}, summ
     return pages;
   };
 
-  const exportProducts = () => {
-    window.location.href = route("products.export");
-  };
-
-  const ProductStatusBadge = ({ status }) => {
-    const statusMap = {
-      1: { label: "Active", className: "text-green-600 bg-green-200 px-3 py-1 rounded text-sm" },
-      0: { label: "Disabled", className: "text-red-600 bg-red-200 px-3 py-1 rounded text-sm" },
-    };
-
-    return (
-      <span className={statusMap[status].className}>
-        {statusMap[status].label}
-      </span>
-    );
-  };
-
   return (
     <AuthenticatedLayout>
       <Toaster />
       <SidebarInset>
         <div className="main-content">
           <PageHeader
-            page="Products"
-            subpage="Trash"
-            url="products.index"
+            page="Brands"
+            subpage="List"
+            url="brands.index"
           />
           <div className="p-4">
-            <SummaryCards summary={summary} />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
               <div>
                 <div className="text-red-500">
-                  Total trashed products: {meta.total}
+                  Total trashed brands: {meta.total}
                 </div>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input
-                  placeholder="Search products..."
+                  placeholder="Search trashed brands..."
                   value={search}
                   onChange={(e) => handleSearch(e)}
                   className="w-full md:w-80"
@@ -638,52 +467,33 @@ export default function TrashList({ products = [], meta = {}, filters = {}, summ
                     </TableHead>
                     <TableHead className="w-[80px] cursor-pointer" onClick={() => handleSort("id")}>ID {renderSortIcon("id")}</TableHead>
                     <TableHead className="cursor-pointer" onClick={() => handleSort("name")}>Name {renderSortIcon("name")}</TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("type")}>Type {renderSortIcon("type")}</TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("purchase_cost")}>Purchase Cost {renderSortIcon("purchase_cost")}</TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("selling_price")}>Selling Price {renderSortIcon("selling_price")}</TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("stock")}>Stock {renderSortIcon("stock")}</TableHead>
-                    <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {products.length > 0 ? (
-                    products.map((product) => (
-                      <TableRow key={product.id}>
+                  {brands.length > 0 ? (
+                    brands.map((brand) => (
+                      <TableRow key={brand.id}>
                         <TableCell>
                           <Checkbox
-                            checked={selectedProducts.includes(product.id)}
-                            onCheckedChange={() => toggleSelectProduct(product.id)}
+                            checked={selectedBrands.includes(brand.id)}
+                            onCheckedChange={() => toggleSelectBrand(brand.id)}
                           />
                         </TableCell>
-                        <TableCell>{product.id}</TableCell>
-                        <Link href={route("products.show", product.id)} className="underline text-blue-500">
-                          <TableCell>{product.name}</TableCell>
-                        </Link>
-                        <TableCell>{product.type}</TableCell>
-                        <TableCell>{formatCurrency({ amount: product.purchase_cost }) || "-"}</TableCell>
-                        <TableCell>{formatCurrency({ amount: product.selling_price }) || "-"}</TableCell>
-                        <TableCell>{product.stock || "-"}</TableCell>
-                        <TableCell>
-                          {<ProductStatusBadge status={product.status} /> || "-"}
-                        </TableCell>
+                        <TableCell>{brand.id}</TableCell>
+                        <TableCell>{brand.name}</TableCell>
                         <TableCell className="text-right">
-                          <TableActions
+                        <TableActions
                             actions={[
-                              {
-                                label: "View",
-                                icon: <EyeIcon className="h-4 w-4" />,
-                                href: route("products.show", product.id),
-                              },
                               {
                                 label: "Restore",
                                 icon: <RotateCcw className="h-4 w-4" />,
-                                onClick: () => handleRestoreConfirm(product.id),
+                                onClick: () => handleRestoreConfirm(brand.id)
                               },
                               {
-                                label: "Permanent Delete",
+                                label: "Permanently Delete",
                                 icon: <Trash className="h-4 w-4" />,
-                                onClick: () => handleDeleteConfirm(product.id),
+                                onClick: () => handleDeleteConfirm(brand.id),
                                 destructive: true,
                               },
                             ]}
@@ -693,8 +503,8 @@ export default function TrashList({ products = [], meta = {}, filters = {}, summ
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={9} className="h-24 text-center">
-                        No products found.
+                      <TableCell colSpan={8} className="h-24 text-center">
+                        No brands found.
                       </TableCell>
                     </TableRow>
                   )}
@@ -702,7 +512,7 @@ export default function TrashList({ products = [], meta = {}, filters = {}, summ
               </Table>
             </div>
 
-            {products.length > 0 && meta.total > 0 && (
+            {brands.length > 0 && meta.total > 0 && (
               <div className="flex items-center justify-between mt-4">
                 <div className="text-sm text-gray-500">
                   Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, meta.total)} of {meta.total} entries
@@ -748,42 +558,36 @@ export default function TrashList({ products = [], meta = {}, filters = {}, summ
         </div>
       </SidebarInset>
 
-      <DeleteProductModal
+      <DeleteBrandModal
         show={showDeleteModal}
-        onClose={resetModalStates}
+        onClose={() => setShowDeleteModal(false)}
         onConfirm={handleDelete}
         processing={processing}
       />
 
-      <DeleteAllProductsModal
+      <DeleteAllBrandsModal
         show={showDeleteAllModal}
-        onClose={resetModalStates}
+        onClose={() => setShowDeleteAllModal(false)}
         onConfirm={handleDeleteAll}
         processing={processing}
-        count={selectedProducts.length}
+        count={selectedBrands.length}
       />
 
-      <RestoreAllProductsModal
+      <RestoreAllBrandsModal
         show={showRestoreAllModal}
-        onClose={resetModalStates}
-        onConfirm={handleBulkRestore}
+        onClose={() => setShowRestoreAllModal(false)}
+        onConfirm={handleRestoreAll}
         processing={processing}
-        count={selectedProducts.length}
+        count={selectedBrands.length}
       />
 
-      <ImportProductsModal
-        show={showImportModal}
-        onClose={resetModalStates}
-        onSubmit={handleImport}
-        processing={processing}
-      />
-
-      <RestoreProductModal
+      <RestoreBrandModal
         show={showRestoreModal}
-        onClose={resetModalStates}
+        onClose={() => setShowRestoreModal(false)}
         onConfirm={handleRestore}
         processing={processing}
       />
+
     </AuthenticatedLayout>
   );
 }

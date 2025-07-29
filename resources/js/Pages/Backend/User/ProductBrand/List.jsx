@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { Edit, EyeIcon, Plus, Trash, ChevronUp, ChevronDown } from "lucide-react";
+import { Edit, EyeIcon, Plus, Trash, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -128,7 +128,7 @@ const BrandFormModal = ({ show, onClose, onSubmit, processing, brand = null }) =
   );
 };
 
-export default function List({ brands = [], meta = {}, filters = {} }) {
+export default function List({ brands = [], meta = {}, filters = {}, trashed_brands = 0 }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedBrands, setSelectedBrands] = useState([]);
@@ -387,11 +387,21 @@ export default function List({ brands = [], meta = {}, filters = {} }) {
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex flex-col md:flex-row gap-2">
                 <Button onClick={() => setShowCreateModal(true)}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Brand
                 </Button>
+                <Link href={route("brands.trash")}>
+                  <Button variant="outline" className="relative">
+                    <Trash2 className="h-8 w-8" />
+                    {trashed_brands > 0 && (
+                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
+                        {trashed_brands}
+                      </span>
+                    )}
+                  </Button>
+                </Link>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input
