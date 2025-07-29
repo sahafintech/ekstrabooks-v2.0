@@ -156,7 +156,6 @@ export default function TrashList({ brands = [], meta = {}, filters = {} }) {
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [brandToDelete, setBrandToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
-  const [selectedBrand, setSelectedBrand] = useState(null);
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [brandToRestore, setBrandToRestore] = useState(null);
   const [showRestoreAllModal, setShowRestoreAllModal] = useState(false);

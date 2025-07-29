@@ -284,7 +284,13 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('vendors/bulk_destroy', [VendorController::class, 'bulk_destroy'])->name('vendors.bulk_destroy');
 
 		//Product Controller
-		Route::resource('product_units', ProductUnitController::class)->except('show');
+		Route::get('product_units/trash', [ProductUnitController::class, 'trash'])->name('product_units.trash');
+		Route::post('product_units/{id}/restore', [ProductUnitController::class, 'restore'])->name('product_units.restore');
+		Route::post('product_units/bulk_restore', [ProductUnitController::class, 'bulk_restore'])->name('product_units.bulk_restore');
+		Route::post('product_units/bulk_permanent_destroy', [ProductUnitController::class, 'bulk_permanent_destroy'])->name('product_units.bulk_permanent_destroy');
+		Route::delete('product_units/{id}/permanent_destroy', [ProductUnitController::class, 'permanent_destroy'])->name('product_units.permanent_destroy');
+		Route::resource('product_units', ProductUnitController::class);
+		
 		Route::post('product_units/bulk_destroy', [ProductUnitController::class, 'bulk_destroy'])->name('product_units.bulk_destroy');
 		Route::get('products/export', [ProductController::class, 'product_export'])->name('products.export');
 		Route::post('import_products', [ProductController::class, 'import_products'])->name('products.import');

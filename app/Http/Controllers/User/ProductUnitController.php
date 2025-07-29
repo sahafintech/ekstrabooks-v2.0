@@ -63,6 +63,49 @@ class ProductUnitController extends Controller
                 'columnFilters' => $request->get('columnFilters', []),
                 'sorting' => $request->get('sorting', []),
             ],
+            'trashed_units' => ProductUnit::onlyTrashed()->count(),
+        ]);
+    }
+
+    public function trash(Request $request)
+    {
+        $per_page = $request->get('per_page', 50);
+        $search = $request->get('search', '');
+
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        $query = ProductUnit::onlyTrashed()->orderBy($sortColumn, $sortDirection);
+
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('unit', 'like', "%{$search}%");
+            });
+        }
+
+        // Get vendors with pagination
+        $units = $query->paginate($per_page)->withQueryString();
+
+        // Return Inertia view
+        return Inertia::render('Backend/User/ProductUnit/Trash', [
+            'units' => $units->items(),
+            'meta' => [
+                'current_page' => $units->currentPage(),
+                'from' => $units->firstItem(),
+                'last_page' => $units->lastPage(),
+                'links' => $units->linkCollection(),
+                'path' => $units->path(),
+                'per_page' => $units->perPage(),
+                'to' => $units->lastItem(),
+                'total' => $units->total(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $request->get('sorting', []),
+            ],
         ]);
     }
 
@@ -181,5 +224,93 @@ class ProductUnitController extends Controller
         }
 
         return redirect()->route('product_units.index')->with('error', _lang('No product units selected'));
+    }
+
+    public function permanent_destroy($id)
+    {
+        $productunit = ProductUnit::onlyTrashed()->find($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Product Unit Permanently Deleted' . ' ' . $productunit->unit;
+        $audit->save();
+
+        $productunit->forceDelete();
+        return redirect()->route('product_units.trash')->with('success', _lang('Product Unit Permanently Deleted Successfully'));
+    }
+
+    /**
+     * Remove multiple resources from storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_permanent_destroy(Request $request)
+    {
+        if ($request->has('ids')) {
+            $ids = $request->ids;
+            $units = ProductUnit::onlyTrashed()->whereIn('id', $ids)->get();
+
+            foreach ($units as $unit) {
+                // audit log
+                $audit = new AuditLog();
+                $audit->date_changed = date('Y-m-d H:i:s');
+                $audit->changed_by = auth()->user()->id;
+                $audit->event = 'Product Unit Permanently Deleted: ' . $unit->unit;
+                $audit->save();
+
+                $unit->forceDelete();
+            }
+
+            return redirect()->route('product_units.trash')->with('success', _lang('Product Units Permanently Deleted'));
+        }
+
+        return redirect()->route('product_units.trash')->with('error', _lang('No product units selected'));
+    }
+
+    public function restore($id)
+    {
+        $productunit = ProductUnit::onlyTrashed()->find($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Product Unit Restored' . ' ' . $productunit->unit;
+        $audit->save();
+
+        $productunit->restore();
+        return redirect()->route('product_units.trash')->with('success', _lang('Product Unit Restored Successfully'));
+    }
+
+    /**
+     * Remove multiple resources from storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_restore(Request $request)
+    {
+        if ($request->has('ids')) {
+            $ids = $request->ids;
+            $units = ProductUnit::onlyTrashed()->whereIn('id', $ids)->get();
+
+            foreach ($units as $unit) {
+                // audit log
+                $audit = new AuditLog();
+                $audit->date_changed = date('Y-m-d H:i:s');
+                $audit->changed_by = auth()->user()->id;
+                $audit->event = 'Product Unit Restored: ' . $unit->unit;
+                $audit->save();
+
+                $unit->restore();
+            }
+
+            return redirect()->route('product_units.trash')->with('success', _lang('Product Units Restored'));
+        }
+
+        return redirect()->route('product_units.trash')->with('error', _lang('No product units selected'));
     }
 }

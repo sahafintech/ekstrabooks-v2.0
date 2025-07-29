@@ -20,13 +20,12 @@ import {
   SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { Edit, Plus, Trash, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+import { Edit, Plus, Trash, ChevronUp, ChevronDown, RotateCcw } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
-import { Link } from "@inertiajs/react";
 
 // Delete Confirmation Modal Component
 const DeleteUnitModal = ({ show, onClose, onConfirm, processing }) => (
@@ -84,52 +83,63 @@ const DeleteAllUnitsModal = ({ show, onClose, onConfirm, processing, count }) =>
   </Modal>
 );
 
-const UnitFormModal = ({ show, onClose, onSubmit, processing, unit = null }) => {
-  return (
-    <Modal show={show} onClose={onClose}>
-      <form onSubmit={onSubmit}>
-        <div className="ti-modal-header">
-          <h3 className="text-lg font-bold">
-            {unit ? "Edit Product Unit" : "Create New Product Unit"}
-          </h3>
-        </div>
-        <div className="mt-4">
-          <div className="mb-4">
-            <label htmlFor="unit" className="block text-sm font-medium text-gray-700">
-              Unit Name <span className="text-red-500">*</span>
-            </label>
-            <Input
-              type="text"
-              id="unit"
-              name="unit"
-              defaultValue={unit?.unit || ""}
-              required
-              className="mt-1"
-            />
-          </div>
-        </div>
-        <div className="mt-6 flex justify-end">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={onClose}
-            className="mr-3"
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            disabled={processing}
-          >
-            {unit ? "Update Unit" : "Create Unit"}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-};
+// Restore Confirmation Modal Component
+const RestoreUnitModal = ({ show, onClose, onConfirm, processing }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to restore this unit?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Restore
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
 
-export default function List({ units = [], meta = {}, filters = {}, trashed_units = 0 }) {
+// Bulk Restore Confirmation Modal Component
+const RestoreAllUnitsModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to restore {count} selected units{count !== 1 ? 's' : ''}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Restore Selected
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+export default function TrashList({ units = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedUnits, setSelectedUnits] = useState([]);
@@ -145,9 +155,9 @@ export default function List({ units = [], meta = {}, filters = {}, trashed_unit
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [unitToDelete, setUnitToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedUnit, setSelectedUnit] = useState(null);
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [unitToRestore, setUnitToRestore] = useState(null);
+  const [showRestoreAllModal, setShowRestoreAllModal] = useState(false);
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -193,7 +203,7 @@ export default function List({ units = [], meta = {}, filters = {}, trashed_unit
     setSearch(value);
 
     router.get(
-      route("product_units.index"),
+      route("product_units.trash"),
       { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
@@ -203,7 +213,7 @@ export default function List({ units = [], meta = {}, filters = {}, trashed_unit
   const handlePerPageChange = (value) => {
     setPerPage(value);
     router.get(
-      route("product_units.index"),
+      route("product_units.trash"),
       { search, page: 1, per_page: value },
       { preserveState: true }
     );
@@ -212,7 +222,7 @@ export default function List({ units = [], meta = {}, filters = {}, trashed_unit
   const handlePageChange = (page) => {
     setCurrentPage(page);
     router.get(
-      route("product_units.index"),
+      route("product_units.trash"),
       { search, page, per_page: perPage },
       { preserveState: true }
     );
@@ -232,6 +242,9 @@ export default function List({ units = [], meta = {}, filters = {}, trashed_unit
 
     if (bulkAction === "delete") {
       setShowDeleteAllModal(true);
+    }else 
+    if (bulkAction === "restore") {
+      setShowRestoreAllModal(true);
     }
   };
 
@@ -240,54 +253,16 @@ export default function List({ units = [], meta = {}, filters = {}, trashed_unit
     setShowDeleteModal(true);
   };
 
-  // Handle create unit
-  const handleCreate = (e) => {
-    e.preventDefault();
-    setProcessing(true);
-
-    const formData = new FormData(e.target);
-
-    router.post(route('product_units.store'), formData, {
-      onSuccess: () => {
-        setShowCreateModal(false);
-        setProcessing(false);
-      },
-      onError: () => {
-        setProcessing(false);
-      }
-    });
-  };
-
-  // Handle edit unit
-  const handleShowEditModal = (unit) => {
-    setSelectedUnit(unit);
-    setShowEditModal(true);
-  };
-
-  const handleUpdate = (e) => {
-    e.preventDefault();
-    setProcessing(true);
-
-    const formData = new FormData(e.target);
-    formData.append('_method', 'PUT');
-
-    router.post(route('product_units.update', selectedUnit.id), formData, {
-      onSuccess: () => {
-        setShowEditModal(false);
-        setProcessing(false);
-        setSelectedUnit(null);
-      },
-      onError: () => {
-        setProcessing(false);
-      }
-    });
+  const handleRestoreConfirm = (id) => {
+    setUnitToRestore(id);
+    setShowRestoreModal(true);
   };
 
   const handleDelete = (e) => {
     e.preventDefault();
     setProcessing(true);
 
-    router.delete(route('product_units.destroy', unitToDelete), {
+    router.delete(route('product_units.permanent_destroy', unitToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
         setUnitToDelete(null);
@@ -303,13 +278,51 @@ export default function List({ units = [], meta = {}, filters = {}, trashed_unit
     e.preventDefault();
     setProcessing(true);
 
-    router.post(route('product_units.bulk_destroy'),
+    router.post(route('product_units.bulk_permanent_destroy'),
       {
         ids: selectedUnits
       },
       {
         onSuccess: () => {
           setShowDeleteAllModal(false);
+          setSelectedUnits([]);
+          setIsAllSelected(false);
+          setProcessing(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
+      }
+    );
+  };
+
+  const handleRestore = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+
+    router.post(route('product_units.restore', unitToRestore), {
+      onSuccess: () => {
+        setShowRestoreModal(false);
+        setUnitToDelete(null);
+        setProcessing(false);
+      },
+      onError: () => {
+        setProcessing(false);
+      }
+    });
+  };
+
+  const handleRestoreAll = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+
+    router.post(route('product_units.bulk_restore'),
+      {
+        ids: selectedUnits
+      },
+      {
+        onSuccess: () => {
+          setShowRestoreAllModal(false);
           setSelectedUnits([]);
           setIsAllSelected(false);
           setProcessing(false);
@@ -328,7 +341,7 @@ export default function List({ units = [], meta = {}, filters = {}, trashed_unit
     }
     setSorting({ column, direction });
     router.get(
-      route("product_units.index"),
+      route("product_units.trash"),
       { ...filters, sorting: { column, direction }, page: 1, per_page: perPage },
       { preserveState: true }
     );
@@ -388,25 +401,14 @@ export default function List({ units = [], meta = {}, filters = {}, trashed_unit
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-2">
-                <Button onClick={() => setShowCreateModal(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Unit
-                </Button>
-                <Link href={route("product_units.trash")}>
-                  <Button variant="outline" className="relative">
-                    <Trash2 className="h-8 w-8" />
-                    {trashed_units > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                        {trashed_units}
-                      </span>
-                    )}
-                  </Button>
-                </Link>
+                <div>
+                    <div className="text-red-500">
+                        Total trashed units: {meta.total}
+                    </div>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input
-                  placeholder="Search units..."
+                  placeholder="Search trashed units..."
                   value={search}
                   onChange={(e) => handleSearch(e)}
                   className="w-full md:w-80"
@@ -421,7 +423,8 @@ export default function List({ units = [], meta = {}, filters = {}, trashed_unit
                     <SelectValue placeholder="Bulk actions" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="delete">Delete Selected</SelectItem>
+                    <SelectItem value="delete">Permanently Delete Selected</SelectItem>
+                    <SelectItem value="restore">Restore Selected</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button onClick={handleBulkAction} variant="outline">
@@ -473,21 +476,21 @@ export default function List({ units = [], meta = {}, filters = {}, trashed_unit
                         <TableCell>{unit.id}</TableCell>
                         <TableCell>{unit.unit}</TableCell>
                         <TableCell className="text-right">
-                          <TableActions
+                        <TableActions
                             actions={[
                               {
-                                label: "Edit",
-                                icon: <Edit className="h-4 w-4" />,
-                                onClick: () => handleShowEditModal(unit)
+                                label: "Restore",
+                                icon: <RotateCcw className="h-4 w-4" />,
+                                onClick: () => handleRestoreConfirm(unit.id)
                               },
                               {
-                                label: "Delete",
+                                label: "Permanently Delete",
                                 icon: <Trash className="h-4 w-4" />,
                                 onClick: () => handleDeleteConfirm(unit.id),
                                 destructive: true,
                               },
                             ]}
-                          />
+                        />
                         </TableCell>
                       </TableRow>
                     ))
@@ -563,19 +566,19 @@ export default function List({ units = [], meta = {}, filters = {}, trashed_unit
         count={selectedUnits.length}
       />
 
-      <UnitFormModal
-        show={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSubmit={handleCreate}
+      <RestoreUnitModal
+        show={showRestoreModal}
+        onClose={() => setShowRestoreModal(false)}
+        onConfirm={handleRestore}
         processing={processing}
       />
 
-      <UnitFormModal
-        show={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        onSubmit={handleUpdate}
+      <RestoreAllUnitsModal
+        show={showRestoreAllModal}
+        onClose={() => setShowRestoreAllModal(false)}
+        onConfirm={handleRestoreAll}
         processing={processing}
-        unit={selectedUnit}
+        count={selectedUnits.length}
       />
 
     </AuthenticatedLayout>
