@@ -18,7 +18,6 @@ use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Imports\InventoryAdjustmentImport;
 use Exception;
-use Illuminate\Support\Facades\Validator;
 
 class InventoryAdjustmentController extends Controller
 {
@@ -56,6 +55,60 @@ class InventoryAdjustmentController extends Controller
 
         // Return Inertia view
         return Inertia::render('Backend/User/InventoryAdjustment/List', [
+            'adjustments' => $adjustments->items(),
+            'meta' => [
+                'current_page' => $adjustments->currentPage(),
+                'from' => $adjustments->firstItem(),
+                'last_page' => $adjustments->lastPage(),
+                'links' => $adjustments->linkCollection(),
+                'path' => $adjustments->path(),
+                'per_page' => $adjustments->perPage(),
+                'to' => $adjustments->lastItem(),
+                'total' => $adjustments->total(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $request->get('sorting', []),
+            ],
+            'trashed_adjustments' => InventoryAdjustment::onlyTrashed()->count(),
+        ]);
+    }
+
+    public function trash(Request $request)
+    {
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        $query = InventoryAdjustment::onlyTrashed()->with('product');
+
+        if ($sortColumn === 'product.name') {
+            $query->join('products', 'inventory_adjustments.product_id', '=', 'products.id')
+                ->orderBy('products.name', $sortDirection)
+                ->select('inventory_adjustments.*');
+        } else {
+            $query->orderBy($sortColumn, $sortDirection);
+        }
+
+        $per_page = $request->get('per_page', 50);
+        $search = $request->get('search', '');
+
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('adjustment_date', 'like', "%{$search}%")
+                    ->orWhereHas('product', function ($q) use ($search) {
+                        $q->where('name', 'like', "%$search%");
+                    });;
+            });
+        }
+
+        // Get vendors with pagination
+        $adjustments = $query->paginate($per_page)->withQueryString();
+
+        // Return Inertia view
+        return Inertia::render('Backend/User/InventoryAdjustment/Trash', [
             'adjustments' => $adjustments->items(),
             'meta' => [
                 'current_page' => $adjustments->currentPage(),
@@ -419,6 +472,146 @@ class InventoryAdjustmentController extends Controller
 
         return redirect()->route('inventory_adjustments.index')
             ->with('success', _lang('Inventory adjustments deleted successfully'));
+    }
+
+    public function permanent_destroy($id)
+    {
+        DB::beginTransaction();
+
+        try {
+            $adjustment = InventoryAdjustment::onlyTrashed()->find($id);
+            $product = Product::find($adjustment->product_id);
+
+            // Delete related transactions
+            Transaction::onlyTrashed()->where('ref_id', $adjustment->product_id)
+                ->where('ref_type', 'product adjustment')
+                ->forceDelete();
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Inventory Adjustment Permanently Deleted For ' . $product->name . ' Quantity Adjusted: ' . $adjustment->adjusted_quantity;
+            $audit->save();
+
+            $adjustment->forceDelete();
+
+            DB::commit();
+
+            return redirect()->route('inventory_adjustments.trash')
+                ->with('success', _lang('Inventory adjustment permanently deleted successfully'));
+        } catch (\Exception $e) {
+            DB::rollback();
+            return redirect()->back()->with('error', _lang('An error occurred: ') . $e->getMessage());
+        }
+    }
+
+    /**
+     * Remove multiple resources from storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_permanent_destroy(Request $request)
+    {
+
+        $ids = $request->ids;
+        $adjustments = InventoryAdjustment::onlyTrashed()->whereIn('id', $ids)->get();
+
+        foreach ($adjustments as $adjustment) {
+            $product = Product::find($adjustment->product_id);
+
+            // Delete related transactions
+            Transaction::onlyTrashed()->where('ref_id', $adjustment->product_id)
+                ->where('ref_type', 'product adjustment')
+                ->forceDelete();
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Inventory Adjustment Permanently Deleted For ' . $product->name . ' Quantity Adjusted: ' . $adjustment->adjusted_quantity;
+            $audit->save();
+
+            $adjustment->forceDelete();
+        }
+
+        return redirect()->route('inventory_adjustments.trash')
+            ->with('success', _lang('Inventory adjustments permanently deleted successfully'));
+    }
+
+    public function restore($id)
+    {
+        DB::beginTransaction();
+
+        try {
+            $adjustment = InventoryAdjustment::onlyTrashed()->findOrFail($id);
+            $product = Product::find($adjustment->product_id);
+
+            // add or deduct stock
+            $product->stock = $adjustment->adjustment_type == 'adds' ? $product->stock + $adjustment->adjusted_quantity : $product->stock - $adjustment->adjusted_quantity;
+            $product->save();
+
+            // Delete related transactions
+            Transaction::onlyTrashed()->where('ref_id', $adjustment->product_id)
+                ->where('ref_type', 'product adjustment')
+                ->restore();
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Inventory Adjustment Restored For ' . $product->name . ' Quantity Adjusted: ' . $adjustment->adjusted_quantity;
+            $audit->save();
+
+            $adjustment->restore();
+
+            DB::commit();
+
+            return redirect()->route('inventory_adjustments.trash')
+                ->with('success', _lang('Inventory adjustment restored successfully'));
+        } catch (\Exception $e) {
+            DB::rollback();
+            return redirect()->back()->with('error', _lang('An error occurred: ') . $e->getMessage());
+        }
+    }
+
+    /**
+     * Remove multiple resources from storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_restore(Request $request)
+    {
+
+        $ids = $request->ids;
+        $adjustments = InventoryAdjustment::onlyTrashed()->whereIn('id', $ids)->get();
+
+        foreach ($adjustments as $adjustment) {
+            $product = Product::find($adjustment->product_id);
+
+            // add or deduct stock
+            $product->stock = $adjustment->adjustment_type == 'adds' ? $product->stock + $adjustment->adjusted_quantity : $product->stock - $adjustment->adjusted_quantity;
+            $product->save();
+
+            // Delete related transactions
+            Transaction::onlyTrashed()->where('ref_id', $adjustment->product_id)
+                ->where('ref_type', 'product adjustment')
+                ->restore();
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Inventory Adjustment Restored For ' . $product->name . ' Quantity Adjusted: ' . $adjustment->adjusted_quantity;
+            $audit->save();
+
+            $adjustment->restore();
+        }
+
+        return redirect()->route('inventory_adjustments.trash')
+            ->with('success', _lang('Inventory adjustments restored successfully'));
     }
 
     public function import_adjustments(Request $request)
