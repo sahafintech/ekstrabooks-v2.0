@@ -332,6 +332,19 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('export_adjustments', [InventoryAdjustmentController::class, 'export_adjustments'])->name('inventory_adjustments.export');
 
 		// inventory adjustments resource route
+		Route::resource('inventory_transfers', InventoryTransferController::class);
+		Route::post('inventory_transfers/bulk_destroy', [InventoryTransferController::class, 'bulk_destroy'])->name('inventory_transfers.bulk_destroy');
+
+		// Inventory Adjustment Import (MUST BE BEFORE RESOURCE ROUTE)
+		Route::post('import_transfers', [InventoryTransferController::class, 'import_transfers'])->name('inventory_transfers.import');
+		Route::get('export_transfers', [InventoryTransferController::class, 'export_transfers'])->name('inventory_transfers.export');
+
+		// inventory adjustments resource route
+		Route::get('inventory_adjustments/trash', [InventoryAdjustmentController::class, 'trash'])->name('inventory_adjustments.trash');
+		Route::post('inventory_adjustments/{id}/restore', [InventoryAdjustmentController::class, 'restore'])->name('inventory_adjustments.restore');
+		Route::post('inventory_adjustments/bulk_restore', [InventoryAdjustmentController::class, 'bulk_restore'])->name('inventory_adjustments.bulk_restore');
+		Route::post('inventory_adjustments/bulk_permanent_destroy', [InventoryAdjustmentController::class, 'bulk_permanent_destroy'])->name('inventory_adjustments.bulk_permanent_destroy');
+		Route::delete('inventory_adjustments/{id}/permanent_destroy', [InventoryAdjustmentController::class, 'permanent_destroy'])->name('inventory_adjustments.permanent_destroy');
 		Route::resource('inventory_adjustments', InventoryAdjustmentController::class);
 		Route::post('inventory_adjustments/bulk_destroy', [InventoryAdjustmentController::class, 'bulk_destroy'])->name('inventory_adjustments.bulk_destroy');
 

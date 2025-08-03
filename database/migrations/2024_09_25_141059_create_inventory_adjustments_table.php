@@ -21,8 +21,9 @@ return new class extends Migration
             $table->float('adjusted_quantity');
             $table->float('new_quantity_on_hand');
             $table->string('adjustment_type');
-            $table->bigInteger('created_by')->unsigned();
-            $table->bigInteger('updated_by')->unsigned();
+            $table->bigInteger('created_user_id')->nullable();
+            $table->bigInteger('updated_user_id')->nullable();
+            $table->bigInteger('deleted_user_id')->nullable();
             $table->bigInteger('business_id')->unsigned();
             $table->bigInteger('user_id')->unsigned();
 
@@ -30,6 +31,7 @@ return new class extends Migration
             $table->foreign('account_id')->references('id')->on('accounts')->onDelete('cascade');
             $table->foreign('business_id')->references('id')->on('business')->onDelete('cascade');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+            $table->softDeletes();
             $table->timestamps();
         });
     }
