@@ -457,6 +457,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('cash_purchases/{id}/send_email', [CashPurchaseController::class, 'send_email'])->name('cash_purchases.send_email');
 		// purchase orders
 		Route::get('purchase_orders/{id}/duplicate', [PurchaseOrderController::class, 'duplicate'])->name('purchase_orders.duplicate');
+		Route::get('purchase_orders/trash', [PurchaseOrderController::class, 'trash'])->name('purchase_orders.trash');
+		Route::post('purchase_orders/{id}/restore', [PurchaseOrderController::class, 'restore'])->name('purchase_orders.restore');
+		Route::post('purchase_orders/bulk_restore', [PurchaseOrderController::class, 'bulk_restore'])->name('purchase_orders.bulk_restore');
+		Route::post('purchase_orders/bulk_permanent_destroy', [PurchaseOrderController::class, 'bulk_permanent_destroy'])->name('purchase_orders.bulk_permanent_destroy');
+		Route::delete('purchase_orders/{id}/permanent_destroy', [PurchaseOrderController::class, 'permanent_destroy'])->name('purchase_orders.permanent_destroy');
 		Route::resource('purchase_orders', PurchaseOrderController::class);
 		Route::post('import_purchase_orders', [PurchaseOrderController::class, 'import_purchase_orders'])->name('purchase_orders.import');
 		Route::post('purchase_orders/filter', [PurchaseOrderController::class, 'purchase_orders_filter'])->name('purchase_orders.filter');

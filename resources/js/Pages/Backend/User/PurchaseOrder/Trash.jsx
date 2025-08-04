@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, router, usePage } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -19,27 +19,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/Components/ui/select";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
 import {
-    MoreVertical,
-    FileUp,
-    FileDown,
-    Plus,
-    Eye,
-    Trash2,
-    Edit,
     ChevronUp,
     ChevronDown,
-    ShoppingCart,
-    DollarSign,
-    FileText,
-    CreditCard,
+    RotateCcw,
+    Trash
 } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
@@ -49,13 +34,12 @@ import Modal from "@/Components/Modal";
 import { formatCurrency } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
-import { Label } from "@/Components/ui/label";
 
 const DeletePurchaseOrderModal = ({ show, onClose, onConfirm, processing }) => (
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
-                Are you sure you want to delete this purchase order?
+                Are you sure you want to permanently delete this purchase order?
             </h2>
             <div className="mt-6 flex justify-end">
                 <Button
@@ -71,153 +55,7 @@ const DeletePurchaseOrderModal = ({ show, onClose, onConfirm, processing }) => (
                     variant="destructive"
                     disabled={processing}
                 >
-                    Delete Purchase Order
-                </Button>
-            </div>
-        </form>
-    </Modal>
-);
-
-const ConvertToBillModal = ({ show, onClose, onConfirm, processing }) => (
-    <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
-            <h2 className="text-lg font-medium">
-                Are you sure you want to convert this purchase order to a credit purchase?
-            </h2>
-            <div className="mt-6 flex justify-end">
-                <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={onClose}
-                    className="mr-3"
-                >
-                    Cancel
-                </Button>
-                <Button type="submit" variant="default" disabled={processing}>
-                    Convert to Credit Purchase
-                </Button>
-            </div>
-        </form>
-    </Modal>
-);
-
-const ConvertToCashPurchaseModal = ({
-    show,
-    onClose,
-    onConfirm,
-    processing,
-    accounts,
-    creditAccountId,
-    setCreditAccountId,
-}) => (
-    <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
-            <h2 className="text-lg font-medium">
-                Are you sure you want to convert this purchase order to a cash
-                purchase?
-            </h2>
-            <div className="flex flex-1 flex-col gap-4 p-4 mt-4">
-                <div className="grid grid-cols-12 mt-2">
-                    <Label htmlFor="credit_account_id" className="md:col-span-3 col-span-12">
-                        Payment Account *
-                    </Label>
-                    <div className="md:col-span-9 col-span-12 md:mt-0 mt-2">
-                        <SearchableCombobox
-                            options={accounts.map(account => ({
-                                id: account.id,
-                                name: account.account_name
-                            }))}
-                            value={creditAccountId}
-                            onChange={setCreditAccountId}
-                            placeholder="Select payment account"
-                            required
-                        />
-                    </div>
-                </div>
-            </div>
-            <div className="mt-6 flex justify-end">
-                <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={onClose}
-                    className="mr-3"
-                >
-                    Cancel
-                </Button>
-                <Button type="submit" variant="default" disabled={processing}>
-                    Convert to Cash Purchase
-                </Button>
-            </div>
-        </form>
-    </Modal>
-);
-
-const ImportPurchaseOrdersModal = ({ show, onClose, onSubmit, processing }) => (
-    <Modal show={show} onClose={onClose}>
-        <form onSubmit={onSubmit} className="p-6">
-            <div className="ti-modal-header">
-                <h3 className="text-lg font-bold">Import Purchase Orders</h3>
-            </div>
-            <div className="ti-modal-body grid grid-cols-12">
-                <div className="col-span-12">
-                    <div className="flex items-center justify-between">
-                        <label className="block font-medium text-sm text-gray-700">
-                            Purchase Orders File
-                        </label>
-                        <Link href="/uploads/media/default/sample_purchase_orders.xlsx">
-                            <Button variant="secondary" size="sm">
-                                Use This Sample File
-                            </Button>
-                        </Link>
-                    </div>
-                    <input
-                        type="file"
-                        className="w-full dropify"
-                        name="purchase_orders_file"
-                        required
-                    />
-                </div>
-                <div className="col-span-12 mt-4">
-                    <ul className="space-y-3 text-sm">
-                        <li className="flex space-x-3">
-                            <span className="text-primary bg-primary/20 rounded-full px-1">
-                                ✓
-                            </span>
-                            <span className="text-gray-800 dark:text-white/70">
-                                Maximum File Size: 1 MB
-                            </span>
-                        </li>
-                        <li className="flex space-x-3">
-                            <span className="text-primary bg-primary/20 rounded-full px-1">
-                                ✓
-                            </span>
-                            <span className="text-gray-800 dark:text-white/70">
-                                File format Supported: CSV, TSV, XLS
-                            </span>
-                        </li>
-                        <li className="flex space-x-3">
-                            <span className="text-primary bg-primary/20 rounded-full px-1">
-                                ✓
-                            </span>
-                            <span className="text-gray-800 dark:text-white/70">
-                                Make sure the format of the import file matches
-                                our sample file by comparing them.
-                            </span>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-            <div className="ti-modal-footer flex justify-end mt-4">
-                <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={onClose}
-                    className="mr-3"
-                >
-                    Close
-                </Button>
-                <Button type="submit" disabled={processing}>
-                    Import Purchase Orders
+                    Permanently Delete Purchase Order
                 </Button>
             </div>
         </form>
@@ -258,6 +96,67 @@ const DeleteAllPurchaseOrdersModal = ({
     </Modal>
 );
 
+const RestorePurchaseOrderModal = ({ show, onClose, onConfirm, processing }) => (
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
+            <h2 className="text-lg font-medium">
+                Are you sure you want to restore this purchase order?
+            </h2>
+            <div className="mt-6 flex justify-end">
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={onClose}
+                    className="mr-3"
+                >
+                    Cancel
+                </Button>
+                <Button
+                    type="submit"
+                    variant="default"
+                    disabled={processing}
+                >
+                    Restore Purchase Order
+                </Button>
+            </div>
+        </form>
+    </Modal>
+);
+
+const RestoreAllPurchaseOrdersModal = ({
+    show,
+    onClose,
+    onConfirm,
+    processing,
+    count,
+}) => (
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
+            <h2 className="text-lg font-medium">
+                Are you sure you want to restore {count} selected purchase order
+                {count !== 1 ? "s" : ""}?
+            </h2>
+            <div className="mt-6 flex justify-end">
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={onClose}
+                    className="mr-3"
+                >
+                    Cancel
+                </Button>
+                <Button
+                    type="submit"
+                    variant="default"
+                    disabled={processing}
+                >
+                    Restore Selected
+                </Button>
+            </div>
+        </form>
+    </Modal>
+);
+
 const PurchaseOrderStatusBadge = ({ status }) => {
     const statusMap = {
         0: { label: "Active", className: "text-blue-500" },
@@ -271,72 +170,11 @@ const PurchaseOrderStatusBadge = ({ status }) => {
     );
 };
 
-const SummaryCards = ({ summary = {} }) => {
-    const cards = [
-        {
-            title: "Total Orders",
-            value: summary.total_orders || 0,
-            description: "Total purchase orders",
-            icon: ShoppingCart,
-            iconColor: "text-blue-500",
-        },
-        {
-            title: "Grand Total",
-            value: formatCurrency({
-                amount: summary.grand_total || 0,
-                currency: "USD", // This will be overridden by the actual currency in the component
-            }),
-            description: "Total amount of all orders",
-            icon: DollarSign,
-            iconColor: "text-green-500",
-        },
-        {
-            title: "Total Converted",
-            value: summary.total_converted || 0,
-            description: "Orders converted to bills",
-            icon: FileText,
-            iconColor: "text-purple-500",
-        },
-        {
-            title: "Converted Grand Total",
-            value: formatCurrency({
-                amount: summary.converted_grand_total || 0,
-                currency: "USD", // This will be overridden by the actual currency in the component
-            }),
-            description: "Total amount of converted orders",
-            icon: CreditCard,
-            iconColor: "text-orange-500",
-        },
-    ];
-
-    return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {cards.map((card, index) => (
-                <div key={index} className="bg-gray-100 rounded-lg shadow-sm p-4">
-                    <div className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <h3 className="text-lg font-medium">{card.title}</h3>
-                        <card.icon className={`h-8 w-8 ${card.iconColor}`} />
-                    </div>
-                    <div className="text-2xl font-bold">
-                        {card.value}
-                        <p className="text-xs text-muted-foreground">
-                            {card.description}
-                        </p>
-                    </div>
-                </div>
-            ))}
-        </div>
-    );
-};
-
-export default function List({
+export default function TrashList({
     orders = [],
     meta = {},
     filters = {},
     vendors = [],
-    summary = {},
-    accounts = [],
-    trashed_purchase_orders = 0,
 }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
@@ -353,17 +191,15 @@ export default function List({
         filters.vendor_id || ""
     );
     const [dateRange, setDateRange] = useState(filters.date_range || "");
-    const [creditAccountId, setCreditAccountId] = useState("");
 
     // Delete confirmation modal states
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [showImportModal, setShowImportModal] = useState(false);
     const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
     const [purchaseOrderToDelete, setPurchaseOrderToDelete] = useState(null);
     const [processing, setProcessing] = useState(false);
-    const [showConvertToBillModal, setShowConvertToBillModal] = useState(false);
-    const [showConvertToCashPurchaseModal, setShowConvertToCashPurchaseModal] =
-        useState(false);
+    const [showRestoreModal, setShowRestoreModal] = useState(false);
+    const [purchaseOrderToRestore, setPurchaseOrderToRestore] = useState(null);
+    const [showRestoreAllModal, setShowRestoreAllModal] = useState(false);
 
     useEffect(() => {
         if (flash && flash.success) {
@@ -404,21 +240,16 @@ export default function List({
         setShowDeleteModal(true);
     };
 
-    const handleConvertToBillConfirm = (purchaseOrderId) => {
-        setPurchaseOrderToDelete(purchaseOrderId);
-        setShowConvertToBillModal(true);
-    };
-
-    const handleConvertToCashPurchaseConfirm = (purchaseOrderId) => {
-        setPurchaseOrderToDelete(purchaseOrderId);
-        setShowConvertToCashPurchaseModal(true);
+    const handleRestoreConfirm = (purchaseOrderId) => {
+        setPurchaseOrderToRestore(purchaseOrderId);
+        setShowRestoreModal(true);
     };
 
     const handleDelete = (e) => {
         e.preventDefault();
         setProcessing(true);
 
-        router.delete(route("purchase_orders.destroy", purchaseOrderToDelete), {
+        router.delete(route("purchase_orders.permanent_destroy", purchaseOrderToDelete), {
             onSuccess: () => {
                 setShowDeleteModal(false);
                 setPurchaseOrderToDelete(null);
@@ -444,74 +275,12 @@ export default function List({
         });
     };
 
-    const handleConvertToBill = (e) => {
-        e.preventDefault();
-        setProcessing(true);
-
-        router.post(
-            route("purchase_orders.convert_to_bill", purchaseOrderToDelete),
-            {
-                onSuccess: () => {
-                    setShowConvertToBillModal(false);
-                    setPurchaseOrderToDelete(null);
-                    setProcessing(false);
-                    setSelectedPurchaseOrders((prev) =>
-                        prev.filter((id) => id !== purchaseOrderToDelete)
-                    );
-                },
-                onError: () => {
-                    setProcessing(false);
-                },
-            }
-        );
-    };
-
-    const handleConvertToCashPurchase = (e) => {
-        e.preventDefault();
-        setProcessing(true);
-
-        router.post(
-            route(
-                "purchase_orders.convert_to_cash_purchase",
-                purchaseOrderToDelete
-            ),
-            {
-                credit_account_id: creditAccountId
-            },
-            {
-                onSuccess: () => {
-                    setShowConvertToCashPurchaseModal(false);
-                    setPurchaseOrderToDelete(null);
-                    setProcessing(false);
-                    setCreditAccountId("");
-                    setSelectedPurchaseOrders((prev) =>
-                        prev.filter((id) => id !== purchaseOrderToDelete)
-                    );
-                    toast({
-                        title: "Purchase Order Converted to Cash Purchase",
-                        description:
-                            "purchase order has been converted to cash purchase successfully.",
-                    });
-                },
-                onError: () => {
-                    setProcessing(false);
-                    toast({
-                        variant: "destructive",
-                        title: "Error",
-                        description:
-                            "There was an error converting the purchase order to cash purchase.",
-                    });
-                },
-            }
-        );
-    };
-
     const handleDeleteAll = (e) => {
         e.preventDefault();
         setProcessing(true);
 
         router.post(
-            route("purchase_orders.bulk_destroy"),
+            route("purchase_orders.bulk_permanent_destroy"),
             {
                 ids: selectedPurchaseOrders,
             },
@@ -540,31 +309,68 @@ export default function List({
         );
     };
 
-    const handleImport = (e) => {
+    const handleRestore = (e) => {
         e.preventDefault();
         setProcessing(true);
 
-        const formData = new FormData(e.target);
-
-        router.post(route("purchase_orders.import"), formData, {
+        router.post(route("purchase_orders.restore", purchaseOrderToRestore), {
             onSuccess: () => {
-                setShowImportModal(false);
+                setShowRestoreModal(false);
+                setPurchaseOrderToRestore(null);
                 setProcessing(false);
+                setSelectedPurchaseOrders((prev) =>
+                    prev.filter((id) => id !== purchaseOrderToRestore)
+                );
                 toast({
-                    title: "Import Successful",
+                    title: "Purchase Order Restored",
                     description:
-                        "Purchase orders have been imported successfully.",
+                        "purchase order has been restored successfully.",
                 });
             },
-            onError: (errors) => {
+            onError: () => {
                 setProcessing(false);
                 toast({
                     variant: "destructive",
-                    title: "Import Failed",
-                    description: Object.values(errors).flat().join(", "),
+                    title: "Error",
+                    description:
+                        "There was an error restoring the purchase order.",
                 });
             },
         });
+    };
+
+    const handleRestoreAll = (e) => {
+        e.preventDefault();
+        setProcessing(true);
+
+        router.post(
+            route("purchase_orders.bulk_restore"),
+            {
+                ids: selectedPurchaseOrders,
+            },
+            {
+                onSuccess: () => {
+                    setShowRestoreAllModal(false);
+                    setProcessing(false);
+                    setSelectedPurchaseOrders([]);
+                    setIsAllSelected(false);
+                    toast({
+                        title: "Purchase Orders Restored",
+                        description:
+                            "Selected purchase orders have been restored successfully.",
+                    });
+                },
+                onError: () => {
+                    setProcessing(false);
+                    toast({
+                        variant: "destructive",
+                        title: "Error",
+                        description:
+                            "There was an error restoring the selected purchase orders.",
+                    });
+                },
+            }
+        );
     };
 
     const handleSearch = (e) => {
@@ -573,7 +379,7 @@ export default function List({
         setSearch(value);
 
         router.get(
-            route("purchase_orders.index"),
+            route("purchase_orders.trash"),
             { search: value, page: 1, per_page: perPage },
             { preserveState: true }
         );
@@ -582,7 +388,7 @@ export default function List({
     const handlePerPageChange = (value) => {
         setPerPage(parseInt(value));
         router.get(
-            route("purchase_orders.index"),
+            route("purchase_orders.trash"),
             { search, page: 1, per_page: value },
             { preserveState: true }
         );
@@ -591,7 +397,7 @@ export default function List({
     const handlePageChange = (page) => {
         setCurrentPage(page);
         router.get(
-            route("purchase_orders.index"),
+            route("purchase_orders.trash"),
             { 
                 search,
                 page,
@@ -607,6 +413,8 @@ export default function List({
     const handleBulkAction = () => {
         if (bulkAction === "delete" && selectedPurchaseOrders.length > 0) {
             setShowDeleteAllModal(true);
+        }else if (bulkAction === "restore" && selectedPurchaseOrders.length > 0) {
+            setShowRestoreAllModal(true);
         }
     };
 
@@ -617,7 +425,7 @@ export default function List({
         }
         setSorting({ column, direction });
         router.get(
-            route("purchase_orders.index"),
+            route("purchase_orders.trash"),
             { ...filters, sorting: { column, direction } },
             { preserveState: true }
         );
@@ -681,7 +489,7 @@ export default function List({
     const handleVendorChange = (value) => {
         setSelectedVendor(value);
         router.get(
-            route("purchase_orders.index"),
+            route("purchase_orders.trash"),
             { ...filters, vendor_id: value },
             { preserveState: true }
         );
@@ -690,7 +498,7 @@ export default function List({
     const handleDateRangeChange = (value) => {
         setDateRange(value);
         router.get(
-            route("purchase_orders.index"),
+            route("purchase_orders.trash"),
             { ...filters, date_range: value },
             { preserveState: true }
         );
@@ -707,56 +515,15 @@ export default function List({
                         url="purchase_orders.index"
                     />
                     <div className="p-4">
-                        <SummaryCards summary={summary} />
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                            <div className="flex flex-col md:flex-row gap-2">
-                                <Link href={route("purchase_orders.create")}>
-                                    <Button>
-                                        <Plus className="h-4 w-4 mr-2" />
-                                        Add Purchase Order
-                                    </Button>
-                                </Link>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="secondary">
-                                            <MoreVertical className="h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        <DropdownMenuItem
-                                            onClick={() =>
-                                                setShowImportModal(true)
-                                            }
-                                        >
-                                            <FileUp className="mr-2 h-4 w-4" />{" "}
-                                            Import
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                            onClick={() =>
-                                                (window.location.href = route(
-                                                    "purchase_orders.export"
-                                                ))
-                                            }
-                                        >
-                                            <FileDown className="mr-2 h-4 w-4" />{" "}
-                                            Export
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                                <Link href={route("purchase_orders.trash")}>
-                                    <Button variant="outline" className="relative">
-                                        <Trash2 className="h-8 w-8" />
-                                        {trashed_purchase_orders > 0 && (
-                                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                                            {trashed_purchase_orders}
-                                        </span>
-                                        )}
-                                    </Button>
-                                </Link>
+                            <div>
+                                <div className="text-red-500">
+                                    Total trashed purchase orders: {meta.total}
+                                </div>
                             </div>
                             <div className="flex flex-col md:flex-row gap-4 md:items-center">
                                 <Input
-                                    placeholder="Search purchase orders..."
+                                    placeholder="Search trashed purchase orders..."
                                     value={search}
                                     onChange={(e) => handleSearch(e)}
                                     className="w-full md:w-80"
@@ -776,7 +543,10 @@ export default function List({
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="delete">
-                                                Delete Selected
+                                                Permanently Delete Selected
+                                            </SelectItem>
+                                            <SelectItem value="restore">
+                                                Restore Selected
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
@@ -935,61 +705,21 @@ export default function List({
                                                     />
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    <TableActions
-                                                        actions={[
-                                                            {
-                                                                label: "View",
-                                                                icon: (
-                                                                    <Eye className="h-4 w-4" />
-                                                                ),
-                                                                href: route(
-                                                                    "purchase_orders.show",
-                                                                    order.id
-                                                                ),
-                                                            },
-                                                            {
-                                                                label: "Convert to Credit Purchase",
-                                                                icon: (
-                                                                    <FileUp className="h-4 w-4" />
-                                                                ),
-                                                                onClick: () =>
-                                                                    handleConvertToBillConfirm(
-                                                                        order.id
-                                                                    ),
-                                                            },
-                                                            {
-                                                                label: "Convert to Cash Purchase",
-                                                                icon: (
-                                                                    <FileUp className="h-4 w-4" />
-                                                                ),
-                                                                onClick: () =>
-                                                                    handleConvertToCashPurchaseConfirm(
-                                                                        order.id
-                                                                    ),
-                                                            },
-                                                            {
-                                                                label: "Edit",
-                                                                icon: (
-                                                                    <Edit className="h-4 w-4" />
-                                                                ),
-                                                                href: route(
-                                                                    "purchase_orders.edit",
-                                                                    order.id
-                                                                ),
-                                                            },
-                                                            {
-                                                                label: "Delete",
-                                                                icon: (
-                                                                    <Trash2 className="h-4 w-4" />
-                                                                ),
-                                                                onClick: () =>
-                                                                    handleDeleteConfirm(
-                                                                        order.id
-                                                                    ),
-                                                                destructive: true,
-                                                            },
-                                                        ]}
-                                                    />
+                                                <TableActions
+                                                    actions={[
+                                                    {
+                                                        label: "Restore",
+                                                        icon: <RotateCcw className="h-4 w-4" />,
+                                                        onClick: () => handleRestoreConfirm(order.id)
+                                                    },
+                                                    {
+                                                        label: "Permanently Delete",
+                                                        icon: <Trash className="h-4 w-4" />,
+                                                        onClick: () => handleDeleteConfirm(order.id),
+                                                        destructive: true,
+                                                    },
+                                                    ]}
+                                                />
                                                 </TableCell>
                                             </TableRow>
                                         ))
@@ -1075,23 +805,6 @@ export default function List({
                 processing={processing}
             />
 
-            <ConvertToBillModal
-                show={showConvertToBillModal}
-                onClose={() => setShowConvertToBillModal(false)}
-                onConfirm={handleConvertToBill}
-                processing={processing}
-            />
-
-            <ConvertToCashPurchaseModal
-                show={showConvertToCashPurchaseModal}
-                onClose={() => setShowConvertToCashPurchaseModal(false)}
-                onConfirm={handleConvertToCashPurchase}
-                processing={processing}
-                accounts={accounts}
-                creditAccountId={creditAccountId}
-                setCreditAccountId={setCreditAccountId}
-            />
-
             <DeleteAllPurchaseOrdersModal
                 show={showDeleteAllModal}
                 onClose={() => setShowDeleteAllModal(false)}
@@ -1100,11 +813,19 @@ export default function List({
                 count={selectedPurchaseOrders.length}
             />
 
-            <ImportPurchaseOrdersModal
-                show={showImportModal}
-                onClose={() => setShowImportModal(false)}
-                onSubmit={handleImport}
+            <RestorePurchaseOrderModal
+                show={showRestoreModal}
+                onClose={() => setShowRestoreModal(false)}
+                onConfirm={handleRestore}
                 processing={processing}
+            />
+
+            <RestoreAllPurchaseOrdersModal
+                show={showRestoreAllModal}
+                onClose={() => setShowRestoreAllModal(false)}
+                onConfirm={handleRestoreAll}
+                processing={processing}
+                count={selectedPurchaseOrders.length}
             />
         </AuthenticatedLayout>
     );

@@ -114,6 +114,71 @@ class PurchaseOrderController extends Controller
 			'vendors' => $vendors,
 			'summary' => $summary,
 			'accounts' => Account::all(),
+			'trashed_purchase_orders' => PurchaseOrder::onlyTrashed()->count(),
+		]);
+	}
+
+	public function trash(Request $request)
+	{
+		$search = $request->get('search', '');
+		$perPage = $request->get('per_page', 50);
+		$sortColumn = $request->get('sorting.column', 'id');
+		$sortDirection = $request->get('sorting.direction', 'desc');
+		$vendorId = $request->get('vendor_id', '');
+		$dateRange = $request->get('date_range', '');
+
+		$query = PurchaseOrder::onlyTrashed()->with('vendor', 'business');
+
+		// Handle sorting
+		if ($sortColumn === 'vendor.name') {
+			$query->join('vendors', 'purchase_orders.vendor_id', '=', 'vendors.id')
+				->orderBy('vendors.name', $sortDirection)
+				->select('purchase_orders.*');
+		} else {
+			$query->orderBy($sortColumn, $sortDirection);
+		}
+
+		if ($search) {
+			$query->where(function ($q) use ($search) {
+				$q->where('order_number', 'like', "%$search%")
+					->orWhere('title', 'like', "%$search%")
+					->orWhereHas('vendor', function ($q) use ($search) {
+						$q->where('name', 'like', "%$search%");
+					});
+			});
+		}
+
+		if ($vendorId) {
+			$query->where('vendor_id', $vendorId);
+		}
+
+		if ($dateRange) {
+			$startDate = Carbon::parse($dateRange[0])->startOfDay();
+			$endDate = Carbon::parse($dateRange[1])->endOfDay();
+			$query->whereBetween('order_date', [$startDate, $endDate]);
+		}
+
+		$orders = $query->paginate($perPage)->withQueryString();
+
+		$vendors = Vendor::orderBy('name')->get();
+
+		return Inertia::render('Backend/User/PurchaseOrder/Trash', [
+			'orders' => $orders->items(),
+			'meta' => [
+				'current_page' => $orders->currentPage(),
+				'per_page' => $orders->perPage(),
+				'last_page' => $orders->lastPage(),
+				'total' => $orders->total(),
+			],
+			'filters' => [
+				'search' => $search,
+				'per_page' => $perPage,
+				'sorting' => $request->get('sorting', []),
+				'vendor_id' => $vendorId,
+				'date_range' => $dateRange,
+			],
+			'vendors' => $vendors,
+			'accounts' => Account::all(),
 		]);
 	}
 
@@ -622,6 +687,21 @@ class PurchaseOrderController extends Controller
 		$audit->event = 'Purchase Order Deleted' . ' ' . $purchase->order_number;
 		$audit->save();
 
+		$purchase->delete();
+		return redirect()->route('purchase_orders.index')->with('success', _lang('Deleted Successfully'));
+	}
+
+	public function permanent_destroy($id)
+	{
+		$purchase = PurchaseOrder::onlyTrashed()->find($id);
+
+		// audit log
+		$audit = new AuditLog();
+		$audit->date_changed = date('Y-m-d H:i:s');
+		$audit->changed_by = auth()->user()->id;
+		$audit->event = 'Purchase Order Permanently Deleted' . ' ' . $purchase->order_number;
+		$audit->save();
+
 		// delete attachments
 		$attachments = Attachment::where('ref_id', $purchase->id)->where('ref_type', 'purchase order')->get();
 		foreach ($attachments as $attachment) {
@@ -632,8 +712,23 @@ class PurchaseOrderController extends Controller
 			$attachment->delete();
 		}
 
-		$purchase->delete();
-		return redirect()->route('purchase_orders.index')->with('success', _lang('Deleted Successfully'));
+		$purchase->forceDelete();
+		return redirect()->route('purchase_orders.trash')->with('success', _lang('Permanently Deleted Successfully'));
+	}
+
+	public function restore($id)
+	{
+		$purchase = PurchaseOrder::onlyTrashed()->find($id);
+
+		// audit log
+		$audit = new AuditLog();
+		$audit->date_changed = date('Y-m-d H:i:s');
+		$audit->changed_by = auth()->user()->id;
+		$audit->event = 'Purchase Order Restored' . ' ' . $purchase->order_number;
+		$audit->save();
+
+		$purchase->restore();
+		return redirect()->route('purchase_orders.trash')->with('success', _lang('Restored Successfully'));
 	}
 
 	public function bulk_destroy(Request $request)
@@ -644,7 +739,7 @@ class PurchaseOrderController extends Controller
 		$audit = new AuditLog();
 		$audit->date_changed = date('Y-m-d H:i:s');
 		$audit->changed_by = auth()->user()->id;
-		$audit->event = count($purchases) . 'Purchae Orders Deleted';
+		$audit->event = count($purchases) . 'Purchase Orders Deleted';
 		$audit->save();
 
 		foreach ($purchases as $order) {
@@ -652,6 +747,51 @@ class PurchaseOrderController extends Controller
 		}
 
 		return redirect()->route('purchase_orders.index')->with('success', _lang('Deleted Successfully'));
+	}
+
+	public function bulk_permanent_destroy(Request $request)
+	{
+		$purchases = PurchaseOrder::onlyTrashed()->whereIn('id', $request->ids)->get();
+
+		// audit log
+		$audit = new AuditLog();
+		$audit->date_changed = date('Y-m-d H:i:s');
+		$audit->changed_by = auth()->user()->id;
+		$audit->event = count($purchases) . 'Purchase Orders Permanently Deleted';
+		$audit->save();
+
+		foreach ($purchases as $order) {
+			// delete attachments
+			$attachments = Attachment::where('ref_id', $order->id)->where('ref_type', 'purchase order')->get();
+			foreach ($attachments as $attachment) {
+				$filePath = public_path($attachment->path);
+				if (file_exists($filePath)) {
+					unlink($filePath);
+				}
+				$attachment->delete();
+			}
+			$order->forceDelete();
+		}
+
+		return redirect()->route('purchase_orders.trash')->with('success', _lang('Permanently Deleted Successfully'));
+	}
+
+	public function bulk_restore(Request $request)
+	{
+		$purchases = PurchaseOrder::onlyTrashed()->whereIn('id', $request->ids)->get();
+
+		// audit log
+		$audit = new AuditLog();
+		$audit->date_changed = date('Y-m-d H:i:s');
+		$audit->changed_by = auth()->user()->id;
+		$audit->event = count($purchases) . 'Purchase Orders Restored';
+		$audit->save();
+
+		foreach ($purchases as $order) {
+			$order->restore();
+		}
+
+		return redirect()->route('purchase_orders.trash')->with('success', _lang('Restored Successfully'));
 	}
 
 	private function calculateTotal(Request $request)
