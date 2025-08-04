@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Head, Link, router, usePage } from "@inertiajs/react";
+import { Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -26,9 +26,8 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { Edit, EyeIcon, FileDown, FileUp, MoreVertical, Plus, Trash, ChevronUp, ChevronDown } from "lucide-react";
-import { Toaster } from "@/Components/ui/toaster";
-import { useToast } from "@/hooks/use-toast";
+import { Edit, EyeIcon, FileDown, FileUp, MoreVertical, Plus, Trash, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+import { toast, Toaster } from 'sonner'
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
@@ -153,9 +152,8 @@ const ImportVendorsModal = ({ show, onClose, onSubmit, processing }) => (
   </Modal>
 );
 
-export default function List({ vendors = [], meta = {}, filters = {} }) {
+export default function List({ vendors = [], meta = {}, filters = {}, trashed_vendors = 0 }) {
   const { flash = {} } = usePage().props;
-  const { toast } = useToast();
   const [selectedVendors, setSelectedVendors] = useState([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
@@ -173,17 +171,26 @@ export default function List({ vendors = [], meta = {}, filters = {} }) {
 
   useEffect(() => {
     if (flash && flash.success) {
-      toast({
-        title: "Success",
+      toast("Success Message", {
         description: flash.success,
+        action: {
+          label: "Close",
+          onClick: () => {
+            toast.dismiss();
+          }
+        }
       });
     }
 
     if (flash && flash.error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
+      toast("Error Message", {
         description: flash.error,
+        action: {
+          label: "Close",
+          onClick: () => {
+            toast.dismiss();
+          }
+        }
       });
     }
   }, [flash, toast]);
@@ -378,7 +385,7 @@ export default function List({ vendors = [], meta = {}, filters = {} }) {
 
   return (
     <AuthenticatedLayout>
-      <Toaster />
+      <Toaster position="top-center" />
       <SidebarInset>
         <div className="main-content">
           <PageHeader
@@ -410,6 +417,16 @@ export default function List({ vendors = [], meta = {}, filters = {} }) {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                <Link href={route("vendors.trash")}>
+                  <Button variant="outline" className="relative">
+                    <Trash2 className="h-8 w-8" />
+                    {trashed_vendors > 0 && (
+                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
+                        {trashed_vendors}
+                      </span>
+                    )}
+                  </Button>
+                </Link>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input

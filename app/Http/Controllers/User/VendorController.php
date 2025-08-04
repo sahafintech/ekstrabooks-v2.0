@@ -74,6 +74,52 @@ class VendorController extends Controller
                 'columnFilters' => $request->get('columnFilters', []),
                 'sorting' => $request->get('sorting', []),
             ],
+            'trashed_vendors' => Vendor::onlyTrashed()->count(),
+        ]);
+    }
+
+    public function trash(Request $request)
+    {
+        $per_page = $request->get('per_page', 50);
+        $search = $request->get('search', '');
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        $query = Vendor::onlyTrashed()->select('vendors.*')
+            ->orderBy($sortColumn, $sortDirection);
+
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('company_name', 'like', "%{$search}%")
+                    ->orWhere('mobile', 'like', "%{$search}%");
+            });
+        }
+
+        // Get vendors with pagination
+        $vendors = $query->paginate($per_page)->withQueryString();
+
+        // Return Inertia view
+        return Inertia::render('Backend/User/Vendor/Trash', [
+            'vendors' => $vendors->items(),
+            'meta' => [
+                'current_page' => $vendors->currentPage(),
+                'from' => $vendors->firstItem(),
+                'last_page' => $vendors->lastPage(),
+                'links' => $vendors->linkCollection(),
+                'path' => $vendors->path(),
+                'per_page' => $vendors->perPage(),
+                'to' => $vendors->lastItem(),
+                'total' => $vendors->total(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $request->get('sorting', []),
+            ],
         ]);
     }
 
@@ -296,6 +342,36 @@ class VendorController extends Controller
         return redirect()->route('vendors.index')->with('success', _lang('Deleted Successfully'));
     }
 
+    public function permanent_destroy($id)
+    {
+        $vendor = Vendor::onlyTrashed()->find($id);
+        $vendor->forceDelete();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Supplier Permanently Deleted ' . $vendor->name;
+        $audit->save();
+
+        return redirect()->route('vendors.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    public function restore($id)
+    {
+        $vendor = Vendor::onlyTrashed()->find($id);
+        $vendor->restore();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Supplier Restored ' . $vendor->name;
+        $audit->save();
+
+        return redirect()->route('vendors.trash')->with('success', _lang('Restored Successfully'));
+    }
+
     /**
      * Store Bulk Actions.
      *
@@ -333,7 +409,7 @@ class VendorController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function export_vendors(Request $request, $type)
+    public function export_vendors($type)
     {
         $filename = date('Y-m-d') . '_vendors.' . $type;
 
@@ -363,5 +439,41 @@ class VendorController extends Controller
         }
 
         return redirect()->route('vendors.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    public function bulk_permanent_destroy(Request $request)
+    {
+        $vendors = Vendor::onlyTrashed()->whereIn('id', $request->ids)->get();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = count($vendors) . 'Suppliers Permanently Deleted';
+        $audit->save();
+
+        foreach ($vendors as $vendor) {
+            $vendor->forceDelete();
+        }
+
+        return redirect()->route('vendors.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    public function bulk_restore(Request $request)
+    {
+        $vendors = Vendor::onlyTrashed()->whereIn('id', $request->ids)->get();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = count($vendors) . 'Suppliers Restored';
+        $audit->save();
+
+        foreach ($vendors as $vendor) {
+            $vendor->restore();
+        }
+
+        return redirect()->route('vendors.trash')->with('success', _lang('Restored Successfully'));
     }
 }

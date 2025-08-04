@@ -278,6 +278,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('export_customers', [CustomerController::class, 'export_customers'])->name('customers.export');
 
 		//Vendors
+		Route::get('vendors/trash', [VendorController::class, 'trash'])->name('vendors.trash');
+		Route::post('vendors/{id}/restore', [VendorController::class, 'restore'])->name('vendors.restore');
+		Route::post('vendors/bulk_restore', [VendorController::class, 'bulk_restore'])->name('vendors.bulk_restore');
+		Route::post('vendors/bulk_permanent_destroy', [VendorController::class, 'bulk_permanent_destroy'])->name('vendors.bulk_permanent_destroy');
+		Route::delete('vendors/{id}/permanent_destroy', [VendorController::class, 'permanent_destroy'])->name('vendors.permanent_destroy');
 		Route::resource('vendors', VendorController::class);
 		Route::post('import_suppliers', [VendorController::class, 'import_vendors'])->name('vendors.import');
 		Route::get('export_suppliers', [VendorController::class, 'export_vendors'])->name('vendors.export');

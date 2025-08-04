@@ -18,7 +18,14 @@ class CreateVendorDocumentsTable extends Migration
             $table->foreignId('vendor_id')->constrained('vendors')->onDelete('cascade');
             $table->string('name');
             $table->string('document');
+            $table->bigInteger('created_user_id')->nullable();
+            $table->bigInteger('updated_user_id')->nullable();
+            $table->bigInteger('deleted_user_id')->nullable();
+            
             $table->foreignId('business_id')->constrained('business')->onDelete('cascade');
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+
+            $table->softDeletes();
             $table->timestamps();
         });
     }

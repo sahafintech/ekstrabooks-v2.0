@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, router, usePage } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -21,18 +21,17 @@ import {
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
 import { Trash, ChevronUp, ChevronDown, RotateCcw } from "lucide-react";
-import { Toaster } from "@/Components/ui/toaster";
-import { useToast } from "@/hooks/use-toast";
+import { toast, Toaster } from 'sonner'
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 
 // Delete Confirmation Modal Component
-const DeleteAdjustmentModal = ({ show, onClose, onConfirm, processing }) => (
+const DeleteVendorModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to delete this adjustment?
+        Are you sure you want to delete this vendor?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -56,11 +55,11 @@ const DeleteAdjustmentModal = ({ show, onClose, onConfirm, processing }) => (
 );
 
 // Bulk Delete Confirmation Modal Component
-const DeleteAllAdjustmentsModal = ({ show, onClose, onConfirm, processing, count }) => (
+const DeleteAllVendorsModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to delete {count} selected adjustment{count !== 1 ? 's' : ''}?
+        Are you sure you want to delete {count} selected vendor{count !== 1 ? 's' : ''}?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -84,11 +83,11 @@ const DeleteAllAdjustmentsModal = ({ show, onClose, onConfirm, processing, count
 );
 
 // Restore Confirmation Modal Component
-const RestoreAdjustmentModal = ({ show, onClose, onConfirm, processing }) => (
+const RestoreVendorModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to restore this adjustment?
+        Are you sure you want to restore this vendor?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -111,12 +110,12 @@ const RestoreAdjustmentModal = ({ show, onClose, onConfirm, processing }) => (
   </Modal>
 );
 
-// Bulk Delete Confirmation Modal Component
-const RestoreAllAdjustmentsModal = ({ show, onClose, onConfirm, processing, count }) => (
+// Bulk Restore Confirmation Modal Component
+const RestoreAllVendorsModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to restore {count} selected adjustment{count !== 1 ? 's' : ''}?
+        Are you sure you want to restore {count} selected vendor{count !== 1 ? 's' : ''}?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -139,60 +138,67 @@ const RestoreAllAdjustmentsModal = ({ show, onClose, onConfirm, processing, coun
   </Modal>
 );
 
-export default function TrashList({ adjustments = [], meta = {}, filters = {} }) {
+export default function List({ vendors = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
-  const { toast } = useToast();
-  const [selectedAdjustments, setSelectedAdjustments] = useState([]);
+  const [selectedVendors, setSelectedVendors] = useState([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
   const [perPage, setPerPage] = useState(meta.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
+  const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
-  const [adjustmentsToDelete, setAdjustmentsToDelete] = useState(null);
-  const [processing, setProcessing] = useState(false);
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [showRestoreAllModal, setShowRestoreAllModal] = useState(false);
-  const [adjustmentsToRestore, setAdjustmentsToRestore] = useState(null);
-
-  const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
+  const [vendorToRestore, setVendorToRestore] = useState(null);
+  const [vendorToDelete, setVendorToDelete] = useState(null);
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     if (flash && flash.success) {
-      toast({
-        title: "Success",
+      toast("Success Message", {
         description: flash.success,
+        action: {
+          label: "Close",
+          onClick: () => {
+            toast.dismiss();
+          }
+        }
       });
     }
 
     if (flash && flash.error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
+      toast("Error Message", {
         description: flash.error,
+        action: {
+          label: "Close",
+          onClick: () => {
+            toast.dismiss();
+          }
+        }
       });
     }
   }, [flash, toast]);
 
   const toggleSelectAll = () => {
     if (isAllSelected) {
-      setSelectedAdjustments([]);
+      setSelectedVendors([]);
     } else {
-      setSelectedAdjustments(adjustments.map((adjustment) => adjustment.id));
+      setSelectedVendors(vendors.map((vendor) => vendor.id));
     }
     setIsAllSelected(!isAllSelected);
   };
 
-  const toggleSelectAdjustment = (id) => {
-    if (selectedAdjustments.includes(id)) {
-      setSelectedAdjustments(selectedAdjustments.filter((adjustmentId) => adjustmentId !== id));
+  const toggleSelectVendor = (id) => {
+    if (selectedVendors.includes(id)) {
+      setSelectedVendors(selectedVendors.filter((vendorId) => vendorId !== id));
       setIsAllSelected(false);
     } else {
-      setSelectedAdjustments([...selectedAdjustments, id]);
-      if (selectedAdjustments.length + 1 === adjustments.length) {
+      setSelectedVendors([...selectedVendors, id]);
+      if (selectedVendors.length + 1 === vendors.length) {
         setIsAllSelected(true);
       }
     }
@@ -204,17 +210,16 @@ export default function TrashList({ adjustments = [], meta = {}, filters = {} })
     setSearch(value);
 
     router.get(
-      route("inventory_adjustments.trash"),
+      route("vendors.trash"),
       { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
   };
 
-
   const handlePerPageChange = (value) => {
     setPerPage(value);
     router.get(
-      route("inventory_adjustments.trash"),
+      route("vendors.trash"),
       { search, page: 1, per_page: value },
       { preserveState: true }
     );
@@ -223,7 +228,7 @@ export default function TrashList({ adjustments = [], meta = {}, filters = {} })
   const handlePageChange = (page) => {
     setCurrentPage(page);
     router.get(
-      route("inventory_adjustments.trash"),
+      route("vendors.trash"),
       { search, page, per_page: perPage },
       { preserveState: true }
     );
@@ -232,11 +237,11 @@ export default function TrashList({ adjustments = [], meta = {}, filters = {} })
   const handleBulkAction = () => {
     if (bulkAction === "") return;
 
-    if (selectedAdjustments.length === 0) {
+    if (selectedVendors.length === 0) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Please select at least one adjustment",
+        description: "Please select at least one vendor",
       });
       return;
     }
@@ -249,12 +254,12 @@ export default function TrashList({ adjustments = [], meta = {}, filters = {} })
   };
 
   const handleDeleteConfirm = (id) => {
-    setAdjustmentsToDelete(id);
+    setVendorToDelete(id);
     setShowDeleteModal(true);
   };
 
   const handleRestoreConfirm = (id) => {
-    setAdjustmentsToRestore(id);
+    setVendorToRestore(id);
     setShowRestoreModal(true);
   };
 
@@ -262,10 +267,10 @@ export default function TrashList({ adjustments = [], meta = {}, filters = {} })
     e.preventDefault();
     setProcessing(true);
 
-    router.delete(route('inventory_adjustments.permanent_destroy', adjustmentsToDelete), {
+    router.delete(route('vendors.permanent_destroy', vendorToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
-        setAdjustmentsToDelete(null);
+        setVendorToDelete(null);
         setProcessing(false);
       },
       onError: () => {
@@ -278,14 +283,14 @@ export default function TrashList({ adjustments = [], meta = {}, filters = {} })
     e.preventDefault();
     setProcessing(true);
 
-    router.post(route('inventory_adjustments.bulk_permanent_destroy'),
+    router.post(route('vendors.bulk_permanent_destroy'),
       {
-        ids: selectedAdjustments
+        ids: selectedVendors
       },
       {
         onSuccess: () => {
           setShowDeleteAllModal(false);
-          setSelectedAdjustments([]);
+          setSelectedVendors([]);
           setIsAllSelected(false);
           setProcessing(false);
         },
@@ -300,10 +305,10 @@ export default function TrashList({ adjustments = [], meta = {}, filters = {} })
     e.preventDefault();
     setProcessing(true);
 
-    router.post(route('inventory_adjustments.restore', adjustmentsToRestore), {
+    router.post(route('vendors.restore', vendorToRestore), {
       onSuccess: () => {
         setShowRestoreModal(false);
-        setAdjustmentsToRestore(null);
+        setVendorToRestore(null);
         setProcessing(false);
       },
       onError: () => {
@@ -316,14 +321,14 @@ export default function TrashList({ adjustments = [], meta = {}, filters = {} })
     e.preventDefault();
     setProcessing(true);
 
-    router.post(route('inventory_adjustments.bulk_restore'),
+    router.post(route('vendors.bulk_restore'),
       {
-        ids: selectedAdjustments
+        ids: selectedVendors
       },
       {
         onSuccess: () => {
           setShowRestoreAllModal(false);
-          setSelectedAdjustments([]);
+          setSelectedVendors([]);
           setIsAllSelected(false);
           setProcessing(false);
         },
@@ -341,20 +346,22 @@ export default function TrashList({ adjustments = [], meta = {}, filters = {} })
     }
     setSorting({ column, direction });
     router.get(
-      route("inventory_adjustments.trash"),
-      { ...filters, sorting: { column, direction }, page: 1, per_page: perPage },
+      route("vendors.trash"),
+      { ...filters, sorting: { column, direction } },
       { preserveState: true }
     );
   };
 
   const renderSortIcon = (column) => {
     const isActive = sorting.column === column;
-    const upColor = isActive && sorting.direction === "asc" ? "text-gray-900" : "text-gray-300";
-    const downColor = isActive && sorting.direction === "desc" ? "text-gray-900" : "text-gray-300";
     return (
       <span className="inline-flex flex-col ml-1">
-        <ChevronUp className={`w-4 h-4 ${upColor}`} />
-        <ChevronDown className={`w-4 h-4 -mt-1 ${downColor}`} />
+        <ChevronUp
+          className={`w-3 h-3 ${isActive && sorting.direction === "asc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+        <ChevronDown
+          className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc" ? "text-gray-800" : "text-gray-300"}`}
+        />
       </span>
     );
   };
@@ -389,43 +396,26 @@ export default function TrashList({ adjustments = [], meta = {}, filters = {} })
     return pages;
   };
 
-  const exportAdjustments = () => {
-    window.location.href = route("inventory_adjustments.export");
-  };
-
-  const AdjustmentTypeBadge = ({ status }) => {
-    const statusMap = {
-      'adds': { label: "Added", className: "text-green-600 bg-green-200 px-3 py-1 rounded text-sm" },
-      'deducts': { label: "Deducted", className: "text-red-600 bg-red-200 px-3 py-1 rounded text-sm" },
-    };
-
-    return (
-      <span className={statusMap[status].className}>
-        {statusMap[status].label}
-      </span>
-    );
-  };
-
   return (
     <AuthenticatedLayout>
-      <Toaster />
+      <Toaster position="top-center" />
       <SidebarInset>
         <div className="main-content">
           <PageHeader
-            page="Inventory Adjustments"
+            page="Vendors"
             subpage="Trash"
-            url="inventory_adjustments.index"
+            url="vendors.index"
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div>
                     <div className="text-red-500">
-                        Total trashed adjustments: {meta.total}
+                        Total trashed vendors: {meta.total}
                     </div>
                 </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input
-                  placeholder="Search trashed adjustments..."
+                  placeholder="Search trashed vendors..."
                   value={search}
                   onChange={(e) => handleSearch(e)}
                   className="w-full md:w-80"
@@ -475,61 +465,43 @@ export default function TrashList({ adjustments = [], meta = {}, filters = {} })
                         onCheckedChange={toggleSelectAll}
                       />
                     </TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("id")}>
-                      ID {renderSortIcon("id")}
-                    </TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("adjustment_date")}>
-                      Date {renderSortIcon("adjustment_date")}
-                    </TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("product.name")}>
-                      Product Name {renderSortIcon("product.name")}
-                    </TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("quantity_on_hand")}>
-                      Qty on Hand {renderSortIcon("quantity_on_hand")}
-                    </TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("adjusted_quantity")}>
-                      Qty Adjusted {renderSortIcon("adjusted_quantity")}
-                    </TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("adjustment_type")}>
-                      Adjustment Type {renderSortIcon("adjustment_type")}
-                    </TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("new_quantity_on_hand")}>
-                      New Quantity {renderSortIcon("new_quantity_on_hand")}
-                    </TableHead>
+                    <TableHead className="w-[80px] cursor-pointer" onClick={() => handleSort("id")}>ID {renderSortIcon("id")}</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("name")}>Name {renderSortIcon("name")}</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("company_name")}>Company {renderSortIcon("company_name")}</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("email")}>Email {renderSortIcon("email")}</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("mobile")}>Phone {renderSortIcon("mobile")}</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("address")}>Address {renderSortIcon("address")}</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {adjustments.length > 0 ? (
-                    adjustments.map((adjustment) => (
-                      <TableRow key={adjustment.id}>
+                  {vendors.length > 0 ? (
+                    vendors.map((vendor) => (
+                      <TableRow key={vendor.id}>
                         <TableCell>
                           <Checkbox
-                            checked={selectedAdjustments.includes(adjustment.id)}
-                            onCheckedChange={() => toggleSelectAdjustment(adjustment.id)}
+                            checked={selectedVendors.includes(vendor.id)}
+                            onCheckedChange={() => toggleSelectVendor(vendor.id)}
                           />
                         </TableCell>
-                        <TableCell>{adjustment.id}</TableCell>
-                        <TableCell>{adjustment.adjustment_date}</TableCell>
-                        <TableCell>{adjustment.product.name}</TableCell>
-                        <TableCell>{adjustment.quantity_on_hand}</TableCell>
-                        <TableCell>{adjustment.adjusted_quantity}</TableCell>
-                        <TableCell>
-                          {<AdjustmentTypeBadge status={adjustment.adjustment_type} /> || "-"}
-                        </TableCell>
-                        <TableCell>{adjustment.new_quantity_on_hand || "-"}</TableCell>
+                        <TableCell>{vendor.id}</TableCell>
+                        <TableCell>{vendor.name}</TableCell>
+                        <TableCell>{vendor.company_name || "-"}</TableCell>
+                        <TableCell>{vendor.email || "-"}</TableCell>
+                        <TableCell>{vendor.mobile || "-"}</TableCell>
+                        <TableCell>{vendor.address || "-"}</TableCell>
                         <TableCell className="text-right">
                         <TableActions
                             actions={[
                               {
                                 label: "Restore",
                                 icon: <RotateCcw className="h-4 w-4" />,
-                                onClick: () => handleRestoreConfirm(adjustment.id)
+                                onClick: () => handleRestoreConfirm(vendor.id)
                               },
                               {
                                 label: "Permanently Delete",
                                 icon: <Trash className="h-4 w-4" />,
-                                onClick: () => handleDeleteConfirm(adjustment.id),
+                                onClick: () => handleDeleteConfirm(vendor.id),
                                 destructive: true,
                               },
                             ]}
@@ -539,8 +511,8 @@ export default function TrashList({ adjustments = [], meta = {}, filters = {} })
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={9} className="h-24 text-center">
-                        No adjustments found.
+                      <TableCell colSpan={8} className="h-24 text-center">
+                        No vendors found.
                       </TableCell>
                     </TableRow>
                   )}
@@ -548,7 +520,7 @@ export default function TrashList({ adjustments = [], meta = {}, filters = {} })
               </Table>
             </div>
 
-            {adjustments.length > 0 && meta.total > 0 && (
+            {vendors.length > 0 && meta.total > 0 && (
               <div className="flex items-center justify-between mt-4">
                 <div className="text-sm text-gray-500">
                   Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, meta.total)} of {meta.total} entries
@@ -594,34 +566,33 @@ export default function TrashList({ adjustments = [], meta = {}, filters = {} })
         </div>
       </SidebarInset>
 
-      <DeleteAdjustmentModal
+      <DeleteVendorModal
         show={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleDelete}
         processing={processing}
       />
 
-      <DeleteAllAdjustmentsModal
+      <DeleteAllVendorsModal
         show={showDeleteAllModal}
         onClose={() => setShowDeleteAllModal(false)}
         onConfirm={handleDeleteAll}
         processing={processing}
-        count={selectedAdjustments.length}
+        count={selectedVendors.length}
       />
-
-      <RestoreAdjustmentModal
+      <RestoreVendorModal
         show={showRestoreModal}
         onClose={() => setShowRestoreModal(false)}
         onConfirm={handleRestore}
         processing={processing}
       />
 
-      <RestoreAllAdjustmentsModal
+      <RestoreAllVendorsModal
         show={showRestoreAllModal}
         onClose={() => setShowRestoreAllModal(false)}
         onConfirm={handleRestoreAll}
         processing={processing}
-        count={selectedAdjustments.length}
+        count={selectedVendors.length}
       />
     </AuthenticatedLayout>
   );
