@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, router, usePage } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -19,14 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/Components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown, ShoppingCart, DollarSign, CheckCircle, Clock } from "lucide-react";
+import { ChevronUp, ChevronDown, Trash, RotateCcw } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -63,69 +57,6 @@ const DeleteCashPurchaseModal = ({ show, onClose, onConfirm, processing }) => (
   </Modal>
 );
 
-const ImportCashPurchasesModal = ({ show, onClose, onSubmit, processing }) => (
-  <Modal show={show} onClose={onClose}>
-    <form onSubmit={onSubmit} className="p-6">
-      <div className="ti-modal-header">
-        <h3 className="text-lg font-bold">Import Cash Purchases</h3>
-      </div>
-      <div className="ti-modal-body grid grid-cols-12">
-        <div className="col-span-12">
-          <div className="flex items-center justify-between">
-            <label className="block font-medium text-sm text-gray-700">
-              Cash Purchases File
-            </label>
-            <Link href="/uploads/media/default/sample_cash_purchases.xlsx">
-              <Button variant="secondary" size="sm">
-                Use This Sample File
-              </Button>
-            </Link>
-          </div>
-          <input type="file" className="w-full dropify" name="cash_purchases_file" required />
-        </div>
-        <div className="col-span-12 mt-4">
-          <ul className="space-y-3 text-sm">
-            <li className="flex space-x-3">
-              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
-              <span className="text-gray-800 dark:text-white/70">
-                Maximum File Size: 1 MB
-              </span>
-            </li>
-            <li className="flex space-x-3">
-              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
-              <span className="text-gray-800 dark:text-white/70">
-                File format Supported: CSV, TSV, XLS
-              </span>
-            </li>
-            <li className="flex space-x-3">
-              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
-              <span className="text-gray-800 dark:text-white/70">
-                Make sure the format of the import file matches our sample file by comparing them.
-              </span>
-            </li>
-          </ul>
-        </div>
-      </div>
-      <div className="ti-modal-footer flex justify-end mt-4">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={onClose}
-          className="mr-3"
-        >
-          Close
-        </Button>
-        <Button
-          type="submit"
-          disabled={processing}
-        >
-          Import Cash Purchases
-        </Button>
-      </div>
-    </form>
-  </Modal>
-);
-
 const DeleteAllCashPurchasesModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
@@ -153,11 +84,11 @@ const DeleteAllCashPurchasesModal = ({ show, onClose, onConfirm, processing, cou
   </Modal>
 );
 
-const ApproveAllCashPurchasesModal = ({ show, onClose, onConfirm, processing, count }) => (
+const RestoreCashPurchaseModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to approve {count} selected cash purchase{count !== 1 ? 's' : ''}?
+        Are you sure you want to restore this cash purchase?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -173,18 +104,18 @@ const ApproveAllCashPurchasesModal = ({ show, onClose, onConfirm, processing, co
           variant="default"
           disabled={processing}
         >
-          Approve Selected
+          Restore Cash Purchase
         </Button>
       </div>
     </form>
   </Modal>
 );
 
-const RejectAllCashPurchasesModal = ({ show, onClose, onConfirm, processing, count }) => (
+const RestoreAllCashPurchasesModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to reject {count} selected cash purchase{count !== 1 ? 's' : ''}?
+        Are you sure you want to restore {count} selected cash purchase{count !== 1 ? 's' : ''}?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -197,10 +128,10 @@ const RejectAllCashPurchasesModal = ({ show, onClose, onConfirm, processing, cou
         </Button>
         <Button
           type="submit"
-          variant="destructive"
+          variant="default"
           disabled={processing}
         >
-          Reject Selected
+          Restore Selected
         </Button>
       </div>
     </form>
@@ -222,60 +153,7 @@ const PurchaseApprovalStatusBadge = ({ status }) => {
   );
 };
 
-const SummaryCards = ({ summary = {} }) => {
-  const cards = [
-    {
-      title: "Total Purchases",
-      value: summary.total_purchases || 0,
-      description: "Total cash purchases",
-      icon: ShoppingCart,
-      iconColor: "text-blue-500"
-    },
-    {
-      title: "Grand Total",
-      value: formatCurrency({ amount: summary.grand_total || 0 }),
-      description: "Total amount of all purchases",
-      icon: DollarSign,
-      iconColor: "text-green-500"
-    },
-    {
-      title: "Total Approved",
-      value: summary.total_approved || 0,
-      description: "Approved cash purchases",
-      icon: CheckCircle,
-      iconColor: "text-purple-500"
-    },
-    {
-      title: "Total Pending",
-      value: summary.total_pending || 0,
-      description: "Pending cash purchases",
-      icon: Clock,
-      iconColor: "text-orange-500"
-    }
-  ];
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-      {cards.map((card, index) => (
-        <div key={index} className="bg-gray-100 rounded-lg shadow-sm p-4">
-          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <h3 className="text-lg font-medium">
-              {card.title}
-            </h3>
-            <card.icon className={`h-8 w-8 ${card.iconColor}`} />
-          </div>
-          <div className="text-2xl font-bold">{card.value}
-          <p className="text-xs text-muted-foreground">
-            {card.description}
-            </p>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-export default function List({ purchases = [], meta = {}, filters = {}, vendors = [], summary = {}, trashed_cash_purchases = 0 }) {
+export default function TrashList({ purchases = [], meta = {}, filters = {}, vendors = [] }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedPurchases, setSelectedPurchases] = useState([]);
@@ -291,11 +169,11 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
-  const [showApproveAllModal, setShowApproveAllModal] = useState(false);
-  const [showRejectAllModal, setShowRejectAllModal] = useState(false);
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [showRestoreAllModal, setShowRestoreAllModal] = useState(false);
   const [purchaseToDelete, setPurchaseToDelete] = useState(null);
+  const [purchaseToRestore, setPurchaseToRestore] = useState(null);
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
@@ -335,11 +213,16 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
     setShowDeleteModal(true);
   };
 
+  const handleRestoreConfirm = (purchaseId) => {
+    setPurchaseToRestore(purchaseId);
+    setShowRestoreModal(true);
+  };
+
   const handleDelete = (e) => {
     e.preventDefault();
     setProcessing(true);
 
-    router.delete(route("cash_purchases.destroy", purchaseToDelete), {
+    router.delete(route("cash_purchases.permanent_destroy", purchaseToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
         setPurchaseToDelete(null);
@@ -357,7 +240,7 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
     setProcessing(true);
 
     router.post(
-      route("cash_purchases.bulk_destroy"),
+      route("cash_purchases.bulk_permanent_destroy"),
       {
         ids: selectedPurchases,
       },
@@ -374,39 +257,35 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
       });
   };
 
-  const handleApproveAll = (e) => {
+  const handleRestore = (e) => {
     e.preventDefault();
     setProcessing(true);
 
-    router.post(route("cash_purchases.bulk_approve"),
-      {
-        ids: selectedPurchases,
+    router.post(route("cash_purchases.restore", purchaseToRestore), {
+      onSuccess: () => {
+        setShowRestoreModal(false);
+        setPurchaseToRestore(null);
+        setProcessing(false);
+        setSelectedPurchases(prev => prev.filter(id => id !== purchaseToRestore));
       },
-      {
-        onSuccess: () => {
-          setShowApproveAllModal(false);
-          setProcessing(false);
-          setSelectedPurchases([]);
-          setIsAllSelected(false);
-        },
-        onError: () => {
-          setProcessing(false);
-        }
-      });
+      onError: () => {
+        setProcessing(false);
+      }
+    });
   };
 
-  const handleRejectAll = (e) => {
+  const handleRestoreAll = (e) => {
     e.preventDefault();
     setProcessing(true);
 
     router.post(
-      route("cash_purchases.bulk_reject"),
+      route("cash_purchases.bulk_restore"),
       {
         ids: selectedPurchases,
       },
       {
         onSuccess: () => {
-          setShowRejectAllModal(false);
+          setShowRestoreAllModal(false);
           setProcessing(false);
           setSelectedPurchases([]);
           setIsAllSelected(false);
@@ -415,23 +294,6 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
           setProcessing(false);
         }
       });
-  };
-
-  const handleImport = (e) => {
-    e.preventDefault();
-    setProcessing(true);
-
-    const formData = new FormData(e.target);
-
-    router.post(route("cash_purchases.import"), formData, {
-      onSuccess: () => {
-        setShowImportModal(false);
-        setProcessing(false);
-      },
-      onError: (errors) => {
-        setProcessing(false);
-      }
-    });
   };
 
   const handleSearch = (e) => {
@@ -440,7 +302,7 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
     setSearch(value);
 
     router.get(
-      route("cash_purchases.index"),
+      route("cash_purchases.trash"),
       { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
@@ -449,7 +311,7 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
   const handlePerPageChange = (value) => {
     setPerPage(parseInt(value));
     router.get(
-      route("cash_purchases.index"),
+      route("cash_purchases.trash"),
       { search, page: 1, per_page: value },
       { preserveState: true }
     );
@@ -458,7 +320,7 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
   const handlePageChange = (page) => {
     setCurrentPage(page);
     router.get(
-      route("cash_purchases.index"),
+      route("cash_purchases.trash"),
       { 
         search, 
         page, 
@@ -475,12 +337,8 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
   const handleBulkAction = () => {
     if (bulkAction === "delete" && selectedPurchases.length > 0) {
       setShowDeleteAllModal(true);
-    }
-    if (bulkAction === "approve" && selectedPurchases.length > 0) {
-      setShowApproveAllModal(true);
-    }
-    if (bulkAction === "reject" && selectedPurchases.length > 0) {
-      setShowRejectAllModal(true);
+    }else if (bulkAction === "restore" && selectedPurchases.length > 0) {
+      setShowRestoreAllModal(true);
     }
   };
 
@@ -491,7 +349,7 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
     }
     setSorting({ column, direction });
     router.get(
-      route("cash_purchases.index"),
+      route("cash_purchases.trash"),
       { ...filters, sorting: { column, direction } },
       { preserveState: true }
     );
@@ -557,7 +415,7 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
 
     // Use the new value directly in the request instead of state
     router.get(
-      route("cash_purchases.index"),
+      route("cash_purchases.trash"),
       { 
         search, 
         page: 1, 
@@ -570,9 +428,6 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
     );
   };
 
-  const exportCashPurchases = () => {
-    window.location.href = route("cash_purchases.export");
-  };
   return (
     <AuthenticatedLayout>
       <Toaster />
@@ -580,45 +435,16 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
         <div className="main-content">
           <PageHeader
             page="Cash Purchases"
-            subpage="List"
+            subpage="Trash"
             url="cash_purchases.index"
           />
           <div className="p-4">
-            <SummaryCards summary={summary} />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-2">
-                <Link href={route("cash_purchases.create")}>
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Cash Purchase
-                  </Button>
-                </Link>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="secondary">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setShowImportModal(true)}>
-                      <FileUp className="mr-2 h-4 w-4" /> Import
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={exportCashPurchases}>
-                      <FileDown className="mr-2 h-4 w-4" /> Export
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Link href={route("cash_purchases.trash")}>
-                  <Button variant="outline" className="relative">
-                    <Trash2 className="h-8 w-8" />
-                    {trashed_cash_purchases > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                        {trashed_cash_purchases}
-                      </span>
-                    )}
-                  </Button>
-                </Link>
-              </div>
+            <   div>
+                    <div className="text-red-500">
+                        Total trashed cash purchases: {meta.total}
+                    </div>
+                </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input
                   placeholder="Search cash purchases..."
@@ -636,9 +462,8 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
                     <SelectValue placeholder="Bulk actions" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="delete">Delete Selected</SelectItem>
-                    <SelectItem value="approve">Approve Selected</SelectItem>
-                    <SelectItem value="reject">Reject Selected</SelectItem>
+                    <SelectItem value="delete">Permanently Delete Selected</SelectItem>
+                    <SelectItem value="restore">Restore Selected</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button onClick={handleBulkAction} variant="outline">
@@ -741,21 +566,16 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
                           <PurchaseApprovalStatusBadge status={purchase.approval_status} />
                         </TableCell>
                         <TableCell className="text-right">
-                          <TableActions
+                        <TableActions
                             actions={[
                               {
-                                label: "View",
-                                icon: <Eye className="h-4 w-4" />,
-                                href: route("cash_purchases.show", purchase.id),
+                                label: "Restore",
+                                icon: <RotateCcw className="h-4 w-4" />,
+                                onClick: () => handleRestoreConfirm(purchase.id)
                               },
                               {
-                                label: "Edit",
-                                icon: <Edit className="h-4 w-4" />,
-                                href: route("cash_purchases.edit", purchase.id),
-                              },
-                              {
-                                label: "Delete",
-                                icon: <Trash2 className="h-4 w-4" />,
+                                label: "Permanently Delete",
+                                icon: <Trash className="h-4 w-4" />,
                                 onClick: () => handleDeleteConfirm(purchase.id),
                                 destructive: true,
                               },
@@ -836,27 +656,19 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
         count={selectedPurchases.length}
       />
 
-      <ApproveAllCashPurchasesModal
-        show={showApproveAllModal}
-        onClose={() => setShowApproveAllModal(false)}
-        onConfirm={handleApproveAll}
+      <RestoreCashPurchaseModal
+        show={showRestoreModal}
+        onClose={() => setShowRestoreModal(false)}
+        onConfirm={handleRestore}
         processing={processing}
-        count={selectedPurchases.length}
       />
 
-      <RejectAllCashPurchasesModal
-        show={showRejectAllModal}
-        onClose={() => setShowRejectAllModal(false)}
-        onConfirm={handleRejectAll}
+      <RestoreAllCashPurchasesModal
+        show={showRestoreAllModal}
+        onClose={() => setShowRestoreAllModal(false)}
+        onConfirm={handleRestoreAll}
         processing={processing}
         count={selectedPurchases.length}
-      />
-
-      <ImportCashPurchasesModal
-        show={showImportModal}
-        onClose={() => setShowImportModal(false)}
-        onSubmit={handleImport}
-        processing={processing}
       />
     </AuthenticatedLayout>
   );

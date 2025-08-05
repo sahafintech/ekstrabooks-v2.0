@@ -446,6 +446,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('bill_invoices/send_email/{id}', [PurchaseController::class, 'send_email'])->name('bill_invoices.send_email');
 
 		//Cash Purchases
+		Route::get('cash_purchases/trash', [CashPurchaseController::class, 'trash'])->name('cash_purchases.trash');
+		Route::post('cash_purchases/{id}/restore', [CashPurchaseController::class, 'restore'])->name('cash_purchases.restore');
+		Route::post('cash_purchases/bulk_restore', [CashPurchaseController::class, 'bulk_restore'])->name('cash_purchases.bulk_restore');
+		Route::post('cash_purchases/bulk_permanent_destroy', [CashPurchaseController::class, 'bulk_permanent_destroy'])->name('cash_purchases.bulk_permanent_destroy');
+		Route::delete('cash_purchases/{id}/permanent_destroy', [CashPurchaseController::class, 'permanent_destroy'])->name('cash_purchases.permanent_destroy');
 		Route::resource('cash_purchases', CashPurchaseController::class);
 		Route::post('import_cash_purchases', [CashPurchaseController::class, 'import_cash_purchases'])->name('cash_purchases.import');
 		Route::post('all_bills', [CashPurchaseController::class, 'bills_all'])->name('cash_purchases.all');

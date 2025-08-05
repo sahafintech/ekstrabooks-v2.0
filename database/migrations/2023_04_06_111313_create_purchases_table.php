@@ -46,6 +46,10 @@ return new class extends Migration {
             $table->string('benificiary')->nullable();
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
+            $table->bigInteger('create_user_id')->nullable();
+            $table->bigInteger('update_user_id')->nullable();
+            $table->bigInteger('delete_user_id')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('created_by')->references('id')->on('users')->onDelete('cascade');

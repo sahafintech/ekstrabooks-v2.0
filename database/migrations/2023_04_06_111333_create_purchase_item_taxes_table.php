@@ -18,6 +18,10 @@ return new class extends Migration {
             $table->decimal('amount', 28, 8);
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
+            $table->bigInteger('create_user_id')->nullable();
+            $table->bigInteger('update_user_id')->nullable();
+            $table->bigInteger('delete_user_id')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('purchase_id')->references('id')->on('purchases')->onDelete('cascade');

@@ -147,6 +147,117 @@ class CashPurchaseController extends Controller
 			],
 			'vendors' => $vendors,
 			'summary' => $summary,
+			'trashed_cash_purchases' => Purchase::onlyTrashed()->where('cash', 1)->count(),
+		]);
+	}
+
+	public function trash(Request $request)
+	{
+		$search = $request->get('search', '');
+		$perPage = $request->get('per_page', 50);
+		$sorting = $request->get('sorting', []);
+		$sortColumn = $sorting['column'] ?? 'id';
+		$sortDirection = $sorting['direction'] ?? 'desc';
+		$vendorId = $request->get('vendor_id', '');
+		$dateRange = $request->get('date_range', []);
+		$status = $request->get('status', '');
+
+		session(['cash_purchases_from' => $dateRange[0] ?? '']);
+		session(['cash_purchases_to' => $dateRange[1] ?? '']);
+		session(['cash_purchases_approval_status' => $status]);
+		session(['cash_purchases_vendor_id' => $vendorId]);
+
+		$query = Purchase::onlyTrashed()->with('vendor', 'business')
+			->where('cash', 1);
+
+		if ($sortColumn === 'vendor.name') {
+			$query->join('vendors', 'purchases.vendor_id', '=', 'vendors.id')
+				->orderBy('vendors.name', $sortDirection)
+				->select('purchases.*');
+		} else {
+			$query->orderBy($sortColumn, $sortDirection);
+		}
+
+		if ($search) {
+			$query->where(function ($q) use ($search) {
+				$q->where('bill_no', 'like', "%$search%")
+					->orWhere('title', 'like', "%$search%")
+					->orWhere('purchase_date', 'like', "%$search%")
+					->orWhere('grand_total', 'like', "%$search%")
+					->orWhereHas('vendor', function ($q) use ($search) {
+						$q->where('name', 'like', "%$search%");
+					});
+			});
+		}
+
+		// Filter by vendor
+		if ($vendorId) {
+			$query->where('vendor_id', $vendorId);
+		}
+
+		// Filter by date range
+		if (!empty($dateRange)) {
+			$query->whereBetween('purchase_date', $dateRange);
+		}
+
+		// Filter by status
+		if ($status) {
+			$query->where('approval_status', $status);
+		}
+
+		// Get paginated purchases
+		$purchases = $query->paginate($perPage)->withQueryString();
+
+		// Get summary statistics for all purchases matching filters
+		$allPurchases = Purchase::where('cash', 1);
+
+		if ($search) {
+			$allPurchases->where(function ($q) use ($search) {
+				$q->where('bill_no', 'like', "%$search%")
+					->orWhere('title', 'like', "%$search%")
+					->orWhereHas('vendor', function ($q) use ($search) {
+						$q->where('name', 'like', "%$search%");
+					});
+			});
+		}
+
+		if ($vendorId) {
+			$allPurchases->where('vendor_id', $vendorId);
+		}
+
+		if (!empty($dateRange)) {
+			$allPurchases->whereBetween('purchase_date', $dateRange);
+		}
+
+		if ($status) {
+			$allPurchases->where('approval_status', $status);
+		}
+
+		$allPurchases = $allPurchases->get();
+
+		$vendors = Vendor::orderBy('name', 'asc')->get();
+
+		return Inertia::render('Backend/User/CashPurchase/Trash', [
+			'purchases' => $purchases->items(),
+			'meta' => [
+				'current_page' => $purchases->currentPage(),
+				'from' => $purchases->firstItem(),
+				'last_page' => $purchases->lastPage(),
+				'links' => $purchases->linkCollection(),
+				'path' => $purchases->path(),
+				'per_page' => $purchases->perPage(),
+				'to' => $purchases->lastItem(),
+				'total' => $purchases->total(),
+			],
+			'filters' => [
+				'search' => $search,
+				'per_page' => $perPage,
+				'sorting' => $sorting,
+				'vendor_id' => $vendorId,
+				'date_range' => $dateRange,
+				'status' => $status,
+			],
+			'vendors' => $vendors,
 		]);
 	}
 
@@ -1550,21 +1661,10 @@ class CashPurchaseController extends Controller
 			}
 		}
 
-
 		// bill invoice payment
 		$transaction = Transaction::where('ref_id', $bill->id)->where('ref_type', 'cash purchase payment')->get();
 		foreach ($transaction as $data) {
 			$data->delete();
-		}
-
-		// delete attachments
-		$attachments = Attachment::where('ref_id', $bill->id)->where('ref_type', 'cash purchase')->get();
-		foreach ($attachments as $attachment) {
-			$filePath = public_path($attachment->path);
-			if (file_exists($filePath)) {
-				unlink($filePath);
-			}
-			$attachment->delete();
 		}
 
 		$bill->delete();
@@ -1632,11 +1732,127 @@ class CashPurchaseController extends Controller
 				}
 			}
 
-
 			// bill invoice payment
 			$transaction = Transaction::where('ref_id', $bill->id)->where('ref_type', 'cash purchase payment')->get();
 			foreach ($transaction as $data) {
 				$data->delete();
+			}
+
+			$bill->delete();
+		}
+		return redirect()->route('cash_purchases.trash')->with('success', _lang('Deleted Successfully'));
+	}
+	
+	public function permanent_destroy($id)
+	{
+		$bill = Purchase::onlyTrashed()->find($id);
+		// audit log
+		$audit = new AuditLog();
+		$audit->date_changed = date('Y-m-d H:i:s');
+		$audit->changed_by = auth()->user()->id;
+		$audit->event = 'Permanently Deleted Cash Purchase ' . $bill->bill_no;
+		$audit->save();
+
+		// delete transactions
+		$transactions = Transaction::onlyTrashed()->where('ref_id', $bill->id)
+			->where(function ($query) {
+				$query->where('ref_type', 'cash purchase')
+					->orWhere('ref_type', 'cash purchase tax')
+					->orWhere('ref_type', 'cash purchase payment');
+			})
+			->get();
+
+
+		if ($transactions->count() > 0) {
+			foreach ($transactions as $transaction) {
+				$transaction->forceDelete();
+			}
+		}
+
+		// delete pending transactions
+		$transactions = PendingTransaction::onlyTrashed()->where('ref_id', $bill->id)
+			->where(function ($query) {
+				$query->where('ref_type', 'cash purchase')
+					->orWhere('ref_type', 'cash purchase tax')
+					->orWhere('ref_type', 'cash purchase payment');
+			})
+			->get();
+
+		if ($transactions->count() > 0) {
+			foreach ($transactions as $transaction) {
+				$transaction->forceDelete();
+			}
+		}
+
+
+		// bill invoice payment
+		$transaction = Transaction::onlyTrashed()->where('ref_id', $bill->id)->where('ref_type', 'cash purchase payment')->get();
+		foreach ($transaction as $data) {
+			$data->forceDelete();
+		}
+
+		// delete attachments
+		$attachments = Attachment::where('ref_id', $bill->id)->where('ref_type', 'cash purchase')->get();
+		foreach ($attachments as $attachment) {
+			$filePath = public_path($attachment->path);
+			if (file_exists($filePath)) {
+				unlink($filePath);
+			}
+			$attachment->delete();
+		}
+
+		$bill->forceDelete();
+		return redirect()->route('cash_purchases.trash')->with('success', _lang('Deleted Successfully'));
+	}
+
+	public function bulk_permanent_destroy(Request $request)
+	{
+		foreach ($request->ids as $id) {
+			$bill = Purchase::onlyTrashed()->find($id);
+
+			// audit log
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = auth()->user()->id;
+			$audit->event = 'Permanently Deleted Cash Purchase ' . $bill->bill_no;
+			$audit->save();
+
+			// delete transactions
+			$transactions = Transaction::onlyTrashed()->where('ref_id', $bill->id)
+				->where(function ($query) {
+					$query->where('ref_type', 'cash purchase')
+						->orWhere('ref_type', 'cash purchase tax')
+						->orWhere('ref_type', 'cash purchase payment');
+				})
+				->get();
+
+
+			if ($transactions->count() > 0) {
+				foreach ($transactions as $transaction) {
+					$transaction->forceDelete();
+				}
+			}
+
+			// delete pending transactions
+			$transactions = PendingTransaction::onlyTrashed()->where('ref_id', $bill->id)
+				->where(function ($query) {
+					$query->where('ref_type', 'cash purchase')
+						->orWhere('ref_type', 'cash purchase tax')
+						->orWhere('ref_type', 'cash purchase payment');
+				})
+				->get();
+
+			if ($transactions->count() > 0) {
+				foreach ($transactions as $transaction) {
+					$transaction->forceDelete();
+				}
+			}
+
+
+			// bill invoice payment
+			$transaction = Transaction::onlyTrashed()->where('ref_id', $bill->id)->where('ref_type', 'cash purchase payment')->get();
+			foreach ($transaction as $data) {
+				$data->forceDelete();
 			}
 
 			// delete attachments
@@ -1649,9 +1865,152 @@ class CashPurchaseController extends Controller
 				$attachment->delete();
 			}
 
-			$bill->delete();
+			$bill->forceDelete();
 		}
-		return redirect()->route('cash_purchases.index')->with('success', _lang('Deleted Successfully'));
+		return redirect()->route('cash_purchases.trash')->with('success', _lang('Deleted Successfully'));
+	}
+
+	public function restore($id)
+	{
+		$bill = Purchase::onlyTrashed()->find($id);
+		// audit log
+		$audit = new AuditLog();
+		$audit->date_changed = date('Y-m-d H:i:s');
+		$audit->changed_by = auth()->user()->id;
+		$audit->event = 'Restored Cash Purchase ' . $bill->bill_no;
+		$audit->save();
+
+		// increase stock
+		foreach ($bill->items as $purchaseItem) {
+			$product = $purchaseItem->product;
+			if ($product && $product->type == 'product' && $product->stock_management == 1) {
+				$product->stock = $product->stock + $purchaseItem->quantity;
+				$product->save();
+			}
+
+			if ($purchaseItem->project_id && $purchaseItem->project_task_id && $purchaseItem->cost_code_id) {
+				$projectBudget = ProjectBudget::where('project_id', $purchaseItem->project_id)->where('project_task_id', $purchaseItem->project_task_id)->where('cost_code_id', $purchaseItem->cost_code_id)->first();
+				if ($projectBudget) {
+					$projectBudget->actual_budget_quantity += $purchaseItem->quantity;
+					$projectBudget->actual_budget_amount += $purchaseItem->sub_total;
+					$projectBudget->save();
+				}
+			}
+		}
+
+		// delete transactions
+		$transactions = Transaction::onlyTrashed()->where('ref_id', $bill->id)
+			->where(function ($query) {
+				$query->where('ref_type', 'cash purchase')
+					->orWhere('ref_type', 'cash purchase tax')
+					->orWhere('ref_type', 'cash purchase payment');
+			})
+			->get();
+
+
+		if ($transactions->count() > 0) {
+			foreach ($transactions as $transaction) {
+				$transaction->restore();
+			}
+		}
+
+		// delete pending transactions
+		$transactions = PendingTransaction::onlyTrashed()->where('ref_id', $bill->id)
+			->where(function ($query) {
+				$query->where('ref_type', 'cash purchase')
+					->orWhere('ref_type', 'cash purchase tax')
+					->orWhere('ref_type', 'cash purchase payment');
+			})
+			->get();
+
+		if ($transactions->count() > 0) {
+			foreach ($transactions as $transaction) {
+				$transaction->restore();
+			}
+		}
+
+
+		// bill invoice payment
+		$transaction = Transaction::onlyTrashed()->where('ref_id', $bill->id)->where('ref_type', 'cash purchase payment')->get();
+		foreach ($transaction as $data) {
+			$data->restore();
+		}
+
+		$bill->restore();
+		return redirect()->route('cash_purchases.trash')->with('success', _lang('Restored Successfully'));
+	}
+
+	public function bulk_restore(Request $request)
+	{
+		foreach ($request->ids as $id) {
+			$bill = Purchase::onlyTrashed()->find($id);
+
+			// audit log
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = auth()->user()->id;
+			$audit->event = 'Restored Cash Purchase ' . $bill->bill_no;
+			$audit->save();
+
+			// increase stock
+			foreach ($bill->items as $purchaseItem) {
+				$product = $purchaseItem->product;
+				if ($product && $product->type == 'product' && $product->stock_management == 1) {
+					$product->stock = $product->stock + $purchaseItem->quantity;
+					$product->save();
+				}
+
+				if ($purchaseItem->project_id && $purchaseItem->project_task_id && $purchaseItem->cost_code_id) {
+					$projectBudget = ProjectBudget::where('project_id', $purchaseItem->project_id)->where('project_task_id', $purchaseItem->project_task_id)->where('cost_code_id', $purchaseItem->cost_code_id)->first();
+					if ($projectBudget) {
+						$projectBudget->actual_budget_quantity += $purchaseItem->quantity;
+						$projectBudget->actual_budget_amount += $purchaseItem->sub_total;
+						$projectBudget->save();
+					}
+				}
+			}
+
+			// delete transactions
+			$transactions = Transaction::onlyTrashed()->where('ref_id', $bill->id)
+				->where(function ($query) {
+					$query->where('ref_type', 'cash purchase')
+						->orWhere('ref_type', 'cash purchase tax')
+						->orWhere('ref_type', 'cash purchase payment');
+				})
+				->get();
+
+
+			if ($transactions->count() > 0) {
+				foreach ($transactions as $transaction) {
+					$transaction->restore();
+				}
+			}
+
+			// delete pending transactions
+			$transactions = PendingTransaction::onlyTrashed()->where('ref_id', $bill->id)
+				->where(function ($query) {
+					$query->where('ref_type', 'cash purchase')
+						->orWhere('ref_type', 'cash purchase tax')
+						->orWhere('ref_type', 'cash purchase payment');
+				})
+				->get();
+
+			if ($transactions->count() > 0) {
+				foreach ($transactions as $transaction) {
+					$transaction->restore();
+				}
+			}
+
+
+			// bill invoice payment
+			$transaction = Transaction::onlyTrashed()->where('ref_id', $bill->id)->where('ref_type', 'cash purchase payment')->get();
+			foreach ($transaction as $data) {
+				$data->restore();
+			}
+
+			$bill->restore();
+		}
+		return redirect()->route('cash_purchases.trash')->with('success', _lang('Deleted Successfully'));
 	}
 
 	public function send_email(Request $request, $id)
