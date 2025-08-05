@@ -1063,10 +1063,40 @@ class ReceiptController extends Controller
             'client_id'      => $request->credit_cash == 'credit' || $request->credit_cash == 'provider' ? 'required' : 'nullable',
             'product_id'     => 'required',
             'currency'       => 'required',
-            'account_id'     => $request->credit_cash == 'cash' ? 'required' : 'nullable',
+            'account_id'     => $request->credit_cash == 'cash' ? 'nullable' : 'nullable', // Changed to nullable as we now use payment_accounts
+            'payment_accounts' => $request->credit_cash == 'cash' ? 'required|array|min:1' : 'nullable',
         ], [
             'product_id.required' => _lang('You must add at least one item'),
+            'payment_accounts.required' => _lang('At least one payment account is required for cash transactions'),
+            'payment_accounts.min' => _lang('At least one payment account is required for cash transactions'),
         ]);
+
+        // Additional validation for payment accounts
+        if ($request->credit_cash == 'cash' && $request->has('payment_accounts')) {
+            $paymentAccounts = $request->payment_accounts;
+            $totalAmount = 0;
+            
+            foreach ($paymentAccounts as $index => $payment) {
+                if (empty($payment['account_id'])) {
+                    $validator->errors()->add("payment_accounts.{$index}.account_id", _lang('Payment account is required'));
+                }
+                if (empty($payment['amount']) || $payment['amount'] <= 0) {
+                    $validator->errors()->add("payment_accounts.{$index}.amount", _lang('Payment amount must be greater than 0'));
+                }
+                if (empty($payment['method'])) {
+                    $validator->errors()->add("payment_accounts.{$index}.method", _lang('Payment method is required'));
+                }
+                $totalAmount += floatval($payment['amount'] ?? 0);
+            }
+            
+            // Calculate expected total
+            $summary = $this->calculatePosTotal($request);
+            $expectedTotal = $summary['grandTotal'];
+            
+            if (abs($totalAmount - $expectedTotal) > 0.01) {
+                $validator->errors()->add("payment_accounts", _lang('Total payment amount must equal invoice total'));
+            }
+        }
 
         if ($validator->fails()) {
             return redirect()->route('receipts.pos')
@@ -1277,22 +1307,45 @@ class ReceiptController extends Controller
 
             DB::commit();
 
-            $transaction              = new Transaction();
-            $transaction->customer_id  = $request->input('customer_id') ?? NULL;
-            $transaction->trans_date  = now()->format('Y-m-d H:i:s');
-            $transaction->account_id  = $request->input('account_id');
-            $transaction->dr_cr       = 'dr';
-            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
-            $transaction->transaction_currency    = $request->currency;
-            $transaction->currency_rate           = $receipt->exchange_rate;
-            $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
-            $transaction->description = 'Cash Invoice Payment #' . $receipt->receipt_number;
-            $transaction->transaction_method      = $request->input('method');
-            $transaction->reference   = $request->input('reference');
-            $transaction->ref_id      = $receipt->id;
-            $transaction->ref_type    = 'receipt';
-            $transaction->customer_id = $receipt->customer_id;
-            $transaction->save();
+            // Create multiple payment transactions
+            if ($request->has('payment_accounts') && is_array($request->payment_accounts)) {
+                foreach ($request->payment_accounts as $index => $payment) {
+                    $transaction = new Transaction();
+                    $transaction->customer_id = $request->input('customer_id') ?? NULL;
+                    $transaction->trans_date = now()->format('Y-m-d H:i:s');
+                    $transaction->account_id = $payment['account_id'];
+                    $transaction->dr_cr = 'dr';
+                    $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $payment['amount']);
+                    $transaction->transaction_currency = $request->currency;
+                    $transaction->currency_rate = $receipt->exchange_rate;
+                    $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $payment['amount']));
+                    $transaction->description = 'Cash Invoice Payment #' . $receipt->receipt_number . ' (Payment ' . ($index + 1) . ')';
+                    $transaction->transaction_method = $payment['method'];
+                    $transaction->reference = $payment['reference'] ?? '';
+                    $transaction->ref_id = $receipt->id;
+                    $transaction->ref_type = 'receipt';
+                    $transaction->customer_id = $receipt->customer_id;
+                    $transaction->save();
+                }
+            } else {
+                // Fallback to single payment for backward compatibility
+                $transaction = new Transaction();
+                $transaction->customer_id = $request->input('customer_id') ?? NULL;
+                $transaction->trans_date = now()->format('Y-m-d H:i:s');
+                $transaction->account_id = $request->input('account_id');
+                $transaction->dr_cr = 'dr';
+                $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
+                $transaction->transaction_currency = $request->currency;
+                $transaction->currency_rate = $receipt->exchange_rate;
+                $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
+                $transaction->description = 'Cash Invoice Payment #' . $receipt->receipt_number;
+                $transaction->transaction_method = $request->input('method');
+                $transaction->reference = $request->input('reference');
+                $transaction->ref_id = $receipt->id;
+                $transaction->ref_type = 'receipt';
+                $transaction->customer_id = $receipt->customer_id;
+                $transaction->save();
+            }
 
             if ($request->input('discount_value') > 0) {
                 $transaction              = new Transaction();
