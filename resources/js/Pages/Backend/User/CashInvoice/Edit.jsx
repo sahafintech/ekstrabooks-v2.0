@@ -15,7 +15,7 @@ import { useState, useEffect } from "react";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 
-export default function Edit({ customers = [], products = [], currencies = [], taxes = [], receipt, accounts, transaction, taxIds, projects, construction_module }) {
+export default function Edit({ customers = [], products = [], currencies = [], taxes = [], receipt, accounts, transaction, paymentTransactions, taxIds, projects, construction_module, methods = [] }) {
   const [receiptItems, setReceiptItems] = useState([{
     product_id: "",
     product_name: "",
@@ -26,6 +26,10 @@ export default function Edit({ customers = [], products = [], currencies = [], t
 
   const [exchangeRate, setExchangeRate] = useState(1);
   const [baseCurrencyInfo, setBaseCurrencyInfo] = useState(null);
+
+  // State for managing multiple payment entries
+  const [paymentEntries, setPaymentEntries] = useState([]);
+  const [paymentTotal, setPaymentTotal] = useState(0);
 
   const { data, setData, put, processing, errors, reset } = useForm({
     customer_id: receipt.customer_id || "",
@@ -49,6 +53,8 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     unit_cost: [],
     taxes: taxIds,
     account_id: transaction.account_id,
+    // Multiple payment accounts support
+    payment_accounts: [],
   });
 
   // Initialize invoice items from existing invoice
@@ -79,7 +85,19 @@ export default function Edit({ customers = [], products = [], currencies = [], t
       unit_cost: receipt.items.map(item => item.unit_cost),
     })
 
-  }, [receipt]);
+    // Initialize payment entries from existing transactions
+    if (paymentTransactions && paymentTransactions.length > 0) {
+      const existingPayments = paymentTransactions.map((transaction, index) => ({
+        id: transaction.id || Date.now() + index,
+        account_id: transaction.account_id,
+        amount: transaction.transaction_amount,
+        method: transaction.transaction_method,
+        reference: transaction.reference || "",
+      }));
+      setPaymentEntries(existingPayments);
+    }
+
+  }, [receipt, paymentTransactions]);
 
   const addReceiptItem = () => {
     setReceiptItems([...receiptItems, {
@@ -171,6 +189,58 @@ export default function Edit({ customers = [], products = [], currencies = [], t
     return (subtotal + taxes) - discount;
   };
 
+  // Helper functions for multiple payment entries
+  const addPaymentEntry = () => {
+    const newEntry = {
+      id: Date.now(),
+      account_id: "",
+      amount: 0,
+      method: "",
+      reference: "",
+    };
+    setPaymentEntries([...paymentEntries, newEntry]);
+  };
+
+  const addQuickPayment = () => {
+    const remaining = getRemainingAmount();
+    if (remaining > 0) {
+      const newEntry = {
+        id: Date.now(),
+        account_id: "",
+        amount: remaining,
+        method: "",
+        reference: "",
+      };
+      setPaymentEntries([...paymentEntries, newEntry]);
+    }
+  };
+
+  const removePaymentEntry = (id) => {
+    setPaymentEntries(paymentEntries.filter(entry => entry.id !== id));
+  };
+
+  const updatePaymentEntry = (id, field, value) => {
+    setPaymentEntries(paymentEntries.map(entry => 
+      entry.id === id ? { ...entry, [field]: value } : entry
+    ));
+  };
+
+  const calculatePaymentTotal = () => {
+    return paymentEntries.reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0);
+  };
+
+  const getRemainingAmount = () => {
+    const total = calculateTotal();
+    const paid = calculatePaymentTotal();
+    return total - paid;
+  };
+
+  const isPaymentComplete = () => {
+    const total = calculateTotal();
+    const paid = calculatePaymentTotal();
+    return Math.abs(total - paid) < 0.01; // Allow for small floating point differences
+  };
+
   // Find and set base currency on component mount
   useEffect(() => {
     // First try to find a currency with base_currency flag set to 1
@@ -213,6 +283,16 @@ export default function Edit({ customers = [], products = [], currencies = [], t
         });
     }
   };
+
+  // Update payment total whenever entries change
+  useEffect(() => {
+    setPaymentTotal(calculatePaymentTotal());
+  }, [paymentEntries]);
+
+  // Update form data with payment accounts
+  useEffect(() => {
+    setData('payment_accounts', paymentEntries);
+  }, [paymentEntries]);
 
   // Update converted_total whenever relevant values change
   useEffect(() => {
@@ -269,6 +349,28 @@ export default function Edit({ customers = [], products = [], currencies = [], t
       toast.error("Please select a valid currency");
       return;
     }
+
+    // Validate payment entries
+    if (paymentEntries.length === 0) {
+      toast.error("Please add at least one payment entry");
+      return;
+    }
+    
+    if (!isPaymentComplete()) {
+      toast.error(`Payment total (${formatCurrency({ amount: paymentTotal, currency: data.currency })}) must equal invoice total (${formatCurrency({ amount: calculateTotal(), currency: data.currency })})`);
+      return;
+    }
+    
+    // Validate all payment entries have required fields
+    const invalidEntries = paymentEntries.filter(entry => 
+      !entry.account_id || !entry.amount || !entry.method
+    );
+    
+    if (invalidEntries.length > 0) {
+      toast.error("Please fill in all required fields for payment entries");
+      return;
+    }
+
     // Create a new data object with all the required fields
     const formData = {
       ...data,
@@ -420,22 +522,151 @@ export default function Edit({ customers = [], products = [], currencies = [], t
 
             <div className="grid grid-cols-12 mt-2">
               <Label htmlFor="customer_id" className="md:col-span-2 col-span-12">
-                Payment Account *
+                Payment Accounts
               </Label>
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                <div className="md:w-1/2 w-full">
-                  <SearchableCombobox
-                    options={accounts.map(account => ({
-                      id: account.id,
-                      name: account.account_name
-                    }))}
-                    value={data.account_id}
-                    onChange={(value) => setData("account_id", value)}
-                    placeholder="Select account"
-                    required
-                  />
+                <div className="md:w-1/2 w-full space-y-4">
+                  {/* Multiple Payment Entries */}
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-sm font-medium">Payment Entries</Label>
+                      <div className="flex gap-2">
+                        {getRemainingAmount() > 0 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={addQuickPayment}
+                          >
+                            Quick Payment
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={addPaymentEntry}
+                        >
+                          Add Payment
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {/* Payment Entries */}
+                    {paymentEntries.length > 0 && (
+                      <div className="space-y-3">
+                        {paymentEntries.map((entry, index) => (
+                          <div key={entry.id} className="border rounded-md p-3 space-y-3 bg-gray-50">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-medium">Payment {index + 1}</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removePaymentEntry(entry.id)}
+                                className="text-red-500"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <Label className="text-xs">Account</Label>
+                                <SearchableCombobox
+                                  options={accounts.map(account => ({
+                                    id: account.id,
+                                    name: account.account_name,
+                                  }))}
+                                  value={entry.account_id}
+                                  onChange={(selectedValue) => {
+                                    updatePaymentEntry(entry.id, 'account_id', selectedValue);
+                                  }}
+                                  placeholder="Select account"
+                                />
+                              </div>
+                              
+                              <div>
+                                <Label className="text-xs">Amount</Label>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={entry.amount}
+                                  onChange={(e) => {
+                                    updatePaymentEntry(entry.id, 'amount', parseFloat(e.target.value) || 0);
+                                  }}
+                                  placeholder="0.00"
+                                />
+                              </div>
+                              
+                              <div>
+                                <Label className="text-xs">Method</Label>
+                                <SearchableCombobox
+                                  options={methods.map(method => ({
+                                    id: method.name,
+                                    name: method.name,
+                                  }))}
+                                  value={entry.method}
+                                  onChange={(selectedValue) => {
+                                    updatePaymentEntry(entry.id, 'method', selectedValue);
+                                  }}
+                                  placeholder="Select method"
+                                />
+                              </div>
+                              
+                              <div>
+                                <Label className="text-xs">Reference</Label>
+                                <Input
+                                  type="text"
+                                  value={entry.reference}
+                                  onChange={(e) => {
+                                    updatePaymentEntry(entry.id, 'reference', e.target.value);
+                                  }}
+                                  placeholder="Reference"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        
+                        {/* Payment Summary */}
+                        <div className="border-t pt-3 space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span>Total Amount:</span>
+                            <span className="font-medium">{formatCurrency({ amount: calculateTotal(), currency: data.currency })}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Paid Amount:</span>
+                            <span className="font-medium">{formatCurrency({ amount: paymentTotal, currency: data.currency })}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Remaining:</span>
+                            <span className={`font-medium ${getRemainingAmount() < 0 ? 'text-red-500' : getRemainingAmount() > 0 ? 'text-orange-500' : 'text-green-500'}`}>
+                              {formatCurrency({ amount: getRemainingAmount(), currency: data.currency })}
+                            </span>
+                          </div>
+                          {isPaymentComplete() && (
+                            <div className="flex items-center gap-2 text-green-600 text-sm">
+                              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                              <span>Payment Complete</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Quick Payment Options */}
+                    {paymentEntries.length === 0 && (
+                      <div className="text-center py-4 text-gray-500 border rounded-md">
+                        <p className="text-sm">No payment entries added yet.</p>
+                        <p className="text-xs">Click "Add Payment" to add payment accounts.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <InputError message={errors.account_id} className="text-sm" />
               </div>
             </div>
 
@@ -639,6 +870,8 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                       unit_cost: 0,
                       taxes: []
                     }]);
+                    setPaymentEntries([]);
+                    setPaymentTotal(0);
                   }}
                 >
                   Reset

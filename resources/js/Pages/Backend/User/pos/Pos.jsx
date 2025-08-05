@@ -42,7 +42,6 @@ export default function POS({ products, categories, currencies, accounts, custom
     taxes: [],
     account_id: "",
     client_id: "",
-    method: "",
     credit_cash: "cash",
     hold_pos_id: "",
     prescription_products_id: "",
@@ -962,23 +961,6 @@ export default function POS({ products, categories, currencies, accounts, custom
                       </div>
                     )}
 
-                    <div className="flex justify-between items-center">
-                      <Label>Payment Method</Label>
-                      <div className="w-[70%]">
-                        <SearchableCombobox
-                          options={methods.map(method => ({
-                            id: method.name,
-                            name: method.name,
-                          }))}
-                          value={data.method}
-                          onChange={(selectedValue) => {
-                            setData("method", selectedValue);
-                          }}
-                          placeholder="Select payment method"
-                        />
-                      </div>
-                    </div>
-
                     {data.credit_cash === "cash" && (
                       <div className="space-y-4">
                         <div className="flex justify-between items-center">
@@ -1523,23 +1505,6 @@ export default function POS({ products, categories, currencies, accounts, custom
                           </div>
                         </div>
                       )}
-
-                      <div className="flex justify-between items-center">
-                        <Label>Payment Method</Label>
-                        <div className="w-[70%]">
-                          <SearchableCombobox
-                            options={methods.map(method => ({
-                              id: method.name,
-                              name: method.name,
-                            }))}
-                            value={data.method}
-                            onChange={(selectedValue) => {
-                              setData("method", selectedValue);
-                            }}
-                            placeholder="Select payment method"
-                          />
-                        </div>
-                      </div>
 
                       {data.credit_cash === "cash" && (
                         <div className="space-y-4">
