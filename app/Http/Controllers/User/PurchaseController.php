@@ -134,6 +134,95 @@ class PurchaseController extends Controller
 			],
 			'vendors' => $vendors,
 			'summary' => $summary,
+			'trashed_bills' => Purchase::onlyTrashed()->where('cash', 0)->count(),
+		]);
+	}
+
+	public function trash(Request $request)
+	{
+		$search = $request->get('search', '');
+		$perPage = $request->get('per_page', 50);
+		$sorting = $request->get('sorting', []);
+		$sortColumn = $sorting['column'] ?? 'id';
+		$sortDirection = $sorting['direction'] ?? 'desc';
+		$vendorId = $request->get('vendor_id', '');
+		$dateRange = $request->get('date_range', '');
+		$approvalStatus = $request->get('approval_status', '');
+		$status = $request->get('status', '');
+
+		$query = Purchase::onlyTrashed()
+			->where('cash', 0);
+
+		// Handle sorting
+		if ($sortColumn === 'vendor.name') {
+			$query->join('vendors', 'purchases.vendor_id', '=', 'vendors.id')
+				->orderBy('vendors.name', $sortDirection)
+				->select('purchases.*');
+		} else {
+			$query->orderBy('purchases.' . $sortColumn, $sortDirection);
+		}
+
+		// Apply filters
+		if ($search) {
+			$query->where(function ($q) use ($search) {
+				$q->where('purchases.bill_no', 'like', "%$search%")
+					->orWhere('purchases.title', 'like', "%$search%")
+					->orWhere('purchases.purchase_date', 'like', "%$search%")
+					->orWhere('purchases.due_date', 'like', "%$search%")
+					->orWhere('purchases.grand_total', 'like', "%$search%")
+					->orWhere('purchases.paid', 'like', "%$search%")
+					->orWhereHas('vendor', function ($q) use ($search) {
+						$q->where('name', 'like', "%$search%");
+					});
+			});
+		}
+
+		if ($vendorId) {
+			$query->where('vendor_id', $vendorId);
+		}
+
+		if ($dateRange) {
+			$query->whereDate('purchase_date', '>=', Carbon::parse($dateRange[0])->format('Y-m-d'))
+				->whereDate('purchase_date', '<=', Carbon::parse($dateRange[1])->format('Y-m-d'));
+		}
+
+		if ($approvalStatus) {
+			$query->where('approval_status', $approvalStatus);
+		}
+
+		if ($status) {
+			$query->where('status', $status);
+		}
+
+		// Get summary data before pagination
+		$summaryQuery = clone $query;
+		$summary = [
+			'total_bills' => $summaryQuery->count(),
+			'total_amount' => $summaryQuery->sum('grand_total'),
+			'total_paid' => $summaryQuery->sum('paid'),
+		];
+
+		$bills = $query->with('vendor', 'business')->paginate($perPage)->withQueryString();
+		$vendors = Vendor::all();
+
+		return Inertia::render('Backend/User/Bill/Trash', [
+			'bills' => $bills->items(),
+			'meta' => [
+				'current_page' => $bills->currentPage(),
+				'per_page' => $bills->perPage(),
+				'last_page' => $bills->lastPage(),
+				'total' => $bills->total(),
+			],
+			'filters' => [
+				'search' => $search,
+				'vendor_id' => $vendorId,
+				'date_range' => $dateRange,
+				'approval_status' => $approvalStatus,
+				'status' => $status,
+				'sorting' => $sorting,
+			],
+			'vendors' => $vendors,
+			'summary' => $summary,
 		]);
 	}
 
@@ -845,16 +934,6 @@ class PurchaseController extends Controller
 			}
 		}
 
-		// delete attachments
-		$attachments = Attachment::where('ref_id', $purchase->id)->where('ref_type', 'bill invoice')->get();
-		foreach ($attachments as $attachment) {
-			$filePath = public_path($attachment->path);
-			if (file_exists($filePath)) {
-				unlink($filePath);
-			}
-			$attachment->delete();
-		}
-
 		$purchase->delete();
 		return redirect()->route('bill_invoices.index')->with('success', _lang('Deleted Successfully'));
 	}
@@ -925,6 +1004,123 @@ class PurchaseController extends Controller
 				}
 			}
 
+			$purchase->delete();
+		}
+
+		return redirect()->route('bill_invoices.index')->with('success', _lang('Deleted Successfully'));
+	}
+
+	public function permanent_destroy($id)
+	{
+		$purchase = Purchase::onlyTrashed()->find($id);
+
+		// audit log
+		$audit = new AuditLog();
+		$audit->date_changed = date('Y-m-d H:i:s');
+		$audit->changed_by = auth()->user()->id;
+		$audit->event = 'Bill Permanently Deleted' . ' ' . $purchase->bill_no;
+		$audit->save();
+
+		// delete transactions
+		$transactions = Transaction::onlyTrashed()->where('ref_id', $purchase->id)
+			->where(function ($query) {
+				$query->where('ref_type', 'bill invoice')
+					->orWhere('ref_type', 'bill invoice tax');
+			})
+			->get();
+
+		foreach ($transactions as $transaction) {
+			$transaction->forceDelete();
+		}
+
+		$purchase_payments = PurchasePayment::onlyTrashed()->where('purchase_id', $purchase->id)->get();
+
+		foreach ($purchase_payments as $purchase_payment) {
+			$bill_payment = BillPayment::onlyTrashed()->find($purchase_payment->payment_id);
+			if ($bill_payment) {
+				$bill_payment->amount = $bill_payment->amount - $purchase_payment->amount;
+				$bill_payment->save();
+
+				if ($bill_payment->amount == 0) {
+					$bill_payment->forceDelete();
+				}
+
+				// delete transactions
+				$transactions = Transaction::onlyTrashed()->where('ref_id', $purchase->id . ',' . $bill_payment->id)->where('ref_type', 'bill payment')->get();
+				foreach ($transactions as $transaction) {
+					$transaction->forceDelete();
+				}
+			}
+			$purchase_payment->forceDelete();
+
+			if ($bill_payment->purchases == null) {
+				$bill_payment->forceDelete();
+			}
+		}
+
+		// delete attachments
+		$attachments = Attachment::where('ref_id', $purchase->id)->where('ref_type', 'bill invoice')->get();
+		foreach ($attachments as $attachment) {
+			$filePath = public_path($attachment->path);
+			if (file_exists($filePath)) {
+				unlink($filePath);
+			}
+			$attachment->delete();
+		}
+
+		$purchase->forceDelete();
+		return redirect()->route('bill_invoices.trash')->with('success', _lang('Permanently Deleted Successfully'));
+	}
+
+	public function bulk_permanent_destroy(Request $request)
+	{
+		foreach ($request->ids as $id) {
+			$purchase = Purchase::onlyTrashed()->find($id);
+
+			// audit log
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = auth()->user()->id;
+			$audit->event = 'Bill Permanently Deleted' . ' ' . $purchase->bill_no;
+			$audit->save();
+
+			// delete transactions
+			$transactions = Transaction::onlyTrashed()->where('ref_id', $purchase->id)
+				->where(function ($query) {
+					$query->where('ref_type', 'bill invoice')
+						->orWhere('ref_type', 'bill invoice tax');
+				})
+				->get();
+
+			foreach ($transactions as $transaction) {
+				$transaction->forceDelete();
+			}
+
+			$purchase_payments = PurchasePayment::onlyTrashed()->where('purchase_id', $purchase->id)->get();
+
+			foreach ($purchase_payments as $purchase_payment) {
+				$bill_payment = BillPayment::onlyTrashed()->find($purchase_payment->payment_id);
+				if ($bill_payment) {
+					$bill_payment->amount = $bill_payment->amount - $purchase_payment->amount;
+					$bill_payment->save();
+
+					if ($bill_payment->amount == 0) {
+						$bill_payment->forceDelete();
+					}
+
+					// delete transactions
+					$transactions = Transaction::onlyTrashed()->where('ref_id', $purchase->id . ',' . $bill_payment->id)->where('ref_type', 'bill payment')->get();
+					foreach ($transactions as $transaction) {
+						$transaction->forceDelete();
+					}
+				}
+				$purchase_payment->forceDelete();
+
+				if ($bill_payment->purchases == null) {
+					$bill_payment->forceDelete();
+				}
+			}
+
 			// delete attachments
 			$attachments = Attachment::where('ref_id', $purchase->id)->where('ref_type', 'bill invoice')->get();
 			foreach ($attachments as $attachment) {
@@ -935,10 +1131,151 @@ class PurchaseController extends Controller
 				$attachment->delete();
 			}
 
-			$purchase->delete();
+			$purchase->forceDelete();
 		}
 
-		return redirect()->route('bill_invoices.index')->with('success', _lang('Deleted Successfully'));
+		return redirect()->route('bill_invoices.trash')->with('success', _lang('Permanently Deleted Successfully'));
+	}
+
+	public function restore($id)
+	{
+		$purchase = Purchase::onlyTrashed()->find($id);
+
+		// audit log
+		$audit = new AuditLog();
+		$audit->date_changed = date('Y-m-d H:i:s');
+		$audit->changed_by = auth()->user()->id;
+		$audit->event = 'Bill Restored' . ' ' . $purchase->bill_no;
+		$audit->save();
+
+		// increase stock
+		foreach ($purchase->items as $purchaseItem) {
+			$product = $purchaseItem->product;
+			if ($product->type == 'product' && $product->stock_management == 1) {
+				$product->stock = $product->stock + $purchaseItem->quantity;
+				$product->save();
+			}
+
+			if ($purchaseItem->project_id && $purchaseItem->project_task_id && $purchaseItem->cost_code_id) {
+				$projectBudget = ProjectBudget::where('project_id', $purchaseItem->project_id)->where('project_task_id', $purchaseItem->project_task_id)->where('cost_code_id', $purchaseItem->cost_code_id)->first();
+				if ($projectBudget) {
+					$projectBudget->actual_budget_quantity += $purchaseItem->quantity;
+					$projectBudget->actual_budget_amount += $purchaseItem->sub_total;
+					$projectBudget->save();
+				}
+			}
+		}
+		// delete transactions
+		$transactions = Transaction::onlyTrashed()->where('ref_id', $purchase->id)
+			->where(function ($query) {
+				$query->where('ref_type', 'bill invoice')
+					->orWhere('ref_type', 'bill invoice tax');
+			})
+			->get();
+
+		foreach ($transactions as $transaction) {
+			$transaction->restore();
+		}
+
+		$purchase_payments = PurchasePayment::onlyTrashed()->where('purchase_id', $purchase->id)->get();
+
+		foreach ($purchase_payments as $purchase_payment) {
+			$bill_payment = BillPayment::onlyTrashed()->find($purchase_payment->payment_id);
+			if ($bill_payment) {
+				$bill_payment->amount = $bill_payment->amount - $purchase_payment->amount;
+				$bill_payment->save();
+
+				if ($bill_payment->amount == 0) {
+					$bill_payment->restore();
+				}
+
+				// delete transactions
+				$transactions = Transaction::onlyTrashed()->where('ref_id', $purchase->id . ',' . $bill_payment->id)->where('ref_type', 'bill payment')->get();
+				foreach ($transactions as $transaction) {
+					$transaction->restore();
+				}
+			}
+			$purchase_payment->delete();
+
+			if ($bill_payment->purchases == null) {
+				$bill_payment->delete();
+			}
+		}
+
+		$purchase->restore();
+		return redirect()->route('bill_invoices.trash')->with('success', _lang('Restored Successfully'));
+	}
+
+	public function bulk_restore(Request $request)
+	{
+		foreach ($request->ids as $id) {
+			$purchase = Purchase::onlyTrashed()->find($id);
+
+			// audit log
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = auth()->user()->id;
+			$audit->event = 'Bill Restored' . ' ' . $purchase->bill_no;
+			$audit->save();
+
+			// increase stock
+			foreach ($purchase->items as $purchaseItem) {
+				$product = $purchaseItem->product;
+				if ($product->type == 'product' && $product->stock_management == 1) {
+					$product->stock = $product->stock + $purchaseItem->quantity;
+					$product->save();
+				}
+
+				if ($purchaseItem->project_id && $purchaseItem->project_task_id && $purchaseItem->cost_code_id) {
+					$projectBudget = ProjectBudget::where('project_id', $purchaseItem->project_id)->where('project_task_id', $purchaseItem->project_task_id)->where('cost_code_id', $purchaseItem->cost_code_id)->first();
+					if ($projectBudget) {
+						$projectBudget->actual_budget_quantity += $purchaseItem->quantity;
+						$projectBudget->actual_budget_amount += $purchaseItem->sub_total;
+						$projectBudget->save();
+					}
+				}
+			}
+			// delete transactions
+			$transactions = Transaction::onlyTrashed()->where('ref_id', $purchase->id)
+				->where(function ($query) {
+					$query->where('ref_type', 'bill invoice')
+						->orWhere('ref_type', 'bill invoice tax');
+				})
+				->get();
+
+			foreach ($transactions as $transaction) {
+				$transaction->restore();
+			}
+
+			$purchase_payments = PurchasePayment::onlyTrashed()->where('purchase_id', $purchase->id)->get();
+
+			foreach ($purchase_payments as $purchase_payment) {
+				$bill_payment = BillPayment::onlyTrashed()->find($purchase_payment->payment_id);
+				if ($bill_payment) {
+					$bill_payment->amount = $bill_payment->amount - $purchase_payment->amount;
+					$bill_payment->save();
+
+					if ($bill_payment->amount == 0) {
+						$bill_payment->restore();
+					}
+
+					// delete transactions
+					$transactions = Transaction::onlyTrashed()->where('ref_id', $purchase->id . ',' . $bill_payment->id)->where('ref_type', 'bill payment')->get();
+					foreach ($transactions as $transaction) {
+						$transaction->restore();
+					}
+				}
+				$purchase_payment->restore();
+
+				if ($bill_payment->purchases == null) {
+					$bill_payment->restore();
+				}
+			}
+
+			$purchase->restore();
+		}
+
+		return redirect()->route('bill_invoices.trash')->with('success', _lang('Restored Successfully'));
 	}
 
 	private function calculateTotal(Request $request)

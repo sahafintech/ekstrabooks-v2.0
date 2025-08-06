@@ -16,6 +16,11 @@ return new class extends Migration
             $table->bigInteger('purchase_id')->unsigned();
             $table->bigInteger('payment_id')->unsigned();
             $table->decimal('amount', 8, 2);
+            $table->bigInteger('created_user_id')->nullable();
+            $table->bigInteger('updated_user_id')->nullable();
+            $table->bigInteger('deleted_user_id')->nullable();
+
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('purchase_id')->references('id')->on('purchases')->onDelete('cascade');

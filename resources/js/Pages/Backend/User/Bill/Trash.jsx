@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, router, usePage } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -19,27 +19,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/Components/ui/select";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
 import {
-    MoreVertical,
-    FileUp,
-    FileDown,
-    Plus,
-    Eye,
-    Trash2,
-    Edit,
     ChevronUp,
     ChevronDown,
-    Receipt,
-    DollarSign,
-    CreditCard,
-    AlertCircle,
+    RotateCcw,
+    Trash,
 } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
@@ -54,7 +39,7 @@ const DeleteBillModal = ({ show, onClose, onConfirm, processing }) => (
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
-                Are you sure you want to delete this bill?
+                Are you sure you want to permanently delete this bill?
             </h2>
             <div className="mt-6 flex justify-end">
                 <Button
@@ -70,82 +55,7 @@ const DeleteBillModal = ({ show, onClose, onConfirm, processing }) => (
                     variant="destructive"
                     disabled={processing}
                 >
-                    Delete Bill
-                </Button>
-            </div>
-        </form>
-    </Modal>
-);
-
-const ImportBillsModal = ({ show, onClose, onSubmit, processing }) => (
-    <Modal show={show} onClose={onClose} maxWidth="3xl">
-        <form onSubmit={onSubmit}>
-            <div className="ti-modal-header">
-                <h3 className="text-lg font-bold">Import Bills</h3>
-            </div>
-            <div className="ti-modal-body grid grid-cols-12">
-                <div className="col-span-12">
-                    <div className="flex items-center justify-between">
-                        <label className="block font-medium text-sm text-gray-700">
-                            Bills File
-                        </label>
-                        <a
-                            href="/uploads/media/default/sample_bills.xlsx"
-                            download
-                        >
-                            <Button variant="secondary" size="sm" type="button">
-                                Use This Sample File
-                            </Button>
-                        </a>
-                    </div>
-                    <input
-                        type="file"
-                        className="w-full dropify"
-                        name="bills_file"
-                        required
-                    />
-                </div>
-                <div className="col-span-12 mt-4">
-                    <ul className="space-y-3 text-sm">
-                        <li className="flex space-x-3">
-                            <span className="text-primary bg-primary/20 rounded-full px-1">
-                                ✓
-                            </span>
-                            <span className="text-gray-800 dark:text-white/70">
-                                Maximum File Size: 1 MB
-                            </span>
-                        </li>
-                        <li className="flex space-x-3">
-                            <span className="text-primary bg-primary/20 rounded-full px-1">
-                                ✓
-                            </span>
-                            <span className="text-gray-800 dark:text-white/70">
-                                File format Supported: CSV, TSV, XLS
-                            </span>
-                        </li>
-                        <li className="flex space-x-3">
-                            <span className="text-primary bg-primary/20 rounded-full px-1">
-                                ✓
-                            </span>
-                            <span className="text-gray-800 dark:text-white/70">
-                                Make sure the format of the import file matches
-                                our sample file by comparing them.
-                            </span>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-            <div className="ti-modal-footer flex justify-end mt-4">
-                <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={onClose}
-                    className="mr-3"
-                >
-                    Close
-                </Button>
-                <Button type="submit" disabled={processing}>
-                    Import Bills
+                    Permanently Delete Bill
                 </Button>
             </div>
         </form>
@@ -162,7 +72,7 @@ const DeleteAllBillsModal = ({
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
-                Are you sure you want to delete {count} selected bill
+                Are you sure you want to permanently delete {count} selected bill
                 {count !== 1 ? "s" : ""}?
             </h2>
             <div className="mt-6 flex justify-end">
@@ -179,25 +89,18 @@ const DeleteAllBillsModal = ({
                     variant="destructive"
                     disabled={processing}
                 >
-                    Delete Selected
+                    Permanently Delete Selected
                 </Button>
             </div>
         </form>
     </Modal>
 );
 
-const ApproveAllBillsModal = ({
-    show,
-    onClose,
-    onConfirm,
-    processing,
-    count,
-}) => (
+const RestoreBillModal = ({ show, onClose, onConfirm, processing }) => (
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
-                Are you sure you want to approve {count} selected bill
-                {count !== 1 ? "s" : ""}?
+                Are you sure you want to restore this bill?
             </h2>
             <div className="mt-6 flex justify-end">
                 <Button
@@ -208,15 +111,19 @@ const ApproveAllBillsModal = ({
                 >
                     Cancel
                 </Button>
-                <Button type="submit" variant="default" disabled={processing}>
-                    Approve Selected
+                <Button
+                    type="submit"
+                    variant="default"
+                    disabled={processing}
+                >
+                    Restore Bill
                 </Button>
             </div>
         </form>
     </Modal>
 );
 
-const RejectAllBillsModal = ({
+const RestoreAllBillsModal = ({
     show,
     onClose,
     onConfirm,
@@ -226,7 +133,7 @@ const RejectAllBillsModal = ({
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
             <h2 className="text-lg font-medium">
-                Are you sure you want to reject {count} selected bill
+                Are you sure you want to restore {count} selected bill
                 {count !== 1 ? "s" : ""}?
             </h2>
             <div className="mt-6 flex justify-end">
@@ -240,10 +147,10 @@ const RejectAllBillsModal = ({
                 </Button>
                 <Button
                     type="submit"
-                    variant="destructive"
+                    variant="default"
                     disabled={processing}
                 >
-                    Reject Selected
+                    Restore Selected
                 </Button>
             </div>
         </form>
@@ -293,64 +200,11 @@ const BillStatusBadge = ({ status }) => {
     );
 };
 
-const SummaryCards = ({ summary = {} }) => {
-    const cards = [
-        {
-            title: "Total Bills",
-            value: summary.total_bills || 0,
-            description: "Total number of bills",
-            icon: Receipt,
-            iconColor: "text-blue-500"
-        },
-        {
-            title: "Grand Total",
-            value: formatCurrency({ amount: summary.total_amount || 0 }),
-            description: "Total amount of all bills",
-            icon: DollarSign,
-            iconColor: "text-green-500"
-        },
-        {
-            title: "Total Paid",
-            value: formatCurrency({ amount: summary.total_paid || 0 }),
-            description: "Total amount paid",
-            icon: CreditCard,
-            iconColor: "text-purple-500"
-        },
-        {
-            title: "Total Due",
-            value: formatCurrency({ amount: (summary.total_amount || 0) - (summary.total_paid || 0) }),
-            description: "Total amount due",
-            icon: AlertCircle,
-            iconColor: "text-orange-500"
-        }
-    ];
-
-    return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {cards.map((card, index) => (
-                <div key={index} className="bg-gray-100 rounded-lg shadow-sm p-4">
-                    <div className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <h3 className="text-lg font-medium">{card.title}</h3>
-                        <card.icon className={`h-8 w-8 ${card.iconColor}`} />
-                    </div>
-                    <div className="text-2xl font-bold">{card.value}
-                        <p className="text-xs text-muted-foreground">
-                            {card.description}
-                        </p>
-                    </div>
-                </div>
-            ))}
-        </div>
-    );
-};
-
-export default function List({
+export default function TrashList({
     bills = [],
     meta = {},
     filters = {},
     vendors = [],
-    summary = {},
-    trashed_bills = 0,
 }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
@@ -376,12 +230,12 @@ export default function List({
 
     // Delete confirmation modal states
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [showImportModal, setShowImportModal] = useState(false);
     const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
-    const [showApproveAllModal, setShowApproveAllModal] = useState(false);
-    const [showRejectAllModal, setShowRejectAllModal] = useState(false);
     const [billToDelete, setBillToDelete] = useState(null);
     const [processing, setProcessing] = useState(false);
+    const [showRestoreAllModal, setShowRestoreAllModal] = useState(false);
+    const [billToRestore, setBillToRestore] = useState(null);
+    const [showRestoreModal, setShowRestoreModal] = useState(false);
 
     useEffect(() => {
         if (flash && flash.success) {
@@ -420,11 +274,16 @@ export default function List({
         setShowDeleteModal(true);
     };
 
+    const handleRestoreConfirm = (billId) => {
+        setBillToRestore(billId);
+        setShowRestoreModal(true);
+    };
+
     const handleDelete = (e) => {
         e.preventDefault();
         setProcessing(true);
 
-        router.delete(route("bill_invoices.destroy", billToDelete), {
+        router.delete(route("bill_invoices.permanent_destroy", billToDelete), {
             onSuccess: () => {
                 setShowDeleteModal(false);
                 setBillToDelete(null);
@@ -453,7 +312,7 @@ export default function List({
         setProcessing(true);
 
         router.post(
-            route("bill_invoices.bulk_destroy"),
+            route("bill_invoices.bulk_permanent_destroy"),
             {
                 ids: selectedBills,
             },
@@ -471,76 +330,55 @@ export default function List({
         );
     };
 
-    const handleApproveAll = (e) => {
+    const handleRestore = (e) => {
         e.preventDefault();
         setProcessing(true);
 
-        router.post(
-            route("bill_invoices.bulk_approve"),
-            {
-                ids: selectedBills,
-            },
-            {
-                onSuccess: () => {
-                    setShowApproveAllModal(false);
-                    setProcessing(false);
-                    setSelectedBills([]);
-                    setIsAllSelected(false);
-                },
-                onError: () => {
-                    setProcessing(false);
-                },
-            }
-        );
-    };
-
-    const handleRejectAll = (e) => {
-        e.preventDefault();
-        setProcessing(true);
-
-        router.post(
-            route("bill_invoices.bulk_reject"),
-            {
-                ids: selectedBills,
-            },
-            {
-                onSuccess: () => {
-                    setShowRejectAllModal(false);
-                    setProcessing(false);
-                    setSelectedBills([]);
-                    setIsAllSelected(false);
-                },
-                onError: () => {
-                    setProcessing(false);
-                },
-            }
-        );
-    };
-
-    const handleImport = (e) => {
-        e.preventDefault();
-        setProcessing(true);
-
-        const formData = new FormData(e.target);
-
-        router.post(route("bill_invoices.import"), formData, {
+        router.post(route("bill_invoices.restore", billToRestore), {
             onSuccess: () => {
-                setShowImportModal(false);
+                setShowRestoreModal(false);
+                setBillToRestore(null);
                 setProcessing(false);
+                setSelectedBills((prev) =>
+                    prev.filter((id) => id !== billToDelete)
+                );
                 toast({
-                    title: "Import Successful",
-                    description: "Bill have been imported successfully.",
+                    title: "Bill Restored",
+                    description: "bill has been restored successfully.",
                 });
             },
-            onError: (errors) => {
+            onError: () => {
                 setProcessing(false);
                 toast({
                     variant: "destructive",
-                    title: "Import Failed",
-                    description: Object.values(errors).flat().join(", "),
+                    title: "Error",
+                    description: "There was an error restoring the bill.",
                 });
             },
         });
+    };
+
+    const handleRestoreAll = (e) => {
+        e.preventDefault();
+        setProcessing(true);
+
+        router.post(
+            route("bill_invoices.bulk_restore"),
+            {
+                ids: selectedBills,
+            },
+            {
+                onSuccess: () => {
+                    setShowRestoreAllModal(false);
+                    setProcessing(false);
+                    setSelectedBills([]);
+                    setIsAllSelected(false);
+                },
+                onError: () => {
+                    setProcessing(false);
+                },
+            }
+        );
     };
 
     const handleSearch = (e) => {
@@ -669,12 +507,8 @@ export default function List({
     const handleBulkAction = () => {
         if (bulkAction === "delete" && selectedBills.length > 0) {
             setShowDeleteAllModal(true);
-        }
-        if (bulkAction === "approve" && selectedBills.length > 0) {
-            setShowApproveAllModal(true);
-        }
-        if (bulkAction === "reject" && selectedBills.length > 0) {
-            setShowRejectAllModal(true);
+        }else if (bulkAction === "restore" && selectedBills.length > 0) {
+            setShowRestoreAllModal(true);
         }
     };
 
@@ -761,52 +595,15 @@ export default function List({
                         url="bill_invoices.index"
                     />
                     <div className="p-4">
-                        <SummaryCards summary={summary} />
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                            <div className="flex flex-col md:flex-row gap-2">
-                                <Link href={route("bill_invoices.create")}>
-                                    <Button>
-                                        <Plus className="h-4 w-4 mr-2" />
-                                        Add Credit Purchase
-                                    </Button>
-                                </Link>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="secondary">
-                                            <MoreVertical className="h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        <DropdownMenuItem
-                                            onClick={() =>
-                                                setShowImportModal(true)
-                                            }
-                                        >
-                                            <FileUp className="mr-2 h-4 w-4" />{" "}
-                                            Import
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                            onClick={handleExport}
-                                        >
-                                            <FileDown className="mr-2 h-4 w-4" />{" "}
-                                            Export
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                                <Link href={route("bill_invoices.trash")}>
-                                    <Button variant="outline" className="relative">
-                                        <Trash2 className="h-8 w-8" />
-                                        {trashed_bills > 0 && (
-                                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                                            {trashed_bills}
-                                        </span>
-                                        )}
-                                    </Button>
-                                </Link>
+                            <div>
+                                <div className="text-red-500">
+                                    Total trashed credit purchases: {meta.total}
+                                </div>
                             </div>
                             <div className="flex flex-col md:flex-row gap-4 md:items-center">
                                 <Input
-                                    placeholder="Search bills..."
+                                    placeholder="Search trashed credit purchases..."
                                     value={search}
                                     onChange={(e) => handleSearch(e)}
                                     className="w-full md:w-80"
@@ -825,13 +622,10 @@ export default function List({
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="delete">
-                                            Delete Selected
+                                            Permanently Delete Selected
                                         </SelectItem>
-                                        <SelectItem value="approve">
-                                            Approve Selected
-                                        </SelectItem>
-                                        <SelectItem value="reject">
-                                            Reject Selected
+                                        <SelectItem value="restore">
+                                            Restore Selected
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -1069,41 +863,21 @@ export default function List({
                                                     />
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    <TableActions
-                                                        actions={[
-                                                            {
-                                                                label: "View",
-                                                                icon: (
-                                                                    <Eye className="h-4 w-4" />
-                                                                ),
-                                                                href: route(
-                                                                    "bill_invoices.show",
-                                                                    bill.id
-                                                                ),
-                                                            },
-                                                            {
-                                                                label: "Edit",
-                                                                icon: (
-                                                                    <Edit className="h-4 w-4" />
-                                                                ),
-                                                                href: route(
-                                                                    "bill_invoices.edit",
-                                                                    bill.id
-                                                                ),
-                                                            },
-                                                            {
-                                                                label: "Delete",
-                                                                icon: (
-                                                                    <Trash2 className="h-4 w-4" />
-                                                                ),
-                                                                onClick: () =>
-                                                                    handleDeleteConfirm(
-                                                                        bill.id
-                                                                    ),
-                                                                destructive: true,
-                                                            },
-                                                        ]}
-                                                    />
+                                                <TableActions
+                                                    actions={[
+                                                    {
+                                                        label: "Restore",
+                                                        icon: <RotateCcw className="h-4 w-4" />,
+                                                        onClick: () => handleRestoreConfirm(bill.id)
+                                                    },
+                                                    {
+                                                        label: "Permanently Delete",
+                                                        icon: <Trash className="h-4 w-4" />,
+                                                        onClick: () => handleDeleteConfirm(bill.id),
+                                                        destructive: true,
+                                                    },
+                                                    ]}
+                                                />
                                                 </TableCell>
                                             </TableRow>
                                         ))
@@ -1197,27 +971,19 @@ export default function List({
                 count={selectedBills.length}
             />
 
-            <ApproveAllBillsModal
-                show={showApproveAllModal}
-                onClose={() => setShowApproveAllModal(false)}
-                onConfirm={handleApproveAll}
+            <RestoreBillModal
+                show={showRestoreModal}
+                onClose={() => setShowRestoreModal(false)}
+                onConfirm={handleRestore}
                 processing={processing}
-                count={selectedBills.length}
             />
 
-            <RejectAllBillsModal
-                show={showRejectAllModal}
-                onClose={() => setShowRejectAllModal(false)}
-                onConfirm={handleRejectAll}
+            <RestoreAllBillsModal
+                show={showRestoreAllModal}
+                onClose={() => setShowRestoreAllModal(false)}
+                onConfirm={handleRestoreAll}
                 processing={processing}
                 count={selectedBills.length}
-            />
-
-            <ImportBillsModal
-                show={showImportModal}
-                onClose={() => setShowImportModal(false)}
-                onSubmit={handleImport}
-                processing={processing}
             />
         </AuthenticatedLayout>
     );

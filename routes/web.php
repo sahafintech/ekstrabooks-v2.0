@@ -434,6 +434,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		//Bills
 		Route::match(['get', 'post'], 'bill_invoices/pay_bill', [PurchaseController::class, 'pay_bill'])->name('billI_invoices.pay_bill');
 		Route::get('purchases/{id}/duplicate', [PurchaseController::class, 'duplicate'])->name('bill_invoices.duplicate');
+		Route::get('bill_invoices/trash', [PurchaseController::class, 'trash'])->name('bill_invoices.trash');
+		Route::post('bill_invoices/{id}/restore', [PurchaseController::class, 'restore'])->name('bill_invoices.restore');
+		Route::post('bill_invoices/bulk_restore', [PurchaseController::class, 'bulk_restore'])->name('bill_invoices.bulk_restore');
+		Route::post('bill_invoices/bulk_permanent_destroy', [PurchaseController::class, 'bulk_permanent_destroy'])->name('bill_invoices.bulk_permanent_destroy');
+		Route::delete('bill_invoices/{id}/permanent_destroy', [PurchaseController::class, 'permanent_destroy'])->name('bill_invoices.permanent_destroy');
 		Route::resource('bill_invoices', PurchaseController::class);
 		Route::post('import_bills', [PurchaseController::class, 'import_bills'])->name('bill_invoices.import');
 		Route::post('bill_invoices/filter', [PurchaseController::class, 'bill_invoices_filter'])->name('bill_invoices.filter');

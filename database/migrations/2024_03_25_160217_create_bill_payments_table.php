@@ -21,11 +21,16 @@ return new class extends Migration
             $table->decimal('amount', 8, 2);
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
+            $table->bigInteger('created_user_id')->nullable();
+            $table->bigInteger('updated_user_id')->nullable();
+            $table->bigInteger('deleted_user_id')->nullable();
 
             $table->foreign('account_id')->references('id')->on('accounts')->onDelete('cascade');
             $table->foreign('vendor_id')->references('id')->on('vendors')->onDelete('cascade');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->foreign('business_id')->references('id')->on('business')->onDelete('cascade');
+
+            $table->softDeletes();
             $table->timestamps();
         });
     }
