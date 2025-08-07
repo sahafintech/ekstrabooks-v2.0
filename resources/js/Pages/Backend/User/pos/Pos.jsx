@@ -1708,7 +1708,7 @@ export default function POS({ products, categories, currencies, accounts, custom
                           
                           // Validate all payment entries have required fields
                           const invalidEntries = paymentEntries.filter(entry => 
-                            !entry.account_id || !entry.amount || !entry.method
+                            !entry.account_id || !entry.method
                           );
                           
                           if (invalidEntries.length > 0) {
