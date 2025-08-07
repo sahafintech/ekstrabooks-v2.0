@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Head, Link, router, usePage } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -20,8 +20,9 @@ import {
     SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { Edit, EyeIcon, Plus, Trash, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
-import { Toaster, toast } from "sonner";
+import { Trash, ChevronUp, ChevronDown, RotateCcw } from "lucide-react";
+import { Toaster } from "@/Components/ui/toaster";
+import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
@@ -85,8 +86,65 @@ const DeleteAllPaymentsModal = ({ show, onClose, onConfirm, processing, count })
     </Modal>
 );
 
-export default function List({ payments = [], meta = {}, filters = {}, vendors = [], trashed_payments = 0 }) {
+// Restore Confirmation Modal Component
+const RestorePaymentModal = ({ show, onClose, onConfirm, processing }) => (
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
+            <h2 className="text-lg font-medium">
+                Are you sure you want to restore this payment?
+            </h2>
+            <div className="mt-6 flex justify-end">
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={onClose}
+                    className="mr-3"
+                >
+                    Cancel
+                </Button>
+                <Button
+                    type="submit"
+                    variant="default"
+                    disabled={processing}
+                >
+                    Restore
+                </Button>
+            </div>
+        </form>
+    </Modal>
+);
+
+// Bulk Restore Confirmation Modal Component
+const RestoreAllPaymentsModal = ({ show, onClose, onConfirm, processing, count }) => (
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
+            <h2 className="text-lg font-medium">
+                Are you sure you want to restore {count} selected payments{count !== 1 ? 's' : ''}?
+            </h2>
+            <div className="mt-6 flex justify-end">
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={onClose}
+                    className="mr-3"
+                >
+                    Cancel
+                </Button>
+                <Button
+                    type="submit"
+                    variant="default"
+                    disabled={processing}
+                >
+                    Restore Selected
+                </Button>
+            </div>
+        </form>
+    </Modal>
+);
+
+export default function TrashList({ payments = [], meta = {}, filters = {}, vendors = [] }) {
     const { flash = {} } = usePage().props;
+    const { toast } = useToast();
     const [selectedPayments, setSelectedPayments] = useState([]);
     const [isAllSelected, setIsAllSelected] = useState(false);
     const [search, setSearch] = useState(filters.search || "");
@@ -103,29 +161,25 @@ export default function List({ payments = [], meta = {}, filters = {}, vendors =
     const [paymentToDelete, setPaymentToDelete] = useState(null);
     const [processing, setProcessing] = useState(false);
 
+    // Restore confirmation modal states
+    const [showRestoreModal, setShowRestoreModal] = useState(false);
+    const [showRestoreAllModal, setShowRestoreAllModal] = useState(false);
+    const [paymentToRestore, setPaymentToRestore] = useState(null);
+
     useEffect(() => {
         if (flash && flash.success) {
-          toast.success("Success Message", {
-            description: flash.success,
-            action: {
-              label: "Close",
-              onClick: () => {
-                toast.dismiss();
-              }
-            }
-          });
+            toast({
+                title: "Success",
+                description: flash.success,
+            });
         }
-    
+
         if (flash && flash.error) {
-          toast.error("Error Message", {
-            description: flash.error,
-            action: {
-              label: "Close",
-              onClick: () => {
-                toast.dismiss();
-              }
-            }
-          });
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: flash.error,
+            });
         }
     }, [flash, toast]);
 
@@ -156,7 +210,7 @@ export default function List({ payments = [], meta = {}, filters = {}, vendors =
         setSearch(value);
 
         router.get(
-            route("bill_payments.index"),
+            route("bill_payments.trash"),
             { search: value, page: 1, per_page: perPage },
             { preserveState: true }
         );
@@ -165,7 +219,7 @@ export default function List({ payments = [], meta = {}, filters = {}, vendors =
     const handlePerPageChange = (value) => {
         setPerPage(value);
         router.get(
-            route("bill_payments.index"),
+            route("bill_payments.trash"),
             { search, page: 1, per_page: value },
             { preserveState: true }
         );
@@ -174,7 +228,7 @@ export default function List({ payments = [], meta = {}, filters = {}, vendors =
     const handlePageChange = (page) => {
         setCurrentPage(page);
         router.get(
-            route("bill_payments.index"),
+            route("bill_payments.trash"),
             { search, page, per_page: perPage },
             { preserveState: true }
         );
@@ -184,20 +238,18 @@ export default function List({ payments = [], meta = {}, filters = {}, vendors =
         if (bulkAction === "") return;
 
         if (selectedPayments.length === 0) {
-            toast("Error Message", {
+            toast({
+                variant: "destructive",
+                title: "Error",
                 description: "Please select at least one payment",
-                action: {
-                    label: "Close",
-                    onClick: () => {
-                        toast.dismiss();
-                    }
-                }
             });
             return;
         }
 
         if (bulkAction === "delete") {
             setShowDeleteAllModal(true);
+        }else if (bulkAction === "restore") {
+            setShowRestoreAllModal(true);
         }
     };
 
@@ -206,11 +258,16 @@ export default function List({ payments = [], meta = {}, filters = {}, vendors =
         setShowDeleteModal(true);
     };
 
+    const handleRestoreConfirm = (id) => {
+        setPaymentToRestore(id);
+        setShowRestoreModal(true);
+    };
+
     const handleDelete = (e) => {
         e.preventDefault();
         setProcessing(true);
 
-        router.delete(route('bill_payments.destroy', paymentToDelete), {
+        router.delete(route('bill_payments.permanent_destroy', paymentToDelete), {
             onSuccess: () => {
                 setShowDeleteModal(false);
                 setPaymentToDelete(null);
@@ -226,13 +283,51 @@ export default function List({ payments = [], meta = {}, filters = {}, vendors =
         e.preventDefault();
         setProcessing(true);
 
-        router.post(route('bill_payments.bulk_destroy'),
+        router.post(route('bill_payments.permanent_bulk_destroy'),
             {
                 ids: selectedPayments
             },
             {
                 onSuccess: () => {
                     setShowDeleteAllModal(false);
+                    setSelectedPayments([]);
+                    setIsAllSelected(false);
+                    setProcessing(false);
+                },
+                onError: () => {
+                    setProcessing(false);
+                }
+            }
+        );
+    };
+
+    const handleRestore = (e) => {
+        e.preventDefault();
+        setProcessing(true);
+
+        router.post(route('bill_payments.restore', paymentToRestore), {
+            onSuccess: () => {
+                setShowRestoreModal(false);
+                setPaymentToRestore(null);
+                setProcessing(false);
+            },
+            onError: () => {
+                setProcessing(false);
+            }
+        });
+    };
+
+    const handleRestoreAll = (e) => {
+        e.preventDefault();
+        setProcessing(true);
+
+        router.post(route('bill_payments.bulk_restore'),
+            {
+                ids: selectedPayments
+            },
+            {
+                onSuccess: () => {
+                    setShowRestoreAllModal(false);
                     setSelectedPayments([]);
                     setIsAllSelected(false);
                     setProcessing(false);
@@ -251,7 +346,7 @@ export default function List({ payments = [], meta = {}, filters = {}, vendors =
         }
         setSorting({ column, direction });
         router.get(
-            route("bill_payments.index"),
+            route("bill_payments.trash"),
             { ...filters, sorting: { column, direction } },
             { preserveState: true }
         );
@@ -304,7 +399,7 @@ export default function List({ payments = [], meta = {}, filters = {}, vendors =
     const handleVendorChange = (value) => {
         setSelectedVendor(value);
         router.get(
-            route("bill_payments.index"),
+            route("bill_payments.trash"),
             { 
                 search, 
                 page: 1, 
@@ -319,7 +414,7 @@ export default function List({ payments = [], meta = {}, filters = {}, vendors =
     const handleDateRangeChange = (dates) => {
         setDateRange(dates);
         router.get(
-            route("bill_payments.index"),
+            route("bill_payments.trash"),
             { 
                 search, 
                 page: 1, 
@@ -333,33 +428,20 @@ export default function List({ payments = [], meta = {}, filters = {}, vendors =
 
     return (
         <AuthenticatedLayout>
-            <Toaster position="top-center" />
+            <Toaster />
             <SidebarInset>
                 <div className="main-content">
                     <PageHeader
                         page="Payments"
-                        subpage="List"
+                        subpage="Trash"
                         url="bill_payments.index"
                     />
                     <div className="p-4">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                            <div className="flex flex-col md:flex-row gap-2">
-                                <Link href={route("bill_payments.create")}>
-                                    <Button>
-                                        <Plus className="w-4 h-4 mr-2" />
-                                        Add Payment
-                                    </Button>
-                                </Link>
-                                <Link href={route("bill_payments.trash")}>
-                                    <Button variant="outline" className="relative">
-                                        <Trash2 className="h-8 w-8" />
-                                        {trashed_payments > 0 && (
-                                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                                            {trashed_payments}
-                                        </span>
-                                        )}
-                                    </Button>
-                                </Link>
+                            <div>
+                                <div className="text-red-500">
+                                    Total trashed payments: {meta.total}
+                                </div>
                             </div>
                             <div className="flex flex-col md:flex-row gap-4 md:items-center">
                                 <Input
@@ -378,7 +460,8 @@ export default function List({ payments = [], meta = {}, filters = {}, vendors =
                                         <SelectValue placeholder="Bulk actions" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="delete">Delete Selected</SelectItem>
+                                        <SelectItem value="delete">Permanently Delete Selected</SelectItem>
+                                        <SelectItem value="restore">Restore Selected</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <Button onClick={handleBulkAction} variant="outline">
@@ -457,26 +540,21 @@ export default function List({ payments = [], meta = {}, filters = {}, vendors =
                                                 <TableCell>{payment.type || "-"}</TableCell>
                                                 <TableCell className="text-right">{formatCurrency({ amount: payment.amount })}</TableCell>
                                                 <TableCell className="text-right">
-                                                    <TableActions
-                                                        actions={[
-                                                            {
-                                                                label: "View",
-                                                                icon: <EyeIcon className="h-4 w-4" />,
-                                                                href: route("bill_payments.show", payment.id),
-                                                            },
-                                                            {
-                                                                label: "Edit",
-                                                                icon: <Edit className="h-4 w-4" />,
-                                                                href: route("bill_payments.edit", payment.id),
-                                                            },
-                                                            {
-                                                                label: "Delete",
-                                                                icon: <Trash className="h-4 w-4" />,
-                                                                onClick: () => handleDeleteConfirm(payment.id),
-                                                                destructive: true,
-                                                            },
-                                                        ]}
-                                                    />
+                                                <TableActions
+                                                    actions={[
+                                                    {
+                                                        label: "Restore",
+                                                        icon: <RotateCcw className="h-4 w-4" />,
+                                                        onClick: () => handleRestoreConfirm(payment.id)
+                                                    },
+                                                    {
+                                                        label: "Permanently Delete",
+                                                        icon: <Trash className="h-4 w-4" />,
+                                                        onClick: () => handleDeleteConfirm(payment.id),
+                                                        destructive: true,
+                                                    },
+                                                    ]}
+                                                />
                                                 </TableCell>
                                             </TableRow>
                                         ))
@@ -548,6 +626,21 @@ export default function List({ payments = [], meta = {}, filters = {}, vendors =
                 show={showDeleteAllModal}
                 onClose={() => setShowDeleteAllModal(false)}
                 onConfirm={handleDeleteAll}
+                processing={processing}
+                count={selectedPayments.length}
+            />
+
+            <RestorePaymentModal
+                show={showRestoreModal}
+                onClose={() => setShowRestoreModal(false)}
+                onConfirm={handleRestore}
+                processing={processing}
+            />
+
+            <RestoreAllPaymentsModal
+                show={showRestoreAllModal}
+                onClose={() => setShowRestoreAllModal(false)}
+                onConfirm={handleRestoreAll}
                 processing={processing}
                 count={selectedPayments.length}
             />

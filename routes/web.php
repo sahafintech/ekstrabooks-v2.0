@@ -442,6 +442,13 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('bill_invoices', PurchaseController::class);
 		Route::post('import_bills', [PurchaseController::class, 'import_bills'])->name('bill_invoices.import');
 		Route::post('bill_invoices/filter', [PurchaseController::class, 'bill_invoices_filter'])->name('bill_invoices.filter');
+
+		//Bill Payments
+		Route::get('bill_payments/trash', [BillPaymentsController::class, 'trash'])->name('bill_payments.trash');
+		Route::post('bill_payments/{id}/restore', [BillPaymentsController::class, 'restore'])->name('bill_payments.restore');
+		Route::post('bill_payments/bulk_restore', [BillPaymentsController::class, 'bulk_restore'])->name('bill_payments.bulk_restore');
+		Route::post('bill_payments/bulk_permanent_destroy', [BillPaymentsController::class, 'bulk_permanent_destroy'])->name('bill_payments.bulk_permanent_destroy');
+		Route::delete('bill_payments/{id}/permanent_destroy', [BillPaymentsController::class, 'permanent_destroy'])->name('bill_payments.permanent_destroy');
 		Route::resource('bill_payments', BillPaymentsController::class);
 		Route::post('bill_payments/bulk_destroy', [BillPaymentsController::class, 'bulk_destroy'])->name('bill_payments.bulk_destroy');
 		Route::get('export_bill_invoices', [PurchaseController::class, 'export_bill_invoices'])->name('bill_invoices.export');
