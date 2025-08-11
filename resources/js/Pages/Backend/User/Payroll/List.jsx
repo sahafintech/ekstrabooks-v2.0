@@ -180,6 +180,8 @@ const BulkAccrueConfirmationModal = ({
     expenseAccountId,
     setLiabilityAccountId,
     setExpenseAccountId,
+    accrueDate,
+    setAccrueDate,
 }) => (
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
@@ -188,6 +190,22 @@ const BulkAccrueConfirmationModal = ({
                 {count !== 1 ? "payslips" : "payslip"}?
             </h2>
             <div className="flex flex-1 flex-col gap-4 p-4 mt-4">
+                <div className="grid grid-cols-12 mt-2">
+                    <Label
+                        htmlFor="credit_account_id"
+                        className="md:col-span-3 col-span-12"
+                    >
+                        Accrue Date *
+                    </Label>
+                    <div className="md:col-span-9 col-span-12 md:mt-0 mt-2">
+                        <DateTimePicker
+                            value={accrueDate}
+                            onChange={(value) => setAccrueDate(value)}
+                            required
+                        />
+                    </div>
+                </div>
+                
                 <div className="grid grid-cols-12 mt-2">
                     <Label
                         htmlFor="liability_account_id"
@@ -429,6 +447,7 @@ export default function List({
     const [advanceAccountId, setAdvanceAccountId] = useState(null);
     const [paymentMethod, setPaymentMethod] = useState(null);
     const [paymentDate, setPaymentDate] = useState(null);
+    const [accrueDate, setAccrueDate] = useState(null);
     const [sorting, setSorting] = useState(
         filters.sorting || { column: "id", direction: "desc" }
     );
@@ -689,6 +708,7 @@ export default function List({
                 ids: selectedPaylips,
                 liability_account_id: liabilityAccountId,
                 expense_account_id: expenseAccountId,
+                accrue_date: accrueDate,
             },
             {
                 preserveState: true,
@@ -1880,6 +1900,8 @@ export default function List({
                         expenseAccountId={expenseAccountId}
                         setLiabilityAccountId={setLiabilityAccountId}
                         setExpenseAccountId={setExpenseAccountId}
+                        accrueDate={accrueDate}
+                        setAccrueDate={setAccrueDate}
                     />
 
                     <BulkPaymentConfirmationModal

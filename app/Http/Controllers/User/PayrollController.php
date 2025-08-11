@@ -643,16 +643,18 @@ class PayrollController extends Controller
 
     public function bulk_accrue(Request $request)
     {
-        if (empty($request->ids)) {
+        if (empty($request->ids) || !is_array($request->ids)) {
             return back()->with('error', _lang('You must select at least one employee'))->withInput();
         }
 
         $validator = Validator::make($request->all(), [
-            'liability_account_id'    => 'required',
-            'expense_account_id'      => 'required',
+            'liability_account_id' => 'required',
+            'expense_account_id'   => 'required',
+            'accrue_date'          => 'required|date',
         ], [
-            'liability_account_id.required'    => 'You must select debit account',
-            'expense_account_id.required'      => 'Expense account is required',
+            'liability_account_id.required' => 'You must select debit account',
+            'expense_account_id.required'   => 'Expense account is required',
+            'accrue_date.required'          => 'Accrue date is required',
         ]);
 
         if ($validator->fails()) {
@@ -660,58 +662,70 @@ class PayrollController extends Controller
         }
 
         DB::beginTransaction();
+        try {
+            $currency = Currency::where('name', request()->activeBusiness->currency)->first();
+            $exchange_rate = $currency ? $currency->exchange_rate : 1;
 
-        $payslips = Payroll::whereIn('id', $request->ids)
-            ->where('status', 1)
-            ->get();
+            $payslips = Payroll::with('employee')
+                ->whereIn('id', $request->ids)
+                ->where('status', 1)
+                ->get();
 
-        if ($payslips->isEmpty()) {
-            return back()->with('error', _lang('No active payslips found'));
+            if ($payslips->isEmpty()) {
+                DB::rollBack();
+                return back()->with('error', _lang('No active payslips found'));
+            }
+
+            foreach ($payslips as $payslip) {
+                // Credit liability
+                $liabilityTx = new Transaction();
+                $liabilityTx->trans_date = Carbon::parse($request->accrue_date)->format('Y-m-d H:i:s');
+                $liabilityTx->account_id = $request->liability_account_id;
+                $liabilityTx->transaction_method = $request->method ?? null;
+                $liabilityTx->dr_cr = 'cr';
+                $liabilityTx->transaction_amount = $payslip->net_salary;
+                $liabilityTx->currency_rate = $exchange_rate;
+                $liabilityTx->base_currency_amount = $payslip->net_salary;
+                $liabilityTx->description = _lang('Staff Salary ' . $payslip->month . '/' . $payslips->first()->year) . ' - ' . $payslip->employee->name;
+                $liabilityTx->ref_id = $payslip->employee_id;
+                $liabilityTx->ref_type = 'payslip';
+                $liabilityTx->employee_id = $payslip->employee_id;
+                $liabilityTx->save();
+
+                // Debit expense
+                $expenseAmount = $payslip->employee->basic_salary + $payslip->total_allowance - $payslip->total_deduction;
+                $expenseTx = new Transaction();
+                $expenseTx->trans_date = Carbon::parse($request->accrue_date)->format('Y-m-d H:i:s');
+                $expenseTx->account_id = $request->expense_account_id;
+                $expenseTx->dr_cr = 'dr';
+                $expenseTx->transaction_amount = $expenseAmount;
+                $expenseTx->currency_rate = $exchange_rate;
+                $expenseTx->base_currency_amount = $expenseAmount;
+                $expenseTx->description = _lang('Staff Salary Expense ' . $payslip->month . ' ' . $payslips->first()->year) . ' - ' . $payslip->employee->name;
+                $expenseTx->ref_id = $payslip->employee_id;
+                $expenseTx->ref_type = 'payslip';
+                $expenseTx->employee_id = $payslip->employee_id;
+                $expenseTx->save();
+
+                $payslip->status = 2;
+                $payslip->transaction_id = $expenseTx->id;
+                $payslip->save();
+            }
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = now()->format('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Accruement made for ' . count($payslips) . ' employees';
+            $audit->save();
+
+            DB::commit();
+
+            return redirect()->route('payslips.index')->with('success', _lang('Accruement made successfully'));
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', $e->getMessage());
         }
-
-        foreach ($payslips as $payslip) {
-            $transaction                          = new Transaction();
-            $transaction->trans_date              = now();
-            $transaction->account_id              = $request->liability_account_id;
-            $transaction->transaction_method      = $request->method;
-            $transaction->dr_cr                   = 'cr';
-            $transaction->transaction_amount      = $payslip->net_salary;
-            $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-            $transaction->base_currency_amount    = $payslip->net_salary;
-            $transaction->description             = _lang('Staff Salary ' . $payslip->month . '/' . $payslips->first()->year) . ' - ' . $payslip->employee->name;
-            $transaction->ref_id                  = $payslip->employee_id;
-            $transaction->ref_type                = 'payslip';
-            $transaction->employee_id             = $payslip->employee_id;
-            $transaction->save();
-
-            $transaction                          = new Transaction();
-            $transaction->trans_date              = now();
-            $transaction->account_id              = $request->expense_account_id;
-            $transaction->dr_cr                   = 'dr';
-            $transaction->transaction_amount      = $payslip->employee->basic_salary + $payslip->total_allowance - $payslip->total_deduction;
-            $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-            $transaction->base_currency_amount    = $payslip->employee->basic_salary + $payslip->total_allowance - $payslip->total_deduction;
-            $transaction->description             = _lang('Staff Salary Expense ' . $payslip->month . ' ' . $payslips->first()->year) . ' - ' . $payslip->employee->name;
-            $transaction->ref_id                  = $payslip->employee_id;
-            $transaction->ref_type                = 'payslip';
-            $transaction->employee_id             = $payslip->employee_id;
-            $transaction->save();
-
-            $payslip->status         = 2;
-            $payslip->transaction_id = $transaction->id;
-            $payslip->save();
-        }
-
-        DB::commit();
-
-        // audit log
-        $audit = new AuditLog();
-        $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Accruement made for ' . count($payslips) . ' employees';
-        $audit->save();
-
-        return redirect()->route('payslips.index')->with('success', _lang('Accruement made successfully'));
     }
 
     /**
