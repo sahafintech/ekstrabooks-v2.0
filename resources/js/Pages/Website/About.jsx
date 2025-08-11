@@ -12,7 +12,7 @@ import {
 export default function About({ pageData }) {
     const stats = [
         {
-            value: "10K+",
+            value: "10+",
             label: "Active Users",
             description: "Trusted by thousands of businesses globally"
         },
@@ -27,7 +27,7 @@ export default function About({ pageData }) {
             description: "Round-the-clock expert assistance"
         },
         {
-            value: "50+",
+            value: "4+",
             label: "Countries",
             description: "Serving businesses worldwide"
         }
@@ -174,7 +174,7 @@ export default function About({ pageData }) {
             </section>
 
             {/* Team Section */}
-            <section className="py-24">
+            {/* <section className="py-24">
                 <div className="container px-4 mx-auto">
                     <div className="max-w-3xl mx-auto text-center mb-16">
                         <h2 className="text-3xl font-bold tracking-tight mb-4">Meet Our Team</h2>
@@ -199,7 +199,7 @@ export default function About({ pageData }) {
                         ))}
                     </div>
                 </div>
-            </section>
+            </section> */}
 
             {/* CTA Section */}
             <section className="py-24 bg-muted/30">
