@@ -72,7 +72,7 @@ class JournalImport implements ToCollection, WithHeadingRow, WithCalculatedFormu
         $journal->user_id = auth()->user()->id;
         $journal->created_by = auth()->user()->id;
         $journal->business_id = request()->activeBusiness->id;
-        if(request()->isOwner == true){
+        if(has_permission('journals.bulk_approve') || request()->isOwner == true){
             $journal->status = 1;
         }else{
             $journal->status = 0;
