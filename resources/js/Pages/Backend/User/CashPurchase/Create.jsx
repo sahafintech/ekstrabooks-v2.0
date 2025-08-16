@@ -541,9 +541,9 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                       <Label>Quantity *</Label>
                       <Input
                         type="number"
-                        min="1"
+                        step="0.01"
                         value={item.quantity}
-                        onChange={(e) => updateInvoiceItem(index, "quantity", parseInt(e.target.value))}
+                        onChange={(e) => updateInvoiceItem(index, "quantity", parseFloat(e.target.value))}
                       />
                     </div>
 
@@ -677,11 +677,11 @@ export default function Create({ vendors = [], products = [], currencies = [], t
                       <Label>Quantity *</Label>
                       <Input
                         type="number"
-                        min="1"
+                        step="0.01"
                         value={accountItem.quantity}
                         onChange={(e) => {
                           const updatedAccounts = [...purchaseAccounts];
-                          updatedAccounts[index].quantity = parseInt(e.target.value);
+                          updatedAccounts[index].quantity = parseFloat(e.target.value);
                           setPurchaseAccounts(updatedAccounts);
                           setData("quantity", [
                             ...purchaseItems.map(item => item.quantity),

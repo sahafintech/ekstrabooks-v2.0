@@ -422,9 +422,9 @@ export default function Create({ customers = [], products = [], currencies = [],
                                             <Label>Quantity *</Label>
                                             <Input
                                                 type="number"
-                                                min="1"
+                                                step="0.01"
                                                 value={item.quantity}
-                                                onChange={(e) => updateQuotationItem(index, "quantity", parseInt(e.target.value))}
+                                                onChange={(e) => updateQuotationItem(index, "quantity", parseFloat(e.target.value))}
                                             />
                                         </div>
 

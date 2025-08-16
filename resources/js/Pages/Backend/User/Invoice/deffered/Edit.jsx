@@ -900,13 +900,13 @@ export default function Edit({
                                                 )}
                                                 <Input
                                                     type="number"
-                                                    min="1"
+                                                    step="0.01"
                                                     value={item.quantity}
                                                     onChange={(e) =>
                                                         updateInvoiceItem(
                                                             index,
                                                             "quantity",
-                                                            parseInt(
+                                                            parseFloat(
                                                                 e.target.value
                                                             )
                                                         )

@@ -501,9 +501,9 @@ export default function Edit({ vendors = [], products = [], purchase_order, curr
                       <Label>Quantity *</Label>
                       <Input
                         type="number"
-                        min="1"
+                        step="0.01"
                         value={item.quantity}
-                        onChange={(e) => updatePurchaseOrderItem(index, "quantity", parseInt(e.target.value))}
+                        onChange={(e) => updatePurchaseOrderItem(index, "quantity", parseFloat(e.target.value))}
                       />
                     </div>
 
@@ -597,11 +597,11 @@ export default function Edit({ vendors = [], products = [], purchase_order, curr
                       <Label>Quantity *</Label>
                       <Input
                         type="number"
-                        min="1"
+                        step="0.01"
                         value={accountItem.quantity || 1}
                         onChange={(e) => {
                           const updatedAccounts = [...purchaseOrderAccounts];
-                          updatedAccounts[index].quantity = parseInt(e.target.value);
+                          updatedAccounts[index].quantity = parseFloat(e.target.value);
                           setPurchaseOrderAccounts(updatedAccounts);
                           setData("quantity", [
                             ...purchaseOrderItems.map(item => item.quantity),

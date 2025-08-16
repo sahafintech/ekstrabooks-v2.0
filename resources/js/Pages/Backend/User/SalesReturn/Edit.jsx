@@ -455,9 +455,9 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                                             <Label>Quantity *</Label>
                                             <Input
                                                 type="number"
-                                                min="1"
+                                                step="0.01"
                                                 value={item.quantity}
-                                                onChange={(e) => updateSalesReturnItem(index, "quantity", parseInt(e.target.value))}
+                                                onChange={(e) => updateSalesReturnItem(index, "quantity", parseFloat(e.target.value))}
                                             />
                                         </div>
 
