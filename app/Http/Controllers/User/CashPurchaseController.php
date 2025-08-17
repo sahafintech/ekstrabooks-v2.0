@@ -20,6 +20,7 @@ use App\Models\PurchaseItem;
 use App\Models\PurchaseItemTax;
 use App\Models\Tax;
 use App\Models\Transaction;
+use App\Models\TransactionMethod;
 use App\Models\Vendor;
 use App\Notifications\SendCashPurchase;
 use Carbon\Carbon;
@@ -321,6 +322,9 @@ class CashPurchaseController extends Controller
 		$cost_codes = CostCode::orderBy('id', 'desc')
 			->get();
 
+		// Get payment methods
+		$methods = TransactionMethod::all();
+
 		return Inertia::render('Backend/User/CashPurchase/Create', [
 			'vendors' => $vendors,
 			'products' => $products,
@@ -333,6 +337,7 @@ class CashPurchaseController extends Controller
 			'projects' => $projects,
 			'cost_codes' => $cost_codes,
 			'construction_module' => package()->construction_module,
+			'methods' => $methods,
 		]);
 	}
 
@@ -350,10 +355,40 @@ class CashPurchaseController extends Controller
 			'purchase_date' => 'required|date',
 			'product_name' => 'required',
 			'currency'  =>  'required',
-			'credit_account_id' => 'required',
+			'credit_account_id' => 'nullable', // Changed to nullable as we now use payment_accounts
+			'payment_accounts' => 'required|array|min:1',
 		], [
 			'product_name.required' => _lang('You must add at least one item'),
+			'payment_accounts.required' => _lang('At least one payment account is required'),
+			'payment_accounts.min' => _lang('At least one payment account is required'),
 		]);
+
+		// Additional validation for payment accounts
+		if ($request->has('payment_accounts') && is_array($request->payment_accounts)) {
+			$paymentAccounts = $request->payment_accounts;
+			$totalAmount = 0;
+			
+			foreach ($paymentAccounts as $index => $payment) {
+				if (empty($payment['account_id'])) {
+					$validator->errors()->add("payment_accounts.{$index}.account_id", _lang('Payment account is required'));
+				}
+				if (empty($payment['amount']) || $payment['amount'] <= 0) {
+					$validator->errors()->add("payment_accounts.{$index}.amount", _lang('Payment amount must be greater than 0'));
+				}
+				if (empty($payment['method'])) {
+					$validator->errors()->add("payment_accounts.{$index}.method", _lang('Payment method is required'));
+				}
+				$totalAmount += floatval($payment['amount'] ?? 0);
+			}
+			
+			// Calculate expected total
+			$summary = $this->calculateTotal($request);
+			$expectedTotal = $summary['grandTotal'];
+			
+			if (abs($totalAmount - $expectedTotal) > 0.01) {
+				$validator->errors()->add("payment_accounts", _lang('Total payment amount must equal purchase total'));
+			}
+		}
 
 		if ($validator->fails()) {
 			return redirect()->route('cash_purchases.create')
@@ -689,90 +724,60 @@ class CashPurchaseController extends Controller
 
 		DB::commit();
 
-		if (has_permission('cash_purchases.bulk_approve') || request()->isOwner) {
-			if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
-				$transaction              = new Transaction();
-				$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-				$transaction->account_id  = $request->input('credit_account_id');
-				$transaction->dr_cr       = 'cr';
-				$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal'] - $summary['taxAmount']);
-				$transaction->transaction_currency    = $request->currency;
+		// Create multiple payment transactions
+		if ($request->has('payment_accounts') && is_array($request->payment_accounts) && count($request->payment_accounts) > 0) {
+			foreach ($request->payment_accounts as $index => $payment) {
+				if (has_permission('cash_purchases.bulk_approve') || request()->isOwner) {
+					$transaction = new Transaction();
+				} else {
+					$transaction = new PendingTransaction();
+				}
+				
+				$transaction->vendor_id = $request->input('vendor_id') ?? NULL;
+				$transaction->trans_date = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+				$transaction->account_id = $payment['account_id'];
+				$transaction->dr_cr = 'cr';
+				$transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $payment['amount'] / $purchase->exchange_rate);
+				$transaction->transaction_currency = $request->currency;
 				$transaction->currency_rate = $purchase->exchange_rate;
-				$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal'] - $summary['taxAmount']));
-				$transaction->ref_type    = 'cash purchase payment';
-				$transaction->ref_id      = $purchase->id;
-				$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
-				$transaction->vendor_id   = $purchase->vendor_id;
-				$transaction->project_id = $purchase->items->first()->project_id;
-				$transaction->save();
-			} else {
-				$transaction              = new Transaction();
-				$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-				$transaction->account_id  = $request->input('credit_account_id');
-				$transaction->dr_cr       = 'cr';
-				$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
-				$transaction->transaction_currency    = $request->currency;
-				$transaction->currency_rate = $purchase->exchange_rate;
-				$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
-				$transaction->ref_type    = 'cash purchase payment';
-				$transaction->ref_id      = $purchase->id;
-				$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
-				$transaction->vendor_id   = $purchase->vendor_id;
-				$transaction->project_id = $purchase->items->first()->project_id;
-				$transaction->save();
-			}
-
-			if ($request->input('discount_value') > 0) {
-				$transaction              = new Transaction();
-				$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-				$transaction->account_id  = get_account('Purchase Discount Allowed')->id;
-				$transaction->dr_cr       = 'cr';
-				$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
-				$transaction->transaction_currency    = $request->currency;
-				$transaction->currency_rate           = $purchase->exchange_rate;
-				$transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
-				$transaction->description = _lang('Bill Invoice Discount') . ' #' . $purchase->bill_no;
-				$transaction->ref_id      = $purchase->id;
-				$transaction->ref_type    = 'cash purchase';
-				$transaction->vendor_id   = $purchase->vendor_id;
-				$transaction->project_id = $purchase->items->first()->project_id;
+				$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $payment['amount'] / $purchase->exchange_rate));
+				$transaction->description = 'Cash Purchase Payment #' . $purchase->bill_no . ' (Payment ' . ($index + 1) . ')';
+				$transaction->transaction_method = $payment['method'];
+				$transaction->reference = $payment['reference'] ?? '';
+				$transaction->ref_id = $purchase->id;
+				$transaction->ref_type = 'cash purchase payment';
+				$transaction->vendor_id = $purchase->vendor_id;
+				$transaction->project_id = $purchase->items->first()->project_id ?? null;
 				$transaction->save();
 			}
 		} else {
-			if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
-				$transaction              = new PendingTransaction();
-				$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-				$transaction->account_id  = $request->input('credit_account_id');
-				$transaction->dr_cr       = 'cr';
-				$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal'] - $summary['taxAmount']);
-				$transaction->transaction_currency    = $request->currency;
-				$transaction->currency_rate = $purchase->exchange_rate;
-				$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal'] - $summary['taxAmount']));
-				$transaction->ref_type    = 'cash purchase payment';
-				$transaction->ref_id      = $purchase->id;
-				$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
-				$transaction->vendor_id   = $purchase->vendor_id;
-				$transaction->project_id = $purchase->items->first()->project_id;
-				$transaction->save();
+			// Fallback to single payment for backward compatibility
+			if (has_permission('cash_purchases.bulk_approve') || request()->isOwner) {
+				$transaction = new Transaction();
 			} else {
-				$transaction              = new PendingTransaction();
-				$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-				$transaction->account_id  = $request->input('credit_account_id');
-				$transaction->dr_cr       = 'cr';
-				$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
-				$transaction->transaction_currency    = $request->currency;
-				$transaction->currency_rate = $purchase->exchange_rate;
-				$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
-				$transaction->ref_type    = 'cash purchase payment';
-				$transaction->ref_id      = $purchase->id;
-				$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
-				$transaction->vendor_id   = $purchase->vendor_id;
-				$transaction->project_id = $purchase->items->first()->project_id;
-				$transaction->save();
+				$transaction = new PendingTransaction();
 			}
+			
+			$transaction->vendor_id = $request->input('vendor_id') ?? NULL;
+			$transaction->trans_date = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+			$transaction->account_id = $request->input('credit_account_id');
+			$transaction->dr_cr = 'cr';
+			$transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
+			$transaction->transaction_currency = $request->currency;
+			$transaction->currency_rate = $purchase->exchange_rate;
+			$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
+			$transaction->description = 'Cash Purchase Payment #' . $purchase->bill_no;
+			$transaction->transaction_method = $request->input('method') ?? '';
+			$transaction->reference = $request->input('reference') ?? '';
+			$transaction->ref_id = $purchase->id;
+			$transaction->ref_type = 'cash purchase payment';
+			$transaction->vendor_id = $purchase->vendor_id;
+			$transaction->project_id = $purchase->items->first()->project_id ?? null;
+			$transaction->save();
+		}
 
 			if ($request->input('discount_value') > 0) {
-				$transaction              = new PendingTransaction();
+				$transaction              = new Transaction();
 				$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
 				$transaction->account_id  = get_account('Purchase Discount Allowed')->id;
 				$transaction->dr_cr       = 'cr';
@@ -787,7 +792,7 @@ class CashPurchaseController extends Controller
 				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
 			}
-		}
+
 
 		// audit log
 		$audit = new AuditLog();
@@ -927,11 +932,29 @@ class CashPurchaseController extends Controller
 			return back()->with('error', _lang('Permission denied'));
 		}
 
+		// Get all payment transactions for this purchase
 		if ($bill->approval_status == 1) {
-			$credit_account = Transaction::where('ref_id', $id)->where('ref_type', 'cash purchase payment')->first();
+			$paymentTransactions = Transaction::where('ref_id', $bill->id)
+				->where('ref_type', 'cash purchase payment')
+				->whereHas('account', function ($query) {
+					$query->where('account_type', 'Bank')
+						->orWhere('account_type', 'Cash');
+				})
+				->with('account')
+				->get();
 		} else {
-			$credit_account = PendingTransaction::where('ref_id', $id)->where('ref_type', 'cash purchase payment')->first();
+			$paymentTransactions = PendingTransaction::where('ref_id', $bill->id)
+				->where('ref_type', 'cash purchase payment')
+				->whereHas('account', function ($query) {
+					$query->where('account_type', 'Bank')
+						->orWhere('account_type', 'Cash');
+				})
+				->with('account')
+				->get();
 		}
+
+		// For backward compatibility, keep the single transaction
+		$credit_account = $paymentTransactions->first();
 
 		$theAttachments = Attachment::where('ref_id', $id)->where('ref_type', 'cash purchase')->get();
 		$accounts = Account::all();
@@ -951,10 +974,14 @@ class CashPurchaseController extends Controller
 		$cost_codes = CostCode::orderBy('id', 'desc')
 			->get();
 
+		// Get payment methods
+		$methods = TransactionMethod::all();
+
 		return Inertia::render('Backend/User/CashPurchase/Edit', [
 			'bill' => $bill,
 			'theAttachments' => $theAttachments,
 			'credit_account' => $credit_account->account_id,
+			'paymentTransactions' => $paymentTransactions,
 			'accounts' => $accounts,
 			'currencies' => $currencies,
 			'vendors' => $vendors,
@@ -965,6 +992,7 @@ class CashPurchaseController extends Controller
 			'projects' => $projects,
 			'cost_codes' => $cost_codes,
 			'construction_module' => package()->construction_module,
+			'methods' => $methods,
 		]);
 	}
 
@@ -982,10 +1010,40 @@ class CashPurchaseController extends Controller
 			'title' => 'required',
 			'purchase_date' => 'required|date',
 			'product_name' => 'required',
-			'credit_account_id' => 'required',
+			'credit_account_id' => 'nullable', // Changed to nullable as we now use payment_accounts
+			'payment_accounts' => 'required|array|min:1',
 		], [
 			'product_name.required' => _lang('You must add at least one item'),
+			'payment_accounts.required' => _lang('At least one payment account is required'),
+			'payment_accounts.min' => _lang('At least one payment account is required'),
 		]);
+
+		// Additional validation for payment accounts
+		if ($request->has('payment_accounts') && is_array($request->payment_accounts)) {
+			$paymentAccounts = $request->payment_accounts;
+			$totalAmount = 0;
+			
+			foreach ($paymentAccounts as $index => $payment) {
+				if (empty($payment['account_id'])) {
+					$validator->errors()->add("payment_accounts.{$index}.account_id", _lang('Payment account is required'));
+				}
+				if (empty($payment['amount']) || $payment['amount'] <= 0) {
+					$validator->errors()->add("payment_accounts.{$index}.amount", _lang('Payment amount must be greater than 0'));
+				}
+				if (empty($payment['method'])) {
+					$validator->errors()->add("payment_accounts.{$index}.method", _lang('Payment method is required'));
+				}
+				$totalAmount += floatval($payment['amount'] ?? 0);
+			}
+			
+			// Calculate expected total
+			$summary = $this->calculateTotal($request);
+			$expectedTotal = $summary['grandTotal'];
+			
+			if (abs($totalAmount - $expectedTotal) > 0.01) {
+				$validator->errors()->add("payment_accounts", _lang('Total payment amount must equal purchase total'));
+			}
+		}
 
 		if ($validator->fails()) {
 			return redirect()->route('cash_purchases.edit', $id)
@@ -1393,47 +1451,76 @@ class CashPurchaseController extends Controller
 
 		DB::commit();
 
+		// Delete existing payment transactions
 		if (has_permission('cash_purchases.bulk_approve') || request()->isOwner && $purchase->approval_status == 1) {
+			Transaction::where('ref_id', $purchase->id)
+				->where('ref_type', 'cash purchase payment')
+				->whereHas('account', function ($query) {
+					$query->where('account_type', 'Bank')
+						->orWhere('account_type', 'Cash');
+				})
+				->delete();
+		} else {
+			PendingTransaction::where('ref_id', $purchase->id)
+				->where('ref_type', 'cash purchase payment')
+				->whereHas('account', function ($query) {
+					$query->where('account_type', 'Bank')
+						->orWhere('account_type', 'Cash');
+				})
+				->delete();
+		}
 
-			$transaction = Transaction::where('ref_id', $purchase->id)->where('ref_type', 'cash purchase payment')
-				->first();
-
-			// delete
-			if ($transaction != null) {
-				$transaction->delete();
-			}
-
-			if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
-				$transaction              = new Transaction();
-				$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-				$transaction->account_id  = $request->input('credit_account_id');
-				$transaction->dr_cr       = 'cr';
-				$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, ($summary['grandTotal'] - $summary['taxAmount']));
-				$transaction->transaction_currency    = $request->currency;
+		// Create new payment transactions
+		if ($request->has('payment_accounts') && is_array($request->payment_accounts) && count($request->payment_accounts) > 0) {
+			foreach ($request->payment_accounts as $index => $payment) {
+				if (has_permission('cash_purchases.bulk_approve') || request()->isOwner && $purchase->approval_status == 1) {
+					$transaction = new Transaction();
+				} else {
+					$transaction = new PendingTransaction();
+				}
+				
+				$transaction->vendor_id = $request->input('vendor_id') ?? NULL;
+				$transaction->trans_date = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+				$transaction->account_id = $payment['account_id'];
+				$transaction->dr_cr = 'cr';
+				$transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $payment['amount'] / $purchase->exchange_rate);
+				$transaction->transaction_currency = $request->currency;
 				$transaction->currency_rate = $purchase->exchange_rate;
-				$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, ($summary['grandTotal'] - $summary['taxAmount'])));
-				$transaction->ref_type    = 'cash purchase payment';
-				$transaction->ref_id      = $purchase->id;
-				$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
-				$transaction->vendor_id   = $purchase->vendor_id;
-				$transaction->project_id = $purchase->items->first()->project_id;
+				$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $payment['amount'] / $purchase->exchange_rate));
+				$transaction->description = 'Cash Purchase Payment #' . $purchase->bill_no . ' (Payment ' . ($index + 1) . ')';
+				$transaction->transaction_method = $payment['method'];
+				$transaction->reference = $payment['reference'] ?? '';
+				$transaction->ref_id = $purchase->id;
+				$transaction->ref_type = 'cash purchase payment';
+				$transaction->vendor_id = $purchase->vendor_id;
+				$transaction->project_id = $purchase->items->first()->project_id ?? null;
 				$transaction->save();
+			}
+		} else {
+			// Fallback to single payment for backward compatibility
+			if (has_permission('cash_purchases.bulk_approve') || request()->isOwner && $purchase->approval_status == 1) {
+				$transaction = new Transaction();
 			} else {
-				$transaction              = new Transaction();
-				$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-				$transaction->account_id  = $request->input('credit_account_id');
-				$transaction->dr_cr       = 'cr';
-				$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
-				$transaction->transaction_currency    = $request->currency;
-				$transaction->currency_rate = $purchase->exchange_rate;
-				$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
-				$transaction->ref_type    = 'cash purchase payment';
-				$transaction->ref_id      = $purchase->id;
-				$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
-				$transaction->vendor_id   = $purchase->vendor_id;
-				$transaction->project_id = $purchase->items->first()->project_id;
-				$transaction->save();
+				$transaction = new PendingTransaction();
 			}
+			
+			$transaction->vendor_id = $request->input('vendor_id') ?? NULL;
+			$transaction->trans_date = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+			$transaction->account_id = $request->input('credit_account_id');
+			$transaction->dr_cr = 'cr';
+			$transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
+			$transaction->transaction_currency = $request->currency;
+			$transaction->currency_rate = $purchase->exchange_rate;
+			$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
+			$transaction->description = 'Cash Purchase Payment #' . $purchase->bill_no;
+			$transaction->transaction_method = $request->input('method') ?? '';
+			$transaction->reference = $request->input('reference') ?? '';
+			$transaction->ref_id = $purchase->id;
+			$transaction->ref_type = 'cash purchase payment';
+			$transaction->vendor_id = $purchase->vendor_id;
+			$transaction->project_id = $purchase->items->first()->project_id ?? null;
+			$transaction->save();
+		}
 
 
 			if ($request->input('discount_value') == 0) {
@@ -1471,84 +1558,7 @@ class CashPurchaseController extends Controller
 					$transaction->save();
 				}
 			}
-		} else {
-			$transaction = PendingTransaction::where('ref_id', $purchase->id)->where('ref_type', 'cash purchase payment')
-				->first();
 
-			// delete
-			if ($transaction != null) {
-				$transaction->delete();
-			}
-
-			if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
-				$transaction              = new PendingTransaction();
-				$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-				$transaction->account_id  = $request->input('credit_account_id');
-				$transaction->dr_cr       = 'cr';
-				$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, ($summary['grandTotal'] - $summary['taxAmount']));
-				$transaction->transaction_currency    = $request->currency;
-				$transaction->currency_rate = $purchase->exchange_rate;
-				$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, ($summary['grandTotal'] - $summary['taxAmount'])));
-				$transaction->ref_type    = 'cash purchase payment';
-				$transaction->ref_id      = $purchase->id;
-				$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
-				$transaction->vendor_id   = $purchase->vendor_id;
-				$transaction->project_id = $purchase->items->first()->project_id;
-				$transaction->save();
-			} else {
-				$transaction              = new PendingTransaction();
-				$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-				$transaction->account_id  = $request->input('credit_account_id');
-				$transaction->dr_cr       = 'cr';
-				$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
-				$transaction->transaction_currency    = $request->currency;
-				$transaction->currency_rate = $purchase->exchange_rate;
-				$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
-				$transaction->ref_type    = 'cash purchase payment';
-				$transaction->ref_id      = $purchase->id;
-				$transaction->description = 'Cash Purchase #' . $purchase->bill_no;
-				$transaction->vendor_id   = $purchase->vendor_id;
-				$transaction->project_id = $purchase->items->first()->project_id;
-				$transaction->save();
-			}
-
-
-			if ($request->input('discount_value') == 0) {
-				$transaction = PendingTransaction::where('ref_id', $purchase->id)->where('ref_type', 'cash purchase')
-					->where('account_id', get_account('Purchase Discount Allowed')->id)
-					->first();
-				if ($transaction != null) {
-					$transaction->delete();
-				}
-			}
-
-			if ($request->input('discount_value') > 0) {
-				$transaction = PendingTransaction::where('ref_id', $purchase->id)->where('ref_type', 'cash purchase')
-					->where('account_id', get_account('Purchase Discount Allowed')->id)
-					->first();
-				if ($transaction == null) {
-					$transaction              = new PendingTransaction();
-					$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-					$transaction->account_id  = get_account('Purchase Discount Allowed')->id;
-					$transaction->dr_cr       = 'cr';
-					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
-					$transaction->transaction_currency    = $request->currency;
-					$transaction->currency_rate           = $purchase->exchange_rate;
-					$transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
-					$transaction->description = _lang('Bill Invoice Discount') . ' #' . $purchase->bill_no;
-					$transaction->ref_id      = $purchase->id;
-					$transaction->ref_type    = 'cash purchase';
-					$transaction->vendor_id   = $purchase->vendor_id;
-					$transaction->project_id = $purchase->items->first()->project_id;
-					$transaction->save();
-				} else {
-					$transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
-					$transaction->trans_date = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-					$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
-					$transaction->save();
-				}
-			}
-		}
 
 		// audit log
 		$audit = new AuditLog();
@@ -1740,7 +1750,7 @@ class CashPurchaseController extends Controller
 
 			$bill->delete();
 		}
-		return redirect()->route('cash_purchases.trash')->with('success', _lang('Deleted Successfully'));
+		return redirect()->route('cash_purchases.index')->with('success', _lang('Deleted Successfully'));
 	}
 	
 	public function permanent_destroy($id)
