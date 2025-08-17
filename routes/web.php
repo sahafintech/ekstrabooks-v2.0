@@ -372,11 +372,18 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::match(['get', 'post'], 'sales_returns/{id}/send_email', [SalesReturnController::class, 'send_email'])->name('sales_returns.send_email');
 
 		// purchase return
+		Route::get('purchase_returns/trash', [PurchaseReturnController::class, 'trash'])->name('purchase_returns.trash');
+		Route::post('purchase_returns/{id}/restore', [PurchaseReturnController::class, 'restore'])->name('purchase_returns.restore');
+		Route::post('purchase_returns/bulk_restore', [PurchaseReturnController::class, 'bulk_restore'])->name('purchase_returns.bulk_restore');
+		Route::post('purchase_returns/bulk_permanent_destroy', [PurchaseReturnController::class, 'bulk_permanent_destroy'])->name('purchase_returns.bulk_permanent_destroy');
+		Route::delete('purchase_returns/{id}/permanent_destroy', [PurchaseReturnController::class, 'permanent_destroy'])->name('purchase_returns.permanent_destroy');
 		Route::resource('purchase_returns', PurchaseReturnController::class);
 		Route::get('purchase_returns/refund/{id}', [PurchaseReturnController::class, 'refund'])->name('purchase_returns.refund');
 		Route::post('purchase_returns/refund/store/{id}', [PurchaseReturnController::class, 'refund_store'])->name('purchase_returns.refund.store');
 		Route::post('purchase_returns/bulk_destroy', [PurchaseReturnController::class, 'bulk_destroy'])->name('purchase_returns.bulk_destroy');
 		Route::match(['get', 'post'], 'purchase_returns/{id}/send_email', [PurchaseReturnController::class, 'send_email'])->name('purchase_returns.send_email');
+		Route::post('purchase_returns/bulk_approve', [PurchaseReturnController::class, 'bulk_approve'])->name('purchase_returns.bulk_approve');
+		Route::post('purchase_returns/bulk_reject', [PurchaseReturnController::class, 'bulk_reject'])->name('purchase_returns.bulk_reject');
 
 		// Journal Entry
 		Route::resource('journals', JournalController::class);

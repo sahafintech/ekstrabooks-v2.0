@@ -7,17 +7,16 @@ use App\Traits\MultiTenant;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PurchaseReturnItem extends Model
 {
-    use HasFactory;
-
-    use MultiTenant;
+    use HasFactory, MultiTenant, SoftDeletes;
 
     protected $table = 'purchase_return_items';
 
     protected $fillable = [
-        'purchase_return_id', 'product_id', 'product_name', 'description', 'quantity', 'unit_cost', 'sub_total',
+        'purchase_return_id', 'product_id', 'product_name', 'description', 'quantity', 'unit_cost', 'sub_total', 'account_id',
     ];
 
     public function product(){

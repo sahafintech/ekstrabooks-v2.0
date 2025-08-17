@@ -13,13 +13,14 @@ return new class extends Migration
     {
         Schema::create('purchase_return_items', function (Blueprint $table) {
             $table->id();
-            $table->bigInteger('purchase_return_id')->unsigned();
+            $table->bigInteger('purchase_return_id')->nullable()->unsigned();
             $table->bigInteger('product_id')->unsigned();
             $table->string('product_name')->nullable();
             $table->text('description')->nullable();
             $table->decimal('quantity', 10, 2);
             $table->decimal('unit_cost', 28, 8);
             $table->decimal('sub_total', 28, 8);
+            $table->bigInteger('account_id')->nullable();
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
             $table->timestamps();

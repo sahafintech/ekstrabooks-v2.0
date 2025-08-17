@@ -261,11 +261,75 @@ const DeleteAllPurchaseReturnModal = ({ show, onClose, onConfirm, processing, co
     </Modal>
 );
 
+const ApproveAllPurchaseReturnModal = ({ show, onClose, onConfirm, processing, count }) => (
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
+            <h2 className="text-lg font-medium">
+                Are you sure you want to approve {count} selected purchase return{count !== 1 ? 's' : ''}?
+            </h2>
+            <div className="mt-6 flex justify-end">
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={onClose}
+                    className="mr-3"
+                >
+                    Cancel
+                </Button>
+                <Button type="submit" variant="default" disabled={processing}>
+                    Approve Selected
+                </Button>
+            </div>
+        </form>
+    </Modal>
+);
+
+const RejectAllPurchaseReturnModal = ({ show, onClose, onConfirm, processing, count }) => (
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
+            <h2 className="text-lg font-medium">
+                Are you sure you want to reject {count} selected purchase return{count !== 1 ? 's' : ''}?
+            </h2>
+            <div className="mt-6 flex justify-end">
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={onClose}
+                    className="mr-3"
+                >
+                    Cancel
+                </Button>
+                <Button
+                    type="submit"
+                    variant="destructive"
+                    disabled={processing}
+                >
+                    Reject Selected
+                </Button>
+            </div>
+        </form>
+    </Modal>
+);
+
 const PurchaseReturnStatusBadge = ({ status }) => {
     const statusMap = {
-        0: { label: "Active", className: "text-blue-600" },
-        1: { label: "Refunded", className: "text-green-600" },
-        2: { label: "Partially Refunded", className: "text-yellow-600" },
+        0: { label: "Active", className: "text-blue-700 bg-blue-50 py-1 px-3 rounded-md" },
+        1: { label: "Refunded", className: "text-green-600 bg-green-50 py-1 px-3 rounded-md" },
+        2: { label: "Partially Refunded", className: "text-yellow-600 bg-yellow-50 py-1 px-3 rounded-md" },
+    };
+
+    return (
+        <span className={statusMap[status].className}>
+            {statusMap[status].label}
+        </span>
+    );
+};
+
+const PurchaseReturnApprovalStatusBadge = ({ status }) => {
+    const statusMap = {
+        0: { label: "Pending", className: "text-yellow-600 bg-yellow-50 py-1 px-3 rounded-md" },
+        1: { label: "Approved", className: "text-green-600 bg-green-50 py-1 px-3 rounded-md" },
+        2: { label: "Rejected", className: "text-red-600 bg-red-50 py-1 px-3 rounded-md" },
     };
 
     return (
@@ -328,7 +392,7 @@ const SummaryCards = ({ summary = {} }) => {
     );
 };
 
-export default function List({ returns = [], meta = {}, filters = {}, accounts = [], errors = {}, vendors = [], summary = {} }) {
+export default function List({ returns = [], meta = {}, filters = {}, accounts = [], errors = {}, vendors = [], summary = {}, trashed_purchase_returns = 0 }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
     const [selectedPurchaseReturns, setSelectedPurchaseReturns] = useState([]);
@@ -343,6 +407,8 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
     const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+    const [showApproveAllModal, setShowApproveAllModal] = useState(false);
+    const [showRejectAllModal, setShowRejectAllModal] = useState(false);
     const [purchaseReturnToDelete, setPurchaseReturnToDelete] = useState(null);
     const [processing, setProcessing] = useState(false);
 
@@ -357,6 +423,7 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
     const [selectedVendor, setSelectedVendor] = useState(filters.vendor_id || "");
     const [dateRange, setDateRange] = useState(filters.date_range || null);
     const [selectedStatus, setSelectedStatus] = useState(filters.status || "");
+    const [selectedApprovalStatus, setSelectedApprovalStatus] = useState(filters.approval_status || "");
 
     useEffect(() => {
         if (flash && flash.success) {
@@ -379,7 +446,7 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
         if (isAllSelected) {
             setSelectedPurchaseReturns([]);
         } else {
-            setSelectedPurchaseReturns(purchase_returns.map((purchase_return) => purchase_return.id));
+            setSelectedPurchaseReturns(returns.map((purchase_return) => purchase_return.id));
         }
         setIsAllSelected(!isAllSelected);
     };
@@ -428,6 +495,7 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                 vendor_id: selectedVendor,
                 date_range: dateRange,
                 status: selectedStatus,
+                approval_status: selectedApprovalStatus,
                 sorting: sorting
             },
             { preserveState: true }
@@ -448,6 +516,12 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
 
         if (bulkAction === "delete") {
             setShowDeleteAllModal(true);
+        }
+        if (bulkAction === "approve") {
+            setShowApproveAllModal(true);
+        }
+        if (bulkAction === "reject") {
+            setShowRejectAllModal(true);
         }
     };
 
@@ -610,6 +684,7 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                 vendor_id: value,
                 date_range: dateRange,
                 status: selectedStatus,
+                approval_status: selectedApprovalStatus,
             },
             { preserveState: true }
         );
@@ -626,6 +701,7 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                 vendor_id: selectedVendor,
                 date_range: dates,
                 status: selectedStatus,
+                approval_status: selectedApprovalStatus,
             },
             { preserveState: true }
         );
@@ -642,6 +718,24 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                 vendor_id: selectedVendor,
                 date_range: dateRange,
                 status: value,
+                approval_status: selectedApprovalStatus,
+            },
+            { preserveState: true }
+        );
+    };
+
+    const handleApprovalStatusChange = (value) => {
+        setSelectedApprovalStatus(value);
+        router.get(
+            route("purchase_returns.index"),
+            {
+                search,
+                page: 1,
+                per_page: perPage,
+                vendor_id: selectedVendor,
+                date_range: dateRange,
+                status: selectedStatus,
+                approval_status: value,
             },
             { preserveState: true }
         );
@@ -682,6 +776,16 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
+                                <Link href={route("purchase_returns.trash")}>
+                                    <Button variant="outline" className="relative">
+                                        <Trash2 className="h-8 w-8" />
+                                        {trashed_purchase_returns > 0 && (
+                                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
+                                            {trashed_purchase_returns}
+                                        </span>
+                                        )}
+                                    </Button>
+                                </Link>
                             </div>
                             <div className="flex flex-col md:flex-row gap-4 md:items-center">
                                 <Input
@@ -701,6 +805,8 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="delete">Delete Selected</SelectItem>
+                                        <SelectItem value="approve">Approve Selected</SelectItem>
+                                        <SelectItem value="reject">Reject Selected</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <Button onClick={handleBulkAction} variant="outline">
@@ -734,6 +840,17 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                                     onChange={handleStatusChange}
                                     placeholder="Select status"
                                     className="w-[150px]"
+                                />
+                                <SearchableCombobox
+                                    options={[
+                                        { id: "", name: "All" },
+                                        { id: "0", name: "Pending" },
+                                        { id: "1", name: "Approved" },
+                                    ]}
+                                    value={selectedApprovalStatus}
+                                    onChange={handleApprovalStatusChange}
+                                    placeholder="Select approval status"
+                                    className="w-[200px]"
                                 />
                             </div>
                             <div className="flex items-center gap-2">
@@ -784,6 +901,9 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                                         <TableHead className="cursor-pointer" onClick={() => handleSort("status")}>
                                             Status {renderSortIcon("status")}
                                         </TableHead>
+                                        <TableHead className="cursor-pointer" onClick={() => handleSort("approval_status")}>
+                                            Approval Status {renderSortIcon("approval_status")}
+                                        </TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -797,7 +917,11 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                                                         onCheckedChange={() => toggleSelectPurchaseReturns(purchase_return.id)}
                                                     />
                                                 </TableCell>
-                                                <TableCell>{purchase_return.return_number}</TableCell>
+                                                    <TableCell>
+                                                        <Link href={route("purchase_returns.show", purchase_return.id)} className="underline text-blue-500">
+                                                            {purchase_return.return_number}
+                                                        </Link>
+                                                    </TableCell>
                                                 <TableCell>{purchase_return.vendor ? purchase_return.vendor.name : "-"}</TableCell>
                                                 <TableCell>{purchase_return.return_date}</TableCell>
                                                 <TableCell className="text-right">{formatCurrency(purchase_return.grand_total)}</TableCell>
@@ -805,6 +929,9 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                                                 <TableCell className="text-right">{formatCurrency(purchase_return.grand_total - purchase_return.paid)}</TableCell>
                                                 <TableCell>
                                                     <PurchaseReturnStatusBadge status={purchase_return.status} />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <PurchaseReturnApprovalStatusBadge status={purchase_return.approval_status} />
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <TableActions
@@ -918,6 +1045,54 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                 show={showDeleteAllModal}
                 onClose={() => setShowDeleteAllModal(false)}
                 onConfirm={handleDeleteAll}
+                processing={processing}
+                count={selectedPurchaseReturns.length}
+            />
+
+            <ApproveAllPurchaseReturnModal
+                show={showApproveAllModal}
+                onClose={() => setShowApproveAllModal(false)}
+                onConfirm={() => {
+                    setProcessing(true);
+                    router.post(route('purchase_returns.bulk_approve'), {
+                        ids: selectedPurchaseReturns
+                    }, {
+                        onSuccess: () => {
+                            setShowApproveAllModal(false);
+                            setSelectedPurchaseReturns([]);
+                            setIsAllSelected(false);
+                            setProcessing(false);
+                            toast.success('Purchase returns approved successfully');
+                        },
+                        onError: () => {
+                            setProcessing(false);
+                        }
+                    });
+                }}
+                processing={processing}
+                count={selectedPurchaseReturns.length}
+            />
+
+            <RejectAllPurchaseReturnModal
+                show={showRejectAllModal}
+                onClose={() => setShowRejectAllModal(false)}
+                onConfirm={() => {
+                    setProcessing(true);
+                    router.post(route('purchase_returns.bulk_reject'), {
+                        ids: selectedPurchaseReturns
+                    }, {
+                        onSuccess: () => {
+                            setShowRejectAllModal(false);
+                            setSelectedPurchaseReturns([]);
+                            setIsAllSelected(false);
+                            setProcessing(false);
+                            toast.success('Purchase returns rejected successfully');
+                        },
+                        onError: () => {
+                            setProcessing(false);
+                        }
+                    });
+                }}
                 processing={processing}
                 count={selectedPurchaseReturns.length}
             />

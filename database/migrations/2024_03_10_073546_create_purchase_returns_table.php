@@ -29,6 +29,8 @@ return new class extends Migration
             $table->tinyInteger('status')->default(0);
             $table->text('note')->nullable();
             $table->text('footer')->nullable();
+            $table->tinyInteger('approval_status')->default(0);
+            $table->bigInteger('approved_by')->nullable();
             $table->string('short_code')->nullable();
             $table->tinyInteger('email_send')->default(0);
             $table->datetime('email_send_at')->nullable();
