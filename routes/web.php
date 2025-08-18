@@ -272,6 +272,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('dashboard/receivables_vs_payables_widget', [DashboardController::class, 'receivables_vs_payables_widget'])->name('dashboard.receivables_vs_payables_widget');
 
 		//Customers
+		Route::get('customers/trash', [CustomerController::class, 'trash'])->name('customers.trash');
+		Route::post('customers/{id}/restore', [CustomerController::class, 'restore'])->name('customers.restore');
+		Route::post('customers/bulk_restore', [CustomerController::class, 'bulk_restore'])->name('customers.bulk_restore');
+		Route::post('customers/bulk_permanent_destroy', [CustomerController::class, 'bulk_permanent_destroy'])->name('customers.bulk_permanent_destroy');
+		Route::delete('customers/{id}/permanent_destroy', [CustomerController::class, 'permanent_destroy'])->name('customers.permanent_destroy');
 		Route::resource('customers', CustomerController::class);
 		Route::post('import_customers', [CustomerController::class, 'import_customers'])->name('customers.import');
 		Route::post('customers/bulk_destroy', [CustomerController::class, 'bulk_destroy'])->name('customers.bulk_destroy');

@@ -93,6 +93,55 @@ class CustomerController extends Controller
                 'columnFilters' => $request->get('columnFilters', []),
                 'sorting' => $sorting,
             ],
+            'trashed_customers' => Customer::onlyTrashed()->count(),
+        ]);
+    }
+
+    public function trash(Request $request)
+    {
+        $per_page = $request->get('per_page', 50);
+        $search = $request->get('search', '');
+
+        $query = Customer::onlyTrashed();
+
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('company_name', 'like', "%{$search}%")
+                    ->orWhere('mobile', 'like', "%{$search}%");
+            });
+        }
+
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        $query->orderBy($sortColumn, $sortDirection);
+
+        // Get customers with pagination
+        $customers = $query->paginate($per_page)->withQueryString();
+
+        // Return Inertia view
+        return Inertia::render('Backend/User/Customer/Trash', [
+            'customers' => $customers->items(),
+            'meta' => [
+                'current_page' => $customers->currentPage(),
+                'from' => $customers->firstItem(),
+                'last_page' => $customers->lastPage(),
+                'links' => $customers->linkCollection(),
+                'path' => $customers->path(),
+                'per_page' => $customers->perPage(),
+                'to' => $customers->lastItem(),
+                'total' => $customers->total(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $sorting,
+            ],
         ]);
     }
 
@@ -337,6 +386,72 @@ class CustomerController extends Controller
         }
         
         return redirect()->route('customers.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    public function permanent_destroy($id)
+    {
+        $customer = Customer::onlyTrashed()->find($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Permanently Deleted Customer ' . $customer->name;
+        $audit->save();
+
+        $customer->forceDelete();
+        return redirect()->route('customers.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    public function bulk_permanent_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $customer = Customer::onlyTrashed()->find($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Permanently Deleted Customer ' . $customer->name;
+            $audit->save();
+
+            $customer->forceDelete();
+        }
+        
+        return redirect()->route('customers.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    public function restore($id)
+    {
+        $customer = Customer::onlyTrashed()->find($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Restored Customer ' . $customer->name;
+        $audit->save();
+
+        $customer->restore();
+        return redirect()->route('customers.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    public function bulk_restore(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $customer = Customer::onlyTrashed()->find($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Restored Customer ' . $customer->name;
+            $audit->save();
+
+            $customer->restore();
+        }
+        
+        return redirect()->route('customers.trash')->with('success', _lang('Restored Successfully'));
     }
 
     public function import_customers(Request $request)
