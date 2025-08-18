@@ -4,11 +4,12 @@ namespace App\Models;
 
 use App\Traits\MultiTenant;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Notifications\Notifiable;
 
 class Customer extends Model
 {
-    use MultiTenant, Notifiable;
+    use MultiTenant, Notifiable, SoftDeletes;
     /**
      * The table associated with the model.
      *

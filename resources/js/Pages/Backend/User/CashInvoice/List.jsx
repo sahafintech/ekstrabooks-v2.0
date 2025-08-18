@@ -215,7 +215,7 @@ const SummaryCards = ({ receipts = [], business }) => {
   );
 };
 
-export default function List({ receipts = [], meta = {}, filters = {}, customers = [], business }) {
+export default function List({ receipts = [], meta = {}, filters = {}, customers = [], business, trashed_receipts = 0 }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedRows, setSelectedRows] = useState([]);
@@ -505,6 +505,16 @@ export default function List({ receipts = [], meta = {}, filters = {}, customers
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                <Link href={route("receipts.trash")}>
+                  <Button variant="outline" className="relative">
+                    <Trash2 className="h-8 w-8" />
+                    {trashed_receipts > 0 && (
+                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
+                        {trashed_receipts}
+                      </span>
+                    )}
+                  </Button>
+                </Link>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input

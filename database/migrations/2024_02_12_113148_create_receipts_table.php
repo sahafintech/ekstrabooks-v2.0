@@ -35,8 +35,12 @@ return new class extends Migration
             $table->string('short_code')->nullable();
             $table->tinyInteger('email_send')->default(0);
             $table->datetime('email_send_at')->nullable();
+            $table->bigInteger('created_user_id')->nullable();
+            $table->bigInteger('updated_user_id')->nullable();
+            $table->bigInteger('deleted_user_id')->nullable();
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
+            $table->softDeletes();
 
             $table->foreign('customer_id')->references('id')->on('customers')->nullable()->onDelete('cascade');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');

@@ -20,8 +20,12 @@ return new class extends Migration
             $table->decimal('quantity', 10, 2);
             $table->decimal('unit_cost', 28, 8);
             $table->decimal('sub_total', 28, 8);
+            $table->bigInteger('created_user_id')->nullable();
+            $table->bigInteger('updated_user_id')->nullable();
+            $table->bigInteger('deleted_user_id')->nullable();
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
+            $table->softDeletes();
 
             $table->foreign('receipt_id')->references('id')->on('receipts')->onDelete('cascade');
             $table->foreign('product_id')->references('id')->on('products')->onDelete('cascade');

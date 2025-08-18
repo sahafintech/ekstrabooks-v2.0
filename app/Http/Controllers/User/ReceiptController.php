@@ -146,6 +146,66 @@ class ReceiptController extends Controller
             'customers' => Customer::select('id', 'name')->orderBy('id')->get(),
             'summary' => $summary,
             'business' => $request->activeBusiness,
+            'trashed_receipts' => Receipt::onlyTrashed()->count(),
+        ]);
+    }
+
+    public function trash(Request $request)
+    {
+        $search = $request->get('search', '');
+        $perPage = $request->get('per_page', 50);
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+        $customerId = $request->get('customer_id', '');
+        $dateRange = $request->get('date_range', []);
+
+        $query = Receipt::onlyTrashed()->with('customer');
+
+        if ($sortColumn === 'customer.name') {
+            $query->join('customers', 'receipts.customer_id', '=', 'customers.id')
+                ->orderBy('customers.name', $sortDirection)
+                ->select('receipts.*');
+        } else {
+            $query->orderBy($sortColumn, $sortDirection);
+        }
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('receipt_number', 'like', "%$search%")
+                    ->orWhere('title', 'like', "%$search%")
+                    ->orWhereHas('customer', function ($q) use ($search) {
+                        $q->where('name', 'like', "%$search%");
+                    });
+            });
+        }
+
+        // Filter by customer
+        if ($customerId) {
+            $query->where('customer_id', $customerId);
+        }
+
+        // Filter by date range
+        if (!empty($dateRange)) {
+            $query->whereDate('receipt_date', '>=', $dateRange[0])
+                ->whereDate('receipt_date', '<=', $dateRange[1]);
+        }
+
+        $receipts = $query->paginate($perPage);
+
+        return Inertia::render('Backend/User/CashInvoice/Trash', [
+            'receipts' => $receipts->items(),
+            'meta' => [
+                'current_page' => $receipts->currentPage(),
+                'per_page' => $receipts->perPage(),
+                'from' => $receipts->firstItem(),
+                'to' => $receipts->lastItem(),
+                'total' => $receipts->total(),
+                'last_page' => $receipts->lastPage(),
+            ],
+            'filters' => request()->only(['search', 'per_page', 'customer_id', 'date_range']),
+            'customers' => Customer::select('id', 'name')->orderBy('id')->get(),
+            'business' => $request->activeBusiness,
         ]);
     }
 
@@ -996,6 +1056,28 @@ class ReceiptController extends Controller
         $audit->event = 'Cash Invoice Deleted' . ' ' . $receipt->receipt_number;
         $audit->save();
 
+        // delete transactions
+        Transaction::where('ref_id', $receipt->id)
+            ->where(function ($query) {
+                $query->where('ref_type', 'receipt')
+                    ->orWhere('ref_type', 'receipt tax');
+            })
+            ->delete();
+        $receipt->delete();
+        return redirect()->route('receipts.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    public function permanent_destroy($id)
+    {
+        $receipt = Receipt::onlyTrashed()->find($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->id();
+        $audit->event = 'Cash Invoice Permanently Deleted' . ' ' . $receipt->receipt_number;
+        $audit->save();
+
         // increaase stock
         foreach ($receipt->items as $receipt_item) {
             $product = $receipt_item->product;
@@ -1010,9 +1092,31 @@ class ReceiptController extends Controller
                 $query->where('ref_type', 'receipt')
                     ->orWhere('ref_type', 'receipt tax');
             })
-            ->delete();
-        $receipt->delete();
-        return redirect()->route('receipts.index')->with('success', _lang('Deleted Successfully'));
+            ->forceDelete();
+        $receipt->forceDelete();
+        return redirect()->route('receipts.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    public function restore($id)
+    {
+        $receipt = Receipt::onlyTrashed()->find($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->id();
+        $audit->event = 'Cash Invoice Restored' . ' ' . $receipt->receipt_number;
+        $audit->save();
+
+        // delete transactions
+        Transaction::where('ref_id', $receipt->id)
+            ->where(function ($query) {
+                $query->where('ref_type', 'receipt')
+                    ->orWhere('ref_type', 'receipt tax');
+            })
+            ->restore();
+        $receipt->restore();
+        return redirect()->route('receipts.trash')->with('success', _lang('Restored Successfully'));
     }
 
     public function pos()
@@ -1966,16 +2070,8 @@ class ReceiptController extends Controller
         $audit->save();
 
         foreach ($receipts as $receipt) {
-            // increaase stock
-            foreach ($receipt->items as $receipt_item) {
-                $product = $receipt_item->product;
-                if ($product->type == 'product' && $product->stock_management == 1) {
-                    $product->stock = $product->stock + $receipt_item->quantity;
-                    $product->save();
-                }
-            }
             // delete transactions
-            $transactions = Transaction::where('ref_id', $receipt->id)->where('ref_type', 'receipt')->get();
+            $transactions = Transaction::where('ref_id', $receipt->id)->whereIn('ref_type', ['receipt', 'receipt tax'])->get();
 
             foreach ($transactions as $trans) {
                 $trans->delete();
@@ -1985,6 +2081,72 @@ class ReceiptController extends Controller
         }
 
         return redirect()->route('receipts.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    public function bulk_permanent_destroy(Request $request)
+    {
+        if ($request->ids == null) {
+            return redirect()->route('receipts.trash')->with('error', _lang('Please Select invoice'));
+        }
+
+        $receipts = Receipt::onlyTrashed()->whereIn('id', $request->ids)->get();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->id();
+        $audit->event = 'Permanently Deleted Cash Invoices #' . $receipts->pluck('receipt_number')->implode(', ');
+        $audit->save();
+
+        foreach ($receipts as $receipt) {
+            // increaase stock
+            foreach ($receipt->items as $receipt_item) {
+                $product = $receipt_item->product;
+                if ($product->type == 'product' && $product->stock_management == 1) {
+                    $product->stock = $product->stock + $receipt_item->quantity;
+                    $product->save();
+                }
+            }
+            // delete transactions
+            $transactions = Transaction::where('ref_id', $receipt->id)->whereIn('ref_type', ['receipt', 'receipt tax'])->get();
+
+            foreach ($transactions as $trans) {
+                $trans->forceDelete();
+            }
+
+            $receipt->forceDelete();
+        }
+
+        return redirect()->route('receipts.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    public function bulk_restore(Request $request)
+    {
+        if ($request->ids == null) {
+            return redirect()->route('receipts.trash')->with('error', _lang('Please Select invoice'));
+        }
+
+        $receipts = Receipt::onlyTrashed()->whereIn('id', $request->ids)->get();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->id();
+        $audit->event = 'Restored Cash Invoices #' . $receipts->pluck('receipt_number')->implode(', ');
+        $audit->save();
+
+        foreach ($receipts as $receipt) {
+            // delete transactions
+            $transactions = Transaction::where('ref_id', $receipt->id)->whereIn('ref_type', ['receipt', 'receipt tax'])->get();
+
+            foreach ($transactions as $trans) {
+                $trans->restore();
+            }
+
+            $receipt->restore();
+        }
+
+        return redirect()->route('receipts.trash')->with('success', _lang('Restored Successfully'));
     }
 
     public function export_receipts()

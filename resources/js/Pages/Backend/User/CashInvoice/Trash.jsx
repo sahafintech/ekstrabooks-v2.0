@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
@@ -20,18 +20,22 @@ import {
   SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { Trash, ChevronUp, ChevronDown, RotateCcw } from "lucide-react";
-import { toast, Toaster } from 'sonner'
+import { ChevronUp, ChevronDown, Trash, RotateCcw } from "lucide-react";
+import { Toaster } from "@/Components/ui/toaster";
+import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
+import { formatCurrency } from "@/lib/utils";
+import DateTimePicker from "@/Components/DateTimePicker";
+import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 
 // Delete Confirmation Modal Component
-const DeleteVendorModal = ({ show, onClose, onConfirm, processing }) => (
+const DeleteReceiptModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to delete this vendor?
+        Are you sure you want to permanently delete this cash invoice?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -55,11 +59,11 @@ const DeleteVendorModal = ({ show, onClose, onConfirm, processing }) => (
 );
 
 // Bulk Delete Confirmation Modal Component
-const DeleteAllVendorsModal = ({ show, onClose, onConfirm, processing, count }) => (
+const DeleteAllReceiptsModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to delete {count} selected vendor{count !== 1 ? 's' : ''}?
+        Are you sure you want to permanently delete {count} selected cash invoice{count !== 1 ? 's' : ''}?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -75,7 +79,7 @@ const DeleteAllVendorsModal = ({ show, onClose, onConfirm, processing, count }) 
           variant="destructive"
           disabled={processing}
         >
-          Delete Selected
+          Permanently Delete Selected
         </Button>
       </div>
     </form>
@@ -83,11 +87,11 @@ const DeleteAllVendorsModal = ({ show, onClose, onConfirm, processing, count }) 
 );
 
 // Restore Confirmation Modal Component
-const RestoreVendorModal = ({ show, onClose, onConfirm, processing }) => (
+const RestoreReceiptModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to restore this vendor?
+        Are you sure you want to restore this cash invoice?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -111,11 +115,11 @@ const RestoreVendorModal = ({ show, onClose, onConfirm, processing }) => (
 );
 
 // Bulk Restore Confirmation Modal Component
-const RestoreAllVendorsModal = ({ show, onClose, onConfirm, processing, count }) => (
+const RestoreAllReceiptsModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to restore {count} selected vendor{count !== 1 ? 's' : ''}?
+        Are you sure you want to restore {count} selected cash invoice{count !== 1 ? 's' : ''}?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -138,67 +142,63 @@ const RestoreAllVendorsModal = ({ show, onClose, onConfirm, processing, count })
   </Modal>
 );
 
-export default function TrashList({ vendors = [], meta = {}, filters = {} }) {
+export default function TrashList({ receipts = [], meta = {}, filters = {}, customers = [], business }) {
   const { flash = {} } = usePage().props;
-  const [selectedVendors, setSelectedVendors] = useState([]);
+  const { toast } = useToast();
+  const [selectedReceipts, setSelectedReceipts] = useState([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
   const [perPage, setPerPage] = useState(meta.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
   const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
+  const [selectedCustomer, setSelectedCustomer] = useState(filters.customer_id || "");
+  const [dateRange, setDateRange] = useState(filters.date_range || null);
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [receiptToDelete, setReceiptToDelete] = useState(null);
+  const [processing, setProcessing] = useState(false);
+
+  // Restore confirmation modal states
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [showRestoreAllModal, setShowRestoreAllModal] = useState(false);
-  const [vendorToRestore, setVendorToRestore] = useState(null);
-  const [vendorToDelete, setVendorToDelete] = useState(null);
-  const [processing, setProcessing] = useState(false);
+  const [receiptToRestore, setReceiptToRestore] = useState(null);
 
   useEffect(() => {
     if (flash && flash.success) {
-      toast("Success Message", {
+      toast({
+        title: "Success",
         description: flash.success,
-        action: {
-          label: "Close",
-          onClick: () => {
-            toast.dismiss();
-          }
-        }
       });
     }
 
     if (flash && flash.error) {
-      toast("Error Message", {
+      toast({
+        variant: "destructive",
+        title: "Error",
         description: flash.error,
-        action: {
-          label: "Close",
-          onClick: () => {
-            toast.dismiss();
-          }
-        }
       });
     }
   }, [flash, toast]);
 
   const toggleSelectAll = () => {
     if (isAllSelected) {
-      setSelectedVendors([]);
+      setSelectedReceipts([]);
     } else {
-      setSelectedVendors(vendors.map((vendor) => vendor.id));
+      setSelectedReceipts(receipts.map((receipt) => receipt.id));
     }
     setIsAllSelected(!isAllSelected);
   };
 
-  const toggleSelectVendor = (id) => {
-    if (selectedVendors.includes(id)) {
-      setSelectedVendors(selectedVendors.filter((vendorId) => vendorId !== id));
+  const toggleSelectReceipt = (id) => {
+    if (selectedReceipts.includes(id)) {
+      setSelectedReceipts(selectedReceipts.filter((receiptId) => receiptId !== id));
       setIsAllSelected(false);
     } else {
-      setSelectedVendors([...selectedVendors, id]);
-      if (selectedVendors.length + 1 === vendors.length) {
+      setSelectedReceipts([...selectedReceipts, id]);
+      if (selectedReceipts.length + 1 === receipts.length) {
         setIsAllSelected(true);
       }
     }
@@ -210,8 +210,8 @@ export default function TrashList({ vendors = [], meta = {}, filters = {} }) {
     setSearch(value);
 
     router.get(
-      route("vendors.trash"),
-      { search: value, page: 1, per_page: perPage },
+      route("receipts.trash"),
+      { search: value, page: 1, per_page: perPage, customer_id: selectedCustomer, date_range: dateRange },
       { preserveState: true }
     );
   };
@@ -219,8 +219,8 @@ export default function TrashList({ vendors = [], meta = {}, filters = {} }) {
   const handlePerPageChange = (value) => {
     setPerPage(value);
     router.get(
-      route("vendors.trash"),
-      { search, page: 1, per_page: value },
+      route("receipts.trash"),
+      { search, page: 1, per_page: value, customer_id: selectedCustomer, date_range: dateRange },
       { preserveState: true }
     );
   };
@@ -228,8 +228,14 @@ export default function TrashList({ vendors = [], meta = {}, filters = {} }) {
   const handlePageChange = (page) => {
     setCurrentPage(page);
     router.get(
-      route("vendors.trash"),
-      { search, page, per_page: perPage },
+      route("receipts.trash"),
+      { 
+        search, 
+        page, 
+        per_page: perPage, 
+        customer_id: selectedCustomer,
+        date_range: dateRange
+      },
       { preserveState: true }
     );
   };
@@ -237,29 +243,29 @@ export default function TrashList({ vendors = [], meta = {}, filters = {} }) {
   const handleBulkAction = () => {
     if (bulkAction === "") return;
 
-    if (selectedVendors.length === 0) {
+    if (selectedReceipts.length === 0) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Please select at least one vendor",
+        description: "Please select at least one cash invoice",
       });
       return;
     }
 
     if (bulkAction === "delete") {
       setShowDeleteAllModal(true);
-    }else if (bulkAction === "restore") {
+    } else if (bulkAction === "restore") {
       setShowRestoreAllModal(true);
     }
   };
 
   const handleDeleteConfirm = (id) => {
-    setVendorToDelete(id);
+    setReceiptToDelete(id);
     setShowDeleteModal(true);
   };
 
   const handleRestoreConfirm = (id) => {
-    setVendorToRestore(id);
+    setReceiptToRestore(id);
     setShowRestoreModal(true);
   };
 
@@ -267,10 +273,10 @@ export default function TrashList({ vendors = [], meta = {}, filters = {} }) {
     e.preventDefault();
     setProcessing(true);
 
-    router.delete(route('vendors.permanent_destroy', vendorToDelete), {
+    router.delete(route('receipts.permanent_destroy', receiptToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
-        setVendorToDelete(null);
+        setReceiptToDelete(null);
         setProcessing(false);
       },
       onError: () => {
@@ -283,14 +289,14 @@ export default function TrashList({ vendors = [], meta = {}, filters = {} }) {
     e.preventDefault();
     setProcessing(true);
 
-    router.post(route('vendors.bulk_permanent_destroy'),
+    router.post(route('receipts.bulk_permanent_destroy'),
       {
-        ids: selectedVendors
+        ids: selectedReceipts
       },
       {
         onSuccess: () => {
           setShowDeleteAllModal(false);
-          setSelectedVendors([]);
+          setSelectedReceipts([]);
           setIsAllSelected(false);
           setProcessing(false);
         },
@@ -305,10 +311,10 @@ export default function TrashList({ vendors = [], meta = {}, filters = {} }) {
     e.preventDefault();
     setProcessing(true);
 
-    router.post(route('vendors.restore', vendorToRestore), {
+    router.post(route('receipts.restore', receiptToRestore), {
       onSuccess: () => {
         setShowRestoreModal(false);
-        setVendorToRestore(null);
+        setReceiptToRestore(null);
         setProcessing(false);
       },
       onError: () => {
@@ -321,14 +327,14 @@ export default function TrashList({ vendors = [], meta = {}, filters = {} }) {
     e.preventDefault();
     setProcessing(true);
 
-    router.post(route('vendors.bulk_restore'),
+    router.post(route('receipts.bulk_restore'),
       {
-        ids: selectedVendors
+        ids: selectedReceipts
       },
       {
         onSuccess: () => {
           setShowRestoreAllModal(false);
-          setSelectedVendors([]);
+          setSelectedReceipts([]);
           setIsAllSelected(false);
           setProcessing(false);
         },
@@ -346,7 +352,7 @@ export default function TrashList({ vendors = [], meta = {}, filters = {} }) {
     }
     setSorting({ column, direction });
     router.get(
-      route("vendors.trash"),
+      route("receipts.trash"),
       { ...filters, sorting: { column, direction } },
       { preserveState: true }
     );
@@ -396,26 +402,56 @@ export default function TrashList({ vendors = [], meta = {}, filters = {} }) {
     return pages;
   };
 
+  const handleCustomerChange = (value) => {
+    setSelectedCustomer(value);
+    router.get(
+      route("receipts.trash"),
+      {
+        search,
+        page: 1,
+        per_page: perPage,
+        customer_id: value,
+        date_range: dateRange,
+      },
+      { preserveState: true }
+    );
+  };
+
+  const handleDateRangeChange = (dates) => {
+    setDateRange(dates);
+    router.get(
+      route("receipts.trash"),
+      {
+        search,
+        page: 1,
+        per_page: perPage,
+        customer_id: selectedCustomer,
+        date_range: dates,
+      },
+      { preserveState: true }
+    );
+  };
+
   return (
     <AuthenticatedLayout>
-      <Toaster position="top-center" />
+      <Toaster />
       <SidebarInset>
         <div className="main-content">
           <PageHeader
-            page="Vendors"
+            page="Cash Invoices"
             subpage="Trash"
-            url="vendors.index"
+            url="receipts.index"
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div>
                     <div className="text-red-500">
-                        Total trashed vendors: {meta.total}
+                        Total trashed cash invoices: {meta.total}
                     </div>
                 </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input
-                  placeholder="Search trashed vendors..."
+                  placeholder="search trashed cash invoices..."
                   value={search}
                   onChange={(e) => handleSearch(e)}
                   className="w-full md:w-80"
@@ -437,6 +473,23 @@ export default function TrashList({ vendors = [], meta = {}, filters = {} }) {
                 <Button onClick={handleBulkAction} variant="outline">
                   Apply
                 </Button>
+                <SearchableCombobox
+                  options={customers.map(customer => ({
+                    id: customer.id,
+                    name: customer.name
+                  }))}
+                  value={selectedCustomer}
+                  onChange={handleCustomerChange}
+                  placeholder="Select customer"
+                  className="w-[200px]"
+                />
+                <DateTimePicker
+                  value={dateRange}
+                  onChange={handleDateRangeChange}
+                  isRange={true}
+                  className="w-[200px]"
+                  placeholder="Select date range"
+                />
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Show</span>
@@ -465,43 +518,61 @@ export default function TrashList({ vendors = [], meta = {}, filters = {} }) {
                         onCheckedChange={toggleSelectAll}
                       />
                     </TableHead>
-                    <TableHead className="w-[80px] cursor-pointer" onClick={() => handleSort("id")}>ID {renderSortIcon("id")}</TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("name")}>Name {renderSortIcon("name")}</TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("company_name")}>Company {renderSortIcon("company_name")}</TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("email")}>Email {renderSortIcon("email")}</TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("mobile")}>Phone {renderSortIcon("mobile")}</TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("address")}>Address {renderSortIcon("address")}</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("receipt_number")}>
+                      Invoice # {renderSortIcon("receipt_number")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("customer.name")}>
+                      Customer {renderSortIcon("customer.name")}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("receipt_date")}>
+                      Date {renderSortIcon("receipt_date")}
+                    </TableHead>
+                    <TableHead className="text-right cursor-pointer" onClick={() => handleSort("grand_total")}>
+                      Grand Total {renderSortIcon("grand_total")}
+                    </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {vendors.length > 0 ? (
-                    vendors.map((vendor) => (
-                      <TableRow key={vendor.id}>
+                  {receipts.length > 0 ? (
+                    receipts.map((receipt) => (
+                      <TableRow key={receipt.id}>
                         <TableCell>
                           <Checkbox
-                            checked={selectedVendors.includes(vendor.id)}
-                            onCheckedChange={() => toggleSelectVendor(vendor.id)}
+                            checked={selectedReceipts.includes(receipt.id)}
+                            onCheckedChange={() => toggleSelectReceipt(receipt.id)}
                           />
                         </TableCell>
-                        <TableCell>{vendor.id}</TableCell>
-                        <TableCell>{vendor.name}</TableCell>
-                        <TableCell>{vendor.company_name || "-"}</TableCell>
-                        <TableCell>{vendor.email || "-"}</TableCell>
-                        <TableCell>{vendor.mobile || "-"}</TableCell>
-                        <TableCell>{vendor.address || "-"}</TableCell>
+                        <TableCell>{receipt.receipt_number}</TableCell>
+                        <TableCell>
+                          {receipt.customer ? receipt.customer.name : "-"}
+                        </TableCell>
+                        <TableCell>
+                          {receipt.receipt_date}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {receipt.grand_total !== receipt.converted_total ? (
+                            <span>
+                              {formatCurrency({ amount: receipt.grand_total, currency: business.currency })} ({formatCurrency({ amount: receipt.converted_total, currency: receipt.currency })})
+                            </span>
+                          ) : (
+                            <span>
+                              {formatCurrency({ amount: receipt.grand_total, currency: business.currency })}
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right">
                         <TableActions
                             actions={[
                               {
                                 label: "Restore",
                                 icon: <RotateCcw className="h-4 w-4" />,
-                                onClick: () => handleRestoreConfirm(vendor.id)
+                                onClick: () => handleRestoreConfirm(receipt.id)
                               },
                               {
                                 label: "Permanently Delete",
                                 icon: <Trash className="h-4 w-4" />,
-                                onClick: () => handleDeleteConfirm(vendor.id),
+                                onClick: () => handleDeleteConfirm(receipt.id),
                                 destructive: true,
                               },
                             ]}
@@ -512,7 +583,7 @@ export default function TrashList({ vendors = [], meta = {}, filters = {} }) {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={8} className="h-24 text-center">
-                        No vendors found.
+                        No cash invoices found.
                       </TableCell>
                     </TableRow>
                   )}
@@ -520,7 +591,7 @@ export default function TrashList({ vendors = [], meta = {}, filters = {} }) {
               </Table>
             </div>
 
-            {vendors.length > 0 && meta.total > 0 && (
+            {receipts.length > 0 && meta.total > 0 && (
               <div className="flex items-center justify-between mt-4">
                 <div className="text-sm text-gray-500">
                   Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, meta.total)} of {meta.total} entries
@@ -566,33 +637,34 @@ export default function TrashList({ vendors = [], meta = {}, filters = {} }) {
         </div>
       </SidebarInset>
 
-      <DeleteVendorModal
+      <DeleteReceiptModal
         show={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleDelete}
         processing={processing}
       />
 
-      <DeleteAllVendorsModal
+      <DeleteAllReceiptsModal
         show={showDeleteAllModal}
         onClose={() => setShowDeleteAllModal(false)}
         onConfirm={handleDeleteAll}
         processing={processing}
-        count={selectedVendors.length}
+        count={selectedReceipts.length}
       />
-      <RestoreVendorModal
+
+      <RestoreReceiptModal
         show={showRestoreModal}
         onClose={() => setShowRestoreModal(false)}
         onConfirm={handleRestore}
         processing={processing}
       />
 
-      <RestoreAllVendorsModal
+      <RestoreAllReceiptsModal
         show={showRestoreAllModal}
         onClose={() => setShowRestoreAllModal(false)}
         onConfirm={handleRestoreAll}
         processing={processing}
-        count={selectedVendors.length}
+        count={selectedReceipts.length}
       />
     </AuthenticatedLayout>
   );

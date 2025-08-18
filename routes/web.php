@@ -399,6 +399,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('journal/bulk_reject', [JournalController::class, 'bulk_reject'])->name('journals.bulk_reject');
 
 		// Sales Receipts
+		Route::get('receipts/trash', [ReceiptController::class, 'trash'])->name('receipts.trash');
+		Route::post('receipts/{id}/restore', [ReceiptController::class, 'restore'])->name('receipts.restore');
+		Route::post('receipts/bulk_restore', [ReceiptController::class, 'bulk_restore'])->name('receipts.bulk_restore');
+		Route::post('receipts/bulk_permanent_destroy', [ReceiptController::class, 'bulk_permanent_destroy'])->name('receipts.bulk_permanent_destroy');
+		Route::delete('receipts/{id}/permanent_destroy', [ReceiptController::class, 'permanent_destroy'])->name('receipts.permanent_destroy');
 		Route::resource('receipts', ReceiptController::class);
 		Route::match(['get', 'post'], 'receipts/{id}/send_email', [ReceiptController::class, 'send_email'])->name('receipts.send_email');
 		Route::match(['get', 'post'], 'receipts/receive_payment', [ReceiptController::class, 'receive_payment'])->name('receipts.receive_payment');
