@@ -16,6 +16,10 @@ return new class extends Migration
             $table->bigInteger('invoice_id')->unsigned();
             $table->bigInteger('payment_id')->unsigned();
             $table->decimal('amount', 8, 2);
+            $table->bigInteger('created_user_id')->nullable();
+            $table->bigInteger('updated_user_id')->nullable();
+            $table->bigInteger('deleted_user_id')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('invoice_id')->references('id')->on('invoices')->onDelete('cascade');

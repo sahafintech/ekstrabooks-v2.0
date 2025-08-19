@@ -176,6 +176,86 @@ class InvoiceController extends Controller
             'customers' => Customer::select('id', 'name')->orderBy('id')->get(),
             'summary' => $summary,
             'business' => $request->activeBusiness,
+            'trashed_invoices' => Invoice::onlyTrashed()->where('is_deffered', 0)->count(),
+        ]);
+    }
+
+    public function trash(Request $request)
+    {
+        $query = Invoice::onlyTrashed()->with('customer', 'client')
+            ->where('is_deffered', 0);
+
+        // Apply search if provided
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('customer', function ($q2) use ($search) {
+                    $q2->where('name', 'like', "%{$search}%");
+                })
+                    ->orWhereHas('client', function ($q2) use ($search) {
+                        $q2->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhere('invoice_number', 'like', "%{$search}%")
+                    ->orWhere('order_number', 'like', "%{$search}%");
+            });
+        }
+
+        // Filter by customer
+        if ($request->customer_id) {
+            $query->where('customer_id', $request->customer_id);
+        }
+
+        // Filter by status
+        if ($request->status) {
+            $query->where('status', $request->status);
+        }
+
+        // Filter by date range
+        if ($request->date_range) {
+            $dateRange = $request->date_range;
+            if (!empty($dateRange[0])) {
+                $query->whereDate('invoice_date', '>=', $dateRange[0]);
+            }
+            if (!empty($dateRange[1])) {
+                $query->whereDate('invoice_date', '<=', $dateRange[1]);
+            }
+        }
+
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+        if ($sortColumn === 'customer.name') {
+            $query->join('customers', 'invoices.customer_id', '=', 'customers.id')
+                ->orderBy('customers.name', $sortDirection)
+                ->select('invoices.*');
+        } else if ($sortColumn === 'client.name') {
+            $query->join('customers', 'invoices.client_id', '=', 'customers.id')
+                ->orderBy('customers.name', $sortDirection)
+                ->select('invoices.*');
+        } else {
+            $query->orderBy('invoices.' . $sortColumn, $sortDirection);
+        }
+
+        // Handle pagination
+        $perPage = $request->get('per_page', 50);
+        $invoices = $query->paginate($perPage);
+
+        return Inertia::render('Backend/User/Invoice/Trash', [
+            'invoices' => $invoices->items(),
+            'meta' => [
+                'total' => $invoices->total(),
+                'per_page' => $invoices->perPage(),
+                'current_page' => $invoices->currentPage(),
+                'last_page' => $invoices->lastPage(),
+                'from' => $invoices->firstItem(),
+                'to' => $invoices->lastItem(),
+            ],
+            'filters' => array_merge($request->only(['search', 'customer_id', 'status', 'date_range']), [
+                'sorting' => $sorting,
+            ]),
+            'customers' => Customer::select('id', 'name')->orderBy('id')->get(),
+            'business' => $request->activeBusiness,
         ]);
     }
 
@@ -1115,14 +1195,6 @@ class InvoiceController extends Controller
         $audit->event = 'Deleted Invoice ' . $invoice->invoice_number;
         $audit->save();
 
-        // increase product stock
-        foreach ($invoice->items as $invoiceItem) {
-            $product = $invoiceItem->product;
-            if ($product->type == 'product' && $product->stock_management == 1) {
-                $product->stock = $product->stock + $invoiceItem->quantity;
-                $product->save();
-            }
-        }
         // delete transactions
         Transaction::where('ref_id', $invoice->id)
             ->where(function ($query) {
@@ -1156,16 +1228,6 @@ class InvoiceController extends Controller
             }
         }
 
-        // delete attachments
-        $attachments = Attachment::where('ref_id', $invoice->id)->where('ref_type', 'invoice')->get();
-        foreach ($attachments as $attachment) {
-            $filePath = public_path($attachment->path);
-            if (file_exists($filePath)) {
-                unlink($filePath);
-            }
-            $attachment->delete();
-        }
-
         $invoice->delete();
         return redirect()->route('invoices.index')->with('success', _lang('Deleted Successfully'));
     }
@@ -1182,14 +1244,6 @@ class InvoiceController extends Controller
             $audit->event = 'Deleted Invoice ' . $invoice->invoice_number;
             $audit->save();
 
-            // increase product stock
-            foreach ($invoice->items as $invoiceItem) {
-                $product = $invoiceItem->product;
-                if ($product->type == 'product' && $product->stock_management == 1) {
-                    $product->stock = $product->stock + $invoiceItem->quantity;
-                    $product->save();
-                }
-            }
             // delete transactions
             Transaction::where('ref_id', $invoice->id)
                 ->where(function ($query) {
@@ -1223,6 +1277,130 @@ class InvoiceController extends Controller
                 }
             }
 
+            $invoice->delete();
+        }
+        return redirect()->route('invoices.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    public function permanent_destroy($id)
+    {
+        $invoice = Invoice::onlyTrashed()->find($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Permanently Deleted Invoice ' . $invoice->invoice_number;
+        $audit->save();
+
+        // increase product stock
+        foreach ($invoice->items as $invoiceItem) {
+            $product = $invoiceItem->product;
+            if ($product->type == 'product' && $product->stock_management == 1) {
+                $product->stock = $product->stock + $invoiceItem->quantity;
+                $product->save();
+            }
+        }
+        // delete transactions
+        Transaction::onlyTrashed()->where('ref_id', $invoice->id)
+            ->where(function ($query) {
+                $query->where('ref_type', 'invoice')
+                    ->orWhere('ref_type', 'invoice tax');
+            })
+            ->forceDelete();
+
+        $invoice_payments = InvoicePayment::onlyTrashed()->where('invoice_id', $invoice->id)->get();
+
+        foreach ($invoice_payments as $invoice_payment) {
+            $receive_payment = ReceivePayment::onlyTrashed()->with('invoices')->find($invoice_payment->payment_id);
+            if ($receive_payment) {
+                $receive_payment->amount = $receive_payment->amount - $invoice_payment->amount;
+                $receive_payment->save();
+
+                if ($receive_payment->amount == 0) {
+                    $receive_payment->forceDelete();
+                }
+
+                // delete transactions
+                $transactions = Transaction::onlyTrashed()->where('ref_id', $invoice->id . ',' . $receive_payment->id)->where('ref_type', 'invoice payment')->get();
+                foreach ($transactions as $transaction) {
+                    $transaction->forceDelete();
+                }
+            }
+            $invoice_payment->forceDelete();
+
+            if ($receive_payment->invoices == null) {
+                $receive_payment->forceDelete();
+            }
+        }
+
+        // delete attachments
+        $attachments = Attachment::where('ref_id', $invoice->id)->where('ref_type', 'invoice')->get();
+        foreach ($attachments as $attachment) {
+            $filePath = public_path($attachment->path);
+            if (file_exists($filePath)) {
+                unlink($filePath);
+            }
+            $attachment->delete();
+        }
+
+        $invoice->forceDelete();
+        return redirect()->route('invoices.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    public function bulk_permanent_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $invoice = Invoice::onlyTrashed()->find($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Permanently Deleted Invoice ' . $invoice->invoice_number;
+            $audit->save();
+
+            // increase product stock
+            foreach ($invoice->items as $invoiceItem) {
+                $product = $invoiceItem->product;
+                if ($product->type == 'product' && $product->stock_management == 1) {
+                    $product->stock = $product->stock + $invoiceItem->quantity;
+                    $product->save();
+                }
+            }
+            // delete transactions
+            Transaction::onlyTrashed()->where('ref_id', $invoice->id)
+                ->where(function ($query) {
+                    $query->where('ref_type', 'invoice')
+                        ->orWhere('ref_type', 'invoice tax');
+                })
+                ->forceDelete();
+
+            $invoice_payments = InvoicePayment::onlyTrashed()->where('invoice_id', $invoice->id)->get();
+
+            foreach ($invoice_payments as $invoice_payment) {
+                $receive_payment = ReceivePayment::onlyTrashed()->find($invoice_payment->payment_id);
+                if ($receive_payment) {
+                    $receive_payment->amount = $receive_payment->amount - $invoice_payment->amount;
+                    $receive_payment->save();
+
+                    if ($receive_payment->amount == 0) {
+                        $receive_payment->forceDelete();
+                    }
+
+                    // delete transactions
+                    $transactions = Transaction::onlyTrashed()->where('ref_id', $invoice->id . ',' . $receive_payment->id)->where('ref_type', 'invoice payment')->get();
+                    foreach ($transactions as $transaction) {
+                        $transaction->forceDelete();
+                    }
+                }
+                $invoice_payment->forceDelete();
+
+                if ($receive_payment->invoices == null) {
+                    $receive_payment->forceDelete();
+                }
+            }
+
             // delete attachments
             $attachments = Attachment::where('ref_id', $invoice->id)->where('ref_type', 'invoice')->get();
             foreach ($attachments as $attachment) {
@@ -1233,9 +1411,107 @@ class InvoiceController extends Controller
                 $attachment->delete();
             }
 
-            $invoice->delete();
+            $invoice->forceDelete();
         }
-        return redirect()->route('invoices.index')->with('success', _lang('Deleted Successfully'));
+        return redirect()->route('invoices.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    public function restore($id)
+    {
+        $invoice = Invoice::onlyTrashed()->find($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Restored Invoice ' . $invoice->invoice_number;
+        $audit->save();
+
+        // delete transactions
+        Transaction::onlyTrashed()->where('ref_id', $invoice->id)
+            ->where(function ($query) {
+                $query->where('ref_type', 'invoice')
+                    ->orWhere('ref_type', 'invoice tax');
+            })
+            ->restore();
+
+        $invoice_payments = InvoicePayment::onlyTrashed()->where('invoice_id', $invoice->id)->get();
+
+        foreach ($invoice_payments as $invoice_payment) {
+            $receive_payment = ReceivePayment::onlyTrashed()->find($invoice_payment->payment_id);
+            if ($receive_payment) {
+                $receive_payment->amount = $receive_payment->amount - $invoice_payment->amount;
+                $receive_payment->save();
+
+                if ($receive_payment->amount == 0) {
+                    $receive_payment->restore();
+                }
+
+                // delete transactions
+                $transactions = Transaction::onlyTrashed()->where('ref_id', $invoice->id . ',' . $receive_payment->id)->where('ref_type', 'invoice payment')->get();
+                foreach ($transactions as $transaction) {
+                    $transaction->restore();
+                }
+            }
+            $invoice_payment->restore();
+
+            if ($receive_payment->invoices == null) {
+                $receive_payment->restore();
+            }
+        }
+
+        $invoice->restore();
+        return redirect()->route('invoices.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    public function bulk_restore(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $invoice = Invoice::onlyTrashed()->find($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Restored Invoice ' . $invoice->invoice_number;
+            $audit->save();
+
+            // delete transactions
+            Transaction::onlyTrashed()->where('ref_id', $invoice->id)
+                ->where(function ($query) {
+                    $query->where('ref_type', 'invoice')
+                        ->orWhere('ref_type', 'invoice tax');
+                })
+                ->restore();
+
+            $invoice_payments = InvoicePayment::onlyTrashed()->where('invoice_id', $invoice->id)->get();
+
+            foreach ($invoice_payments as $invoice_payment) {
+                $receive_payment = ReceivePayment::onlyTrashed()->find($invoice_payment->payment_id);
+                if ($receive_payment) {
+                    $receive_payment->amount = $receive_payment->amount - $invoice_payment->amount;
+                    $receive_payment->save();
+
+                    if ($receive_payment->amount == 0) {
+                        $receive_payment->restore();
+                    }
+
+                    // delete transactions
+                    $transactions = Transaction::onlyTrashed()->where('ref_id', $invoice->id . ',' . $receive_payment->id)->where('ref_type', 'invoice payment')->get();
+                    foreach ($transactions as $transaction) {
+                        $transaction->restore();
+                    }
+                }
+                $invoice_payment->restore();
+
+                if ($receive_payment->invoices == null) {
+                    $receive_payment->restore();
+                }
+            }
+
+            $invoice->restore();
+        }
+        return redirect()->route('invoices.trash')->with('success', _lang('Restored Successfully'));
     }
 
     private function calculateTotal(Request $request)

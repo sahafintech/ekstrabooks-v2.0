@@ -51,6 +51,7 @@ return new class extends Migration
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
             $table->bigInteger('client_id')->nullable();
+            $table->softDeletes();
             $table->timestamps();
             // deffered invoice
             $table->string('invoice_category')->nullable();
@@ -59,15 +60,14 @@ return new class extends Migration
             $table->date('deffered_end')->nullable();
             $table->integer('active_days')->nullable();
             $table->decimal('cost_per_day', 28, 8)->nullable();
-            $table->bigInteger('created_by')->nullable()->unsigned();
-            $table->bigInteger('updated_by')->nullable()->unsigned();
+            $table->bigInteger('created_user_id')->nullable();
+            $table->bigInteger('updated_user_id')->nullable();
+            $table->bigInteger('deleted_user_id')->nullable();
             $table->text('attachments')->nullable();
 
             $table->foreign('customer_id')->references('id')->on('customers')->onDelete('cascade');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->foreign('business_id')->references('id')->on('business')->onDelete('cascade');
-            $table->foreign('created_by')->references('id')->on('users')->onDelete('cascade');
-            $table->foreign('updated_by')->references('id')->on('users')->onDelete('cascade');
         });
     }
 

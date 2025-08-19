@@ -21,8 +21,12 @@ return new class extends Migration
             $table->decimal('amount', 8, 2);
             $table->string('type');
             $table->tinyInteger('deffered_payment')->default(0);
+            $table->bigInteger('created_user_id')->nullable();
+            $table->bigInteger('updated_user_id')->nullable();
+            $table->bigInteger('deleted_user_id')->nullable();
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('account_id')->references('id')->on('accounts')->onDelete('cascade');
