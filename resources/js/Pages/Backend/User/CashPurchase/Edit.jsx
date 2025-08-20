@@ -17,7 +17,7 @@ import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multip
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/Components/ui/tooltip";
 import Attachment from "@/Components/ui/attachment";
 
-export default function Edit({ vendors = [], products = [], bill, currencies = [], taxes = [], accounts = [], credit_account, inventory, taxIds, theAttachments, projects = [], cost_codes = [], construction_module, paymentTransactions = [], methods = [] }) {
+export default function Edit({ vendors = [], products = [], bill, currencies = [], taxes = [], accounts = [], inventory, taxIds, theAttachments, projects = [], cost_codes = [], construction_module, paymentTransactions = [], methods = [] }) {
   const [purchaseItems, setPurchaseItems] = useState([{
     product_id: "",
     product_name: "",
@@ -61,7 +61,6 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
     taxes: taxIds,
     account_id: [],
     benificiary: bill.benificiary,
-    credit_account_id: credit_account,
     project_id: [],
     project_task_id: [],
     cost_code_id: [],

@@ -802,14 +802,14 @@ class ReceiptController extends Controller
                 $product->save();
             }
 
-            $receipt_item->delete();
+            $receipt_item->forceDelete();
 
             $transaction = Transaction::where('ref_id', $receipt->id)->where('ref_type', 'receipt')
                 ->where('account_id', $product->income_account_id)
                 ->first();
 
             if ($transaction != null) {
-                $transaction->delete();
+                $transaction->forceDelete();
             }
 
             $transaction = Transaction::where('ref_id', $receipt->id)->where('ref_type', 'receipt')
@@ -817,7 +817,7 @@ class ReceiptController extends Controller
                 ->first();
 
             if ($transaction != null) {
-                $transaction->delete();
+                $transaction->forceDelete();
             }
 
             $transaction = Transaction::where('ref_id', $receipt->id)->where('ref_type', 'receipt')
@@ -825,7 +825,7 @@ class ReceiptController extends Controller
                 ->first();
 
             if ($transaction != null) {
-                $transaction->delete();
+                $transaction->forceDelete();
             }
         }
 
@@ -901,7 +901,7 @@ class ReceiptController extends Controller
                     ->get();
 
                 foreach ($transaction as $taxTransaction) {
-                    $taxTransaction->delete();
+                    $taxTransaction->forceDelete();
                 }
 
                 foreach ($request->taxes as $taxId) {
@@ -954,7 +954,7 @@ class ReceiptController extends Controller
                 $query->where('account_type', 'Bank')
                     ->orWhere('account_type', 'Cash');
             })
-            ->delete();
+            ->forceDelete();
 
         // Create new payment transactions
         if ($request->has('payment_accounts') && is_array($request->payment_accounts) && count($request->payment_accounts) > 0) {
@@ -1004,7 +1004,7 @@ class ReceiptController extends Controller
                 ->where('account_id', get_account('Sales Discount Allowed')->id)
                 ->first();
             if ($transaction != null) {
-                $transaction->delete();
+                $transaction->forceDelete();
             }
         }
 

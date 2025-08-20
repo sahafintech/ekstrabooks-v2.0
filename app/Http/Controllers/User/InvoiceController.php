@@ -920,14 +920,14 @@ class InvoiceController extends Controller
                 $product->stock = $product->stock + $invoice_item->quantity;
                 $product->save();
             }
-            $invoice_item->delete();
+            $invoice_item->forceDelete();
 
             $transaction = Transaction::where('ref_id', $invoice->id)->where('ref_type', 'invoice')
                 ->where('account_id', $product->income_account_id)
                 ->first();
 
             if ($transaction != null) {
-                $transaction->delete();
+                $transaction->forceDelete();
             }
 
             if ($product->stock_management == 1) {
@@ -936,7 +936,7 @@ class InvoiceController extends Controller
                     ->first();
 
                 if ($transaction != null) {
-                    $transaction->delete();
+                    $transaction->forceDelete();
                 }
             }
 
@@ -946,7 +946,7 @@ class InvoiceController extends Controller
                     ->first();
 
                 if ($transaction != null) {
-                    $transaction->delete();
+                    $transaction->forceDelete();
                 }
             }
         }
@@ -1022,7 +1022,7 @@ class InvoiceController extends Controller
                 $transaction = Transaction::where('ref_id', $invoice->id)->where('ref_type', 'invoice tax')
                     ->get();
                 foreach ($transaction as $t) {
-                    $t->delete();
+                    $t->forceDelete();
                 }
 
                 foreach ($request->taxes as $taxId) {
@@ -1081,7 +1081,7 @@ class InvoiceController extends Controller
                 ->where('account_id', get_account('Sales Discount Allowed')->id)
                 ->first();
             if ($transaction != null) {
-                $transaction->delete();
+                $transaction->forceDelete();
             }
         }
 
