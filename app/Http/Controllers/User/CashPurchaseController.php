@@ -953,9 +953,6 @@ class CashPurchaseController extends Controller
 				->get();
 		}
 
-		// For backward compatibility, keep the single transaction
-		$credit_account = $paymentTransactions->first();
-
 		$theAttachments = Attachment::where('ref_id', $id)->where('ref_type', 'cash purchase')->get();
 		$accounts = Account::all();
 		$currencies = Currency::all();
@@ -980,7 +977,6 @@ class CashPurchaseController extends Controller
 		return Inertia::render('Backend/User/CashPurchase/Edit', [
 			'bill' => $bill,
 			'theAttachments' => $theAttachments,
-			'credit_account' => $credit_account->account_id,
 			'paymentTransactions' => $paymentTransactions,
 			'accounts' => $accounts,
 			'currencies' => $currencies,
