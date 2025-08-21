@@ -363,6 +363,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::match(['get', 'post'], 'invoices/receive_payment', [InvoiceController::class, 'receive_payment'])->name('invoices.receive_payment');
 		Route::get('invoices/{id}/duplicate', [InvoiceController::class, 'duplicate'])->name('invoices.duplicate');
 		Route::get('invoices/{id}/get_invoice_link', [InvoiceController::class, 'get_invoice_link'])->name('invoices.get_invoice_link');
+		Route::get('invoices/trash', [InvoiceController::class, 'trash'])->name('invoices.trash');
+		Route::post('invoices/{id}/restore', [InvoiceController::class, 'restore'])->name('invoices.restore');
+		Route::post('invoices/bulk_restore', [InvoiceController::class, 'bulk_restore'])->name('invoices.bulk_restore');
+		Route::post('invoices/bulk_permanent_destroy', [InvoiceController::class, 'bulk_permanent_destroy'])->name('invoices.bulk_permanent_destroy');
+		Route::delete('invoices/{id}/permanent_destroy', [InvoiceController::class, 'permanent_destroy'])->name('invoices.permanent_destroy');
 		Route::resource('invoices', InvoiceController::class);
 		Route::resource('receive_payments', ReceivePaymentsController::class);
 		Route::post('import_invoices', [InvoiceController::class, 'import_invoices'])->name('invoices.import');
