@@ -1,4 +1,4 @@
-<?php
+f<?php
 
 namespace App\Http\Controllers;
 
@@ -428,12 +428,12 @@ class ReceivePaymentsController extends Controller
             }
             $invoice->save();
 
-            $invoice_payment->delete();
+            $invoice_payment->forceDelete();
 
             $transactions = Transaction::where('ref_id', $request->invoices[$i])->where('ref_type', 'invoice payment')->get();
 
             foreach ($transactions as $transaction) {
-                $transaction->delete();
+                $transaction->forceDelete();
             }
 
             $invoice_payment = new InvoicePayment();
