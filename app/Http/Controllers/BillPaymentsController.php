@@ -433,10 +433,10 @@ class BillPaymentsController extends Controller
             $purchase->save();
 
             // Delete old payment and transactions
-            $old_purchase_payment->delete();
+            $old_purchase_payment->forceDelete();
             Transaction::where('ref_id', $invoice['invoice_id'] . ',' . $payment->id)
                 ->where('ref_type', 'bill payment')
-                ->delete();
+                ->forceDelete();
 
             // Create new purchase payment
             $purchase_payment = new PurchasePayment();
