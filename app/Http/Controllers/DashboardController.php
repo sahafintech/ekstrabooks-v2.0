@@ -316,7 +316,7 @@ class DashboardController extends Controller
 				->map(function ($product) use ($start_date, $end_date) {
 					$quantity_sold = $product->invoice_items
 						->filter(function ($item) use ($start_date, $end_date) {
-							$invoice_date = $item->invoice->invoice_date;
+							$invoice_date = $item?->invoice?->invoice_date;
 							return $invoice_date >= $start_date && $invoice_date <= $end_date;
 						})
 						->sum('quantity');
@@ -362,7 +362,7 @@ class DashboardController extends Controller
 					$total_sold = $products->sum(function ($product) use ($start_date, $end_date) {
 						return $product->invoice_items
 							->filter(function ($item) use ($start_date, $end_date) {
-								$invoice_date = $item->invoice->invoice_date;
+								$invoice_date = $item?->invoice?->invoice_date;
 								return $invoice_date >= $start_date && $invoice_date <= $end_date;
 							})
 							->sum('quantity');
