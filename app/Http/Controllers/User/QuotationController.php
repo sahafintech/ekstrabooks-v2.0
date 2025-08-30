@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
-use App\Http\Middleware\Business;
 use App\Models\AuditLog;
 use App\Models\BusinessSetting;
 use App\Models\Currency;
@@ -184,6 +183,82 @@ class QuotationController extends Controller
             ]),
             'customers' => $customers,
             'summary' => $summary,
+            'trashed_quotations' => Quotation::onlyTrashed()->count(),
+        ]);
+    }
+
+    public function trash(Request $request)
+    {
+        $query = Quotation::onlyTrashed()->with('customer');
+
+        // Apply search filter
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('quotation_number', 'like', "%{$search}%")
+                  ->orWhere('title', 'like', "%{$search}%")
+                  ->orWhereHas('customer', function($q) use ($search) {
+                      $q->where('name', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        // Filter by customer
+        if ($request->has('customer_id') && $request->customer_id !== '') {
+            $query->where('customer_id', $request->customer_id);
+        }
+
+        // Filter by date range
+        if ($request->has('date_range') && $request->date_range) {
+            $query->where(function($q) use ($request) {
+                $q->where('quotation_date', '>=', $request->date_range[0])
+                  ->where('quotation_date', '<=', $request->date_range[1]);
+            });
+        }
+
+        // Filter by status
+        if ($request->status) {
+            if ($request->status === '0') {
+                $query->where('expired_date', '>', now());
+            } else if ($request->status === '1') {
+                $query->where('expired_date', '<=', now());
+            }
+        }
+
+        // Handle sorting
+        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
+        $sortColumn = $sorting['column'];
+        $sortDirection = $sorting['direction'];
+
+        if ($sortColumn === 'customer.name') {
+            $query->join('customers', 'quotations.customer_id', '=', 'customers.id')
+                ->orderBy('customers.name', $sortDirection)
+                ->select('quotations.*');
+        } else {
+            $query->orderBy('quotations.' . $sortColumn, $sortDirection);
+        }
+
+        // Handle pagination
+        $perPage = $request->get('per_page', 50);
+        $quotations = $query->paginate($perPage);
+
+        // Get all customers for the filter
+        $customers = Customer::all();
+
+        return Inertia::render('Backend/User/Quotation/Trash', [
+            'quotations' => $quotations->items(),
+            'meta' => [
+                'total' => $quotations->total(),
+                'per_page' => $quotations->perPage(),
+                'current_page' => $quotations->currentPage(),
+                'last_page' => $quotations->lastPage(),
+                'from' => $quotations->firstItem(),
+                'to' => $quotations->lastItem(),
+            ],
+            'filters' => array_merge($request->all(), [
+                'sorting' => $sorting,
+            ]),
+            'customers' => $customers,
         ]);
     }
 
@@ -761,6 +836,70 @@ class QuotationController extends Controller
             $quotation->delete();
         }
         return redirect()->route('quotations.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    public function permanent_destroy($id)
+    {
+        $quotation = Quotation::onlyTrashed()->find($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Quotation Permanently Deleted' . ' ' . $quotation->quotation_number;
+        $audit->save();
+
+        $quotation->forceDelete();
+        return redirect()->route('quotations.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    public function bulk_permanent_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $quotation = Quotation::onlyTrashed()->find($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Quotation Permanently Deleted' . ' ' . $quotation->quotation_number;
+            $audit->save();
+
+            $quotation->forceDelete();
+        }
+        return redirect()->route('quotations.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    public function restore($id)
+    {
+        $quotation = Quotation::onlyTrashed()->find($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Quotation Restored' . ' ' . $quotation->quotation_number;
+        $audit->save();
+
+        $quotation->restore();
+        return redirect()->route('quotations.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    public function bulk_restore(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $quotation = Quotation::onlyTrashed()->find($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Quotation Restored' . ' ' . $quotation->quotation_number;
+            $audit->save();
+
+            $quotation->restore();
+        }
+        return redirect()->route('quotations.trash')->with('success', _lang('Restored Successfully'));
     }
 
     private function calculateTotal(Request $request)

@@ -457,6 +457,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('insurance_family_sizes', InsuranceFamilySizeController::class);
 
 		//Quotation
+		Route::get('quotations/trash', [QuotationController::class, 'trash'])->name('quotations.trash');
+		Route::post('quotations/{id}/restore', [QuotationController::class, 'restore'])->name('quotations.restore');
+		Route::post('quotations/bulk_restore', [QuotationController::class, 'bulk_restore'])->name('quotations.bulk_restore');
+		Route::post('quotations/bulk_permanent_destroy', [QuotationController::class, 'bulk_permanent_destroy'])->name('quotations.bulk_permanent_destroy');
+		Route::delete('quotations/{id}/permanent_destroy', [QuotationController::class, 'permanent_destroy'])->name('quotations.permanent_destroy');
 		Route::match(['get', 'post'], 'quotations/{id}/send_email', [QuotationController::class, 'send_email'])->name('quotations.send_email');
 		Route::get('quotations/{id}/convert_to_invoice', [QuotationController::class, 'convert_to_invoice'])->name('quotations.convert_to_invoice');
 		Route::get('quotations/{id}/duplicate', [QuotationController::class, 'duplicate'])->name('quotations.duplicate');

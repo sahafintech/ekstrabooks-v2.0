@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, router, usePage } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -19,14 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/Components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown, FileText, DollarSign, Clock, CheckCircle } from "lucide-react";
+import { ChevronUp, ChevronDown, RotateCcw, Trash } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -63,69 +57,6 @@ const DeleteQuotationModal = ({ show, onClose, onConfirm, processing }) => (
   </Modal>
 );
 
-const ImportQuotationModal = ({ show, onClose, onSubmit, processing }) => (
-  <Modal show={show} onClose={onClose}>
-    <form onSubmit={onSubmit} className="p-6">
-      <div className="ti-modal-header">
-        <h3 className="text-lg font-bold">Import Quotations</h3>
-      </div>
-      <div className="ti-modal-body grid grid-cols-12">
-        <div className="col-span-12">
-          <div className="flex items-center justify-between">
-            <label className="block font-medium text-sm text-gray-700">
-              Quotations File
-            </label>
-            <Link href="/uploads/media/default/sample_quotations.xlsx">
-              <Button variant="secondary" size="sm">
-                Use This Sample File
-              </Button>
-            </Link>
-          </div>
-          <input type="file" className="w-full dropify" name="quotations_file" required />
-        </div>
-        <div className="col-span-12 mt-4">
-          <ul className="space-y-3 text-sm">
-            <li className="flex space-x-3">
-              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
-              <span className="text-gray-800 dark:text-white/70">
-                Maximum File Size: 1 MB
-              </span>
-            </li>
-            <li className="flex space-x-3">
-              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
-              <span className="text-gray-800 dark:text-white/70">
-                File format Supported: CSV, TSV, XLS
-              </span>
-            </li>
-            <li className="flex space-x-3">
-              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
-              <span className="text-gray-800 dark:text-white/70">
-                Make sure the format of the import file matches our sample file by comparing them.
-              </span>
-            </li>
-          </ul>
-        </div>
-      </div>
-      <div className="mt-6 flex justify-end">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={onClose}
-          className="mr-3"
-        >
-          Close
-        </Button>
-        <Button
-          type="submit"
-          disabled={processing}
-        >
-          Import Quotations
-        </Button>
-      </div>
-    </form>
-  </Modal>
-);
-
 const DeleteAllQuotationsModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
@@ -153,6 +84,60 @@ const DeleteAllQuotationsModal = ({ show, onClose, onConfirm, processing, count 
   </Modal>
 );
 
+const RestoreQuotationModal = ({ show, onClose, onConfirm, processing }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to restore this quotation?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Restore Quotation
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+const RestoreAllQuotationsModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to restore {count} selected quotation{count !== 1 ? 's' : ''}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Restore Selected
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
 const QuotationStatusBadge = ({ expired_date }) => {
   const statusMap = {
     0: { label: "Active", className: "text-blue-600" },
@@ -166,60 +151,7 @@ const QuotationStatusBadge = ({ expired_date }) => {
   );
 };
 
-const SummaryCards = ({ summary = {} }) => {
-  const cards = [
-    {
-      title: "Total Quotations",
-      value: summary.total_quotations || 0,
-      description: "Total number of quotations",
-      icon: FileText,
-      iconColor: "text-blue-500"
-    },
-    {
-      title: "Grand Total",
-      value: formatCurrency({ amount: summary.grand_total || 0, currency: 'USD' }),
-      description: "Total amount of all quotations",
-      icon: DollarSign,
-      iconColor: "text-green-500"
-    },
-    {
-      title: "Active Quotations",
-      value: summary.active_quotations || 0,
-      description: "Quotations that are still valid",
-      icon: CheckCircle,
-      iconColor: "text-purple-500"
-    },
-    {
-      title: "Expired Quotations",
-      value: summary.expired_quotations || 0,
-      description: "Quotations that have expired",
-      icon: Clock,
-      iconColor: "text-orange-500"
-    }
-  ];
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-      {cards.map((card, index) => (
-        <div key={index} className="bg-gray-100 rounded-lg shadow-sm p-4">
-          <div className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <h3 className="text-lg font-medium">
-              {card.title}
-            </h3>
-            <card.icon className={`h-8 w-8 ${card.iconColor}`} />
-          </div>
-          <div className="text-2xl font-bold">{card.value}
-            <p className="text-xs text-muted-foreground">
-              {card.description}
-            </p>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-export default function List({ quotations = [], meta = {}, filters = {}, customers = [], summary = {}, trashed_quotations = 0 }) {
+export default function TrashList({ quotations = [], meta = {}, filters = {}, customers = [] }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedQuotations, setSelectedQuotations] = useState([]);
@@ -235,10 +167,14 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [quotationToDelete, setQuotationToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
+
+  // Restore confirmation modal states
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [showRestoreAllModal, setShowRestoreAllModal] = useState(false);
+  const [quotationToRestore, setQuotationToRestore] = useState(null);
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -285,7 +221,7 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
     }
     setSorting({ column, direction });
     router.get(
-      route("quotations.index"),
+      route("quotations.trash"),
       { ...filters, sorting: { column, direction } },
       { preserveState: true }
     );
@@ -310,7 +246,7 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
     const value = e.target.value;
     setSearch(value);
     router.get(
-      route("quotations.index"),
+      route("quotations.trash"),
       { 
         search: value, 
         page: 1, 
@@ -327,7 +263,7 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
   const handlePerPageChange = (value) => {
     setPerPage(value);
     router.get(
-      route("quotations.index"),
+      route("quotations.trash"),
       { 
         search, 
         page: 1, 
@@ -344,7 +280,7 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
   const handlePageChange = (page) => {
     setCurrentPage(page);
     router.get(
-      route("quotations.index"),
+      route("quotations.trash"),
       { 
         search, 
         page, 
@@ -361,7 +297,7 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
   const handleCustomerChange = (value) => {
     setSelectedCustomer(value);
     router.get(
-      route("quotations.index"),
+      route("quotations.trash"),
       { 
         search, 
         page: 1, 
@@ -378,7 +314,7 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
   const handleDateRangeChange = (dates) => {
     setDateRange(dates);
     router.get(
-      route("quotations.index"),
+      route("quotations.trash"),
       { 
         search, 
         page: 1, 
@@ -395,7 +331,7 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
   const handleStatusChange = (value) => {
     setSelectedStatus(value);
     router.get(
-      route("quotations.index"),
+      route("quotations.trash"),
       { 
         search, 
         page: 1, 
@@ -423,6 +359,8 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
 
     if (bulkAction === "delete") {
       setShowDeleteAllModal(true);
+    } else if (bulkAction === "restore") {
+      setShowRestoreAllModal(true);
     }
   };
 
@@ -431,11 +369,16 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
     setShowDeleteModal(true);
   };
 
+  const handleRestoreConfirm = (id) => {
+    setQuotationToRestore(id);
+    setShowRestoreModal(true);
+  };
+
   const handleDelete = (e) => {
     e.preventDefault();
     setProcessing(true);
 
-    router.delete(route('quotations.destroy', quotationToDelete), {
+    router.delete(route('quotations.permanent_destroy', quotationToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
         setQuotationToDelete(null);
@@ -451,13 +394,14 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
     e.preventDefault();
     setProcessing(true);
 
-    router.post(route('quotations.bulk_destroy'),
+    router.post(route('quotations.bulk_permanent_destroy'),
       {
         ids: selectedQuotations
       },
       {
         onSuccess: () => {
           setShowDeleteAllModal(false);
+          setQuotationToDelete(null);
           setSelectedQuotations([]);
           setIsAllSelected(false);
           setProcessing(false);
@@ -469,20 +413,42 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
     );
   };
 
-  const handleImport = (e) => {
+  const handleRestore = (e) => {
     e.preventDefault();
-    const formData = new FormData(e.target);
     setProcessing(true);
 
-    router.post(route('quotations.import'), formData, {
+    router.post(route('quotations.restore', quotationToRestore), {
       onSuccess: () => {
-        setShowImportModal(false);
+        setShowRestoreModal(false);
+        setQuotationToRestore(null);
         setProcessing(false);
       },
       onError: () => {
         setProcessing(false);
       }
     });
+  };
+
+  const handleRestoreAll = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+
+    router.post(route('quotations.bulk_restore'),
+      {
+        ids: selectedQuotations
+      },
+      {
+        onSuccess: () => {
+          setShowRestoreAllModal(false);
+          setSelectedQuotations([]);
+          setIsAllSelected(false);
+          setProcessing(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
+      }
+    );
   };
 
   const renderPageNumbers = () => {
@@ -515,10 +481,6 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
     return pages;
   };
 
-  const exportQuotations = () => {
-    router.get(route("quotations.export"));
-  };
-
   return (
     <AuthenticatedLayout>
       <Toaster />
@@ -526,45 +488,18 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
         <div className="main-content">
           <PageHeader
             page="Quotations"
-            subpage="List"
+            subpage="Trash"
             url="quotations.index"
           />
           <div className="p-4">
-            <SummaryCards summary={summary} />
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-2">
-                <Link href={route("quotations.create")}>
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Quotation
-                  </Button>
-                </Link>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="secondary">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setShowImportModal(true)}>
-                      <FileUp className="mr-2 h-4 w-4" /> Import
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={exportQuotations}>
-                      <FileDown className="mr-2 h-4 w-4" /> Export
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Link href={route("quotations.trash")}>
-                    <Button variant="outline" className="relative">
-                        <Trash2 className="h-8 w-8" />
-                        {trashed_quotations > 0 && (
-                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                            {trashed_quotations}
-                        </span>
-                        )}
-                    </Button>
-                </Link>
-              </div>
+                <div className="flex flex-col md:flex-row gap-2">
+                    <div>
+                        <div className="text-red-500">
+                            Total trashed quotations: {meta.total}
+                        </div>
+                    </div>
+                </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input
                   placeholder="Search quotations..."
@@ -582,7 +517,8 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
                     <SelectValue placeholder="Bulk actions" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="delete">Delete Selected</SelectItem>
+                    <SelectItem value="delete">Permanently Delete Selected</SelectItem>
+                    <SelectItem value="restore">Restore Selected</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button onClick={handleBulkAction} variant="outline">
@@ -682,26 +618,21 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
                           <QuotationStatusBadge expired_date={quotation.expired_date} />
                         </TableCell>
                         <TableCell className="text-right">
-                          <TableActions
+                        <TableActions
                             actions={[
-                              {
-                                label: "View",
-                                icon: <Eye className="h-4 w-4" />,
-                                href: route("quotations.show", quotation.id),
-                              },
-                              {
-                                label: "Edit",
-                                icon: <Edit className="h-4 w-4" />,
-                                href: route("quotations.edit", quotation.id),
-                              },
-                              {
-                                label: "Delete",
-                                icon: <Trash2 className="h-4 w-4" />,
+                            {
+                                label: "Restore",
+                                icon: <RotateCcw className="h-4 w-4" />,
+                                onClick: () => handleRestoreConfirm(quotation.id)
+                            },
+                            {
+                                label: "Permanently Delete",
+                                icon: <Trash className="h-4 w-4" />,
                                 onClick: () => handleDeleteConfirm(quotation.id),
                                 destructive: true,
-                              },
+                            },
                             ]}
-                          />
+                        />
                         </TableCell>
                       </TableRow>
                     ))
@@ -777,11 +708,19 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
         count={selectedQuotations.length}
       />
 
-      <ImportQuotationModal
-        show={showImportModal}
-        onClose={() => setShowImportModal(false)}
-        onSubmit={handleImport}
+      <RestoreQuotationModal
+        show={showRestoreModal}
+        onClose={() => setShowRestoreModal(false)}
+        onConfirm={handleRestore}
         processing={processing}
+      />
+
+      <RestoreAllQuotationsModal
+        show={showRestoreAllModal}
+        onClose={() => setShowRestoreAllModal(false)}
+        onConfirm={handleRestoreAll}
+        processing={processing}
+        count={selectedQuotations.length}
       />
     </AuthenticatedLayout>
   );
