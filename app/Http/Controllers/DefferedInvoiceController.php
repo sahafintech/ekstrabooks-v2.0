@@ -976,24 +976,24 @@ class DefferedInvoiceController extends Controller
             }
 
             if ($invoice_item->taxes) {
-                $invoice_item->taxes()->delete();
+                $invoice_item->taxes()->forceDelete();
 
                 $transaction = Transaction::where('ref_id', $invoice->id)->where('ref_type', 'd invoice tax')
                     ->get();
 
                 foreach ($transaction as $t) {
-                    $t->delete();
+                    $t->forceDelete();
                 }
             }
 
-            $invoice_item->delete();
+            $invoice_item->forceDelete();
 
             $transaction = Transaction::where('ref_id', $invoice->id)->where('ref_type', 'd invoice')
                 ->where('account_id', $product->income_account_id)
                 ->first();
 
             if ($transaction != null) {
-                $transaction->delete();
+                $transaction->forceDelete();
             }
 
             if ($product->stock_management == 1) {
@@ -1002,7 +1002,7 @@ class DefferedInvoiceController extends Controller
                     ->first();
 
                 if ($transaction != null) {
-                    $transaction->delete();
+                    $transaction->forceDelete();
                 }
             }
 
@@ -1012,7 +1012,7 @@ class DefferedInvoiceController extends Controller
                     ->first();
 
                 if ($transaction != null) {
-                    $transaction->delete();
+                    $transaction->forceDelete();
                 }
             }
         }

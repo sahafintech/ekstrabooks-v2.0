@@ -376,6 +376,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('export_invoices', [InvoiceController::class, 'export_invoices'])->name('invoices.export');
 
 		// Sales Return
+		Route::get('sales_returns/trash', [SalesReturnController::class, 'trash'])->name('sales_returns.trash');
+		Route::post('sales_returns/{id}/restore', [SalesReturnController::class, 'restore'])->name('sales_returns.restore');
+		Route::post('sales_returns/bulk_restore', [SalesReturnController::class, 'bulk_restore'])->name('sales_returns.bulk_restore');
+		Route::post('sales_returns/bulk_permanent_destroy', [SalesReturnController::class, 'bulk_permanent_destroy'])->name('sales_returns.bulk_permanent_destroy');
+		Route::delete('sales_returns/{id}/permanent_destroy', [SalesReturnController::class, 'permanent_destroy'])->name('sales_returns.permanent_destroy');
 		Route::resource('sales_returns', SalesReturnController::class);
 		Route::post('sales_returns/refund/store/{id}', [SalesReturnController::class, 'refund_store'])->name('sales_returns.refund.store');
 		Route::post('sales_returns/bulk_destroy', [SalesReturnController::class, 'bulk_destroy'])->name('sales_returns.bulk_destroy');

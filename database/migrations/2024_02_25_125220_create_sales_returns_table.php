@@ -35,6 +35,10 @@ return new class extends Migration
             $table->datetime('email_send_at')->nullable();
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
+            $table->bigInteger('created_user_id')->nullable();
+            $table->bigInteger('updated_user_id')->nullable();
+            $table->bigInteger('deleted_user_id')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('customer_id')->references('id')->on('customers')->onDelete('cascade');

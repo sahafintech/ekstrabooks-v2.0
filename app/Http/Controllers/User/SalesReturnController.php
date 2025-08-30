@@ -135,6 +135,78 @@ class SalesReturnController extends Controller
                 'sorting' => $sorting,
             ],
             'summary' => $summary,
+            'trashed_sales_returns' => SalesReturn::onlyTrashed()->count(),
+        ]);
+    }
+
+    public function trash(Request $request)
+    {
+        $query = SalesReturn::onlyTrashed()->with('customer');
+
+        // Apply search filter
+        if (!empty($request->search)) {
+            $query->where(function ($q) use ($request) {
+                $q->where('return_number', 'like', "%{$request->search}%")
+                    ->orWhereHas('customer', function ($query) use ($request) {
+                        $query->where('name', 'like', "%{$request->search}%");
+                    });
+            });
+        }
+
+        // Apply customer filter
+        if (!empty($request->customer_id)) {
+            $query->where('customer_id', $request->customer_id);
+        }
+
+        // Apply status filter
+        if ($request->status) {
+            $query->where('status', $request->status);
+        }
+
+        // Apply date range filter
+        if (!empty($request->date_range)) {
+            $query->where('return_date', '>=', $request->date_range[0])
+                ->orWhere('return_date', '<=', $request->date_range[1]);
+        }
+
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        if ($sortColumn === 'customer.name') {
+            $query->join('customers', 'sales_returns.customer_id', '=', 'customers.id')
+                ->orderBy('customers.name', $sortDirection)
+                ->select('sales_returns.*');
+        } else {
+            $query->orderBy('sales_returns.' . $sortColumn, $sortDirection);
+        }
+
+        // Handle pagination
+        $perPage = $request->get('per_page', 10);
+        $returns = $query->paginate($perPage);
+        $accounts = Account::all();
+        $customers = Customer::all();
+
+        return Inertia::render('Backend/User/SalesReturn/Trash', [
+            'returns' => $returns->items(),
+            'accounts' => $accounts,
+            'customers' => $customers,
+            'meta' => [
+                'total' => $returns->total(),
+                'per_page' => $returns->perPage(),
+                'current_page' => $returns->currentPage(),
+                'last_page' => $returns->lastPage(),
+                'from' => $returns->firstItem(),
+                'to' => $returns->lastItem(),
+            ],
+            'filters' => [
+                'search' => $request->search,
+                'customer_id' => $request->customer_id,
+                'date_range' => $request->date_range,
+                'status' => $request->status,
+                'sorting' => $sorting,
+            ],
         ]);
     }
 
@@ -1075,6 +1147,138 @@ class SalesReturnController extends Controller
             $return->delete();
         }
         return redirect()->route('sales_returns.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    public function permanent_destroy($id)
+    {
+        $return = SalesReturn::onlyTrashed()->find($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Sales Return Deleted' . ' ' . $return->return_number;
+        $audit->save();
+
+        // delete transactions
+        $transactions = Transaction::onlyTrashed()->where('ref_id', $return->id)
+            ->where(function ($query) {
+                $query->where('ref_type', 's return')
+                    ->orWhere('ref_type', 's return tax');
+            })
+            ->get();
+        foreach ($transactions as $transaction) {
+            $transaction->forceDelete();
+        }
+
+        // delete refund transactions
+        $transactions = Transaction::onlyTrashed()->where('ref_id', $return->id)->where('ref_type', 's refund')->get();
+        foreach ($transactions as $transaction) {
+            $transaction->forceDelete();
+        }
+
+        $return->forceDelete();
+        return redirect()->route('sales_returns.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    public function bulk_permanent_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $return = SalesReturn::onlyTrashed()->find($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Sales Return Deleted' . ' ' . $return->return_number;
+            $audit->save();
+
+            // delete transactions
+            $transactions = Transaction::onlyTrashed()->where('ref_id', $return->id)
+                ->where(function ($query) {
+                    $query->where('ref_type', 's return')
+                        ->orWhere('ref_type', 's return tax');
+                })
+                ->get();
+            foreach ($transactions as $transaction) {
+                $transaction->forceDelete();
+            }
+
+            // delete refund transactions
+            $transactions = Transaction::onlyTrashed()->where('ref_id', $return->id)->where('ref_type', 's refund')->get();
+            foreach ($transactions as $transaction) {
+                $transaction->forceDelete();
+            }
+
+            $return->forceDelete();
+        }
+        return redirect()->route('sales_returns.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    public function restore($id)
+    {
+        $return = SalesReturn::onlyTrashed()->find($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Sales Return Restored' . ' ' . $return->return_number;
+        $audit->save();
+
+        // delete transactions
+        $transactions = Transaction::onlyTrashed()->where('ref_id', $return->id)
+            ->where(function ($query) {
+                $query->where('ref_type', 's return')
+                    ->orWhere('ref_type', 's return tax');
+            })
+            ->get();
+        foreach ($transactions as $transaction) {
+            $transaction->restore();
+        }
+
+        // delete refund transactions
+        $transactions = Transaction::onlyTrashed()->where('ref_id', $return->id)->where('ref_type', 's refund')->get();
+        foreach ($transactions as $transaction) {
+            $transaction->restore();
+        }
+
+        $return->restore();
+        return redirect()->route('sales_returns.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    public function bulk_restore(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $return = SalesReturn::onlyTrashed()->find($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Sales Return Restored' . ' ' . $return->return_number;
+            $audit->save();
+
+            // delete transactions
+            $transactions = Transaction::onlyTrashed()->where('ref_id', $return->id)
+                ->where(function ($query) {
+                    $query->where('ref_type', 's return')
+                        ->orWhere('ref_type', 's return tax');
+                })
+                ->get();
+            foreach ($transactions as $transaction) {
+                $transaction->restore();
+            }
+
+            // delete refund transactions
+            $transactions = Transaction::onlyTrashed()->where('ref_id', $return->id)->where('ref_type', 's refund')->get();
+            foreach ($transactions as $transaction) {
+                $transaction->restore();
+            }
+
+            $return->restore();
+        }
+        return redirect()->route('sales_returns.trash')->with('success', _lang('Permanently Deleted Successfully'));
     }
 
     private function calculateTotal(Request $request)
