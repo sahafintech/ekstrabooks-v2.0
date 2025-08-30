@@ -65,6 +65,58 @@ class PrescriptionController extends Controller
                 'columnFilters' => $request->get('columnFilters', []),
                 'sorting' => $sorting,
             ],
+            'trashed_prescriptions' => Prescription::onlyTrashed()->count(),
+        ]);
+    }
+
+    public function trash(Request $request)
+    {
+        $query = Prescription::onlyTrashed()->with('customer', 'medical_record');
+
+        // handle search
+        if ($request->has('search') && !empty($request->get('search'))) {
+            $search = $request->get('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('prescriptions.date', 'like', "%{$search}%")
+                    ->orWhere('prescriptions.result_date', 'like', "%{$search}%")
+                    ->orWhereHas('customer', function ($q2) use ($search) {
+                        $q2->where('name', 'like', "%{$search}%")
+                            ->orWhere('mobile', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        // handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        if (in_array($sortColumn, ['customer.name', 'customer.age', 'customer.mobile'])) {
+            $customerField = explode('.', $sortColumn)[1];
+            $query->join('customers', 'prescriptions.customer_id', '=', 'customers.id')
+                  ->orderBy('customers.' . $customerField, $sortDirection)
+                  ->select('prescriptions.*');
+        } else {
+            $query->orderBy('prescriptions.' . $sortColumn, $sortDirection);
+        }
+
+        // handle pagination
+        $per_page = $request->get('per_page', 50);
+        $prescriptions = $query->paginate($per_page);
+
+        return Inertia::render('Backend/User/Prescription/Trash', [
+            'prescriptions' => $prescriptions->items(),
+            'meta' => [
+                'total' => $prescriptions->total(),
+                'per_page' => $prescriptions->perPage(),
+                'current_page' => $prescriptions->currentPage(),
+                'last_page' => $prescriptions->lastPage(),
+            ],
+            'filters' => [
+                'search' => $request->get('search', ''),
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $sorting,
+            ],
         ]);
     }
 
@@ -271,6 +323,87 @@ class PrescriptionController extends Controller
         $audit->save();
 
         return redirect()->route('prescriptions.index')->with('success', 'Prescription deleted successfully');
+    }
+
+    public function permanent_destroy($id)
+    {
+        $prescription = Prescription::onlyTrashed()->find($id);
+        $prescription->forceDelete();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Prescription Permanently Deleted';
+        $audit->save();
+
+        return redirect()->route('prescriptions.trash')->with('success', 'Prescription permanently deleted successfully');
+    }
+
+    public function restore($id)
+    {
+        $prescription = Prescription::onlyTrashed()->find($id);
+        $prescription->restore();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Prescription Restored - ' . $prescription->id . ' Prescription';
+        $audit->save();
+
+        return redirect()->route('prescriptions.trash')->with('success', 'Prescription restored successfully');
+    }
+
+    public function bulk_destroy(Request $request)
+    {
+        $prescriptions = Prescription::whereIn('id', $request->ids)->get();
+        foreach ($prescriptions as $prescription) {
+            $prescription->delete();
+        }
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Prescription Deleted - ' . count($prescriptions) . ' Prescriptions';
+        $audit->save();
+
+        return redirect()->route('prescriptions.index')->with('success', 'Prescriptions deleted successfully');
+    }
+
+    public function bulk_permanent_destroy(Request $request)
+    {
+        $prescriptions = Prescription::onlyTrashed()->whereIn('id', $request->ids)->get();
+        foreach ($prescriptions as $prescription) {
+            $prescription->forceDelete();
+        }
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Prescription Permanently Deleted - ' . count($prescriptions) . ' Prescriptions';
+        $audit->save();
+
+        return redirect()->route('prescriptions.trash')->with('success', 'Prescriptions permanently deleted successfully');
+    }
+
+    public function bulk_restore(Request $request)
+    {
+        $prescriptions = Prescription::onlyTrashed()->whereIn('id', $request->ids)->get();
+        foreach ($prescriptions as $prescription) {
+            $prescription->restore();
+        }
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Prescription Restored - ' . count($prescriptions) . ' Prescriptions';
+        $audit->save();
+
+        return redirect()->route('prescriptions.trash')->with('success', 'Prescriptions restored successfully');
     }
 
     public function show($id)

@@ -20,13 +20,12 @@ import {
   SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { Edit, EyeIcon, Plus, Trash, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+import { Plus, Trash, ChevronUp, ChevronDown, RotateCcw } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
-import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 
 // Delete Confirmation Modal Component
 const DeletePrescriptionModal = ({ show, onClose, onConfirm, processing }) => (
@@ -84,60 +83,12 @@ const DeleteAllPrescriptionsModal = ({ show, onClose, onConfirm, processing, cou
   </Modal>
 );
 
-// Change Status Modal Component
-const ChangeStatusModal = ({ show, onClose, onConfirm, processing, currentStatus }) => {
-  const [newStatus, setNewStatus] = useState(currentStatus);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onConfirm(newStatus);
-  };
-
-  return (
-    <Modal show={show} onClose={onClose}>
-      <form onSubmit={handleSubmit}>
-        <h2 className="text-lg font-medium mb-4">Change Prescription Status</h2>
-        <div className="mb-4">
-          <SearchableCombobox
-            options={
-              [
-                { name: "Not Started", id: 0 },
-                { name: "Working Progress", id: 1 },
-                { name: "Completed", id: 2 },
-                { name: "Delivered", id: 3 },
-              ]
-            }
-            value={newStatus}
-            onChange={(value) => setNewStatus(value)}
-          />
-        </div>
-        <div className="mt-6 flex justify-end">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={onClose}
-            className="mr-3"
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            disabled={processing}
-          >
-            Update Status
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-};
-
-// Send to POS Confirmation Modal Component
-const SendToPosModal = ({ show, onClose, onConfirm, processing }) => (
+// Delete Confirmation Modal Component
+const RestorePrescriptionModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to send this prescription to POS?
+        Are you sure you want to restore this prescription?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -150,9 +101,38 @@ const SendToPosModal = ({ show, onClose, onConfirm, processing }) => (
         </Button>
         <Button
           type="submit"
+          variant="default"
           disabled={processing}
         >
-          Send to POS
+          Restore
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+// Bulk Delete Confirmation Modal Component
+const RestoreAllPrescriptionsModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to restore {count} selected prescription{count !== 1 ? 's' : ''}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Restore Selected
         </Button>
       </div>
     </form>
@@ -186,7 +166,7 @@ const PrescriptionStatusBadge = ({ status }) => {
   );
 };
 
-export default function List({ prescriptions = [], meta = {}, filters = {}, trashed_prescriptions = 0 }) {
+export default function List({ prescriptions = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedPrescriptions, setSelectedPrescriptions] = useState([]);
@@ -200,16 +180,11 @@ export default function List({ prescriptions = [], meta = {}, filters = {}, tras
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [showRestoreAllModal, setShowRestoreAllModal] = useState(false);
+  const [prescriptionToRestore, setPrescriptionToRestore] = useState(null);
   const [prescriptionToDelete, setPrescriptionToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
-
-  // Change Status modal states
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [prescriptionToUpdate, setPrescriptionToUpdate] = useState(null);
-
-  // Send to POS modal states
-  const [showSendToPosModal, setShowSendToPosModal] = useState(false);
-  const [prescriptionToSendToPos, setPrescriptionToSendToPos] = useState(null);
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -254,7 +229,7 @@ export default function List({ prescriptions = [], meta = {}, filters = {}, tras
     const value = e.target.value;
     setSearch(value);
     router.get(
-      route("prescriptions.index"),
+      route("prescriptions.trash"),
       { search: value, page: 1, per_page: perPage, sorting },
       { preserveState: true }
     );
@@ -263,7 +238,7 @@ export default function List({ prescriptions = [], meta = {}, filters = {}, tras
   const handlePerPageChange = (value) => {
     setPerPage(value);
     router.get(
-      route("prescriptions.index"),
+      route("prescriptions.trash"),
       { search, page: 1, per_page: value, sorting },
       { preserveState: true }
     );
@@ -272,7 +247,7 @@ export default function List({ prescriptions = [], meta = {}, filters = {}, tras
   const handlePageChange = (page) => {
     setCurrentPage(page);
     router.get(
-      route("prescriptions.index"),
+      route("prescriptions.trash"),
       { search, page, per_page: perPage, sorting },
       { preserveState: true }
     );
@@ -285,7 +260,7 @@ export default function List({ prescriptions = [], meta = {}, filters = {}, tras
     }
     setSorting({ column, direction });
     router.get(
-      route("prescriptions.index"),
+      route("prescriptions.trash"),
       { ...filters, sorting: { column, direction } },
       { preserveState: true }
     );
@@ -305,6 +280,8 @@ export default function List({ prescriptions = [], meta = {}, filters = {}, tras
 
     if (bulkAction === "delete") {
       setShowDeleteAllModal(true);
+    }else if(bulkAction === "restore") {
+      setShowRestoreAllModal(true);
     }
   };
 
@@ -313,11 +290,16 @@ export default function List({ prescriptions = [], meta = {}, filters = {}, tras
     setShowDeleteModal(true);
   };
 
+  const handleRestoreConfirm = (id) => {
+    setPrescriptionToRestore(id);
+    setShowRestoreModal(true);
+  };
+
   const handleDelete = (e) => {
     e.preventDefault();
     setProcessing(true);
 
-    router.delete(route('prescriptions.destroy', prescriptionToDelete), {
+    router.delete(route('prescriptions.permanent_destroy', prescriptionToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
         setPrescriptionToDelete(null);
@@ -333,7 +315,7 @@ export default function List({ prescriptions = [], meta = {}, filters = {}, tras
     e.preventDefault();
     setProcessing(true);
 
-    router.post(route('prescriptions.bulk_destroy'),
+    router.post(route('prescriptions.bulk_permanent_destroy'),
       {
         ids: selectedPrescriptions
       },
@@ -351,23 +333,40 @@ export default function List({ prescriptions = [], meta = {}, filters = {}, tras
     );
   };
 
-  const handleStatusChange = (id) => {
-    const prescription = prescriptions.find(p => p.id === id);
-    setPrescriptionToUpdate(prescription);
-    setShowStatusModal(true);
-  };
-
-  const handleStatusUpdate = (newStatus) => {
+  const handleRestore = (e) => {
+    e.preventDefault();
     setProcessing(true);
 
-    router.post(route('prescriptions.change_status', prescriptionToUpdate.id), 
-      { status: newStatus },
+    router.post(route('prescriptions.restore', prescriptionToRestore), {
+      onSuccess: () => {
+        setShowRestoreModal(false);
+        setPrescriptionToRestore(null);
+        setProcessing(false);
+      },
+      onError: () => {
+        setProcessing(false);
+      }
+    });
+  };
+
+  const handleRestoreAll = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+
+    router.post(route('prescriptions.bulk_restore'),
+      {
+        ids: selectedPrescriptions
+      },
       {
         onSuccess: () => {
-          setShowStatusModal(false);
-          setPrescriptionToUpdate(null);
+          setShowRestoreAllModal(false);
+          setSelectedPrescriptions([]);
+          setIsAllSelected(false);
           setProcessing(false);
         },
+        onError: () => {
+          setProcessing(false);
+        }
       }
     );
   };
@@ -416,31 +415,6 @@ export default function List({ prescriptions = [], meta = {}, filters = {}, tras
     );
   };
 
-  const handleSendToPos = (id) => {
-    setPrescriptionToSendToPos(id);
-    setShowSendToPosModal(true);
-  };
-
-  const handleSendToPosConfirm = (e) => {
-    e.preventDefault();
-    setProcessing(true);
-
-    router.post(route('prescriptions.send_to_pos', prescriptionToSendToPos), {
-      onSuccess: () => {
-        setShowSendToPosModal(false);
-        setPrescriptionToSendToPos(null);
-        setProcessing(false);
-        toast({
-          title: "Success",
-          description: "Prescription sent to POS successfully",
-        });
-      },
-      onError: () => {
-        setProcessing(false);
-      }
-    });
-  };
-
   return (
     <AuthenticatedLayout>
       <Toaster />
@@ -448,32 +422,19 @@ export default function List({ prescriptions = [], meta = {}, filters = {}, tras
         <div className="main-content">
           <PageHeader
             page="Prescriptions"
-            subpage="List"
+            subpage="Trash"
             url="prescriptions.index"
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-2">
-                <Link href={route("prescriptions.create")}>
-                  <Button>
-                    <Plus className="w-4 h-4" />
-                    Add Prescription
-                  </Button>
-                </Link>
-                <Link href={route("prescriptions.trash")}>
-                    <Button variant="outline" className="relative">
-                        <Trash2 className="h-8 w-8" />
-                        {trashed_prescriptions > 0 && (
-                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                            {trashed_prescriptions}
-                        </span>
-                        )}
-                    </Button>
-                </Link>
-              </div>
+                <div>
+                    <div className="text-red-500">
+                        Total trashed prescriptions: {meta.total}
+                    </div>
+                </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input
-                  placeholder="Search prescriptions..."
+                  placeholder="Search trashed prescriptions..."
                   value={search}
                   onChange={(e) => handleSearch(e)}
                   className="w-full md:w-80"
@@ -488,7 +449,8 @@ export default function List({ prescriptions = [], meta = {}, filters = {}, tras
                     <SelectValue placeholder="Bulk actions" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="delete">Delete Selected</SelectItem>
+                    <SelectItem value="delete">Permanently Delete Selected</SelectItem>
+                    <SelectItem value="restore">Restore Selected</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button onClick={handleBulkAction} variant="outline">
@@ -564,36 +526,21 @@ export default function List({ prescriptions = [], meta = {}, filters = {}, tras
                         <TableCell>{prescription.customer?.mobile}</TableCell>
                         <TableCell>{<PrescriptionStatusBadge status={prescription.status} />}</TableCell>
                         <TableCell className="text-right">
-                          <TableActions
+                        <TableActions
                             actions={[
-                              {
-                                label: "View",
-                                icon: <EyeIcon className="h-4 w-4" />,
-                                href: route("prescriptions.show", prescription.id),
-                              },
-                              {
-                                label: "Edit",
-                                icon: <Edit className="h-4 w-4" />,
-                                href: route("prescriptions.edit", prescription.id),
-                              },
-                              {
-                                label: "Change Status",
-                                icon: <Edit className="h-4 w-4" />,
-                                onClick: () => handleStatusChange(prescription.id),
-                              },
-                              {
-                                label: "Send To POS",
-                                icon: <Edit className="h-4 w-4" />,
-                                onClick: () => handleSendToPos(prescription.id),
-                              },
-                              {
-                                label: "Delete",
+                            {
+                                label: "Restore",
+                                icon: <RotateCcw className="h-4 w-4" />,
+                                onClick: () => handleRestoreConfirm(prescription.id)
+                            },
+                            {
+                                label: "Permanently Delete",
                                 icon: <Trash className="h-4 w-4" />,
                                 onClick: () => handleDeleteConfirm(prescription.id),
                                 destructive: true,
-                              },
+                            },
                             ]}
-                          />
+                        />
                         </TableCell>
                       </TableRow>
                     ))
@@ -669,19 +616,19 @@ export default function List({ prescriptions = [], meta = {}, filters = {}, tras
         count={selectedPrescriptions.length}
       />
 
-      <ChangeStatusModal
-        show={showStatusModal}
-        onClose={() => setShowStatusModal(false)}
-        onConfirm={handleStatusUpdate}
+      <RestorePrescriptionModal
+        show={showRestoreModal}
+        onClose={() => setShowRestoreModal(false)}
+        onConfirm={handleRestore}
         processing={processing}
-        currentStatus={prescriptionToUpdate?.status}
       />
 
-      <SendToPosModal
-        show={showSendToPosModal}
-        onClose={() => setShowSendToPosModal(false)}
-        onConfirm={handleSendToPosConfirm}
+      <RestoreAllPrescriptionsModal
+        show={showRestoreAllModal}
+        onClose={() => setShowRestoreAllModal(false)}
+        onConfirm={handleRestoreAll}
         processing={processing}
+        count={selectedPrescriptions.length}
       />
 
     </AuthenticatedLayout>

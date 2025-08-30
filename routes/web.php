@@ -520,7 +520,13 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('medical_records/bulk_destroy', [MedicalRecordController::class, 'bulk_destroy'])->name('medical_records.bulk_destroy');
 
 		// prescriptions
+		Route::get('prescriptions/trash', [PrescriptionController::class, 'trash'])->name('prescriptions.trash');
+		Route::post('prescriptions/{id}/restore', [PrescriptionController::class, 'restore'])->name('prescriptions.restore');
+		Route::post('prescriptions/bulk_restore', [PrescriptionController::class, 'bulk_restore'])->name('prescriptions.bulk_restore');
+		Route::post('prescriptions/bulk_permanent_destroy', [PrescriptionController::class, 'bulk_permanent_destroy'])->name('prescriptions.bulk_permanent_destroy');
+		Route::delete('prescriptions/{id}/permanent_destroy', [PrescriptionController::class, 'permanent_destroy'])->name('prescriptions.permanent_destroy');
 		Route::resource('prescriptions', PrescriptionController::class);
+		Route::post('prescriptions/bulk_destroy', [PrescriptionController::class, 'bulk_destroy'])->name('prescriptions.bulk_destroy');
 		Route::post('prescriptions/{id}', [PrescriptionController::class, 'change_status'])->name('prescriptions.change_status');
 		Route::get('prescriptions/{id}/edit_status', [PrescriptionController::class, 'edit_status'])->name('prescriptions.edit_status');
 
