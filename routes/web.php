@@ -511,7 +511,13 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('purchase_orders/{id}/send_email', [PurchaseOrderController::class, 'send_email'])->name('purchase_orders.send_email');
 
 		// medical records
+		Route::get('medical_records/trash', [MedicalRecordController::class, 'trash'])->name('medical_records.trash');
+		Route::post('medical_records/{id}/restore', [MedicalRecordController::class, 'restore'])->name('medical_records.restore');
+		Route::post('medical_records/bulk_restore', [MedicalRecordController::class, 'bulk_restore'])->name('medical_records.bulk_restore');
+		Route::post('medical_records/bulk_permanent_destroy', [MedicalRecordController::class, 'bulk_permanent_destroy'])->name('medical_records.bulk_permanent_destroy');
+		Route::delete('medical_records/{id}/permanent_destroy', [MedicalRecordController::class, 'permanent_destroy'])->name('medical_records.permanent_destroy');
 		Route::resource('medical_records', MedicalRecordController::class);
+		Route::post('medical_records/bulk_destroy', [MedicalRecordController::class, 'bulk_destroy'])->name('medical_records.bulk_destroy');
 
 		// prescriptions
 		Route::resource('prescriptions', PrescriptionController::class);

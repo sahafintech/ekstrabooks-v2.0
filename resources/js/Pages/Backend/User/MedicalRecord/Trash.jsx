@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, router, usePage } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -20,12 +20,10 @@ import {
   SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown } from "lucide-react";
-import { Toaster } from "@/Components/ui/toaster";
+import { ChevronUp, ChevronDown, RotateCcw, Trash } from "lucide-react";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
-import { toast } from "sonner";
 
 const DeleteMedicalRecordsModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
@@ -81,7 +79,61 @@ const DeleteAllMedicalRecordsModal = ({ show, onClose, onConfirm, processing, co
   </Modal>
 );
 
-export default function List({ records = [], meta = {}, filters = {}, trashed_medical_records = 0 }) {
+const RestoreMedicalRecordsModal = ({ show, onClose, onConfirm, processing }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to restore this medical record?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Restore Medical Record
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+const RestoreAllMedicalRecordsModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to restore {count} selected medical record{count !== 1 ? 's' : ''}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Restore Selected
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+export default function TrashList({ records = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
   const [selectedRecords, setSelectedRecords] = useState([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
@@ -92,6 +144,9 @@ export default function List({ records = [], meta = {}, filters = {}, trashed_me
   const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [showRestoreAllModal, setShowRestoreAllModal] = useState(false);
+  const [recordToRestore, setRecordToRestore] = useState(null);
   const [recordToDelete, setRecordToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
 
@@ -130,7 +185,7 @@ export default function List({ records = [], meta = {}, filters = {}, trashed_me
     const value = e.target.value;
     setSearch(value);
     router.get(
-      route("medical_records.index"),
+      route("medical_records.trash"),
       { search: value, page: 1, per_page: perPage, sorting },
       { preserveState: true }
     );
@@ -139,7 +194,7 @@ export default function List({ records = [], meta = {}, filters = {}, trashed_me
   const handlePerPageChange = (value) => {
     setPerPage(value);
     router.get(
-      route("medical_records.index"),
+      route("medical_records.trash"),
       { search, page: 1, per_page: value, sorting },
       { preserveState: true }
     );
@@ -148,7 +203,7 @@ export default function List({ records = [], meta = {}, filters = {}, trashed_me
   const handlePageChange = (page) => {
     setCurrentPage(page);
     router.get(
-      route("medical_records.index"),
+      route("medical_records.trash"),
       { search, page, per_page: perPage, sorting },
       { preserveState: true }
     );
@@ -166,6 +221,8 @@ export default function List({ records = [], meta = {}, filters = {}, trashed_me
     }
     if (bulkAction === "delete") {
       setShowDeleteAllModal(true);
+    }else if (bulkAction === "restore") {
+      setShowRestoreAllModal(true);
     }
   };
 
@@ -173,11 +230,16 @@ export default function List({ records = [], meta = {}, filters = {}, trashed_me
     setRecordToDelete(id);
     setShowDeleteModal(true);
   };
+  
+  const handleRestoreConfirm = (id) => {
+    setRecordToRestore(id);
+    setShowRestoreModal(true);
+  };
 
   const handleDelete = (e) => {
     e.preventDefault();
     setProcessing(true);
-    router.delete(route('medical_records.destroy', recordToDelete), {
+    router.delete(route('medical_records.permanent_destroy', recordToDelete), {
       onSuccess: () => {
         setShowDeleteModal(false);
         setRecordToDelete(null);
@@ -192,13 +254,49 @@ export default function List({ records = [], meta = {}, filters = {}, trashed_me
   const handleDeleteAll = (e) => {
     e.preventDefault();
     setProcessing(true);
-    router.post(route('medical_records.bulk_destroy'),
+    router.post(route('medical_records.bulk_permanent_destroy'),
       {
         ids: selectedRecords
       },
       {
         onSuccess: () => {
           setShowDeleteAllModal(false);
+          setSelectedRecords([]);
+          setIsAllSelected(false);
+          setProcessing(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
+      }
+    );
+  };
+
+  const handleRestore = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+    router.post(route('medical_records.restore', recordToRestore), {
+      onSuccess: () => {
+        setShowRestoreModal(false);
+        setRecordToRestore(null);
+        setProcessing(false);
+      },
+      onError: () => {
+        setProcessing(false);
+      }
+    });
+  };
+
+  const handleRestoreAll = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+    router.post(route('medical_records.bulk_restore'),
+      {
+        ids: selectedRecords
+      },
+      {
+        onSuccess: () => {
+          setShowRestoreAllModal(false);
           setSelectedRecords([]);
           setIsAllSelected(false);
           setProcessing(false);
@@ -217,7 +315,7 @@ export default function List({ records = [], meta = {}, filters = {}, trashed_me
     }
     setSorting({ column, direction });
     router.get(
-      route("medical_records.index"),
+      route("medical_records.trash"),
       { ...filters, sorting: { column, direction } },
       { preserveState: true }
     );
@@ -270,19 +368,11 @@ export default function List({ records = [], meta = {}, filters = {}, trashed_me
           <PageHeader page="Medical Records" subpage="List" url="medical_records.index" />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-2">
-                <Link href={route("medical_records.create")}> <Button> <Plus className="w-4 h-4 mr-2" /> Add Medical Record </Button> </Link>
-                <Link href={route("medical_records.trash")}>
-                  <Button variant="outline" className="relative">
-                      <Trash2 className="h-8 w-8" />
-                      {trashed_medical_records > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                          {trashed_medical_records}
-                      </span>
-                      )}
-                  </Button>
-              </Link>
-              </div>
+            <div>
+                <div className="text-red-500">
+                    Total trashed medical records: {meta.total}
+                </div>
+            </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input
                   placeholder="Search medical records..."
@@ -299,7 +389,8 @@ export default function List({ records = [], meta = {}, filters = {}, trashed_me
                     <SelectValue placeholder="Bulk actions" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="delete">Delete Selected</SelectItem>
+                    <SelectItem value="delete">Permanently Delete Selected</SelectItem>
+                    <SelectItem value="restore">Restore Selected</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button onClick={handleBulkAction} variant="outline">Apply</Button>
@@ -354,26 +445,21 @@ export default function List({ records = [], meta = {}, filters = {}, trashed_me
                         <TableCell>{record.customer ? record.customer.age : "-"}</TableCell>
                         <TableCell>{record.customer ? record.customer.mobile : "-"}</TableCell>
                         <TableCell className="text-right">
-                          <TableActions
+                        <TableActions
                             actions={[
-                              {
-                                label: "View",
-                                icon: <Eye className="h-4 w-4" />,
-                                href: route("medical_records.show", record.id),
-                              },
-                              {
-                                label: "Edit",
-                                icon: <Edit className="h-4 w-4" />,
-                                href: route("medical_records.edit", record.id),
-                              },
-                              {
-                                label: "Delete",
-                                icon: <Trash2 className="h-4 w-4" />,
+                            {
+                                label: "Restore",
+                                icon: <RotateCcw className="h-4 w-4" />,
+                                onClick: () => handleRestoreConfirm(record.id)
+                            },
+                            {
+                                label: "Permanently Delete",
+                                icon: <Trash className="h-4 w-4" />,
                                 onClick: () => handleDeleteConfirm(record.id),
                                 destructive: true,
-                              },
+                            },
                             ]}
-                          />
+                        />
                         </TableCell>
                       </TableRow>
                     ))
@@ -442,6 +528,20 @@ export default function List({ records = [], meta = {}, filters = {}, trashed_me
         show={showDeleteAllModal}
         onClose={() => setShowDeleteAllModal(false)}
         onConfirm={handleDeleteAll}
+        processing={processing}
+        count={selectedRecords.length}
+      />
+      
+      <RestoreMedicalRecordsModal
+        show={showRestoreModal}
+        onClose={() => setShowRestoreModal(false)}
+        onConfirm={handleRestore}
+        processing={processing}
+      />
+      <RestoreAllMedicalRecordsModal
+        show={showRestoreAllModal}
+        onClose={() => setShowRestoreAllModal(false)}
+        onConfirm={handleRestoreAll}
         processing={processing}
         count={selectedRecords.length}
       />

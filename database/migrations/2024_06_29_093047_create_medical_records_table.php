@@ -64,7 +64,16 @@ return new class extends Migration
             $table->string('hyper_near_30cm_50cm')->nullable();
             $table->tinyInteger('tropia')->default(0)->comment('0 = No | 1 = Yes')->nullable();
             $table->tinyInteger('phoria')->default(0)->comment('0 = No | 1 = Yes')->nullable();
+            $table->bigInteger('created_user_id')->nullable();
+            $table->bigInteger('updated_user_id')->nullable();
+            $table->bigInteger('deleted_user_id')->nullable();
+            $table->bigInteger('user_id')->unsigned();
+            $table->bigInteger('business_id')->unsigned();
+            $table->softDeletes();
             $table->timestamps();
+
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+            $table->foreign('business_id')->references('id')->on('business')->onDelete('cascade');
         });
     }
 

@@ -87,6 +87,70 @@ class MedicalRecordController extends Controller
                 'columnFilters' => $request->get('columnFilters', []),
                 'sorting' => $sorting,
             ],
+            'trashed_medical_records' => MedicalRecord::onlyTrashed()->count(),
+        ]);
+    }
+
+    public function trash(Request $request) {
+        $query = MedicalRecord::onlyTrashed()->select('medical_records.*')->with('customer');
+
+        // handle search
+        if ($request->has('search') && !empty($request->get('search'))) {
+            $search = $request->get('search');
+            $query->whereHas('customer', function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('mobile', 'like', "%{$search}%")
+                  ->orWhere('age', 'like', "%{$search}%");
+            });
+        }
+
+        // handle column filters
+        if ($request->has('columnFilters')) {
+            $columnFilters = $request->get('columnFilters');
+            if (is_string($columnFilters)) {
+                $columnFilters = json_decode($columnFilters, true);
+            }
+            if (is_array($columnFilters)) {
+                foreach ($columnFilters as $column => $value) {
+                    if ($value !== null && $value !== '') {
+                        $query->whereHas('customer', function ($q) use ($column, $value) {
+                            $q->where($column, $value);
+                        });
+                    }
+                }
+            }
+        }
+
+        // handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        if (in_array($sortColumn, ['customer.name', 'customer.age', 'customer.mobile'])) {
+            $customerField = explode('.', $sortColumn)[1];
+            $query->join('customers', 'medical_records.customer_id', '=', 'customers.id')
+                  ->orderBy('customers.' . $customerField, $sortDirection)
+                  ->select('medical_records.*');
+        } else {
+            $query->orderBy('medical_records.' . $sortColumn, $sortDirection);
+        }
+
+        // handle pagination
+        $perPage = $request->get('per_page', 10);
+        $records = $query->paginate($perPage);
+        return Inertia::render('Backend/User/MedicalRecord/Trash', [
+            'records' => $records->items(),
+            'meta' => [
+                'total' => $records->total(),
+                'per_page' => $records->perPage(),
+                'current_page' => $records->currentPage(),
+                'last_page' => $records->lastPage(),
+            ],
+            'filters' => [
+                'search' => $request->get('search', ''),
+                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $sorting,
+            ],
         ]);
     }
 
@@ -367,5 +431,84 @@ class MedicalRecordController extends Controller
 
         $record->delete();
         return redirect()->route('medical_records.index');
+    }
+
+    public function permanent_destroy($id) {
+        $record = MedicalRecord::onlyTrashed()->find($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Medical Record Permanently Deleted';
+        $audit->save();
+
+        $record->forceDelete();
+        return redirect()->route('medical_records.trash');
+    }
+
+    public function restore($id) {
+        $record = MedicalRecord::onlyTrashed()->find($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Medical Record Restored';
+        $audit->save();
+
+        $record->restore();
+        return redirect()->route('medical_records.trash');
+    }
+
+    public function bulk_destroy(Request $request) {
+        $records = MedicalRecord::whereIn('id', $request->ids)->get();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Medical Records Deleted - ' . count($records) . ' Medical Records';
+        $audit->save();
+
+        foreach ($records as $record) {
+            $record->delete();
+        }
+
+        return redirect()->route('medical_records.index');
+    }
+
+    public function bulk_permanent_destroy(Request $request) {
+        $records = MedicalRecord::onlyTrashed()->whereIn('id', $request->ids)->get();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Medical Records Permanently Deleted - ' . count($records) . ' Medical Records';
+        $audit->save();
+
+        foreach ($records as $record) {
+            $record->forceDelete();
+        }
+
+        return redirect()->route('medical_records.index');
+    }
+
+    public function bulk_restore(Request $request) {
+        $records = MedicalRecord::onlyTrashed()->whereIn('id', $request->ids)->get();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Medical Records Restored - ' . count($records) . ' Medical Records';
+        $audit->save();
+
+        foreach ($records as $record) {
+            $record->restore();
+        }
+
+        return redirect()->route('medical_records.trash');
     }
 }
