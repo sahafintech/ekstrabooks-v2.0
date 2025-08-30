@@ -6,11 +6,11 @@ use App\Traits\MultiTenant;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class DefferedPayment extends Model
 {
-    use HasFactory;
-    use MultiTenant;
+    use HasFactory, MultiTenant, SoftDeletes;
 
     protected $table = 'deffered_payments';
 

@@ -108,7 +108,65 @@ class DefferedInvoiceController extends Controller
             ],
             'filters' => request()->only(['search', 'per_page', 'customer_id', 'date_range', 'status']),
             'customers' => Customer::select('id', 'name')->orderBy('id')->get(),
-            'summary' => $summary
+            'summary' => $summary,
+            'trashed_invoices' => Invoice::onlyTrashed()->where('is_deffered', 1)->count(),
+        ]);
+    }
+
+    public function trash(Request $request)
+    {
+        $per_page = $request->get('per_page', 50);
+        $search = $request->get('search', '');
+        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
+        $customer_id = $request->get('customer_id', '');
+        $dateRange = $request->get('date_range', null);
+        $status = $request->get('status', '');
+
+        $query = Invoice::onlyTrashed()->where('is_deffered', 1)->with('customer');
+
+        // Apply search if provided
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('customer', function ($q2) use ($search) {
+                    $q2->where('name', 'like', "%{$search}%");
+                })
+                    ->orWhere('grand_total', 'like', "%{$search}%")
+                    ->orWhere('order_number', 'like', "%{$search}%");
+            });
+        }
+
+        // Apply customer filter
+        if (!empty($customer_id)) {
+            $query->where('customer_id', $customer_id);
+        }
+
+        // Apply date range filter
+        if (!empty($dateRange)) {
+            $query->whereDate('invoice_date', '>=', Carbon::parse($dateRange[0]))
+                ->whereDate('invoice_date', '<=', Carbon::parse($dateRange[1]));
+        }
+
+        // Apply status filter
+        if ($status) {
+            $query->where('status', $status);
+        }
+
+        // Get paginated results
+        $invoices = $query->orderBy($sorting['column'], $sorting['direction'])
+            ->paginate($per_page);
+
+        return Inertia::render('Backend/User/Invoice/Deffered/Trash', [
+            'invoices' => $invoices->items(),
+            'meta' => [
+                'current_page' => $invoices->currentPage(),
+                'per_page' => $invoices->perPage(),
+                'from' => $invoices->firstItem(),
+                'to' => $invoices->lastItem(),
+                'total' => $invoices->total(),
+                'last_page' => $invoices->lastPage(),
+            ],
+            'filters' => request()->only(['search', 'per_page', 'customer_id', 'date_range', 'status']),
+            'customers' => Customer::select('id', 'name')->orderBy('id')->get(),
         ]);
     }
 
@@ -522,16 +580,6 @@ class DefferedInvoiceController extends Controller
             foreach ($defferedPayments as $defferedPayment) {
                 $defferedPayment->delete();
             }
-            // deffered deductions
-            $defferedDeductions = DefferedDeduction::where('invoice_id', $id)->get();
-            foreach ($defferedDeductions as $defferedDeduction) {
-                $defferedDeduction->delete();
-            }
-            // deffered additions
-            $defferedAdditions = DefferedAddition::where('invoice_id', $id)->get();
-            foreach ($defferedAdditions as $defferedAddition) {
-                $defferedAddition->delete();
-            }
             // transactions
             $transactions = Transaction::where('ref_id', $invoice->id)
                 ->where(function ($query) {
@@ -544,15 +592,7 @@ class DefferedInvoiceController extends Controller
             foreach ($transactions as $transaction) {
                 $transaction->delete();
             }
-            // delete attachments
-            $attachments = Attachment::where('ref_id', $invoice->id)->where('ref_type', 'invoice')->get();
-            foreach ($attachments as $attachment) {
-                $filePath = public_path($attachment->path);
-                if (file_exists($filePath)) {
-                    unlink($filePath);
-                }
-                $attachment->delete();
-            }
+
             $invoice->delete();
             return redirect()->route('deffered_invoices.index')->with('success', _lang('Deleted Successfully'));
         } else {
@@ -571,16 +611,6 @@ class DefferedInvoiceController extends Controller
                 foreach ($defferedPayments as $defferedPayment) {
                     $defferedPayment->delete();
                 }
-                // deffered deductions
-                $defferedDeductions = DefferedDeduction::where('invoice_id', $id)->get();
-                foreach ($defferedDeductions as $defferedDeduction) {
-                    $defferedDeduction->delete();
-                }
-                // deffered additions
-                $defferedAdditions = DefferedAddition::where('invoice_id', $id)->get();
-                foreach ($defferedAdditions as $defferedAddition) {
-                    $defferedAddition->delete();
-                }
                 // transactions
                 $transactions = Transaction::where('ref_id', $invoice->id)
                     ->where(function ($query) {
@@ -593,6 +623,77 @@ class DefferedInvoiceController extends Controller
                 foreach ($transactions as $transaction) {
                     $transaction->delete();
                 }
+
+                $invoice->delete();
+            }
+        }
+        return redirect()->route('deffered_invoices.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    public function permanent_destroy($id)
+    {
+        $invoice = Invoice::onlyTrashed()->find($id);
+        if ($invoice) {
+            $invoice->items()->forceDelete();
+            // deffered payments
+            $defferedPayments = DefferedPayment::onlyTrashed()->where('invoice_id', $id)->get();
+            foreach ($defferedPayments as $defferedPayment) {
+                $defferedPayment->forceDelete();
+            }
+
+            // transactions
+            $transactions = Transaction::onlyTrashed()->where('ref_id', $invoice->id)
+                ->where(function ($query) {
+                    $query->where('ref_type', 'd invoice')
+                        ->orWhere('ref_type', 'd invoice tax')
+                        ->orWhere('ref_type', 'd invoice payment')
+                        ->orWhere('ref_type', 'd invoice income');
+                })
+                ->get();
+            foreach ($transactions as $transaction) {
+                $transaction->forceDelete();
+            }
+            // delete attachments
+            $attachments = Attachment::where('ref_id', $invoice->id)->where('ref_type', 'invoice')->get();
+            foreach ($attachments as $attachment) {
+                $filePath = public_path($attachment->path);
+                if (file_exists($filePath)) {
+                    unlink($filePath);
+                }
+                $attachment->delete();
+            }
+
+            $invoice->forceDelete();
+            return redirect()->route('deffered_invoices.trash')->with('success', _lang('Deleted Successfully'));
+        } else {
+            return redirect()->route('deffered_invoices.trash')->with('error', _lang('Something going wrong, Please try again'));
+        }
+    }
+
+    public function bulk_permanent_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $invoice = Invoice::onlyTrashed()->find($id);
+            if ($invoice) {
+                $invoice->items()->forceDelete();
+                // deffered payments
+                $defferedPayments = DefferedPayment::onlyTrashed()->where('invoice_id', $id)->get();
+                foreach ($defferedPayments as $defferedPayment) {
+                    $defferedPayment->forceDelete();
+                }
+
+                // transactions
+                $transactions = Transaction::onlyTrashed()->where('ref_id', $invoice->id)
+                    ->where(function ($query) {
+                        $query->where('ref_type', 'd invoice')
+                            ->orWhere('ref_type', 'd invoice tax')
+                            ->orWhere('ref_type', 'd invoice payment')
+                            ->orWhere('ref_type', 'd invoice income');
+                    })
+                    ->get();
+                foreach ($transactions as $transaction) {
+                    $transaction->forceDelete();
+                }
                 // delete attachments
                 $attachments = Attachment::where('ref_id', $invoice->id)->where('ref_type', 'invoice')->get();
                 foreach ($attachments as $attachment) {
@@ -602,10 +703,72 @@ class DefferedInvoiceController extends Controller
                     }
                     $attachment->delete();
                 }
-                $invoice->delete();
+                $invoice->forceDelete();
             }
         }
-        return redirect()->route('deffered_invoices.index')->with('success', _lang('Deleted Successfully'));
+        return redirect()->route('deffered_invoices.trash')->with('success', _lang('Deleted Successfully'));
+    }
+    
+    public function restore($id)
+    {
+        $invoice = Invoice::onlyTrashed()->find($id);
+        if ($invoice) {
+            $invoice->items()->restore();
+            // deffered payments
+            $defferedPayments = DefferedPayment::onlyTrashed()->where('invoice_id', $id)->get();
+            foreach ($defferedPayments as $defferedPayment) {
+                $defferedPayment->restore();
+            }
+
+            // transactions
+            $transactions = Transaction::onlyTrashed()->where('ref_id', $invoice->id)
+                ->where(function ($query) {
+                    $query->where('ref_type', 'd invoice')
+                        ->orWhere('ref_type', 'd invoice tax')
+                        ->orWhere('ref_type', 'd invoice payment')
+                        ->orWhere('ref_type', 'd invoice income');
+                })
+                ->get();
+            foreach ($transactions as $transaction) {
+                $transaction->restore();
+            }
+
+            $invoice->restore();
+            return redirect()->route('deffered_invoices.trash')->with('success', _lang('Restored Successfully'));
+        } else {
+            return redirect()->route('deffered_invoices.trash')->with('error', _lang('Something going wrong, Please try again'));
+        }
+    }
+
+    public function bulk_restore(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $invoice = Invoice::onlyTrashed()->find($id);
+            if ($invoice) {
+                $invoice->items()->restore();
+                // deffered payments
+                $defferedPayments = DefferedPayment::onlyTrashed()->where('invoice_id', $id)->get();
+                foreach ($defferedPayments as $defferedPayment) {
+                    $defferedPayment->restore();
+                }
+
+                // transactions
+                $transactions = Transaction::onlyTrashed()->where('ref_id', $invoice->id)
+                    ->where(function ($query) {
+                        $query->where('ref_type', 'd invoice')
+                            ->orWhere('ref_type', 'd invoice tax')
+                            ->orWhere('ref_type', 'd invoice payment')
+                            ->orWhere('ref_type', 'd invoice income');
+                    })
+                    ->get();
+                foreach ($transactions as $transaction) {
+                    $transaction->restore();
+                }
+
+                $invoice->restore();
+            }
+        }
+        return redirect()->route('deffered_invoices.trash')->with('success', _lang('Restored Successfully'));
     }
 
     public function edit($id)

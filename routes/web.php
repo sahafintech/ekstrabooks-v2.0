@@ -430,6 +430,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('recurring_invoices', RecurringInvoiceController::class);
 
 		// Deffered Invoices
+		Route::get('deffered_invoices/trash', [DefferedInvoiceController::class, 'trash'])->name('deffered_invoices.trash');
+		Route::post('deffered_invoices/{id}/restore', [DefferedInvoiceController::class, 'restore'])->name('deffered_invoices.restore');
+		Route::post('deffered_invoices/bulk_restore', [DefferedInvoiceController::class, 'bulk_restore'])->name('deffered_invoices.bulk_restore');
+		Route::post('deffered_invoices/bulk_permanent_destroy', [DefferedInvoiceController::class, 'bulk_permanent_destroy'])->name('deffered_invoices.bulk_permanent_destroy');
+		Route::delete('deffered_invoices/{id}/permanent_destroy', [DefferedInvoiceController::class, 'permanent_destroy'])->name('deffered_invoices.permanent_destroy');
 		Route::resource('deffered_invoices', DefferedInvoiceController::class);
 		Route::get('deffered_invoices/payments/{id}', [DefferedInvoiceController::class, 'payments'])->name('deffered_invoices.payments');
 		Route::get('deffered_invoices/earnings/{id}', [DefferedInvoiceController::class, 'earnings'])->name('deffered_invoices.earnings');
