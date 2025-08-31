@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { router, usePage } from "@inertiajs/react";
+import { router, usePage, Link } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -21,7 +21,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/Components/ui/select";
-import { Plus, Edit, Trash } from "lucide-react";
+import { Plus, Edit, Trash, Trash2 } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -163,7 +163,7 @@ const WeekendSelectionModal = ({
     );
 };
 
-export default function List({ holidays = [], meta = {}, filters = {}, weekends = [] }) {
+export default function List({ holidays = [], meta = {}, filters = {}, weekends = [], trashed_holidays = 0 }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
     const [selectedHolidays, setSelectedHolidays] = useState([]);
@@ -355,8 +355,9 @@ export default function List({ holidays = [], meta = {}, filters = {}, weekends 
         e.preventDefault();
         setIsProcessing(true);
 
-        router.delete(route("holidays.bulk-destroy"), {
-            data: { ids: selectedHolidays },
+        router.post(route("holidays.bulk_destroy"), {
+            ids: selectedHolidays
+        }, {
             preserveState: true,
             onSuccess: () => {
                 setShowBulkDeleteModal(false);
@@ -545,6 +546,16 @@ export default function List({ holidays = [], meta = {}, filters = {}, weekends 
                                 >
                                     Weekend
                                 </Button>
+                                <Link href={route("holidays.trash")}>
+                                    <Button variant="outline" className="relative">
+                                        <Trash2 className="h-8 w-8" />
+                                        {trashed_holidays > 0 && (
+                                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
+                                            {trashed_holidays}
+                                        </span>
+                                        )}
+                                    </Button>
+                                </Link>
                             </div>
                             <div className="flex flex-col md:flex-row gap-2">
                                 <Input

@@ -7,7 +7,7 @@ use App\Models\AuditLog;
 use App\Models\Department;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Validator;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
 
 class DepartmentController extends Controller {

@@ -87,6 +87,7 @@ class HolidayController extends Controller
                 'date' => $request->date ?? '',
             ],
             'weekends' => $weekends,
+            'trashed_holidays' => Holiday::onlyTrashed()->count(),
         ]);
     }
 
@@ -260,5 +261,143 @@ class HolidayController extends Controller
         $audit->save();
 
         return redirect()->route('holidays.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    /**
+     * Display a listing of trashed holidays.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function trash(Request $request)
+    {
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
+        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
+
+        $query = Holiday::onlyTrashed();
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%$search%")
+                    ->orWhere('date', 'like', "%$search%");
+            });
+        }
+
+        // Handle sorting
+        if (isset($sorting['column']) && isset($sorting['direction'])) {
+            $column = $sorting['column'];
+            $direction = $sorting['direction'];
+            $query->orderBy($column, $direction);
+        }
+
+        $holidays = $query->paginate($per_page);
+
+        return Inertia::render('Backend/User/Holiday/Trash', [
+            'holidays' => $holidays->items(),
+            'meta' => [
+                'current_page' => $holidays->currentPage(),
+                'per_page' => $holidays->perPage(),
+                'from' => $holidays->firstItem(),
+                'to' => $holidays->lastItem(),
+                'total' => $holidays->total(),
+                'last_page' => $holidays->lastPage(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'sorting' => $sorting,
+            ],
+        ]);
+    }
+
+    /**
+     * Restore the specified holiday from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function restore(Request $request, $id)
+    {
+        $holiday = Holiday::onlyTrashed()->findOrFail($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Restored Holiday ' . $holiday->title;
+        $audit->save();
+
+        $holiday->restore();
+
+        return redirect()->route('holidays.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Bulk restore selected holidays from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_restore(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $holiday = Holiday::onlyTrashed()->findOrFail($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Restored Holiday ' . $holiday->title;
+            $audit->save();
+
+            $holiday->restore();
+        }
+
+        return redirect()->route('holidays.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Permanently delete the specified holiday from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function permanent_destroy(Request $request, $id)
+    {
+        $holiday = Holiday::onlyTrashed()->findOrFail($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Permanently Deleted Holiday ' . $holiday->title;
+        $audit->save();
+
+        $holiday->forceDelete();
+
+        return redirect()->route('holidays.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    /**
+     * Bulk permanently delete selected holidays from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_permanent_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $holiday = Holiday::onlyTrashed()->findOrFail($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Permanently Deleted Holiday ' . $holiday->title;
+            $audit->save();
+
+            $holiday->forceDelete();
+        }
+
+        return redirect()->route('holidays.trash')->with('success', _lang('Permanently Deleted Successfully'));
     }
 }

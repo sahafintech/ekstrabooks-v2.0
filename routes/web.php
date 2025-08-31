@@ -655,6 +655,12 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 		//Holiday Controller
 		Route::match(['get', 'post'], 'holidays/weekends', [HolidayController::class, 'weekends'])->name('holidays.weekends');
+		Route::get('holidays/trash', [HolidayController::class, 'trash'])->name('holidays.trash');
+		Route::post('holidays/{id}/restore', [HolidayController::class, 'restore'])->name('holidays.restore');
+		Route::post('holidays/bulk_restore', [HolidayController::class, 'bulk_restore'])->name('holidays.bulk_restore');
+		Route::delete('holidays/{id}/permanent_destroy', [HolidayController::class, 'permanent_destroy'])->name('holidays.permanent_destroy');
+		Route::post('holidays/bulk_permanent_destroy', [HolidayController::class, 'bulk_permanent_destroy'])->name('holidays.bulk_permanent_destroy');
+		Route::post('holidays/bulk_destroy', [HolidayController::class, 'bulk_delete'])->name('holidays.bulk_destroy');
 		Route::resource('holidays', HolidayController::class)->except('show');
 
 		//Leave Application
