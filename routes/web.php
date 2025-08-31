@@ -547,6 +547,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 		//Accounts
 		Route::get('accounts/{accountId}/{amount}/convert_due_amount', [AccountController::class, 'convert_due_amount']);
+		Route::get('accounts/trash', [AccountController::class, 'trash'])->name('accounts.trash');
+		Route::post('accounts/{id}/restore', [AccountController::class, 'restore'])->name('accounts.restore');
+		Route::post('accounts/bulk_restore', [AccountController::class, 'bulk_restore'])->name('accounts.bulk_restore');
+		Route::post('accounts/bulk_permanent_destroy', [AccountController::class, 'bulk_permanent_destroy'])->name('accounts.bulk_permanent_destroy');
+		Route::delete('accounts/{id}/permanent_destroy', [AccountController::class, 'permanent_destroy'])->name('accounts.permanent_destroy');
 		Route::resource('accounts', AccountController::class);
 		Route::post('account/import_statement/{id}', [AccountController::class, 'importStatement'])->name('accounts.import_statement');
 		Route::post('import_accounts', [AccountController::class, 'import_accounts'])->name('accounts.import');

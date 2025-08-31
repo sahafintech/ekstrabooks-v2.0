@@ -56,7 +56,7 @@ class AccountController extends Controller
 
         $query->orderBy($sortColumn, $sortDirection);
 
-        $accounts = $query->paginate($per_page)->withQueryString();
+        $accounts = $query->paginate($per_page);
         return Inertia::render('Backend/User/Account/List', [
             'accounts' => $accounts->items(),
             'meta' => [
@@ -66,8 +66,53 @@ class AccountController extends Controller
                 'per_page' => $per_page,
                 'to' => $accounts->lastItem(),
                 'total' => $accounts->total(),
-                'links' => $accounts->linkCollection(),
                 'path' => $accounts->path(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'sorting' => $sorting,
+            ],
+            'trashed_accounts' => Account::onlyTrashed()->count(),
+        ]);
+    }
+
+    /**
+     * Display a listing of trashed accounts.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function trash(Request $request) {
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
+        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
+
+        $query = Account::onlyTrashed();
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('account_name', 'like', "%$search%")
+                    ->orWhere('account_code', 'like', "%$search%");
+            });
+        }
+
+        // Handle sorting
+        if (isset($sorting['column']) && isset($sorting['direction'])) {
+            $column = $sorting['column'];
+            $direction = $sorting['direction'];
+            $query->orderBy($column, $direction);
+        }
+
+        $accounts = $query->paginate($per_page);
+
+        return Inertia::render('Backend/User/Account/Trash', [
+            'accounts' => $accounts->items(),
+            'meta' => [
+                'current_page' => $accounts->currentPage(),
+                'per_page' => $accounts->perPage(),
+                'from' => $accounts->firstItem(),
+                'to' => $accounts->lastItem(),
+                'total' => $accounts->total(),
+                'last_page' => $accounts->lastPage(),
             ],
             'filters' => [
                 'search' => $search,
@@ -594,6 +639,99 @@ class AccountController extends Controller
         }
 
         return back()->with('success', $deletedCount . ' accounts deleted successfully');
+    }
+
+    /**
+     * Restore the specified account from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function restore(Request $request, $id)
+    {
+        $account = Account::onlyTrashed()->findOrFail($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->id();
+        $audit->event = 'Restored Account ' . $account->account_name;
+        $audit->save();
+
+        $account->restore();
+
+        return redirect()->route('accounts.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Bulk restore selected accounts from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_restore(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $account = Account::onlyTrashed()->findOrFail($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->id();
+            $audit->event = 'Restored Account ' . $account->account_name;
+            $audit->save();
+
+            $account->restore();
+        }
+
+        return redirect()->route('accounts.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Permanently delete the specified account from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Request
+     * @return \Illuminate\Http\Response
+     */
+    public function permanent_destroy(Request $request, $id)
+    {
+        $account = Account::onlyTrashed()->findOrFail($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->id();
+        $audit->event = 'Permanently Deleted Account ' . $account->account_name;
+        $audit->save();
+
+        $account->forceDelete();
+
+        return redirect()->route('accounts.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    /**
+     * Bulk permanently delete selected accounts from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_permanent_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $account = Account::onlyTrashed()->findOrFail($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->id();
+            $audit->event = 'Permanently Deleted Account ' . $account->account_name;
+            $audit->save();
+
+            $account->forceDelete();
+        }
+
+        return redirect()->route('accounts.trash')->with('success', _lang('Permanently Deleted Successfully'));
     }
 
     public function importStatement(Request $request)
