@@ -5,9 +5,10 @@ namespace App\Models;
 use App\Traits\MultiTenant;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Employee extends Model {
-	use MultiTenant;
+	use MultiTenant, SoftDeletes;
 	/**
 	 * The table associated with the model.
 	 *

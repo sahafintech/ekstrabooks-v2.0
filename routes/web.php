@@ -616,6 +616,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('bulk_destroy_change_orders', [ChangeOrderController::class, 'bulk_destroy'])->name('change_orders.bulk_destroy');
 		
 		//Staff Controller
+		Route::get('staffs/trash', [StaffController::class, 'trash'])->name('staffs.trash');
+		Route::post('staffs/{id}/restore', [StaffController::class, 'restore'])->name('staffs.restore');
+		Route::post('staffs/bulk_restore', [StaffController::class, 'bulk_restore'])->name('staffs.bulk_restore');
+		Route::post('staffs/bulk_permanent_destroy', [StaffController::class, 'bulk_permanent_destroy'])->name('staffs.bulk_permanent_destroy');
+		Route::delete('staffs/{id}/permanent_destroy', [StaffController::class, 'permanent_destroy'])->name('staffs.permanent_destroy');
 		Route::post('staffs/bulk_destroy', [StaffController::class, 'bulk_destroy'])->name('staffs.bulk_destroy');
 		Route::resource('staffs', StaffController::class);
 		Route::post('import_staffs', [StaffController::class, 'import_staffs'])->name('staffs.import');

@@ -34,8 +34,12 @@ return new class extends Migration {
             $table->string('account_number', 30)->nullable();
 
             $table->text('custom_fields')->nullable();
+            $table->bigInteger('created_user_id')->nullable();
+            $table->bigInteger('updated_user_id')->nullable();
+            $table->bigInteger('deleted_user_id')->nullable();
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('department_id')->references('id')->on('departments')->restrictOnDelete();

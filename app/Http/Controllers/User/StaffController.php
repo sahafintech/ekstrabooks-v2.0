@@ -99,6 +99,61 @@ class StaffController extends Controller
                 'search' => $search,
                 'sorting' => $sorting,
             ],
+            'trashed_staffs' => Employee::onlyTrashed()->count(),
+        ]);
+    }
+
+    public function trash(Request $request)
+    {
+        $per_page = $request->get('per_page', 50);
+        $search = $request->get('search', '');
+        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
+
+        $query = Employee::onlyTrashed()->with('department', 'designation')
+            ->where('employees.business_id', $request->activeBusiness->id);
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('employees.name', 'like', "%$search%")
+                    ->orWhere('employees.employee_id', 'like', "%$search%")
+                    ->orWhere('employees.email', 'like', "%$search%")
+                    ->orWhere('employees.phone', 'like', "%$search%");
+            });
+        }
+
+        // Handle sorting
+        if (isset($sorting['column']) && isset($sorting['direction'])) {
+            $column = $sorting['column'];
+            $direction = $sorting['direction'];
+
+            // Handle relationship sorting
+            if (str_contains($column, '.')) {
+                [$relation, $field] = explode('.', $column);
+                $query->join($relation . 's', 'employees.' . $relation . '_id', '=', $relation . 's.id')
+                    ->where($relation . 's.business_id', $request->activeBusiness->id)
+                    ->orderBy($relation . 's.' . $field, $direction)
+                    ->select('employees.*');
+            } else {
+                $query->orderBy('employees.' . $column, $direction);
+            }
+        }
+
+        $employees = $query->paginate($per_page);
+
+        return Inertia::render('Backend/User/Staff/Trash', [
+            'employees' => $employees->items(),
+            'meta' => [
+                'current_page' => $employees->currentPage(),
+                'per_page' => $employees->perPage(),
+                'from' => $employees->firstItem(),
+                'to' => $employees->lastItem(),
+                'total' => $employees->total(),
+                'last_page' => $employees->lastPage(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'sorting' => $sorting,
+            ],
         ]);
     }
 
@@ -365,6 +420,78 @@ class StaffController extends Controller
         }
 
         return redirect()->route('staffs.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    public function permanent_destroy(Request $request, $id)
+    {
+        $employee = Employee::onlyTrashed()->where('business_id', $request->activeBusiness->id)
+            ->findOrFail($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Permanently Deleted Staff ' . $employee->name;
+        $audit->save();
+
+        $employee->forceDelete();
+
+        return redirect()->route('staffs.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    public function bulk_permanent_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $employee = Employee::onlyTrashed()->where('business_id', $request->activeBusiness->id)
+                ->findOrFail($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Permanently Deleted Staff ' . $employee->name;
+            $audit->save();
+
+            $employee->forceDelete();
+        }
+
+        return redirect()->route('staffs.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    public function restore(Request $request, $id)
+    {
+        $employee = Employee::onlyTrashed()->where('business_id', $request->activeBusiness->id)
+            ->findOrFail($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Restored Staff ' . $employee->name;
+        $audit->save();
+
+        $employee->restore();
+
+        return redirect()->route('staffs.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    public function bulk_restore(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $employee = Employee::onlyTrashed()->where('business_id', $request->activeBusiness->id)
+                ->findOrFail($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Restored Staff ' . $employee->name;
+            $audit->save();
+
+            $employee->restore();
+        }
+
+        return redirect()->route('staffs.trash')->with('success', _lang('Restored Successfully'));
     }
 
     /**

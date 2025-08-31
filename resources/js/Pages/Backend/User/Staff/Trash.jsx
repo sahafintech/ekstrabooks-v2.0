@@ -19,15 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/Components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
 import { format, parse, isValid } from "date-fns";
-import { Download, Edit, EyeIcon, FileDown, FileUp, MoreVertical, Plus, Trash, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+import { Edit, EyeIcon, Trash, ChevronUp, ChevronDown, RotateCcw } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -91,50 +85,13 @@ const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, cou
   </Modal>
 );
 
-// Import Staff Modal Component
-const ImportStaffModal = ({ show, onClose, onSubmit, processing }) => (
+// Restore Confirmation Modal Component
+const RestoreConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <form onSubmit={onSubmit} className="p-6">
-      <div className="ti-modal-header">
-        <h3 className="text-lg font-bold">Import Staff</h3>
-      </div>
-      <div className="ti-modal-body grid grid-cols-12">
-        <div className="col-span-12">
-          <div className="flex items-center justify-between">
-            <label className="block font-medium text-sm text-gray-700">
-              Staff File
-            </label>
-            <a href="/uploads/media/default/sample_staffs.xlsx" download>
-              <Button variant="secondary" size="sm" type="button">
-                Use This Sample File
-              </Button>
-            </a>
-          </div>
-          <input type="file" className="w-full dropify" name="staffs_file" required />
-        </div>
-        <div className="col-span-12 mt-4">
-          <ul className="space-y-3 text-sm">
-            <li className="flex space-x-3">
-              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
-              <span className="text-gray-800 dark:text-white/70">
-                Maximum File Size: 1 MB
-              </span>
-            </li>
-            <li className="flex space-x-3">
-              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
-              <span className="text-gray-800 dark:text-white/70">
-                File format Supported: CSV, TSV, XLS
-              </span>
-            </li>
-            <li className="flex space-x-3">
-              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
-              <span className="text-gray-800 dark:text-white/70">
-                Make sure the format of the import file matches our sample file by comparing them.
-              </span>
-            </li>
-          </ul>
-        </div>
-      </div>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to restore this staff member?
+      </h2>
       <div className="mt-6 flex justify-end">
         <Button
           type="button"
@@ -142,20 +99,49 @@ const ImportStaffModal = ({ show, onClose, onSubmit, processing }) => (
           onClick={onClose}
           className="mr-3"
         >
-          Close
+          Cancel
         </Button>
         <Button
           type="submit"
+          variant="default"
           disabled={processing}
         >
-          Import Staff
+          Restore
         </Button>
       </div>
     </form>
   </Modal>
 );
 
-export default function List({ employees = [], meta = {}, filters = {}, trashed_staffs = 0 }) {
+// Bulk Restore Confirmation Modal Component
+const BulkRestoreConfirmationModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to restore {count} selected staff {count !== 1 ? 'members' : 'member'}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Restore Selected
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+export default function TrashList({ employees = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedEmployees, setSelectedEmployees] = useState([]);
@@ -169,9 +155,13 @@ export default function List({ employees = [], meta = {}, filters = {}, trashed_
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
+  const [showBulkRestoreModal, setShowBulkRestoreModal] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Restore confirmation modal states
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [employeeToRestore, setEmployeeToRestore] = useState(null);
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -217,7 +207,7 @@ export default function List({ employees = [], meta = {}, filters = {}, trashed_
     setSearch(value);
 
     router.get(
-      route("staffs.index"),
+      route("staffs.trash"),
       { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
@@ -226,7 +216,7 @@ export default function List({ employees = [], meta = {}, filters = {}, trashed_
   const handlePerPageChange = (value) => {
     setPerPage(value);
     router.get(
-      route("staffs.index"),
+      route("staffs.trash"),
       { search, page: 1, per_page: value },
       { preserveState: true }
     );
@@ -235,7 +225,7 @@ export default function List({ employees = [], meta = {}, filters = {}, trashed_
   const handlePageChange = (page) => {
     setCurrentPage(page);
     router.get(
-      route("staffs.index"),
+      route("staffs.trash"),
       { search, page, per_page: perPage },
       { preserveState: true }
     );
@@ -255,6 +245,8 @@ export default function List({ employees = [], meta = {}, filters = {}, trashed_
 
     if (bulkAction === "delete") {
       setShowBulkDeleteModal(true);
+    }else if (bulkAction === "restore") {
+      setShowBulkRestoreModal(true);
     }
   };
 
@@ -263,11 +255,16 @@ export default function List({ employees = [], meta = {}, filters = {}, trashed_
     setShowDeleteModal(true);
   };
 
+  const handleRestoreConfirm = (id) => {
+    setEmployeeToRestore(id);
+    setShowRestoreModal(true);
+  };
+
   const handleDelete = (e) => {
     e.preventDefault();
     setIsProcessing(true);
 
-    router.delete(route("staffs.destroy", employeeToDelete), {
+    router.delete(route("staffs.permanent_destroy", employeeToDelete), {
       preserveState: true,
       onSuccess: () => {
         setShowDeleteModal(false);
@@ -280,11 +277,11 @@ export default function List({ employees = [], meta = {}, filters = {}, trashed_
     });
   };
 
-  const handleBulkDeleteConfirm = (e) => {
+  const handleBulkDelete = (e) => {
     e.preventDefault();
     setIsProcessing(true);
 
-    router.post(route("staffs.bulk_destroy"),
+    router.post(route("staffs.bulk_permanent_destroy"),
       {
         ids: selectedEmployees
       },
@@ -304,20 +301,45 @@ export default function List({ employees = [], meta = {}, filters = {}, trashed_
     );
   };
 
-  const handleImport = (e) => {
+  const handleRestore = (e) => {
     e.preventDefault();
-    const formData = new FormData(e.target);
     setIsProcessing(true);
 
-    router.post(route('staffs.import'), formData, {
+    router.post(route("staffs.restore", employeeToRestore), {
+      preserveState: true,
       onSuccess: () => {
-        setShowImportModal(false);
+        setShowRestoreModal(false);
+        setEmployeeToRestore(null);
         setIsProcessing(false);
       },
       onError: () => {
         setIsProcessing(false);
       }
     });
+  };
+
+  const handleBulkRestore = (e) => {
+    e.preventDefault();
+    setIsProcessing(true);
+
+    router.post(route("staffs.bulk_restore"),
+      {
+        ids: selectedEmployees
+      },
+      {
+        preserveState: true,
+        onSuccess: () => {
+          setSelectedEmployees([]);
+          setIsAllSelected(false);
+          setBulkAction("");
+          setShowBulkRestoreModal(false);
+          setIsProcessing(false);
+        },
+        onError: () => {
+          setIsProcessing(false);
+        }
+      }
+    );
   };
 
   const handleSort = (column) => {
@@ -327,7 +349,7 @@ export default function List({ employees = [], meta = {}, filters = {}, trashed_
     }
     setSorting({ column, direction });
     router.get(
-      route("staffs.index"),
+      route("staffs.trash"),
       { ...filters, sorting: { column, direction } },
       { preserveState: true }
     );
@@ -395,44 +417,18 @@ export default function List({ employees = [], meta = {}, filters = {}, trashed_
         <div className="main-content">
           <PageHeader
             page="Staff Management"
-            subpage="List"
+            subpage="Trash"
             url="staffs.index"
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-2">
-                <Link href={route("staffs.create")}>
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Staff
-                  </Button>
-                </Link>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="secondary">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setShowImportModal(true)}>
-                      <FileUp className="mr-2 h-4 w-4" /> Import
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={exportStaffs}>
-                      <FileDown className="mr-2 h-4 w-4" /> Export
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Link href={route("staffs.trash")}>
-                    <Button variant="outline" className="relative">
-                        <Trash2 className="h-8 w-8" />
-                        {trashed_staffs > 0 && (
-                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                            {trashed_staffs}
-                        </span>
-                        )}
-                    </Button>
-                </Link>
-              </div>
+                <div className="flex flex-col md:flex-row gap-2">
+                    <div>
+                        <div className="text-red-500">
+                            Total trashed staffs: {meta.total}
+                        </div>
+                    </div>
+                </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input
                   placeholder="Search staff..."
@@ -450,7 +446,8 @@ export default function List({ employees = [], meta = {}, filters = {}, trashed_
                     <SelectValue placeholder="Bulk actions" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="delete">Delete Selected</SelectItem>
+                    <SelectItem value="delete">Permanently Delete Selected</SelectItem>
+                    <SelectItem value="restore">Restore Selected</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button onClick={handleBulkAction} variant="outline">
@@ -526,26 +523,21 @@ export default function List({ employees = [], meta = {}, filters = {}, trashed_
                         <TableCell>{formatDate(employee.joining_date)}</TableCell>
                         <TableCell>{formatCurrency({ amount: employee.basic_salary })}</TableCell>
                         <TableCell className="text-right">
-                          <TableActions
+                        <TableActions
                             actions={[
-                              {
-                                label: "View",
-                                icon: <EyeIcon className="h-4 w-4" />,
-                                href: route("staffs.show", employee.id),
-                              },
-                              {
-                                label: "Edit",
-                                icon: <Edit className="h-4 w-4" />,
-                                href: route("staffs.edit", employee.id),
-                              },
-                              {
-                                label: "Delete",
+                            {
+                                label: "Restore",
+                                icon: <RotateCcw className="h-4 w-4" />,
+                                onClick: () => handleRestoreConfirm(employee.id)
+                            },
+                            {
+                                label: "Permanently Delete",
                                 icon: <Trash className="h-4 w-4" />,
                                 onClick: () => handleDeleteConfirm(employee.id),
                                 destructive: true,
-                              },
+                            },
                             ]}
-                          />
+                        />
                         </TableCell>
                       </TableRow>
                     ))
@@ -570,7 +562,6 @@ export default function List({ employees = [], meta = {}, filters = {}, trashed_
             )}
           </div>
 
-          {/* Delete Confirmation Modal */}
           <DeleteConfirmationModal
             show={showDeleteModal}
             onClose={() => setShowDeleteModal(false)}
@@ -578,21 +569,27 @@ export default function List({ employees = [], meta = {}, filters = {}, trashed_
             processing={isProcessing}
           />
 
-          {/* Bulk Delete Confirmation Modal */}
           <BulkDeleteConfirmationModal
             show={showBulkDeleteModal}
             onClose={() => setShowBulkDeleteModal(false)}
-            onConfirm={handleBulkDeleteConfirm}
+            onConfirm={handleBulkDelete}
             processing={isProcessing}
             count={selectedEmployees.length}
           />
 
-          {/* Import Staff Modal */}
-          <ImportStaffModal
-            show={showImportModal}
-            onClose={() => setShowImportModal(false)}
-            onSubmit={handleImport}
+          <RestoreConfirmationModal
+            show={showRestoreModal}
+            onClose={() => setShowRestoreModal(false)}
+            onConfirm={handleRestore}
             processing={isProcessing}
+          />
+
+          <BulkRestoreConfirmationModal
+            show={showBulkRestoreModal}
+            onClose={() => setShowBulkRestoreModal(false)}
+            onConfirm={handleBulkRestore}
+            processing={isProcessing}
+            count={selectedEmployees.length}
           />
         </div>
       </SidebarInset>
