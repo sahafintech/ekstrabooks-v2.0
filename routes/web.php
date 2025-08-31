@@ -569,6 +569,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('transactions', TransactionController::class);
 
 		//Transaction Methods
+		Route::get('transaction_methods/trash', [TransactionMethodController::class, 'trash'])->name('transaction_methods.trash');
+		Route::post('transaction_methods/{id}/restore', [TransactionMethodController::class, 'restore'])->name('transaction_methods.restore');
+		Route::post('transaction_methods/bulk_restore', [TransactionMethodController::class, 'bulk_restore'])->name('transaction_methods.bulk_restore');
+		Route::post('transaction_methods/bulk_permanent_destroy', [TransactionMethodController::class, 'bulk_permanent_destroy'])->name('transaction_methods.bulk_permanent_destroy');
+		Route::delete('transaction_methods/{id}/permanent_destroy', [TransactionMethodController::class, 'permanent_destroy'])->name('transaction_methods.permanent_destroy');
 		Route::resource('transaction_methods', TransactionMethodController::class)->except('view');
 		Route::post('transaction_methods/bulk_destroy', [TransactionMethodController::class, 'bulk_destroy'])->name('transaction_methods.bulk_destroy');
 

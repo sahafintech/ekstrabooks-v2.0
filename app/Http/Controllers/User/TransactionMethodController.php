@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\TransactionMethod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,21 +25,25 @@ class TransactionMethodController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function index(Request $request) {
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
+        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
+
         $query = TransactionMethod::query()
             ->where('business_id', request()->activeBusiness->id);
         
-        if ($request->has('search') && $request->search != '') {
-            $query->where('name', 'like', '%' . $request->search . '%');
+        if ($search) {
+            $query->where('name', 'like', '%' . $search . '%');
         }
 
         // Handle sorting
-        $sorting = $request->get('sorting', []);
-        $sortColumn = $sorting['column'] ?? 'id';
-        $sortDirection = $sorting['direction'] ?? 'desc';
-
-        $query->orderBy($sortColumn, $sortDirection);
+        if (isset($sorting['column']) && isset($sorting['direction'])) {
+            $column = $sorting['column'];
+            $direction = $sorting['direction'];
+            $query->orderBy($column, $direction);
+        }
         
-        $transaction_methods = $query->paginate($request->get('per_page', 10));
+        $transaction_methods = $query->paginate($per_page);
         
         return Inertia::render('Backend/User/TransactionMethod/List', [
             'transaction_methods' => $transaction_methods->items(),
@@ -50,7 +55,54 @@ class TransactionMethodController extends Controller {
                 'total' => $transaction_methods->total(),
                 'last_page' => $transaction_methods->lastPage()
             ],
-            'filters' => array_merge($request->only('search'), ['sorting' => $sorting])
+            'filters' => [
+                'search' => $search,
+                'sorting' => $sorting,
+            ],
+            'trashed_transaction_methods' => TransactionMethod::onlyTrashed()->where('business_id', request()->activeBusiness->id)->count(),
+        ]);
+    }
+
+    /**
+     * Display a listing of trashed transaction methods.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function trash(Request $request) {
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
+        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
+
+        $query = TransactionMethod::onlyTrashed()
+            ->where('business_id', request()->activeBusiness->id);
+
+        if ($search) {
+            $query->where('name', 'like', "%$search%");
+        }
+
+        // Handle sorting
+        if (isset($sorting['column']) && isset($sorting['direction'])) {
+            $column = $sorting['column'];
+            $direction = $sorting['direction'];
+            $query->orderBy($column, $direction);
+        }
+
+        $transaction_methods = $query->paginate($per_page);
+
+        return Inertia::render('Backend/User/TransactionMethod/Trash', [
+            'transaction_methods' => $transaction_methods->items(),
+            'meta' => [
+                'current_page' => $transaction_methods->currentPage(),
+                'per_page' => $transaction_methods->perPage(),
+                'from' => $transaction_methods->firstItem(),
+                'to' => $transaction_methods->lastItem(),
+                'total' => $transaction_methods->total(),
+                'last_page' => $transaction_methods->lastPage()
+            ],
+            'filters' => [
+                'search' => $search,
+                'sorting' => $sorting,
+            ],
         ]);
     }
 
@@ -76,6 +128,13 @@ class TransactionMethodController extends Controller {
         $transactionmethod->business_id = request()->activeBusiness->id;
         $transactionmethod->user_id = Auth::user()->id;
         $transactionmethod->save();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Created Transaction Method ' . $transactionmethod->name;
+        $audit->save();
 
         return redirect()->route('transaction_methods.index')->with('success', _lang('Transaction Method Added Successfully'));
     }
@@ -109,6 +168,13 @@ class TransactionMethodController extends Controller {
         $transactionmethod->status = $request->input('status');
         $transactionmethod->save();
 
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Updated Transaction Method ' . $transactionmethod->name;
+        $audit->save();
+
         return redirect()->route('transaction_methods.index')->with('success', _lang('Transaction Method Updated Successfully'));
     }
 
@@ -126,9 +192,20 @@ class TransactionMethodController extends Controller {
         if (!$transactionmethod) {
             return redirect()->route('transaction_methods.index')->with('error', _lang('Transaction Method not found!'));
         }
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Deleted Transaction Method ' . $transactionmethod->name;
+        $audit->save();
         
-        $transactionmethod->delete();
-        return redirect()->route('transaction_methods.index')->with('success', _lang('Transaction Method Deleted Successfully'));
+        try {
+            $transactionmethod->delete();
+            return redirect()->route('transaction_methods.index')->with('success', _lang('Deleted Successfully'));
+        } catch (\Exception $e) {
+            return redirect()->route('transaction_methods.index')->with('error', _lang('This item is already exists in other entity'));
+        }
     }
     
     /**
@@ -142,10 +219,129 @@ class TransactionMethodController extends Controller {
             return redirect()->route('transaction_methods.index')->with('error', _lang('Please select at least one transaction method'));
         }
         
-        TransactionMethod::whereIn('id', $request->ids)
+        $transaction_methods = TransactionMethod::whereIn('id', $request->ids)
             ->where('business_id', request()->activeBusiness->id)
-            ->delete();
+            ->get();
+        
+        foreach($transaction_methods as $transaction_method) {
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Deleted Transaction Method ' . $transaction_method->name;
+            $audit->save();
+
+            try {
+                $transaction_method->delete();
+            } catch (\Exception $e) {
+                // Continue with the next transaction method
+            }
+        }
             
         return redirect()->route('transaction_methods.index')->with('success', _lang('Selected Transaction Methods Deleted Successfully'));
+    }
+
+    /**
+     * Restore the specified transaction method from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function restore(Request $request, $id)
+    {
+        $transaction_method = TransactionMethod::onlyTrashed()
+            ->where('id', $id)
+            ->where('business_id', request()->activeBusiness->id)
+            ->firstOrFail();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Restored Transaction Method ' . $transaction_method->name;
+        $audit->save();
+
+        $transaction_method->restore();
+
+        return redirect()->route('transaction_methods.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Bulk restore selected transaction methods from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_restore(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $transaction_method = TransactionMethod::onlyTrashed()
+                ->where('id', $id)
+                ->where('business_id', request()->activeBusiness->id)
+                ->firstOrFail();
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Restored Transaction Method ' . $transaction_method->name;
+            $audit->save();
+
+            $transaction_method->restore();
+        }
+
+        return redirect()->route('transaction_methods.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Permanently delete the specified transaction method from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function permanent_destroy(Request $request, $id)
+    {
+        $transaction_method = TransactionMethod::onlyTrashed()
+            ->where('id', $id)
+            ->where('business_id', request()->activeBusiness->id)
+            ->firstOrFail();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Permanently Deleted Transaction Method ' . $transaction_method->name;
+        $audit->save();
+
+        $transaction_method->forceDelete();
+
+        return redirect()->route('transaction_methods.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    /**
+     * Bulk permanently delete selected transaction methods from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_permanent_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $transaction_method = TransactionMethod::onlyTrashed()
+                ->where('id', $id)
+                ->where('business_id', request()->activeBusiness->id)
+                ->firstOrFail();
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Permanently Deleted Transaction Method ' . $transaction_method->name;
+            $audit->save();
+
+            $transaction_method->forceDelete();
+        }
+
+        return redirect()->route('transaction_methods.trash')->with('success', _lang('Permanently Deleted Successfully'));
     }
 }

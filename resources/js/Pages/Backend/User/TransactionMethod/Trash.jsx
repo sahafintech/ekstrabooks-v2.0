@@ -20,16 +20,7 @@ import {
   SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { Label } from "@/Components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogTrigger
-} from "@/Components/ui/dialog";
-import { Plus, Edit, Trash, Search, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+import { Edit, Trash, ChevronUp, ChevronDown, RotateCcw } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -92,7 +83,63 @@ const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, cou
   </Modal>
 );
 
-export default function List({ transaction_methods = [], meta = {}, filters = {}, trashed_transaction_methods = 0 }) {
+// Restore Confirmation Modal Component
+const RestoreConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to restore this transaction method?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Restore
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+// Bulk Restore Confirmation Modal Component
+const BulkRestoreConfirmationModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to restore {count} selected transaction method{count !== 1 ? 's' : ''}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Restore Selected
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+export default function TrashList({ transaction_methods = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedMethods, setSelectedMethods] = useState([]);
@@ -103,23 +150,16 @@ export default function List({ transaction_methods = [], meta = {}, filters = {}
   const [bulkAction, setBulkAction] = useState("");
   const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
 
-  // Form state for Create/Edit dialogs
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingMethod, setEditingMethod] = useState(null);
-  const [form, setForm] = useState({
-    name: "",
-    status: "1"
-  });
-
-  // Form errors
-  const [errors, setErrors] = useState({});
-
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [showBulkRestoreModal, setShowBulkRestoreModal] = useState(false);
   const [methodToDelete, setMethodToDelete] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Restore confirmation modal states
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [methodToRestore, setMethodToRestore] = useState(null);
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -165,7 +205,7 @@ export default function List({ transaction_methods = [], meta = {}, filters = {}
     setSearch(value);
 
     router.get(
-      route("transaction_methods.index"),
+      route("transaction_methods.trash"),
       { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
@@ -174,7 +214,7 @@ export default function List({ transaction_methods = [], meta = {}, filters = {}
   const handlePerPageChange = (value) => {
     setPerPage(value);
     router.get(
-      route("transaction_methods.index"),
+      route("transaction_methods.trash"),
       { search, page: 1, per_page: value },
       { preserveState: true }
     );
@@ -183,7 +223,7 @@ export default function List({ transaction_methods = [], meta = {}, filters = {}
   const handlePageChange = (page) => {
     setCurrentPage(page);
     router.get(
-      route("transaction_methods.index"),
+      route("transaction_methods.trash"),
       { search, page, per_page: perPage },
       { preserveState: true }
     );
@@ -203,6 +243,8 @@ export default function List({ transaction_methods = [], meta = {}, filters = {}
 
     if (bulkAction === "delete") {
       setShowBulkDeleteModal(true);
+    } else if (bulkAction === "restore") {
+      setShowBulkRestoreModal(true);
     }
   };
 
@@ -211,11 +253,16 @@ export default function List({ transaction_methods = [], meta = {}, filters = {}
     setShowDeleteModal(true);
   };
 
+  const handleRestoreConfirm = (id) => {
+    setMethodToRestore(id);
+    setShowRestoreModal(true);
+  };
+
   const handleDelete = (e) => {
     e.preventDefault();
     setIsProcessing(true);
 
-    router.delete(route("transaction_methods.destroy", methodToDelete), {
+    router.delete(route("transaction_methods.permanent_destroy", methodToDelete), {
       preserveState: true,
       onSuccess: () => {
         setShowDeleteModal(false);
@@ -228,28 +275,69 @@ export default function List({ transaction_methods = [], meta = {}, filters = {}
     });
   };
 
-  const handleBulkDeleteConfirm = (e) => {
+  const handleBulkDelete = (e) => {
     e.preventDefault();
     setIsProcessing(true);
 
-    router.post(route("transaction_methods.bulk_destroy"),
-    {
-      ids: selectedMethods
-    },
-    {
+    router.post(route("transaction_methods.bulk_permanent_destroy"),
+      {
+        ids: selectedMethods
+      },
+      {
+        preserveState: true,
+        onSuccess: () => {
+          setSelectedMethods([]);
+          setIsAllSelected(false);
+          setBulkAction("");
+          setShowBulkDeleteModal(false);
+          setIsProcessing(false);
+        },
+        onError: () => {
+          setIsProcessing(false);
+        }
+      }
+    );
+  };
+
+  const handleRestore = (e) => {
+    e.preventDefault();
+    setIsProcessing(true);
+
+    router.post(route("transaction_methods.restore", methodToRestore), {
       preserveState: true,
       onSuccess: () => {
-        setSelectedMethods([]);
-        setIsAllSelected(false);
-        setBulkAction("");
-        setShowBulkDeleteModal(false);
+        setShowRestoreModal(false);
+        setMethodToRestore(null);
         setIsProcessing(false);
       },
       onError: () => {
         setIsProcessing(false);
       }
-    }
-  );
+    });
+  };
+
+  const handleBulkRestore = (e) => {
+    e.preventDefault();
+    setIsProcessing(true);
+
+    router.post(route("transaction_methods.bulk_restore"),
+      {
+        ids: selectedMethods
+      },
+      {
+        preserveState: true,
+        onSuccess: () => {
+          setSelectedMethods([]);
+          setIsAllSelected(false);
+          setBulkAction("");
+          setShowBulkRestoreModal(false);
+          setIsProcessing(false);
+        },
+        onError: () => {
+          setIsProcessing(false);
+        }
+      }
+    );
   };
 
   const handleSort = (column) => {
@@ -259,7 +347,7 @@ export default function List({ transaction_methods = [], meta = {}, filters = {}
     }
     setSorting({ column, direction });
     router.get(
-      route("transaction_methods.index"),
+      route("transaction_methods.trash"),
       { ...filters, sorting: { column, direction } },
       { preserveState: true }
     );
@@ -309,76 +397,6 @@ export default function List({ transaction_methods = [], meta = {}, filters = {}
     return pages;
   };
 
-  // Create form handlers
-  const openCreateDialog = () => {
-    setForm({
-      name: "",
-      status: "1"
-    });
-    setErrors({});
-    setIsCreateDialogOpen(true);
-  };
-
-  const handleCreateSubmit = (e) => {
-    e.preventDefault();
-
-    router.post(route("transaction_methods.store"), form, {
-      preserveState: true,
-      onSuccess: () => {
-        setIsCreateDialogOpen(false);
-        setForm({
-          name: "",
-          status: "1"
-        });
-      },
-      onError: (errors) => {
-        setErrors(errors);
-      }
-    });
-  };
-
-  // Edit form handlers
-  const openEditDialog = (method) => {
-    setEditingMethod(method);
-    setForm({
-      name: method.name,
-      status: method.status.toString()
-    });
-    setErrors({});
-    setIsEditDialogOpen(true);
-  };
-
-  const handleEditSubmit = (e) => {
-    e.preventDefault();
-
-    router.put(route("transaction_methods.update", editingMethod.id), form, {
-      preserveState: true,
-      onSuccess: () => {
-        setIsEditDialogOpen(false);
-        setEditingMethod(null);
-      },
-      onError: (errors) => {
-        setErrors(errors);
-      }
-    });
-  };
-
-  // Form input change handler
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setForm({
-      ...form,
-      [name]: value
-    });
-  };
-
-  const handleStatusChange = (value) => {
-    setForm({
-      ...form,
-      status: value
-    });
-  };
-
   const getStatusBadge = (status) => {
     if (status === 1) {
       return <p className="text-green-500">Active</p>;
@@ -393,34 +411,25 @@ export default function List({ transaction_methods = [], meta = {}, filters = {}
         <div className="main-content">
           <PageHeader
             page="Transaction Methods"
-            subpage="List"
+            subpage="Trash"
             url="transaction_methods.index"
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-2">
-                <Button onClick={openCreateDialog}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Transaction Method
-                </Button>
-                <Link href={route("transaction_methods.trash")}>
-                    <Button variant="outline" className="relative">
-                        <Trash2 className="h-8 w-8" />
-                        {trashed_transaction_methods > 0 && (
-                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                            {trashed_transaction_methods}
-                        </span>
-                        )}
-                    </Button>
-                </Link>
-              </div>
+                <div className="flex flex-col md:flex-row gap-2">
+                    <div>
+                        <div className="text-red-500">
+                            Total trashed transaction methods: {meta.total}
+                        </div>
+                    </div>
+                </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                  <Input
-                    placeholder="Search transaction methods..."
-                    value={search}
-                    onChange={(e) => handleSearch(e)}
-                    className="w-full md:w-80"
-                  />
+                <Input
+                  placeholder="Search transaction methods..."
+                  value={search}
+                  onChange={(e) => handleSearch(e)}
+                  className="w-full md:w-80"
+                />
               </div>
             </div>
 
@@ -431,7 +440,8 @@ export default function List({ transaction_methods = [], meta = {}, filters = {}
                     <SelectValue placeholder="Bulk actions" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="delete">Delete Selected</SelectItem>
+                    <SelectItem value="delete">Permanently Delete Selected</SelectItem>
+                    <SelectItem value="restore">Restore Selected</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button onClick={handleBulkAction} variant="outline">
@@ -491,21 +501,21 @@ export default function List({ transaction_methods = [], meta = {}, filters = {}
                         <TableCell>{method.name}</TableCell>
                         <TableCell>{getStatusBadge(method.status)}</TableCell>
                         <TableCell className="text-right">
-                          <TableActions
+                        <TableActions
                             actions={[
-                              {
-                                label: "Edit",
-                                icon: <Edit className="h-4 w-4" />,
-                                onClick: () => openEditDialog(method),
-                              },
-                              {
-                                label: "Delete",
+                            {
+                                label: "Restore",
+                                icon: <RotateCcw className="h-4 w-4" />,
+                                onClick: () => handleRestoreConfirm(method.id)
+                            },
+                            {
+                                label: "Permanently Delete",
                                 icon: <Trash className="h-4 w-4" />,
                                 onClick: () => handleDeleteConfirm(method.id),
                                 destructive: true,
-                              },
+                            },
                             ]}
-                          />
+                        />
                         </TableCell>
                       </TableRow>
                     ))
@@ -530,101 +540,6 @@ export default function List({ transaction_methods = [], meta = {}, filters = {}
             )}
           </div>
 
-          {/* Create Dialog */}
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Transaction Method</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleCreateSubmit}>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">Name</Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      value={form.name}
-                      onChange={handleInputChange}
-                      placeholder="Enter transaction method name"
-                    />
-                    {errors.name && (
-                      <p className="text-sm text-red-500">{errors.name}</p>
-                    )}
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="status">Status</Label>
-                    <Select value={form.status} onValueChange={handleStatusChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">Active</SelectItem>
-                        <SelectItem value="0">Inactive</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {errors.status && (
-                      <p className="text-sm text-red-500">{errors.status}</p>
-                    )}
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">Save</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-
-          {/* Edit Dialog */}
-          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Edit Transaction Method</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleEditSubmit}>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">Name</Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      value={form.name}
-                      onChange={handleInputChange}
-                      placeholder="Enter transaction method name"
-                    />
-                    {errors.name && (
-                      <p className="text-sm text-red-500">{errors.name}</p>
-                    )}
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="status">Status</Label>
-                    <Select value={form.status} onValueChange={handleStatusChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">Active</SelectItem>
-                        <SelectItem value="0">Inactive</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {errors.status && (
-                      <p className="text-sm text-red-500">{errors.status}</p>
-                    )}
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">Update</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-
-          {/* Delete Confirmation Modal */}
           <DeleteConfirmationModal
             show={showDeleteModal}
             onClose={() => setShowDeleteModal(false)}
@@ -632,11 +547,25 @@ export default function List({ transaction_methods = [], meta = {}, filters = {}
             processing={isProcessing}
           />
 
-          {/* Bulk Delete Confirmation Modal */}
           <BulkDeleteConfirmationModal
             show={showBulkDeleteModal}
             onClose={() => setShowBulkDeleteModal(false)}
-            onConfirm={handleBulkDeleteConfirm}
+            onConfirm={handleBulkDelete}
+            processing={isProcessing}
+            count={selectedMethods.length}
+          />
+
+          <RestoreConfirmationModal
+            show={showRestoreModal}
+            onClose={() => setShowRestoreModal(false)}
+            onConfirm={handleRestore}
+            processing={isProcessing}
+          />
+
+          <BulkRestoreConfirmationModal
+            show={showBulkRestoreModal}
+            onClose={() => setShowBulkRestoreModal(false)}
+            onConfirm={handleBulkRestore}
             processing={isProcessing}
             count={selectedMethods.length}
           />
