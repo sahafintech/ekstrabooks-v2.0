@@ -87,6 +87,63 @@ class DesignationController extends Controller {
                 'search' => $search,
                 'sorting' => $sorting,
             ],
+            'trashed_designations' => Designation::onlyTrashed()->count(),
+        ]);
+    }
+
+    /**
+     * Display a listing of trashed designations.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function trash(Request $request) {
+        $per_page = $request->get('per_page', 50);
+        $search = $request->get('search', '');
+        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
+
+        $query = Designation::onlyTrashed()->with('department')
+            ->where('designations.business_id', $request->activeBusiness->id);
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('designations.name', 'like', "%$search%")
+                    ->orWhere('designations.descriptions', 'like', "%$search%");
+            });
+        }
+
+        // Handle sorting
+        if (isset($sorting['column']) && isset($sorting['direction'])) {
+            $column = $sorting['column'];
+            $direction = $sorting['direction'];
+
+            // Handle relationship sorting
+            if (str_contains($column, '.')) {
+                [$relation, $field] = explode('.', $column);
+                $query->join($relation . 's', 'designations.' . $relation . '_id', '=', $relation . 's.id')
+                    ->where($relation . 's.business_id', $request->activeBusiness->id)
+                    ->orderBy($relation . 's.' . $field, $direction)
+                    ->select('designations.*');
+            } else {
+                $query->orderBy('designations.' . $column, $direction);
+            }
+        }
+
+        $designations = $query->paginate($per_page);
+
+        return Inertia::render('Backend/User/Designation/Trash', [
+            'designations' => $designations->items(),
+            'meta' => [
+                'current_page' => $designations->currentPage(),
+                'per_page' => $designations->perPage(),
+                'from' => $designations->firstItem(),
+                'to' => $designations->lastItem(),
+                'total' => $designations->total(),
+                'last_page' => $designations->lastPage(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'sorting' => $sorting,
+            ],
         ]);
     }
 
@@ -260,5 +317,97 @@ class DesignationController extends Controller {
         }
         
         return back()->with('success', 'Selected designations deleted successfully');
+    }
+
+    /**
+     * Permanently delete the specified designation.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function permanent_destroy(Request $request, $id) {
+        $designation = Designation::onlyTrashed()->where('business_id', $request->activeBusiness->id)
+            ->findOrFail($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Permanently Deleted Designation ' . $designation->name;
+        $audit->save();
+
+        $designation->forceDelete();
+
+        return redirect()->route('designations.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    /**
+     * Bulk permanently delete selected designations.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_permanent_destroy(Request $request) {
+        foreach ($request->ids as $id) {
+            $designation = Designation::onlyTrashed()->where('business_id', $request->activeBusiness->id)
+                ->findOrFail($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Permanently Deleted Designation ' . $designation->name;
+            $audit->save();
+
+            $designation->forceDelete();
+        }
+
+        return redirect()->route('designations.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    /**
+     * Restore the specified designation.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function restore(Request $request, $id) {
+        $designation = Designation::onlyTrashed()->where('business_id', $request->activeBusiness->id)
+            ->findOrFail($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Restored Designation ' . $designation->name;
+        $audit->save();
+
+        $designation->restore();
+
+        return redirect()->route('designations.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Bulk restore selected designations.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_restore(Request $request) {
+        foreach ($request->ids as $id) {
+            $designation = Designation::onlyTrashed()->where('business_id', $request->activeBusiness->id)
+                ->findOrFail($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Restored Designation ' . $designation->name;
+            $audit->save();
+
+            $designation->restore();
+        }
+
+        return redirect()->route('designations.trash')->with('success', _lang('Restored Successfully'));
     }
 }

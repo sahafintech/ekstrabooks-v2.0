@@ -575,6 +575,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::delete('departments/{id}/permanent_destroy', [DepartmentController::class, 'permanent_destroy'])->name('departments.permanent_destroy');
 		Route::resource('departments', DepartmentController::class);
 		Route::post('departments/bulk_destroy', [DepartmentController::class, 'bulk_destroy'])->name('departments.bulk_destroy');
+		Route::get('designations/trash', [DesignationController::class, 'trash'])->name('designations.trash');
+		Route::post('designations/{id}/restore', [DesignationController::class, 'restore'])->name('designations.restore');
+		Route::post('designations/bulk_restore', [DesignationController::class, 'bulk_restore'])->name('designations.bulk_restore');
+		Route::post('designations/bulk_permanent_destroy', [DesignationController::class, 'bulk_permanent_destroy'])->name('designations.bulk_permanent_destroy');
+		Route::delete('designations/{id}/permanent_destroy', [DesignationController::class, 'permanent_destroy'])->name('designations.permanent_destroy');
 		Route::get('designations/get_designations/{deaprtment_id}', [DesignationController::class, 'get_designations']);
 		Route::resource('designations', DesignationController::class)->except('show');
 		Route::post('designations/bulk_destroy', [DesignationController::class, 'bulk_destroy'])->name('designations.bulk_destroy');

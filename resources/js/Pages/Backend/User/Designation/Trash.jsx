@@ -20,15 +20,12 @@ import {
   SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { Label } from "@/Components/ui/label";
-import { Textarea } from "@/Components/ui/textarea";
-import { Plus, Edit, Trash, Search, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+import { Edit, EyeIcon, Trash, ChevronUp, ChevronDown, RotateCcw } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
-import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
@@ -86,57 +83,13 @@ const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, cou
   </Modal>
 );
 
-// Create Modal Component
-const CreateModal = ({ show, onClose, onSubmit, form, errors, departments, handleInputChange, handleDepartmentChange, processing }) => (
+// Restore Confirmation Modal Component
+const RestoreConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
-    <form onSubmit={onSubmit}>
-      <h2 className="text-lg font-medium mb-4">Add Designation</h2>
-      <div className="grid gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor="name">Name <span className="text-red-500">*</span></Label>
-          <Input
-            id="name"
-            name="name"
-            value={form.name}
-            onChange={handleInputChange}
-            placeholder="Enter designation name"
-          />
-          {errors.name && (
-            <p className="text-sm text-red-500">{errors.name}</p>
-          )}
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="department_id">Department <span className="text-red-500">*</span></Label>
-          <SearchableCombobox
-            options={
-              departments.map((department) => ({
-                id: department.id,
-                name: department.name,
-              }))
-            }
-            value={form.department_id}
-            onChange={handleDepartmentChange}
-            placeholder="Select department"
-          />
-          {errors.department_id && (
-            <p className="text-sm text-red-500">{errors.department_id}</p>
-          )}
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="descriptions">Description</Label>
-          <Textarea
-            id="descriptions"
-            name="descriptions"
-            value={form.descriptions}
-            onChange={handleInputChange}
-            placeholder="Enter designation description"
-            rows={3}
-          />
-          {errors.descriptions && (
-            <p className="text-sm text-red-500">{errors.descriptions}</p>
-          )}
-        </div>
-      </div>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to restore this designation?
+      </h2>
       <div className="mt-6 flex justify-end">
         <Button
           type="button"
@@ -146,63 +99,25 @@ const CreateModal = ({ show, onClose, onSubmit, form, errors, departments, handl
         >
           Cancel
         </Button>
-        <Button type="submit" disabled={processing}>Save</Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Restore
+        </Button>
       </div>
     </form>
   </Modal>
 );
 
-// Edit Modal Component
-const EditModal = ({ show, onClose, onSubmit, form, errors, departments, handleInputChange, handleDepartmentChange, processing }) => (
+// Bulk Restore Confirmation Modal Component
+const BulkRestoreConfirmationModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
-    <form onSubmit={onSubmit}>
-      <h2 className="text-lg font-medium mb-4">Edit Designation</h2>
-      <div className="grid gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor="name">Name <span className="text-red-500">*</span></Label>
-          <Input
-            id="name"
-            name="name"
-            value={form.name}
-            onChange={handleInputChange}
-            placeholder="Enter designation name"
-          />
-          {errors.name && (
-            <p className="text-sm text-red-500">{errors.name}</p>
-          )}
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="department_id">Department <span className="text-red-500">*</span></Label>
-          <SearchableCombobox
-            options={
-              departments.map((department) => ({
-                id: department.id,
-                name: department.name,
-              }))
-            }
-            placeholder="Select department"
-            value={form.department_id}
-            onChange={handleDepartmentChange}
-          />
-          {errors.department_id && (
-            <p className="text-sm text-red-500">{errors.department_id}</p>
-          )}
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="descriptions">Description</Label>
-          <Textarea
-            id="descriptions"
-            name="descriptions"
-            value={form.descriptions}
-            onChange={handleInputChange}
-            placeholder="Enter designation description"
-            rows={3}
-          />
-          {errors.descriptions && (
-            <p className="text-sm text-red-500">{errors.descriptions}</p>
-          )}
-        </div>
-      </div>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to restore {count} selected designation{count !== 1 ? 's' : ''}?
+      </h2>
       <div className="mt-6 flex justify-end">
         <Button
           type="button"
@@ -212,41 +127,39 @@ const EditModal = ({ show, onClose, onSubmit, form, errors, departments, handleI
         >
           Cancel
         </Button>
-        <Button type="submit" disabled={processing}>Update</Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Restore Selected
+        </Button>
       </div>
     </form>
   </Modal>
 );
 
-export default function List({ designations = [], departments = [], meta = {}, filters = {}, trashed_designations = 0 }) {
+export default function TrashList({ designations = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedDesignations, setSelectedDesignations] = useState([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
-  const [perPage, setPerPage] = useState(meta.per_page || 10);
+  const [perPage, setPerPage] = useState(meta.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
   const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
 
-  // Form state for Create/Edit dialogs
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingDesignation, setEditingDesignation] = useState(null);
-  const [form, setForm] = useState({
-    name: "",
-    descriptions: "",
-    department_id: ""
-  });
-
-  // Form errors
-  const [errors, setErrors] = useState({});
-
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [showBulkRestoreModal, setShowBulkRestoreModal] = useState(false);
   const [designationToDelete, setDesignationToDelete] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Restore confirmation modal states
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [designationToRestore, setDesignationToRestore] = useState(null);
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -292,7 +205,7 @@ export default function List({ designations = [], departments = [], meta = {}, f
     setSearch(value);
 
     router.get(
-      route("designations.index"),
+      route("designations.trash"),
       { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
@@ -301,7 +214,7 @@ export default function List({ designations = [], departments = [], meta = {}, f
   const handlePerPageChange = (value) => {
     setPerPage(value);
     router.get(
-      route("designations.index"),
+      route("designations.trash"),
       { search, page: 1, per_page: value },
       { preserveState: true }
     );
@@ -310,7 +223,7 @@ export default function List({ designations = [], departments = [], meta = {}, f
   const handlePageChange = (page) => {
     setCurrentPage(page);
     router.get(
-      route("designations.index"),
+      route("designations.trash"),
       { search, page, per_page: perPage },
       { preserveState: true }
     );
@@ -330,6 +243,8 @@ export default function List({ designations = [], departments = [], meta = {}, f
 
     if (bulkAction === "delete") {
       setShowBulkDeleteModal(true);
+    }else if (bulkAction === "restore") {
+      setShowBulkRestoreModal(true);
     }
   };
 
@@ -338,11 +253,16 @@ export default function List({ designations = [], departments = [], meta = {}, f
     setShowDeleteModal(true);
   };
 
+  const handleRestoreConfirm = (id) => {
+    setDesignationToRestore(id);
+    setShowRestoreModal(true);
+  };
+
   const handleDelete = (e) => {
     e.preventDefault();
     setIsProcessing(true);
 
-    router.delete(route("designations.destroy", designationToDelete), {
+    router.delete(route("designations.permanent_destroy", designationToDelete), {
       preserveState: true,
       onSuccess: () => {
         setShowDeleteModal(false);
@@ -355,11 +275,11 @@ export default function List({ designations = [], departments = [], meta = {}, f
     });
   };
 
-  const handleBulkDeleteConfirm = (e) => {
+  const handleBulkDelete = (e) => {
     e.preventDefault();
     setIsProcessing(true);
 
-    router.post(route("designations.bulk_destroy"),
+    router.post(route("designations.bulk_permanent_destroy"),
       {
         ids: selectedDesignations
       },
@@ -372,10 +292,78 @@ export default function List({ designations = [], departments = [], meta = {}, f
           setShowBulkDeleteModal(false);
           setIsProcessing(false);
         },
-        onError: (errors) => {
+        onError: () => {
           setIsProcessing(false);
         }
       }
+    );
+  };
+
+  const handleRestore = (e) => {
+    e.preventDefault();
+    setIsProcessing(true);
+
+    router.post(route("designations.restore", designationToRestore), {
+      preserveState: true,
+      onSuccess: () => {
+        setShowRestoreModal(false);
+        setDesignationToRestore(null);
+        setIsProcessing(false);
+      },
+      onError: () => {
+        setIsProcessing(false);
+      }
+    });
+  };
+
+  const handleBulkRestore = (e) => {
+    e.preventDefault();
+    setIsProcessing(true);
+
+    router.post(route("designations.bulk_restore"),
+      {
+        ids: selectedDesignations
+      },
+      {
+        preserveState: true,
+        onSuccess: () => {
+          setSelectedDesignations([]);
+          setIsAllSelected(false);
+          setBulkAction("");
+          setShowBulkRestoreModal(false);
+          setIsProcessing(false);
+        },
+        onError: () => {
+          setIsProcessing(false);
+        }
+      }
+    );
+  };
+
+  const handleSort = (column) => {
+    let direction = "asc";
+    if (sorting.column === column && sorting.direction === "asc") {
+      direction = "desc";
+    }
+    setSorting({ column, direction });
+    router.get(
+      route("designations.trash"),
+      { ...filters, sorting: { column, direction } },
+      { preserveState: true }
+    );
+  };
+
+  const renderSortIcon = (column) => {
+    const isActive = sorting.column === column;
+    return (
+      <span className="inline-flex flex-col ml-1">
+        <ChevronUp
+          className={`w-3 h-3 ${isActive && sorting.direction === "asc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+        <ChevronDown
+          className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc" ? "text-gray-800" : "text-gray-300"}`}
+        />
+      </span>
     );
   };
 
@@ -409,113 +397,6 @@ export default function List({ designations = [], departments = [], meta = {}, f
     return pages;
   };
 
-  // Form input change handler
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setForm({
-      ...form,
-      [name]: value
-    });
-  };
-
-  // Department select change handler
-  const handleDepartmentChange = (value) => {
-    setForm({
-      ...form,
-      department_id: value
-    });
-  };
-
-  // Create form handlers
-  const openCreateDialog = () => {
-    setForm({
-      name: "",
-      descriptions: "",
-      department_id: ""
-    });
-    setErrors({});
-    setIsCreateDialogOpen(true);
-  };
-
-  const handleCreateSubmit = (e) => {
-    e.preventDefault();
-    setIsProcessing(true);
-
-    router.post(route("designations.store"), form, {
-      preserveState: true,
-      onSuccess: () => {
-        setIsCreateDialogOpen(false);
-        setForm({
-          name: "",
-          descriptions: "",
-          department_id: ""
-        });
-        setIsProcessing(false);
-      },
-      onError: (errors) => {
-        setErrors(errors);
-        setIsProcessing(false);
-      }
-    });
-  };
-
-  // Edit form handlers
-  const openEditDialog = (designation) => {
-    setEditingDesignation(designation);
-    setForm({
-      name: designation.name,
-      descriptions: designation.descriptions || "",
-      department_id: designation.department_id.toString()
-    });
-    setErrors({});
-    setIsEditDialogOpen(true);
-  };
-
-  const handleEditSubmit = (e) => {
-    e.preventDefault();
-    setIsProcessing(true);
-
-    router.put(route("designations.update", editingDesignation.id), form, {
-      preserveState: true,
-      onSuccess: () => {
-        setIsEditDialogOpen(false);
-        setEditingDesignation(null);
-        setIsProcessing(false);
-      },
-      onError: (errors) => {
-        setErrors(errors);
-        setIsProcessing(false);
-      }
-    });
-  };
-
-  const handleSort = (column) => {
-    let direction = "asc";
-    if (sorting.column === column && sorting.direction === "asc") {
-      direction = "desc";
-    }
-    setSorting({ column, direction });
-    router.get(
-      route("designations.index"),
-      { ...filters, sorting: { column, direction } },
-      { preserveState: true }
-    );
-  };
-
-  const renderSortIcon = (column) => {
-    const isActive = sorting.column === column;
-    return (
-      <span className="inline-flex flex-col ml-1">
-        <ChevronUp
-          className={`w-3 h-3 ${isActive && sorting.direction === "asc" ? "text-gray-800" : "text-gray-300"}`}
-        />
-        <ChevronDown
-          className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc" ? "text-gray-800" : "text-gray-300"}`}
-        />
-      </span>
-    );
-  };
-
   return (
     <AuthenticatedLayout>
       <Toaster />
@@ -523,27 +404,18 @@ export default function List({ designations = [], departments = [], meta = {}, f
         <div className="main-content">
           <PageHeader
             page="Designation Management"
-            subpage="List"
+            subpage="Trash"
             url="designations.index"
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-2">
-                <Button onClick={openCreateDialog}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Designation
-                </Button>
-                <Link href={route("designations.trash")}>
-                    <Button variant="outline" className="relative">
-                        <Trash2 className="h-8 w-8" />
-                        {trashed_designations > 0 && (
-                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                            {trashed_designations}
-                        </span>
-                        )}
-                    </Button>
-                </Link>
-              </div>
+                <div className="flex flex-col md:flex-row gap-2">
+                    <div>
+                        <div className="text-red-500">
+                            Total trashed designations: {meta.total}
+                        </div>
+                    </div>
+                </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input
                   placeholder="Search designations..."
@@ -561,7 +433,8 @@ export default function List({ designations = [], departments = [], meta = {}, f
                     <SelectValue placeholder="Bulk actions" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="delete">Delete Selected</SelectItem>
+                    <SelectItem value="delete">Permanently Delete Selected</SelectItem>
+                    <SelectItem value="restore">Restore Selected</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button onClick={handleBulkAction} variant="outline">
@@ -625,21 +498,21 @@ export default function List({ designations = [], departments = [], meta = {}, f
                         <TableCell>{designation.department?.name || "-"}</TableCell>
                         <TableCell>{designation.descriptions || "-"}</TableCell>
                         <TableCell className="text-right">
-                          <TableActions
+                        <TableActions
                             actions={[
-                              {
-                                label: "Edit",
-                                icon: <Edit className="h-4 w-4" />,
-                                onClick: () => openEditDialog(designation),
-                              },
-                              {
-                                label: "Delete",
+                            {
+                                label: "Restore",
+                                icon: <RotateCcw className="h-4 w-4" />,
+                                onClick: () => handleRestoreConfirm(designation.id)
+                            },
+                            {
+                                label: "Permanently Delete",
                                 icon: <Trash className="h-4 w-4" />,
                                 onClick: () => handleDeleteConfirm(designation.id),
                                 destructive: true,
-                              },
+                            },
                             ]}
-                          />
+                        />
                         </TableCell>
                       </TableRow>
                     ))
@@ -664,33 +537,6 @@ export default function List({ designations = [], departments = [], meta = {}, f
             )}
           </div>
 
-          {/* Create Modal */}
-          <CreateModal
-            show={isCreateDialogOpen}
-            onClose={() => setIsCreateDialogOpen(false)}
-            onSubmit={handleCreateSubmit}
-            form={form}
-            errors={errors}
-            departments={departments}
-            handleInputChange={handleInputChange}
-            handleDepartmentChange={handleDepartmentChange}
-            processing={isProcessing}
-          />
-
-          {/* Edit Modal */}
-          <EditModal
-            show={isEditDialogOpen}
-            onClose={() => setIsEditDialogOpen(false)}
-            onSubmit={handleEditSubmit}
-            form={form}
-            errors={errors}
-            departments={departments}
-            handleInputChange={handleInputChange}
-            handleDepartmentChange={handleDepartmentChange}
-            processing={isProcessing}
-          />
-
-          {/* Delete Confirmation Modal */}
           <DeleteConfirmationModal
             show={showDeleteModal}
             onClose={() => setShowDeleteModal(false)}
@@ -698,11 +544,25 @@ export default function List({ designations = [], departments = [], meta = {}, f
             processing={isProcessing}
           />
 
-          {/* Bulk Delete Confirmation Modal */}
           <BulkDeleteConfirmationModal
             show={showBulkDeleteModal}
             onClose={() => setShowBulkDeleteModal(false)}
-            onConfirm={handleBulkDeleteConfirm}
+            onConfirm={handleBulkDelete}
+            processing={isProcessing}
+            count={selectedDesignations.length}
+          />
+
+          <RestoreConfirmationModal
+            show={showRestoreModal}
+            onClose={() => setShowRestoreModal(false)}
+            onConfirm={handleRestore}
+            processing={isProcessing}
+          />
+
+          <BulkRestoreConfirmationModal
+            show={showBulkRestoreModal}
+            onClose={() => setShowBulkRestoreModal(false)}
+            onConfirm={handleBulkRestore}
             processing={isProcessing}
             count={selectedDesignations.length}
           />
