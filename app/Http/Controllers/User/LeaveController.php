@@ -118,6 +118,62 @@ class LeaveController extends Controller
                 'sorting' => $sorting,
             ],
             'staff' => $staff,
+            'trashed_leaves' => Leave::onlyTrashed()->count(),
+        ]);
+    }
+
+    /**
+     * Display a listing of trashed leaves.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function trash(Request $request) {
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
+        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
+
+        $query = Leave::onlyTrashed()->with('staff');
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('staff', function ($q2) use ($search) {
+                    $q2->where('name', 'like', "%$search%");
+                })
+                ->orWhere('leave_type', 'like', "%$search%")
+                ->orWhere('description', 'like', "%$search%");
+            });
+        }
+
+        // Handle sorting
+        if (isset($sorting['column']) && isset($sorting['direction'])) {
+            $column = $sorting['column'];
+            $direction = $sorting['direction'];
+            
+            if ($column === 'staff.name') {
+                $query->join('employees', 'leaves.employee_id', '=', 'employees.id')
+                    ->orderBy('employees.name', $direction)
+                    ->select('leaves.*');
+            } else {
+                $query->orderBy($column, $direction);
+            }
+        }
+
+        $leaves = $query->paginate($per_page);
+
+        return Inertia::render('Backend/User/Leave/Trash', [
+            'leaves' => $leaves->items(),
+            'meta' => [
+                'current_page' => $leaves->currentPage(),
+                'per_page' => $leaves->perPage(),
+                'from' => $leaves->firstItem(),
+                'to' => $leaves->lastItem(),
+                'total' => $leaves->total(),
+                'last_page' => $leaves->lastPage(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'sorting' => $sorting,
+            ],
         ]);
     }
 
@@ -172,7 +228,7 @@ class LeaveController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Created Leave ' . $leave->leave_type;
         $audit->save();
 
@@ -252,7 +308,7 @@ class LeaveController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Updated Leave ' . $leave->leave_type;
         $audit->save();
 
@@ -297,20 +353,116 @@ class LeaveController extends Controller
             return back()->withErrors($validator);
         }
 
-        // Get leave types for audit log
-        $leaveTypes = Leave::whereIn('id', $request->ids)->pluck('leave_type')->implode(', ');
+        $leaves = Leave::whereIn('id', $request->ids)->get();
+        
+        foreach($leaves as $leave) {
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Deleted Leave ' . $leave->leave_type;
+            $audit->save();
 
-        // Delete the leaves
-        Leave::whereIn('id', $request->ids)->delete();
+            try {
+                $leave->delete();
+            } catch (\Exception $e) {
+                // Continue with the next leave
+            }
+        }
 
-        // Audit log
+        return back()->with('success', 'Selected leaves deleted successfully');
+    }
+
+    /**
+     * Restore the specified leave from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function restore(Request $request, $id)
+    {
+        $leave = Leave::onlyTrashed()->findOrFail($id);
+
+        // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = Auth::id();
-        $audit->event = 'Bulk Deleted Leaves: ' . $leaveTypes;
+        $audit->event = 'Restored Leave ' . $leave->leave_type;
         $audit->save();
 
-        return redirect()->route('leaves.index')->with('success', _lang('Deleted Successfully'));
+        $leave->restore();
+
+        return redirect()->route('leaves.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Bulk restore selected leaves from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_restore(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $leave = Leave::onlyTrashed()->findOrFail($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Restored Leave ' . $leave->leave_type;
+            $audit->save();
+
+            $leave->restore();
+        }
+
+        return redirect()->route('leaves.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Permanently delete the specified leave from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function permanent_destroy(Request $request, $id)
+    {
+        $leave = Leave::onlyTrashed()->findOrFail($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Permanently Deleted Leave ' . $leave->leave_type;
+        $audit->save();
+
+        $leave->forceDelete();
+
+        return redirect()->route('leaves.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    /**
+     * Bulk permanently delete selected leaves from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_permanent_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $leave = Leave::onlyTrashed()->findOrFail($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Permanently Deleted Leave ' . $leave->leave_type;
+            $audit->save();
+
+            $leave->forceDelete();
+        }
+
+        return redirect()->route('leaves.trash')->with('success', _lang('Permanently Deleted Successfully'));
     }
 
     public function bulk_approve(Request $request)

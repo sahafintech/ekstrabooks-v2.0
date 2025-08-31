@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, router, usePage } from "@inertiajs/react";
+import { Head, Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -12,7 +12,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/Components/ui/table";
-import { Input } from "@/Components/ui/input";
 import {
   Select,
   SelectContent,
@@ -20,14 +19,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/Components/ui/select";
-import { Plus, Edit, Trash, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+import { Input } from "@/Components/ui/input";
+import { Edit, Trash, ChevronUp, ChevronDown, RotateCcw } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
-import { format } from "date-fns";
-
 
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
@@ -85,11 +83,12 @@ const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, cou
   </Modal>
 );
 
-const ApproveAllLeavesModal = ({ show, onClose, onConfirm, processing, count }) => (
+// Restore Confirmation Modal Component
+const RestoreConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to approve {count} selected leave record{count !== 1 ? 's' : ''}?
+        Are you sure you want to restore this leave record?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -105,18 +104,19 @@ const ApproveAllLeavesModal = ({ show, onClose, onConfirm, processing, count }) 
           variant="default"
           disabled={processing}
         >
-          Approve Selected
+          Restore
         </Button>
       </div>
     </form>
   </Modal>
 );
 
-const RejectAllLeavesModal = ({ show, onClose, onConfirm, processing, count }) => (
+// Bulk Restore Confirmation Modal Component
+const BulkRestoreConfirmationModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
     <form onSubmit={onConfirm}>
       <h2 className="text-lg font-medium">
-        Are you sure you want to reject {count} selected leave record{count !== 1 ? 's' : ''}?
+        Are you sure you want to restore {count} selected leave record{count !== 1 ? 's' : ''}?
       </h2>
       <div className="mt-6 flex justify-end">
         <Button
@@ -129,35 +129,37 @@ const RejectAllLeavesModal = ({ show, onClose, onConfirm, processing, count }) =
         </Button>
         <Button
           type="submit"
-          variant="destructive"
+          variant="default"
           disabled={processing}
         >
-          Reject Selected
+          Restore Selected
         </Button>
       </div>
     </form>
   </Modal>
 );
 
-export default function List({ leaves = [], meta = {}, filters = {}, trashed_leaves = 0 }) {
+export default function TrashList({ leaves = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedLeaves, setSelectedLeaves] = useState([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [search, setSearch] = useState(filters.search || "");
-  const [dateFilter, setDateFilter] = useState(filters.date || "");
-  const [perPage, setPerPage] = useState(meta.per_page || 50);
+  const [perPage, setPerPage] = useState(meta.per_page || 10);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [bulkAction, setBulkAction] = useState("");
   const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
-  const [showApproveAllModal, setShowApproveAllModal] = useState(false);
-  const [showRejectAllModal, setShowRejectAllModal] = useState(false);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [showBulkRestoreModal, setShowBulkRestoreModal] = useState(false);
   const [leaveToDelete, setLeaveToDelete] = useState(null);
-  const [processing, setProcessing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Restore confirmation modal states
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [leaveToRestore, setLeaveToRestore] = useState(null);
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -165,23 +167,16 @@ export default function List({ leaves = [], meta = {}, filters = {}, trashed_lea
         title: "Success",
         description: flash.success,
       });
-    } else if (flash && flash.error) {
+    }
+
+    if (flash && flash.error) {
       toast({
         variant: "destructive",
         title: "Error",
         description: flash.error,
       });
     }
-  }, [flash]);
-
-  useEffect(() => {
-    // Update isAllSelected when leaves or selectedLeaves change
-    if (leaves.length > 0 && selectedLeaves.length === leaves.length) {
-      setIsAllSelected(true);
-    } else {
-      setIsAllSelected(false);
-    }
-  }, [leaves, selectedLeaves]);
+  }, [flash, toast]);
 
   const toggleSelectAll = () => {
     if (isAllSelected) {
@@ -210,17 +205,8 @@ export default function List({ leaves = [], meta = {}, filters = {}, trashed_lea
     setSearch(value);
 
     router.get(
-      route("leaves.index"),
+      route("leaves.trash"),
       { search: value, page: 1, per_page: perPage },
-      { preserveState: true }
-    );
-  };
-
-  const handleDateFilterChange = (date) => {
-    setDateFilter(date ? format(date, "yyyy-MM-dd") : "");
-    router.get(
-      route("leaves.index"),
-      { search, date: date ? format(date, "yyyy-MM-dd") : "", page: 1, per_page: perPage },
       { preserveState: true }
     );
   };
@@ -228,8 +214,8 @@ export default function List({ leaves = [], meta = {}, filters = {}, trashed_lea
   const handlePerPageChange = (value) => {
     setPerPage(value);
     router.get(
-      route("leaves.index"),
-      { search, date: dateFilter, page: 1, per_page: value },
+      route("leaves.trash"),
+      { search, page: 1, per_page: value },
       { preserveState: true }
     );
   };
@@ -237,8 +223,8 @@ export default function List({ leaves = [], meta = {}, filters = {}, trashed_lea
   const handlePageChange = (page) => {
     setCurrentPage(page);
     router.get(
-      route("leaves.index"),
-      { search, date: dateFilter, page, per_page: perPage },
+      route("leaves.trash"),
+      { search, page, per_page: perPage },
       { preserveState: true }
     );
   };
@@ -256,11 +242,9 @@ export default function List({ leaves = [], meta = {}, filters = {}, trashed_lea
     }
 
     if (bulkAction === "delete") {
-      setShowDeleteAllModal(true);
-    } else if (bulkAction === "approve") {
-      setShowApproveAllModal(true);
-    } else if (bulkAction === "reject") {
-      setShowRejectAllModal(true);
+      setShowBulkDeleteModal(true);
+    } else if (bulkAction === "restore") {
+      setShowBulkRestoreModal(true);
     }
   };
 
@@ -269,28 +253,33 @@ export default function List({ leaves = [], meta = {}, filters = {}, trashed_lea
     setShowDeleteModal(true);
   };
 
+  const handleRestoreConfirm = (id) => {
+    setLeaveToRestore(id);
+    setShowRestoreModal(true);
+  };
+
   const handleDelete = (e) => {
     e.preventDefault();
-    setProcessing(true);
+    setIsProcessing(true);
 
-    router.delete(route("leaves.destroy", leaveToDelete), {
+    router.delete(route("leaves.permanent_destroy", leaveToDelete), {
       preserveState: true,
       onSuccess: () => {
         setShowDeleteModal(false);
         setLeaveToDelete(null);
-        setProcessing(false);
+        setIsProcessing(false);
       },
       onError: () => {
-        setProcessing(false);
+        setIsProcessing(false);
       }
     });
   };
 
-  const handleBulkDeleteConfirm = (e) => {
+  const handleBulkDelete = (e) => {
     e.preventDefault();
-    setProcessing(true);
+    setIsProcessing(true);
 
-    router.post(route("leaves.bulk_destroy"),
+    router.post(route("leaves.bulk_permanent_destroy"),
       {
         ids: selectedLeaves
       },
@@ -300,58 +289,55 @@ export default function List({ leaves = [], meta = {}, filters = {}, trashed_lea
           setSelectedLeaves([]);
           setIsAllSelected(false);
           setBulkAction("");
-          setShowDeleteAllModal(false);
-          setProcessing(false);
+          setShowBulkDeleteModal(false);
+          setIsProcessing(false);
         },
         onError: () => {
-          setProcessing(false);
+          setIsProcessing(false);
         }
       }
     );
   };
 
-  const handleApproveAll = (e) => {
+  const handleRestore = (e) => {
     e.preventDefault();
-    setProcessing(true);
+    setIsProcessing(true);
 
-    router.post(route("leaves.bulk_approve"),
-      {
-        ids: selectedLeaves,
+    router.post(route("leaves.restore", leaveToRestore), {
+      preserveState: true,
+      onSuccess: () => {
+        setShowRestoreModal(false);
+        setLeaveToRestore(null);
+        setIsProcessing(false);
       },
-      {
-        onSuccess: () => {
-          setShowApproveAllModal(false);
-          setProcessing(false);
-          setSelectedLeaves([]);
-          setIsAllSelected(false);
-          setBulkAction("");
-        },
-        onError: () => {
-          setProcessing(false);
-        }
-      });
+      onError: () => {
+        setIsProcessing(false);
+      }
+    });
   };
 
-  const handleRejectAll = (e) => {
+  const handleBulkRestore = (e) => {
     e.preventDefault();
-    setProcessing(true);
+    setIsProcessing(true);
 
-    router.post(route("leaves.bulk_reject"),
+    router.post(route("leaves.bulk_restore"),
       {
-        ids: selectedLeaves,
+        ids: selectedLeaves
       },
       {
+        preserveState: true,
         onSuccess: () => {
-          setShowRejectAllModal(false);
-          setProcessing(false);
           setSelectedLeaves([]);
           setIsAllSelected(false);
           setBulkAction("");
+          setShowBulkRestoreModal(false);
+          setIsProcessing(false);
         },
         onError: () => {
-          setProcessing(false);
+          setIsProcessing(false);
         }
-      });
+      }
+    );
   };
 
   const handleSort = (column) => {
@@ -361,7 +347,7 @@ export default function List({ leaves = [], meta = {}, filters = {}, trashed_lea
     }
     setSorting({ column, direction });
     router.get(
-      route("leaves.index"),
+      route("leaves.trash"),
       { ...filters, sorting: { column, direction } },
       { preserveState: true }
     );
@@ -452,32 +438,21 @@ export default function List({ leaves = [], meta = {}, filters = {}, trashed_lea
         <div className="main-content">
           <PageHeader
             page="Leave Management"
-            subpage="List"
+            subpage="Trash"
             url="leaves.index"
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-2">
-                <Link href={route("leaves.create")}>
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Leave
-                  </Button>
-                </Link>
-                <Link href={route("leaves.trash")}>
-                    <Button variant="outline" className="relative">
-                        <Trash2 className="h-8 w-8" />
-                        {trashed_leaves > 0 && (
-                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                            {trashed_leaves}
-                        </span>
-                        )}
-                    </Button>
-                </Link>
-              </div>
+                <div className="flex flex-col md:flex-row gap-2">
+                    <div>
+                        <div className="text-red-500">
+                            Total trashed leaves: {meta.total}
+                        </div>
+                    </div>
+                </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input
-                  placeholder="search leaves..."
+                  placeholder="Search leaves..."
                   value={search}
                   onChange={(e) => handleSearch(e)}
                   className="w-full md:w-80"
@@ -492,16 +467,11 @@ export default function List({ leaves = [], meta = {}, filters = {}, trashed_lea
                     <SelectValue placeholder="Bulk actions" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="delete">Delete Selected</SelectItem>
-                    <SelectItem value="approve">Approve Selected</SelectItem>
-                    <SelectItem value="reject">Reject Selected</SelectItem>
+                    <SelectItem value="delete">Permanently Delete Selected</SelectItem>
+                    <SelectItem value="restore">Restore Selected</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button
-                  onClick={handleBulkAction}
-                  variant="outline"
-                  disabled={!bulkAction || selectedLeaves.length === 0}
-                >
+                <Button onClick={handleBulkAction} variant="outline">
                   Apply
                 </Button>
               </div>
@@ -578,21 +548,21 @@ export default function List({ leaves = [], meta = {}, filters = {}, trashed_lea
                         <TableCell>{leave.total_days}</TableCell>
                         <TableCell><LeaveStatusBadge status={leave.status} /></TableCell>
                         <TableCell className="text-right">
-                          <TableActions
+                        <TableActions
                             actions={[
-                              {
-                                label: "Edit",
-                                icon: <Edit className="h-4 w-4" />,
-                                href: route("leaves.edit", leave.id),
-                              },
-                              {
-                                label: "Delete",
+                            {
+                                label: "Restore",
+                                icon: <RotateCcw className="h-4 w-4" />,
+                                onClick: () => handleRestoreConfirm(leave.id)
+                            },
+                            {
+                                label: "Permanently Delete",
                                 icon: <Trash className="h-4 w-4" />,
                                 onClick: () => handleDeleteConfirm(leave.id),
                                 destructive: true,
-                              },
+                            },
                             ]}
-                          />
+                        />
                         </TableCell>
                       </TableRow>
                     ))
@@ -607,82 +577,47 @@ export default function List({ leaves = [], meta = {}, filters = {}, trashed_lea
               </Table>
             </div>
 
-            {leaves.length > 0 && meta.total > 0 && (
-              <div className="flex items-center justify-between mt-4">
+            {meta.last_page > 1 && (
+              <div className="flex justify-between items-center mt-4">
                 <div className="text-sm text-gray-500">
-                  Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, meta.total)} of {meta.total} entries
+                  Showing {meta.from || 0} to {meta.to || 0} of {meta.total} entries
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(1)}
-                    disabled={currentPage === 1}
-                  >
-                    First
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                  >
-                    Previous
-                  </Button>
-                  {renderPageNumbers()}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === meta.last_page}
-                  >
-                    Next
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(meta.last_page)}
-                    disabled={currentPage === meta.last_page}
-                  >
-                    Last
-                  </Button>
-                </div>
+                <div className="flex gap-1">{renderPageNumbers()}</div>
               </div>
             )}
           </div>
+
+          <DeleteConfirmationModal
+            show={showDeleteModal}
+            onClose={() => setShowDeleteModal(false)}
+            onConfirm={handleDelete}
+            processing={isProcessing}
+          />
+
+          <BulkDeleteConfirmationModal
+            show={showBulkDeleteModal}
+            onClose={() => setShowBulkDeleteModal(false)}
+            onConfirm={handleBulkDelete}
+            processing={isProcessing}
+            count={selectedLeaves.length}
+          />
+
+          <RestoreConfirmationModal
+            show={showRestoreModal}
+            onClose={() => setShowRestoreModal(false)}
+            onConfirm={handleRestore}
+            processing={isProcessing}
+          />
+
+          <BulkRestoreConfirmationModal
+            show={showBulkRestoreModal}
+            onClose={() => setShowBulkRestoreModal(false)}
+            onConfirm={handleBulkRestore}
+            processing={isProcessing}
+            count={selectedLeaves.length}
+          />
         </div>
       </SidebarInset>
-
-      <DeleteConfirmationModal
-        show={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        onConfirm={handleDelete}
-        processing={processing}
-      />
-
-      <BulkDeleteConfirmationModal
-        show={showDeleteAllModal}
-        onClose={() => setShowDeleteAllModal(false)}
-        onConfirm={handleBulkDeleteConfirm}
-        processing={processing}
-        count={selectedLeaves.length}
-      />
-
-      <ApproveAllLeavesModal
-        show={showApproveAllModal}
-        onClose={() => setShowApproveAllModal(false)}
-        onConfirm={handleApproveAll}
-        processing={processing}
-        count={selectedLeaves.length}
-      />
-
-      <RejectAllLeavesModal
-        show={showRejectAllModal}
-        onClose={() => setShowRejectAllModal(false)}
-        onConfirm={handleRejectAll}
-        processing={processing}
-        count={selectedLeaves.length}
-      />
     </AuthenticatedLayout>
   );
 }

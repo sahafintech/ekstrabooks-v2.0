@@ -665,6 +665,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 		//Leave Application
 		Route::resource('leave_types', LeaveTypeController::class)->except('show');
+		Route::get('leaves/trash', [LeaveController::class, 'trash'])->name('leaves.trash');
+		Route::post('leaves/{id}/restore', [LeaveController::class, 'restore'])->name('leaves.restore');
+		Route::post('leaves/bulk_restore', [LeaveController::class, 'bulk_restore'])->name('leaves.bulk_restore');
+		Route::post('leaves/bulk_permanent_destroy', [LeaveController::class, 'bulk_permanent_destroy'])->name('leaves.bulk_permanent_destroy');
+		Route::delete('leaves/{id}/permanent_destroy', [LeaveController::class, 'permanent_destroy'])->name('leaves.permanent_destroy');
 		Route::post('leaves/bulk_destroy', [LeaveController::class, 'bulk_destroy'])->name('leaves.bulk_destroy');
 		Route::post('leaves/bulk_approve', [LeaveController::class, 'bulk_approve'])->name('leaves.bulk_approve');
 		Route::post('leaves/bulk_reject', [LeaveController::class, 'bulk_reject'])->name('leaves.bulk_reject');
