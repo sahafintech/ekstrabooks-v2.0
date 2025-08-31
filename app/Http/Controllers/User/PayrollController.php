@@ -5,7 +5,6 @@ namespace App\Http\Controllers\User;
 use App\Exports\PayslipsExport;
 use App\Http\Controllers\Controller;
 use App\Mail\GeneralMail;
-use App\Models\AbsentFine;
 use App\Models\Account;
 use App\Models\Attendance;
 use App\Models\AuditLog;
@@ -21,14 +20,12 @@ use App\Models\Transaction;
 use App\Models\TransactionMethod;
 use App\Utilities\Overrider;
 use Carbon\Carbon;
-use DataTables;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
-use PhpOffice\PhpSpreadsheet\Calculation\DateTimeExcel\Current;
 use Validator;
 
 class PayrollController extends Controller
@@ -135,6 +132,7 @@ class PayrollController extends Controller
             'totals' => $totals,
             'accounts' => Account::where('business_id', $request->activeBusiness->id)->get(),
             'methods' => TransactionMethod::where('business_id', $request->activeBusiness->id)->get(),
+            'trashed_payrolls' => Payroll::onlyTrashed()->where('business_id', $request->activeBusiness->id)->count(),
         ]);
     }
 
@@ -143,7 +141,7 @@ class PayrollController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create(Request $request)
+    public function create()
     {
         $years = [];
         for ($y = 2020; $y <= date('Y'); $y++) {
@@ -160,11 +158,12 @@ class PayrollController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
+
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'month' => 'required',
-            'year'  => 'required',
+            'year'  => 'required|integer',
         ]);
 
         if ($validator->fails()) {
@@ -173,15 +172,68 @@ class PayrollController extends Controller
                 ->withInput();
         }
 
-        $month = $request->month;
+        $month = str_pad($request->month, 2, '0', STR_PAD_LEFT);
         $year  = $request->year;
+        $periodDate = Carbon::createFromFormat('Y-m-d', "{$year}-{$month}-01");
 
-        // previous month and year
-        $previous_month = Carbon::parse($year . '-' . $month . '-01')->subMonth()->format('m');
-        $previous_year  = Carbon::parse($year . '-' . $month . '-01')->subMonth()->format('Y');
+        DB::beginTransaction();
+        try {
+            // Duplicate employee benefits from previous month
+            $this->duplicateEmployeeBenefits($periodDate);
 
-        // duplicate employee benefits from previous month
-        $employee_benefits = EmployeeBenefit::where('month', $previous_month)
+            // Get employees for payroll generation
+            $employees = $this->getEmployeesForPayroll($month, $year);
+
+            if ($employees->isEmpty()) {
+                DB::rollBack();
+                return back()->with('error', _lang('Payslip is already generated for the selected period !'));
+            }
+
+            // Get business settings
+            $businessSettings = $this->getBusinessSettings();
+
+            $errors = [];
+            foreach ($employees as $employee) {
+                try {
+                    $this->validateEmployeeRequirements($employee);
+                    $this->generateEmployeePayroll($employee, $month, $year, $businessSettings);
+                } catch (\Exception $e) {
+                    $errors[] = "Error processing {$employee->name}: " . $e->getMessage();
+                }
+            }
+
+            if (!empty($errors)) {
+                DB::commit();
+                $msg = implode('; ', $errors);
+                return redirect()->route('payslips.index')
+                    ->with('warning', _lang('Payslip generated with some skipped employees: ') . $msg)
+                    ->with('success', _lang('Payslip Generated Successfully'));
+            }
+
+            // Create audit log
+            $this->createAuditLog(count($employees));
+
+            DB::commit();
+            return redirect()->route('payslips.index')->with('success', _lang('Payslip Generated Successfully'));
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Duplicate employee benefits from previous month
+     */
+    private function duplicateEmployeeBenefits(Carbon $periodDate)
+    {
+        $previousPeriod = $periodDate->copy()->subMonth();
+        $previous_month = $previousPeriod->format('m');
+        $previous_year  = $previousPeriod->format('Y');
+        $month = $periodDate->format('m');
+        $year = $periodDate->format('Y');
+
+        $employee_benefits = EmployeeBenefit::with('salary_benefits')
+            ->where('month', $previous_month)
             ->where('year', $previous_year)
             ->get();
 
@@ -189,117 +241,232 @@ class PayrollController extends Controller
             $new_employee_benefit = $employee_benefit->replicate();
             $new_employee_benefit->month = $month;
             $new_employee_benefit->year = $year;
-            $new_employee_benefit->advance = $employee_benefit->advance;
             $new_employee_benefit->save();
 
-            $salary_benefits = SalaryBenefit::where('employee_benefit_id', $employee_benefit->id)->get();
-            foreach ($salary_benefits as $salary_benefit) {
+            foreach ($employee_benefit->salary_benefits as $salary_benefit) {
                 $new_salary_benefit = $salary_benefit->replicate();
                 $new_salary_benefit->employee_benefit_id = $new_employee_benefit->id;
-                $new_salary_benefit->date = $salary_benefit->date;
-                $new_salary_benefit->amount = $salary_benefit->amount;
-                $new_salary_benefit->type = $salary_benefit->type;
                 $new_salary_benefit->save();
             }
         }
+    }
 
-        DB::beginTransaction();
-
-        $employees = Employee::with('employee_benefits.salary_benefits')
+    /**
+     * Get employees for payroll generation
+     */
+    private function getEmployeesForPayroll($month, $year)
+    {
+        return Employee::with([
+            'employee_benefits' => function ($q) use ($month, $year) {
+                $q->where('month', $month)->where('year', $year);
+            },
+            'employee_benefits.salary_benefits',
+        ])
             ->whereDoesntHave('payslips', function ($query) use ($month, $year) {
                 $query->where('month', $month)->where('year', $year);
             })
             ->where(function (Builder $query) {
-                $query->where("end_date", NULL)->orWhere("end_date", ">", now());
+                $query->whereNull('end_date')->orWhere('end_date', '>', now());
             })
             ->get();
+    }
 
-        if ($employees->count() == 0) {
-            return back()->with('error', _lang('Payslip is already generated for the selected period !'));
+    /**
+     * Get business settings for payroll calculations
+     */
+    private function getBusinessSettings()
+    {
+        $business = request()->activeBusiness;
+        
+        return [
+            'business' => $business,
+            'weekendOption' => function_exists('package') && package()->timesheet_module == 1 
+                ? json_decode(get_business_option('weekends'), true) ?: [] 
+                : null,
+            'overtimeMultiplier' => floatval(get_business_option('overtime_rate_multiplier') ?: 1),
+            'publicHolidayMultiplier' => floatval(get_business_option('public_holiday_rate_multiplier') ?: 1),
+            'weekendMultiplier' => floatval(get_business_option('weekend_holiday_rate_multiplier') ?: 1),
+        ];
+    }
+
+    /**
+     * Validate employee requirements based on timesheet setting
+     */
+    private function validateEmployeeRequirements($employee)
+    {
+        if ($employee->timesheet_based == 1) {
+            if (empty($employee->working_hours) || $employee->working_hours == 0) {
+                throw new \Exception("Working hours is not set for {$employee->name}");
+            }
+        }
+        // If timesheet_based == 0, working_hours and max_overtime are not required
+    }
+
+    /**
+     * Generate payroll for a single employee
+     */
+    private function generateEmployeePayroll($employee, $month, $year, $businessSettings)
+    {
+        $calculationData = $this->calculateWorkingData($employee, $month, $year, $businessSettings);
+        $benefitsData = $this->getEmployeeBenefits($employee);
+        
+        $payroll = $this->createPayrollRecord($employee, $month, $year, $calculationData, $benefitsData, $businessSettings);
+        $payroll->save();
+    }
+
+    /**
+     * Calculate working data for employee
+     */
+    private function calculateWorkingData($employee, $month, $year, $businessSettings)
+    {
+        $required_working_days = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+        $public_holidays = 0;
+        $weekend = 0;
+        $required_working_hours = $employee->working_hours * $required_working_days;
+        $actual_working_hours = $required_working_hours;
+        $overtime_hours = 0;
+
+        if ($employee->timesheet_based == 1 && package()->timesheet_module == 1) {
+            return $this->calculateTimesheetBasedData($employee, $month, $year, $businessSettings);
         }
 
-        foreach ($employees as $employee) {
+        return [
+            'required_working_days' => $required_working_days,
+            'public_holidays' => $public_holidays,
+            'weekend' => $weekend,
+            'required_working_hours' => $required_working_hours,
+            'actual_working_hours' => $actual_working_hours,
+            'overtime_hours' => $overtime_hours,
+        ];
+    }
 
-            if($employee->working_hours == 0 || $employee->working_hours == null){
-                return back()->with('error', _lang('Working hours is not set for ' . $employee->name . ' !'));
-            }
+    /**
+     * Calculate timesheet-based working data
+     */
+    private function calculateTimesheetBasedData($employee, $month, $year, $businessSettings)
+    {
+        $weekends = array_map('strtolower', $businessSettings['weekendOption'] ?: []);
+        $business = $businessSettings['business'];
 
-            // Initialize variables with default values
-            $required_working_days = cal_days_in_month(CAL_GREGORIAN, $request->month, $request->year);
-            $public_holidays = 0;
-            $weekend = 0;
-            $required_working_hours = $employee->working_hours * $required_working_days;
-            $actual_working_hours = $required_working_hours;
-            $overtime_hours = 0;
+        $holidays = Holiday::where('business_id', $business->id)
+            ->whereMonth('date', $month)
+            ->whereYear('date', $year)
+            ->get();
 
-            // Only calculate from timesheet if employee is timesheet-based and package has timesheet module
-            if ($employee->timesheet_based == 1 && package()->timesheet_module == 1) {
-                $weekends = json_decode(get_business_option('weekends'));
-                $holidays = Holiday::where('business_id', request()->activeBusiness->id)
-                    ->whereMonth('date', $request->month)
-                    ->whereYear('date', $request->year)
-                    ->get();
-                $required_working_days = cal_days_in_month(CAL_GREGORIAN, $request->month, $request->year) - $holidays->count() - $this->countSpecificDaysInMonth($request->year, $request->month, $weekends);
-                $public_holidays = Timesheet::where('employee_id', $employee->id)->whereIn('date', $holidays->pluck('date'))->sum('working_hours');
-                $weekend = Timesheet::where('employee_id', $employee->id)
-                    ->whereMonth('date', $request->month)
-                    ->whereYear('date', $request->year)
-                    ->get()
-                    ->filter(function ($timesheet) use ($weekends) {
-                        return in_array(strtolower(\Carbon\Carbon::createFromFormat(get_date_format(), $timesheet->date)->format('l')), $weekends);
-                    })
-                    ->sum('working_hours');
-                $required_working_hours = $required_working_days * $employee->working_hours;
-                $actual_working_hours = Timesheet::where('employee_id', $employee->id)
-                    ->whereMonth('date', $request->month)
-                    ->whereYear('date', $request->year)
-                    ->sum('working_hours');
-                $overtime_hours = min(max($actual_working_hours - $required_working_hours, 0), $employee->max_overtime_hours * $required_working_days);
-            }
+        $specificWeekendDays = $this->countSpecificDaysInMonth($year, $month, $businessSettings['weekendOption']);
+        $required_working_days = cal_days_in_month(CAL_GREGORIAN, $month, $year) - $holidays->count() - $specificWeekendDays;
 
-            $benefits        = $employee->employee_benefits->where('month', $month)->where('year', $year)->first()?->salary_benefits()->where('type', 'add')->get();
-            $deductions      = $employee->employee_benefits->where('month', $month)->where('year', $year)->first()?->salary_benefits()->where('type', 'deduct')->get();
-            $total_benefits  = $employee->basic_salary + $benefits?->sum('amount');
-            $total_deduction = $deductions?->sum('amount');
+        $public_holidays = Timesheet::where('employee_id', $employee->id)
+            ->whereIn('date', $holidays->pluck('date'))
+            ->sum('working_hours');
 
-            $payroll                            = new Payroll();
-            $payroll->employee_id               = $employee->id;
-            $payroll->month                     = $month;
-            $payroll->year                      = $year;
-            $payroll->required_working_days     = $required_working_days;
-            $payroll->public_holiday            = $public_holidays;
-            $payroll->weekend                   = $weekend;
-            $payroll->required_working_hours    = $required_working_hours;
-            $payroll->overtime_hours            = $overtime_hours;
-            $payroll->cost_normal_hours         = $employee->basic_salary / $required_working_hours;
-            $payroll->cost_overtime_hours       = $employee->basic_salary / $required_working_hours * floatval(get_business_option('overtime_rate_multiplier'));
-            $payroll->cost_public_holiday       = $employee->basic_salary / $required_working_hours * floatval(get_business_option('public_holiday_rate_multiplier'));
-            $payroll->cost_weekend              = $employee->basic_salary / $required_working_hours * floatval(get_business_option('weekend_holiday_rate_multiplier'));
-            $payroll->total_cost_normal_hours   = $payroll->cost_normal_hours * $actual_working_hours;
-            $payroll->total_cost_overtime_hours = $payroll->cost_overtime_hours * $overtime_hours;
-            $payroll->total_cost_public_holiday = $payroll->cost_public_holiday * $public_holidays;
-            $payroll->total_cost_weekend        = $payroll->cost_weekend * $weekend;
-            $payroll->current_salary            = $employee->basic_salary;
-            $payroll->net_salary                = $payroll->total_cost_normal_hours + $payroll->total_cost_overtime_hours + $payroll->total_cost_public_holiday + $payroll->total_cost_weekend;
-            $payroll->tax_amount                = 0;
-            $payroll->total_allowance           = $benefits?->sum('amount');
-            $payroll->total_deduction           = $total_deduction;
-            $payroll->absence_fine              = 0;
-            $payroll->advance                   = $employee->employee_benefits->where('month', $month)->where('year', $year)->first()?->advance;
-            $payroll->status                    = 0;
-            $payroll->save();
+        $timesheets = Timesheet::where('employee_id', $employee->id)
+            ->whereMonth('date', $month)
+            ->whereYear('date', $year)
+            ->get();
+
+        $weekend = $timesheets
+            ->filter(function ($ts) use ($weekends) {
+                $dayName = strtolower(Carbon::createFromFormat(get_date_format(), $ts->date)->format('l'));
+                return in_array($dayName, $weekends);
+            })
+            ->sum('working_hours');
+
+        $required_working_hours = $required_working_days * $employee->working_hours;
+        $actual_working_hours = $timesheets->sum('working_hours');
+
+        $maxOvertimePerDay = $employee->max_overtime_hours ?? 0;
+        $overtime_hours = min(max($actual_working_hours - $required_working_hours, 0), $maxOvertimePerDay * max($required_working_days, 0));
+
+        return [
+            'required_working_days' => $required_working_days,
+            'public_holidays' => $public_holidays,
+            'weekend' => $weekend,
+            'required_working_hours' => $required_working_hours,
+            'actual_working_hours' => $actual_working_hours,
+            'overtime_hours' => $overtime_hours,
+        ];
+    }
+
+    /**
+     * Get employee benefits and deductions
+     */
+    private function getEmployeeBenefits($employee)
+    {
+        $empBenefit = $employee->employee_benefits->first();
+        $benefits = collect();
+        $deductions = collect();
+        $advance = 0;
+
+        if ($empBenefit) {
+            $benefits = $empBenefit->salary_benefits()->where('type', 'add')->get();
+            $deductions = $empBenefit->salary_benefits()->where('type', 'deduct')->get();
+            $advance = $empBenefit->advance ?? 0;
         }
 
-        DB::commit();
+        return [
+            'benefits' => $benefits,
+            'deductions' => $deductions,
+            'advance' => $advance,
+            'total_benefits' => $benefits->sum('amount'),
+            'total_deduction' => $deductions->sum('amount') + $advance,
+        ];
+    }
 
-        // audit log
+    /**
+     * Create payroll record
+     */
+    private function createPayrollRecord($employee, $month, $year, $calculationData, $benefitsData, $businessSettings)
+    {
+        // Guard against division by zero
+        $cost_base = $calculationData['required_working_hours'] > 0 
+            ? ($employee->basic_salary / $calculationData['required_working_hours']) 
+            : 0;
+
+        $payroll = new Payroll();
+        $payroll->employee_id = $employee->id;
+        $payroll->month = $month;
+        $payroll->year = $year;
+        $payroll->required_working_days = $calculationData['required_working_days'];
+        $payroll->public_holiday = $calculationData['public_holidays'];
+        $payroll->weekend = $calculationData['weekend'];
+        $payroll->required_working_hours = $calculationData['required_working_hours'];
+        $payroll->overtime_hours = $calculationData['overtime_hours'];
+        $payroll->cost_normal_hours = $cost_base;
+        $payroll->cost_overtime_hours = $cost_base * $businessSettings['overtimeMultiplier'];
+        $payroll->cost_public_holiday = $cost_base * $businessSettings['publicHolidayMultiplier'];
+        $payroll->cost_weekend = $cost_base * $businessSettings['weekendMultiplier'];
+        $payroll->total_cost_normal_hours = $payroll->cost_normal_hours * $calculationData['actual_working_hours'];
+        $payroll->total_cost_overtime_hours = $payroll->cost_overtime_hours * $calculationData['overtime_hours'];
+        $payroll->total_cost_public_holiday = $payroll->cost_public_holiday * $calculationData['public_holidays'];
+        $payroll->total_cost_weekend = $payroll->cost_weekend * $calculationData['weekend'];
+        $payroll->current_salary = $employee->basic_salary;
+        $payroll->net_salary = $payroll->total_cost_normal_hours
+            + $payroll->total_cost_overtime_hours
+            + $payroll->total_cost_public_holiday
+            + $payroll->total_cost_weekend
+            + $benefitsData['total_benefits']
+            - $benefitsData['total_deduction'];
+        $payroll->tax_amount = 0;
+        $payroll->total_allowance = $benefitsData['total_benefits'];
+        $payroll->total_deduction = $benefitsData['total_deduction'];
+        $payroll->absence_fine = 0;
+        $payroll->advance = $benefitsData['advance'];
+        $payroll->status = 0;
+
+        return $payroll;
+    }
+
+    /**
+     * Create audit log entry
+     */
+    private function createAuditLog($employeeCount)
+    {
         $audit = new AuditLog();
-        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->date_changed = now()->format('Y-m-d H:i:s');
         $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Generated Payslip for ' . count($employees) . ' employees';
+        $audit->event = 'Generated Payslip for ' . $employeeCount . ' employees';
         $audit->save();
-
-        return redirect()->route('payslips.index')->with('success', _lang('Payslip Generated Successfully'));
     }
 
     function countSpecificDaysInMonth($year, $month, $weekends)
@@ -344,7 +511,12 @@ class PayrollController extends Controller
      */
     public function show($id)
     {
-        $payroll      = Payroll::with('staff', 'staff.department', 'staff.designation')->find($id);
+        $payroll = Payroll::with('staff', 'staff.department', 'staff.designation')->find($id);
+        
+        if (!$payroll) {
+            abort(404, 'Payroll not found');
+        }
+        
         $working_days = Attendance::whereMonth('date', $payroll->month)
             ->whereYear('date', $payroll->year)
             ->groupBy('date')->get()->count();
@@ -354,8 +526,9 @@ class PayrollController extends Controller
             ->whereMonth('date', $payroll->month)
             ->whereYear('date', $payroll->year)
             ->where('attendance.status', 0)
-            ->first()
-            ->absence;
+            ->first();
+            
+        $absence = $absence ? $absence->absence : 0;
 
         $allowances = array();
         $deductions = array();
@@ -416,6 +589,10 @@ class PayrollController extends Controller
                     ->with('salary_benefits');
             }])
             ->find($id);
+
+        if (!$payroll) {
+            abort(404, 'Payroll not found');
+        }
 
         $employee_benefits = EmployeeBenefit::where('month', $payroll->month)
             ->where('year', $payroll->year)
@@ -517,12 +694,13 @@ class PayrollController extends Controller
     public function bulk_payment(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'payments'      => 'required',
-            'method'          => 'nullable',
-            'credit_account_id'      => 'required',
-            'debit_account_id' => 'required',
-            'advance_account_id' => 'required',
-            'payment_date' => 'required'
+            'payments'             => 'required|array',
+            'payments.*.id'        => 'required|integer',
+            'payments.*.amount'    => 'required|numeric|min:0',
+            'credit_account_id'    => 'required',
+            'debit_account_id'     => 'required',
+            'advance_account_id'   => 'required',
+            'payment_date'         => 'required|date',
         ]);
 
         if ($validator->fails()) {
@@ -530,109 +708,122 @@ class PayrollController extends Controller
         }
 
         $currentTime = now();
+        $paymentDate = Carbon::parse($request->input('payment_date'))
+            ->setTime($currentTime->hour, $currentTime->minute, $currentTime->second);
+        $currency = Currency::where('name', request()->activeBusiness->currency)->first();
+        $exchange_rate = $currency ? $currency->exchange_rate : 1;
 
         DB::beginTransaction();
         try {
-            $payslips = Payroll::whereIn('id', array_column($request->payments, 'id'))->get();
+            $payslipIds = array_column($request->payments, 'id');
+            $payslips = Payroll::with('employee')->whereIn('id', $payslipIds)->get();
+            $payslipMap = $payslips->keyBy('id');
 
             foreach ($request->payments as $payment) {
-                $payslip = Payroll::find($payment['id']);
+                if (!isset($payslipMap[$payment['id']])) {
+                    continue;
+                }
+                $payslip = $payslipMap[$payment['id']];
+
                 if ($payslip->status == 4) {
                     continue;
                 }
-                $payslip->paid = $payslip->paid + $payment['amount'];
-                $payslip->save();
 
-                // Set payment status
+                $amount = floatval($payment['amount']);
+                $payslip->paid = ($payslip->paid ?? 0) + $amount;
+
+                // Determine status
                 if ($payslip->paid >= $payslip->net_salary) {
                     $payslip->status = 4;
-                    $payslip->save();
                 } else {
                     $payslip->status = 3;
-                    $payslip->save();
                 }
 
-                $transaction                         = new Transaction();
-                $transaction->trans_date             = Carbon::parse($request->input('payment_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-                $transaction->account_id             = $request->credit_account_id;
-                $transaction->dr_cr                  = 'cr';
-                $transaction->transaction_amount     = $payment['amount'];
-                $transaction->currency_rate          = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                $transaction->base_currency_amount   = $payment['amount'];
-                $transaction->description            = _lang('Staff Salary Payment ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
-                $transaction->ref_id                 = $payslip->employee_id;
-                $transaction->ref_type               = 'payslip';
-                $transaction->employee_id            = $payslip->employee_id;
-                $transaction->save();
-
-                $payslip->transaction_id = $transaction->id;
                 $payslip->save();
 
-                if ($payslip->status == 4) {
-                    $transaction                          = new Transaction();
-                    $transaction->trans_date              = Carbon::parse($request->input('payment_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-                    $transaction->account_id              = $request->debit_account_id;
-                    $transaction->dr_cr                   = 'dr';
-                    $transaction->transaction_amount      = $payslip->current_salary;
-                    $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                    $transaction->base_currency_amount    = $payslip->current_salary;
-                    $transaction->description             = _lang('Staff Salary ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
-                    $transaction->ref_id                  = $payslip->employee_id;
-                    $transaction->ref_type                = 'payslip';
-                    $transaction->employee_id             = $payslip->employee_id;
-                    $transaction->save();
-                }
+                // Credit transaction
+                $creditTx = new Transaction();
+                $creditTx->trans_date = $paymentDate->format('Y-m-d H:i');
+                $creditTx->account_id = $request->credit_account_id;
+                $creditTx->dr_cr = 'cr';
+                $creditTx->transaction_amount = $amount;
+                $creditTx->currency_rate = $exchange_rate;
+                $creditTx->base_currency_amount = $amount;
+                $creditTx->description = _lang('Staff Salary Payment ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
+                $creditTx->ref_id = $payslip->employee_id;
+                $creditTx->ref_type = 'payslip';
+                $creditTx->employee_id = $payslip->employee_id;
+                $creditTx->save();
 
-                // Process deductions with specific accounts
-                $deductions = SalaryBenefit::whereHas('employee_benefit', function ($query) use ($payslip) {
-                    $query->where('employee_id', $payslip->employee_id)
-                        ->where('month', $payslip->month)
-                        ->where('year', $payslip->year);
-                })->where('type', 'deduct')
-                    ->whereNotNull('account_id')
-                    ->get();
+                $payslip->transaction_id = $creditTx->id;
+                $payslip->save();
 
+                // If fully paid, create debit and deduction/advance transactions
                 if ($payslip->status == 4) {
+                    // Debit main salary
+                    $debitTx = new Transaction();
+                    $debitTx->trans_date = $paymentDate->format('Y-m-d H:i');
+                    $debitTx->account_id = $request->debit_account_id;
+                    $debitTx->dr_cr = 'dr';
+                    $debitTx->transaction_amount = $payslip->current_salary;
+                    $debitTx->currency_rate = $exchange_rate;
+                    $debitTx->base_currency_amount = $payslip->current_salary;
+                    $debitTx->description = _lang('Staff Salary ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
+                    $debitTx->ref_id = $payslip->employee_id;
+                    $debitTx->ref_type = 'payslip';
+                    $debitTx->employee_id = $payslip->employee_id;
+                    $debitTx->save();
+
+                    // deductions with specific accounts
+                    $deductions = SalaryBenefit::whereHas('employee_benefit', function ($query) use ($payslip) {
+                        $query->where('employee_id', $payslip->employee_id)
+                            ->where('month', $payslip->month)
+                            ->where('year', $payslip->year);
+                    })->where('type', 'deduct')
+                        ->whereNotNull('account_id')
+                        ->get();
+
                     foreach ($deductions as $deduction) {
-                        $transaction = new Transaction();
-                        $transaction->trans_date = Carbon::parse($request->input('payment_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-                        $transaction->account_id = $deduction->account_id;
-                        $transaction->dr_cr = 'cr';
-                        $transaction->transaction_amount = $deduction->amount;
-                        $transaction->currency_rate = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                        $transaction->base_currency_amount = $deduction->amount;
-                        $transaction->description = _lang('Payroll Deduction: ' . $deduction->description . ' - ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
-                        $transaction->ref_id = $payslip->employee_id;
-                        $transaction->ref_type = 'payslip_deduction';
-                        $transaction->employee_id = $payslip->employee_id;
-                        $transaction->save();
+                        $deductTx = new Transaction();
+                        $deductTx->trans_date = $paymentDate->format('Y-m-d H:i');
+                        $deductTx->account_id = $deduction->account_id;
+                        $deductTx->dr_cr = 'cr';
+                        $deductTx->transaction_amount = $deduction->amount;
+                        $deductTx->currency_rate = $exchange_rate;
+                        $deductTx->base_currency_amount = $deduction->amount;
+                        $deductTx->description = _lang('Payroll Deduction: ' . $deduction->description . ' - ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
+                        $deductTx->ref_id = $payslip->employee_id;
+                        $deductTx->ref_type = 'payslip_deduction';
+                        $deductTx->employee_id = $payslip->employee_id;
+                        $deductTx->save();
                     }
-                }
 
-                if ($payslip->status == 4 && $payslip->advance > 0) {
-                    $transaction                          = new Transaction();
-                    $transaction->trans_date              = Carbon::parse($request->input('payment_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-                    $transaction->account_id              = $request->advance_account_id;
-                    $transaction->dr_cr                   = 'cr';
-                    $transaction->transaction_amount      = $payslip->advance;
-                    $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                    $transaction->base_currency_amount    = $payslip->advance;
-                    $transaction->description             = _lang('Staff Salary Advance ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
-                    $transaction->ref_id                  = $payslip->employee_id;
-                    $transaction->ref_type                = 'payslip';
-                    $transaction->employee_id             = $payslip->employee_id;
-                    $transaction->save();
+                    // advance if any
+                    if ($payslip->advance > 0) {
+                        $advanceTx = new Transaction();
+                        $advanceTx->trans_date = $paymentDate->format('Y-m-d H:i');
+                        $advanceTx->account_id = $request->advance_account_id;
+                        $advanceTx->dr_cr = 'cr';
+                        $advanceTx->transaction_amount = $payslip->advance;
+                        $advanceTx->currency_rate = $exchange_rate;
+                        $advanceTx->base_currency_amount = $payslip->advance;
+                        $advanceTx->description = _lang('Staff Salary Advance ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
+                        $advanceTx->ref_id = $payslip->employee_id;
+                        $advanceTx->ref_type = 'payslip';
+                        $advanceTx->employee_id = $payslip->employee_id;
+                        $advanceTx->save();
+                    }
                 }
             }
 
-            DB::commit();
-
             // audit log
             $audit = new AuditLog();
-            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->date_changed = now()->format('Y-m-d H:i:s');
             $audit->changed_by = auth()->user()->id;
-            $audit->event = 'Processed Payslip Payment for ' . count($payslips) . ' employees';
+            $audit->event = 'Processed Payslip Payment for ' . count($payslips ?? []) . ' employees';
             $audit->save();
+
+            DB::commit();
 
             return redirect()->back()->with('success', _lang('Payment Processed Successfully'));
         } catch (\Exception $e) {
@@ -734,28 +925,56 @@ class PayrollController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
+
     public function destroy($id)
     {
-        $payroll = Payroll::find($id);
+        $payroll = Payroll::with('employee')->find($id);
 
-        // audit log
-        $audit = new AuditLog();
-        $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Deleted Payslip for ' . $payroll->employee->name;
-        $audit->save();
-
-        // delete transactions
-        $transactions = Transaction::where('ref_id', $payroll->employee_id)->where('ref_type', 'payslip')
-            ->where('description', 'like', '%' . $payroll->month . '/' . $payroll->year . '%')
-            ->get();
-        foreach ($transactions as $transaction) {
-            $transaction->delete();
+        if (!$payroll) {
+            return redirect()->back()->with('error', _lang('Payslip not found'));
         }
 
-        $payroll->delete();
-        return redirect()->back()->with('success', _lang('Deleted Successfully'));
+        DB::beginTransaction();
+        try {
+            // Delete related transactions
+            Transaction::where('ref_id', $payroll->employee_id)
+                ->whereIn('ref_type', ['payslip', 'payslip_deduction'])
+                ->where('description', 'like', '%' . $payroll->month . '/' . $payroll->year . '%')
+                ->delete();
+
+            // Delete the employee benefit for this employee/month/year and its salary benefits
+            $employeeBenefit = EmployeeBenefit::with('salary_benefits')
+                ->where('employee_id', $payroll->employee_id)
+                ->where('month', $payroll->month)
+                ->where('year', $payroll->year)
+                ->first();
+
+            if ($employeeBenefit) {
+                // Delete salary benefits first if not using cascade
+                foreach ($employeeBenefit->salary_benefits as $sb) {
+                    $sb->delete();
+                }
+                $employeeBenefit->delete();
+            }
+
+            // Audit log
+            $audit = new AuditLog();
+            $audit->date_changed = now()->format('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Deleted Payslip and related benefits for ' . $payroll->employee->name . " ({$payroll->month}/{$payroll->year})";
+            $audit->save();
+
+            // Delete payroll
+            $payroll->delete();
+
+            DB::commit();
+            return redirect()->back()->with('success', _lang('Deleted Successfully'));
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', $e->getMessage());
+        }
     }
+
 
     public function export_payslips()
     {
@@ -894,5 +1113,282 @@ class PayrollController extends Controller
         }
 
         return redirect()->back()->with('success', _lang('Deleted Successfully'));
+    }
+
+    /**
+     * Display a listing of trashed payrolls.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function trash(Request $request)
+    {
+        $month = $request->month ?? date('m');
+        $year = $request->year ?? date('Y');
+        $search = $request->search;
+        $per_page = $request->per_page ?? 50;
+
+        // Store month and year in session
+        session(['month' => $month, 'year' => $year]);
+
+        $query = Payroll::onlyTrashed()
+            ->where('payslips.business_id', $request->activeBusiness->id)
+            ->where('month', $month)
+            ->where('year', $year)
+            ->with('staff');
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('employee_id', 'like', "%$search%")
+                    ->orWhereHas('employee', function ($q) use ($search) {
+                        $q->where('name', 'like', "%$search%");
+                    })
+                    ->orWhere('current_salary', 'like', "%$search%");
+            });
+        }
+
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        // Handle relationship sorting
+        if (str_contains($sortColumn, '.')) {
+            $parts = explode('.', $sortColumn);
+            $column = $parts[1];
+            $query->join('employees', 'payslips.employee_id', '=', 'employees.id')
+                ->where('employees.business_id', $request->activeBusiness->id)
+                ->orderBy('employees.' . $column, $sortDirection)
+                ->select('payslips.*');
+        } else {
+            $query->orderBy('payslips.' . $sortColumn, $sortDirection);
+        }
+
+        $payrolls = $query->paginate($per_page);
+
+        // Calculate totals
+        $totals = [
+            'total_payrolls' => $payrolls->total(),
+            'total_salary' => $payrolls->sum('current_salary'),
+            'total_net_salary' => $payrolls->sum('net_salary'),
+            'total_tax' => $payrolls->sum('tax_amount'),
+            'total_allowance' => $payrolls->sum('total_allowance'),
+            'total_deduction' => $payrolls->sum('total_deduction'),
+        ];
+
+        $years = range(date('Y') - 5, date('Y') + 1);
+        $months = [
+            1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April',
+            5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August',
+            9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'
+        ];
+
+        return Inertia::render('Backend/User/Payroll/Trash', [
+            'payrolls' => $payrolls->items(),
+            'meta' => [
+                'current_page' => $payrolls->currentPage(),
+                'per_page' => $payrolls->perPage(),
+                'last_page' => $payrolls->lastPage(),
+                'total' => $payrolls->total(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'month' => $month,
+                'year' => $year,
+                'sorting' => $sorting,
+            ],
+            'totals' => $totals,
+            'years' => $years,
+            'months' => $months,
+            'year' => $year,
+            'month' => $month,
+        ]);
+    }
+
+    /**
+     * Restore a soft deleted payroll.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function restore($id)
+    {
+        $payroll = Payroll::onlyTrashed()->find($id);
+
+        if (!$payroll) {
+            return redirect()->back()->with('error', _lang('Payslip not found'));
+        }
+
+        DB::beginTransaction();
+        try {
+            // Restore related transactions
+            Transaction::onlyTrashed()
+                ->where('ref_id', $payroll->employee_id)
+                ->whereIn('ref_type', ['payslip', 'payslip_deduction'])
+                ->where('description', 'like', '%' . $payroll->month . '/' . $payroll->year . '%')
+                ->restore();
+
+            // Restore the employee benefit for this employee/month/year and its salary benefits
+            $employeeBenefit = EmployeeBenefit::onlyTrashed()
+                ->with('salary_benefits')
+                ->where('employee_id', $payroll->employee_id)
+                ->where('month', $payroll->month)
+                ->where('year', $payroll->year)
+                ->first();
+
+            if ($employeeBenefit) {
+                // Restore salary benefits first
+                foreach ($employeeBenefit->salary_benefits as $sb) {
+                    $sb->restore();
+                }
+                $employeeBenefit->restore();
+            }
+
+            // Audit log
+            $audit = new AuditLog();
+            $audit->date_changed = now()->format('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Restored Payslip and related benefits for ' . $payroll->employee->name . " ({$payroll->month}/{$payroll->year})";
+            $audit->save();
+
+            // Restore payroll
+            $payroll->restore();
+
+            DB::commit();
+            return redirect()->back()->with('success', _lang('Restored Successfully'));
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Bulk restore soft deleted payrolls.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_restore(Request $request)
+    {
+        if ($request->ids == null) {
+            return redirect()->back()->with('error', _lang('Please Select Payslip'));
+        }
+
+        $payslips = Payroll::onlyTrashed()->whereIn('id', $request->ids)->get();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Restored Payslip for ' . count($payslips) . ' employees';
+        $audit->save();
+
+        foreach ($payslips as $payslip) {
+            // restore transactions
+            $transactions = Transaction::onlyTrashed()
+                ->where('ref_id', $payslip->employee_id)
+                ->where('ref_type', 'payslip')
+                ->where('description', 'like', '%' . $payslip->month . '/' . $payslip->year . '%')
+                ->get();
+            foreach ($transactions as $transaction) {
+                $transaction->restore();
+            }
+            $payslip->restore();
+        }
+
+        return redirect()->back()->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Permanently delete a soft deleted payroll.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function permanent_destroy($id)
+    {
+        $payroll = Payroll::onlyTrashed()->find($id);
+
+        if (!$payroll) {
+            return redirect()->back()->with('error', _lang('Payslip not found'));
+        }
+
+        DB::beginTransaction();
+        try {
+            // Permanently delete related transactions
+            Transaction::onlyTrashed()
+                ->where('ref_id', $payroll->employee_id)
+                ->whereIn('ref_type', ['payslip', 'payslip_deduction'])
+                ->where('description', 'like', '%' . $payroll->month . '/' . $payroll->year . '%')
+                ->forceDelete();
+
+            // Permanently delete the employee benefit for this employee/month/year and its salary benefits
+            $employeeBenefit = EmployeeBenefit::onlyTrashed()
+                ->with('salary_benefits')
+                ->where('employee_id', $payroll->employee_id)
+                ->where('month', $payroll->month)
+                ->where('year', $payroll->year)
+                ->first();
+
+            if ($employeeBenefit) {
+                // Permanently delete salary benefits first
+                foreach ($employeeBenefit->salary_benefits as $sb) {
+                    $sb->forceDelete();
+                }
+                $employeeBenefit->forceDelete();
+            }
+
+            // Audit log
+            $audit = new AuditLog();
+            $audit->date_changed = now()->format('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Permanently Deleted Payslip and related benefits for ' . $payroll->employee->name . " ({$payroll->month}/{$payroll->year})";
+            $audit->save();
+
+            // Permanently delete payroll
+            $payroll->forceDelete();
+
+            DB::commit();
+            return redirect()->back()->with('success', _lang('Permanently Deleted Successfully'));
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Bulk permanently delete soft deleted payrolls.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_permanent_destroy(Request $request)
+    {
+        if ($request->ids == null) {
+            return redirect()->back()->with('error', _lang('Please Select Payslip'));
+        }
+
+        $payslips = Payroll::onlyTrashed()->whereIn('id', $request->ids)->get();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Permanently Deleted Payslip for ' . count($payslips) . ' employees';
+        $audit->save();
+
+        foreach ($payslips as $payslip) {
+            // permanently delete transactions
+            $transactions = Transaction::onlyTrashed()
+                ->where('ref_id', $payslip->employee_id)
+                ->where('ref_type', 'payslip')
+                ->where('description', 'like', '%' . $payslip->month . '/' . $payslip->year . '%')
+                ->get();
+            foreach ($transactions as $transaction) {
+                $transaction->forceDelete();
+            }
+            $payslip->forceDelete();
+        }
+
+        return redirect()->back()->with('success', _lang('Permanently Deleted Successfully'));
     }
 }

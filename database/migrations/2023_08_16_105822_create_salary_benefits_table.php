@@ -18,6 +18,10 @@ return new class extends Migration {
             $table->string('type', 20)->default('add')->comment('add | deduct');
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
+            $table->bigInteger('created_user_id')->nullable();
+            $table->bigInteger('updated_user_id')->nullable();
+            $table->bigInteger('deleted_user_id')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('employee_benefit_id')->references('id')->on('employee_benefits')->cascadeOnDelete();

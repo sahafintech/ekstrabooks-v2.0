@@ -421,6 +421,7 @@ export default function List({
     month,
     accounts,
     methods,
+    trashed_payrolls = 0,
 }) {
     const { flash = {}, errors = {}, userPackage } = usePage().props;
     const { toast } = useToast();
@@ -894,6 +895,16 @@ export default function List({
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
+                                <Link href={route("payslips.trash")}>
+                                    <Button variant="outline" className="relative">
+                                        <Trash className="h-8 w-8" />
+                                        {trashed_payrolls > 0 && (
+                                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
+                                            {trashed_payrolls}
+                                        </span>
+                                        )}
+                                    </Button>
+                                </Link>
                                 {/* months */}
                                 <SearchableCombobox
                                     options={[

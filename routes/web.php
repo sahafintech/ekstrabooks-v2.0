@@ -680,6 +680,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('awards', AwardController::class);
 
 		//Payslip Controller
+		Route::get('payslips/trash', [PayrollController::class, 'trash'])->name('payslips.trash');
+		Route::post('payslips/{id}/restore', [PayrollController::class, 'restore'])->name('payslips.restore');
+		Route::post('payslips/bulk_restore', [PayrollController::class, 'bulk_restore'])->name('payslips.bulk_restore');
+		Route::delete('payslips/{id}/permanent_destroy', [PayrollController::class, 'permanent_destroy'])->name('payslips.permanent_destroy');
+		Route::post('payslips/bulk_permanent_destroy', [PayrollController::class, 'bulk_permanent_destroy'])->name('payslips.bulk_permanent_destroy');
 		Route::post('payslips/store_payment', [PayrollController::class, 'store_payment'])->name('payslips.store_payment');
 		Route::post('payslips/store_accrual', [PayrollController::class, 'store_accrual'])->name('payslips.store_accrual');
 		Route::match(['get', 'post'], 'payslips/accrue', [PayrollController::class, 'accrue_payroll'])->name('payslips.accrue');
