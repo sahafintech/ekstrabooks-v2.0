@@ -95,7 +95,8 @@ class JournalController extends Controller
                 'sorting' => $sorting,
                 'status' => $status
             ],
-            'summary' => $summary
+            'summary' => $summary,
+            'trashed_journals' => Journal::onlyTrashed()->where('business_id', request()->activeBusiness->id)->count(),
         ]);
     }
 
@@ -685,5 +686,214 @@ class JournalController extends Controller
         }
 
         return redirect()->route('journals.index')->with('success', _lang('Journal Entry Rejected'));
+    }
+
+    public function trash(Request $request)
+    {
+        $search = $request->input('search', '');
+        $perPage = $request->input('per_page', 50);
+        $status = $request->input('status', '');
+
+        $query = Journal::onlyTrashed()
+            ->where('business_id', request()->activeBusiness->id)
+            ->with('created_user', 'approved_user');
+
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('journal_number', 'like', "%$search%")
+                    ->orWhere('transaction_amount', 'like', "%$search%");
+            });
+        }
+
+        if ($status) {
+            $query->where('status', $status);
+        }
+
+        // Handle sorting
+        $sorting = $request->get('sorting', []);
+        $sortColumn = $sorting['column'] ?? 'id';
+        $sortDirection = $sorting['direction'] ?? 'desc';
+
+        $query->orderBy($sortColumn, $sortDirection);
+
+        // Get summary statistics for all trashed journals matching filters
+        $allJournals = Journal::onlyTrashed()
+            ->where('business_id', request()->activeBusiness->id);
+
+        if (!empty($search)) {
+            $allJournals->where(function ($q) use ($search) {
+                $q->where('journal_number', 'like', "%$search%")
+                    ->orWhere('transaction_amount', 'like', "%$search%");
+            });
+        }
+
+        if ($status) {
+            $allJournals->where('status', $status);
+        }
+
+        $allJournals = $allJournals->get();
+
+        $summary = [
+            'total_journals' => $allJournals->count(),
+            'total_approved' => $allJournals->where('status', 1)->count(),
+            'total_pending' => $allJournals->where('status', 0)->count(),
+            'total_rejected' => $allJournals->where('status', 2)->count(),
+            'total_amount' => $allJournals->sum('base_currency_amount'),
+        ];
+
+        $journals = $query->paginate($perPage);
+
+        return Inertia::render('Backend/User/Journal/Trash', [
+            'journals' => $journals->items(),
+            'currencies' => Currency::all(),
+            'meta' => [
+                'total' => $journals->total(),
+                'per_page' => $journals->perPage(),
+                'current_page' => $journals->currentPage(),
+                'last_page' => $journals->lastPage(),
+                'from' => $journals->firstItem(),
+                'to' => $journals->lastItem()
+            ],
+            'filters' => [
+                'search' => $search,
+                'sorting' => $sorting,
+                'status' => $status
+            ],
+            'summary' => $summary
+        ]);
+    }
+
+    public function restore($id)
+    {
+        $journal = Journal::onlyTrashed()->find($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Journal Restored ' . $journal->journal_number;
+        $audit->save();
+
+        // restore transactions
+        $transactions = Transaction::onlyTrashed()->where('ref_id', $journal->id)
+            ->where('ref_type', 'journal')
+            ->get();
+
+        foreach ($transactions as $transaction) {
+            $transaction->restore();
+        }
+
+        $pending_transactions = PendingTransaction::onlyTrashed()->where('ref_id', $journal->id)
+            ->where('ref_type', 'journal')
+            ->get();
+
+        foreach ($pending_transactions as $transaction) {
+            $transaction->restore();
+        }
+
+        $journal->restore();
+        return redirect()->route('journals.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    public function bulk_restore(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $journal = Journal::onlyTrashed()->find($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Journal Restored ' . $journal->journal_number;
+            $audit->save();
+
+            // restore transactions
+            $transactions = Transaction::onlyTrashed()->where('ref_id', $journal->id)
+                ->where('ref_type', 'journal')
+                ->get();
+
+            foreach ($transactions as $transaction) {
+                $transaction->restore();
+            }
+
+            $pending_transactions = PendingTransaction::onlyTrashed()->where('ref_id', $journal->id)
+                ->where('ref_type', 'journal')
+                ->get();
+
+            foreach ($pending_transactions as $transaction) {
+                $transaction->restore();
+            }
+
+            $journal->restore();
+        }
+
+        return redirect()->route('journals.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    public function permanent_destroy($id)
+    {
+        $journal = Journal::onlyTrashed()->find($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Journal Permanently Deleted ' . $journal->journal_number;
+        $audit->save();
+
+        // delete transactions
+        $transactions = Transaction::onlyTrashed()->where('ref_id', $journal->id)
+            ->where('ref_type', 'journal')
+            ->get();
+
+        foreach ($transactions as $transaction) {
+            $transaction->forceDelete();
+        }
+
+        $pending_transactions = PendingTransaction::onlyTrashed()->where('ref_id', $journal->id)
+            ->where('ref_type', 'journal')
+            ->get();
+
+        foreach ($pending_transactions as $transaction) {
+            $transaction->forceDelete();
+        }
+
+        $journal->forceDelete();
+        return redirect()->route('journals.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    public function bulk_permanent_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $journal = Journal::onlyTrashed()->find($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Journal Permanently Deleted ' . $journal->journal_number;
+            $audit->save();
+
+            // delete transactions
+            $transactions = Transaction::onlyTrashed()->where('ref_id', $journal->id)
+                ->where('ref_type', 'journal')
+                ->get();
+
+            foreach ($transactions as $transaction) {
+                $transaction->forceDelete();
+            }
+
+            $pending_transactions = PendingTransaction::onlyTrashed()->where('ref_id', $journal->id)
+                ->where('ref_type', 'journal')
+                ->get();
+
+            foreach ($pending_transactions as $transaction) {
+                $transaction->forceDelete();
+            }
+
+            $journal->forceDelete();
+        }
+
+        return redirect()->route('journals.trash')->with('success', _lang('Permanently Deleted Successfully'));
     }
 }

@@ -401,6 +401,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('purchase_returns/bulk_reject', [PurchaseReturnController::class, 'bulk_reject'])->name('purchase_returns.bulk_reject');
 
 		// Journal Entry
+		Route::get('journals/trash', [JournalController::class, 'trash'])->name('journals.trash');
+		Route::post('journals/{id}/restore', [JournalController::class, 'restore'])->name('journals.restore');
+		Route::post('journals/bulk_restore', [JournalController::class, 'bulk_restore'])->name('journals.bulk_restore');
+		Route::post('journals/bulk_permanent_destroy', [JournalController::class, 'bulk_permanent_destroy'])->name('journals.bulk_permanent_destroy');
+		Route::delete('journals/{id}/permanent_destroy', [JournalController::class, 'permanent_destroy'])->name('journals.permanent_destroy');
 		Route::resource('journals', JournalController::class);
 		Route::post('import_journal', [JournalController::class, 'import_journal'])->name('journals.import');
 		Route::get('journal/export/{id}', [JournalController::class, 'export_journal'])->name('journals.export');
