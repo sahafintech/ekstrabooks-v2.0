@@ -34,7 +34,7 @@ import {
   PopoverTrigger,
 } from "@/Components/ui/popover";
 import { Calendar } from "@/Components/ui/calendar";
-import { Plus, Edit, Trash, Search, DollarSign, CalendarIcon, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Edit, Trash, Search, DollarSign, CalendarIcon, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -102,7 +102,7 @@ const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, cou
   </Modal>
 );
 
-export default function List({ awards = [], meta = {}, filters = {}, employees = [] }) {
+export default function List({ awards = [], meta = {}, filters = {}, employees = [], trashed_awards = 0 }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedAwards, setSelectedAwards] = useState([]);
@@ -450,11 +450,21 @@ export default function List({ awards = [], meta = {}, filters = {}, employees =
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex flex-col md:flex-row gap-2">
                 <Button onClick={openCreateDialog}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Award
                 </Button>
+                <Link href={route("awards.trash")}>
+                    <Button variant="outline" className="relative">
+                        <Trash2 className="h-8 w-8" />
+                        {trashed_awards > 0 && (
+                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
+                            {trashed_awards}
+                        </span>
+                        )}
+                    </Button>
+                </Link>
               </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input

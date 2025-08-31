@@ -11,6 +11,7 @@ use DataTables;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 class AwardController extends Controller
@@ -75,7 +76,7 @@ class AwardController extends Controller
         }
 
         // Get awards with pagination
-        $awards = $query->paginate($per_page)->withQueryString();
+        $awards = $query->paginate($per_page);
         $employees = Employee::select('id', 'name')->get();
 
         // Return Inertia view
@@ -84,17 +85,73 @@ class AwardController extends Controller
             'employees' => $employees,
             'meta' => [
                 'current_page' => $awards->currentPage(),
-                'from' => $awards->firstItem(),
-                'last_page' => $awards->lastPage(),
-                'links' => $awards->linkCollection(),
-                'path' => $awards->path(),
                 'per_page' => $awards->perPage(),
+                'from' => $awards->firstItem(),
                 'to' => $awards->lastItem(),
                 'total' => $awards->total(),
+                'last_page' => $awards->lastPage(),
             ],
             'filters' => [
                 'search' => $search,
                 'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $sorting,
+            ],
+            'trashed_awards' => Award::onlyTrashed()->count(),
+        ]);
+    }
+
+    /**
+     * Display a listing of trashed awards.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function trash(Request $request)
+    {
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
+        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
+
+        $query = Award::onlyTrashed()->with('staff');
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('award_name', 'like', "%$search%")
+                    ->orWhere('award', 'like', "%$search%")
+                    ->orWhere('award_date', 'like', "%$search%")
+                    ->orWhereHas('staff', function ($q) use ($search) {
+                        $q->where('name', 'like', "%$search%");
+                    });
+            });
+        }
+
+        // Handle sorting
+        if (isset($sorting['column']) && isset($sorting['direction'])) {
+            $column = $sorting['column'];
+            $direction = $sorting['direction'];
+            
+            if ($column === 'staff.name') {
+                $query->join('employees', 'awards.employee_id', '=', 'employees.id')
+                    ->orderBy('employees.name', $direction)
+                    ->select('awards.*');
+            } else {
+                $query->orderBy($column, $direction);
+            }
+        }
+
+        $awards = $query->paginate($per_page);
+
+        return Inertia::render('Backend/User/Award/Trash', [
+            'awards' => $awards->items(),
+            'meta' => [
+                'current_page' => $awards->currentPage(),
+                'per_page' => $awards->perPage(),
+                'from' => $awards->firstItem(),
+                'to' => $awards->lastItem(),
+                'total' => $awards->total(),
+                'last_page' => $awards->lastPage(),
+            ],
+            'filters' => [
+                'search' => $search,
                 'sorting' => $sorting,
             ],
         ]);
@@ -127,14 +184,19 @@ class AwardController extends Controller
         $award->award_name  = $request->input('award_name');
         $award->award       = $request->input('award');
         $award->details     = $request->input('details');
+        $award->user_id     = Auth::id();
+        $award->business_id = $request->activeBusiness->id;
 
         $award->save();
+
+        // Get employee name for audit log
+        $employeeName = Employee::find($award->employee_id)->name ?? 'Unknown Employee';
 
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Created Award for ' . $award->staff->name;
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Created Award for ' . $employeeName;
         $audit->save();
 
         return redirect()->route('awards.index')->with('success', _lang('Saved Successfully'));
@@ -205,11 +267,14 @@ class AwardController extends Controller
 
         $award->save();
 
+        // Get employee name for audit log
+        $employeeName = Employee::find($award->employee_id)->name ?? 'Unknown Employee';
+
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Updated Award for ' . $award->staff->name;
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Updated Award for ' . $employeeName;
         $audit->save();
 
         return redirect()->route('awards.index')->with('success', _lang('Updated Successfully'));
@@ -225,19 +290,22 @@ class AwardController extends Controller
     {
         $award = Award::find($id);
 
-        // Store the name for the audit log
-        $staffName = $award->staff->name;
-
-        $award->delete();
+        // Get employee name for audit log
+        $employeeName = Employee::find($award->employee_id)->name ?? 'Unknown Employee';
 
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Deleted Award for ' . $staffName;
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Deleted Award for ' . $employeeName;
         $audit->save();
 
-        return redirect()->route('awards.index')->with('success', _lang('Deleted Successfully'));
+        try {
+            $award->delete();
+            return redirect()->route('awards.index')->with('success', _lang('Deleted Successfully'));
+        } catch (\Exception $e) {
+            return redirect()->route('awards.index')->with('error', _lang('This item is already exists in other entity'));
+        }
     }
 
     /**
@@ -248,31 +316,131 @@ class AwardController extends Controller
      */
     public function bulk_destroy(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'ids' => 'required|array',
-            'ids.*' => 'exists:awards,id',
-        ]);
+        $ids = $request->ids;
+        $awards = Award::whereIn('id', $ids)->get();
+        
+        foreach($awards as $award) {
+            // Get employee name for audit log
+            $employeeName = Employee::find($award->employee_id)->name ?? 'Unknown Employee';
+            
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Deleted Award for ' . $employeeName;
+            $audit->save();
 
-        if ($validator->fails()) {
-            return back()->withErrors($validator);
+            try {
+                $award->delete();
+            } catch (\Exception $e) {
+                // Continue with the next award
+            }
         }
+        
+        return back()->with('success', 'Selected awards deleted successfully');
+    }
 
-        // Get award names for audit log
-        $awardNames = Award::whereIn('id', $request->ids)->with('staff')->get()
-            ->map(function ($award) {
-                return $award->award_name . ' (' . $award->staff->name . ')';
-            })->implode(', ');
+    /**
+     * Restore the specified award from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function restore(Request $request, $id)
+    {
+        $award = Award::onlyTrashed()->findOrFail($id);
 
-        // Delete the awards
-        Award::whereIn('id', $request->ids)->delete();
+        // Get employee name for audit log
+        $employeeName = Employee::find($award->employee_id)->name ?? 'Unknown Employee';
 
-        // Audit log
+        // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Bulk Deleted Awards: ' . $awardNames;
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Restored Award for ' . $employeeName;
         $audit->save();
 
-        return redirect()->route('awards.index')->with('success', _lang('Deleted Successfully'));
+        $award->restore();
+
+        return redirect()->route('awards.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Bulk restore selected awards from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_restore(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $award = Award::onlyTrashed()->findOrFail($id);
+
+            // Get employee name for audit log
+            $employeeName = Employee::find($award->employee_id)->name ?? 'Unknown Employee';
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Restored Award for ' . $employeeName;
+            $audit->save();
+
+            $award->restore();
+        }
+
+        return redirect()->route('awards.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Permanently delete the specified award from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function permanent_destroy(Request $request, $id)
+    {
+        $award = Award::onlyTrashed()->findOrFail($id);
+
+        // Get employee name for audit log
+        $employeeName = Employee::find($award->employee_id)->name ?? 'Unknown Employee';
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Permanently Deleted Award for ' . $employeeName;
+        $audit->save();
+
+        $award->forceDelete();
+
+        return redirect()->route('awards.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    /**
+     * Bulk permanently delete selected awards from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_permanent_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $award = Award::onlyTrashed()->findOrFail($id);
+
+            // Get employee name for audit log
+            $employeeName = Employee::find($award->employee_id)->name ?? 'Unknown Employee';
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Permanently Deleted Award for ' . $employeeName;
+            $audit->save();
+
+            $award->forceDelete();
+        }
+
+        return redirect()->route('awards.trash')->with('success', _lang('Permanently Deleted Successfully'));
     }
 }

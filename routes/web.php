@@ -687,6 +687,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 
 		//Award Controller
+		Route::get('awards/trash', [AwardController::class, 'trash'])->name('awards.trash');
+		Route::post('awards/{id}/restore', [AwardController::class, 'restore'])->name('awards.restore');
+		Route::post('awards/bulk_restore', [AwardController::class, 'bulk_restore'])->name('awards.bulk_restore');
+		Route::post('awards/bulk_permanent_destroy', [AwardController::class, 'bulk_permanent_destroy'])->name('awards.bulk_permanent_destroy');
+		Route::delete('awards/{id}/permanent_destroy', [AwardController::class, 'permanent_destroy'])->name('awards.permanent_destroy');
 		Route::post('awards/bulk_destroy', [AwardController::class, 'bulk_destroy'])->name('awards.bulk_destroy');
 		Route::resource('awards', AwardController::class);
 
