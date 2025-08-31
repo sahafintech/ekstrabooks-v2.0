@@ -59,24 +59,67 @@ class DepartmentController extends Controller {
         $query->orderBy($sortColumn, $sortDirection);
 
         // Get departments with pagination
-        $departments = $query->paginate($per_page)->withQueryString();
+        $departments = $query->paginate($per_page);
 
         // Return Inertia view
         return Inertia::render('Backend/User/Department/List', [
             'departments' => $departments->items(),
             'meta' => [
                 'current_page' => $departments->currentPage(),
-                'from' => $departments->firstItem(),
-                'last_page' => $departments->lastPage(),
-                'links' => $departments->linkCollection(),
-                'path' => $departments->path(),
                 'per_page' => $departments->perPage(),
+                'from' => $departments->firstItem(),
                 'to' => $departments->lastItem(),
                 'total' => $departments->total(),
+                'last_page' => $departments->lastPage(),
             ],
             'filters' => [
                 'search' => $search,
-                'columnFilters' => $request->get('columnFilters', []),
+                'sorting' => $sorting,
+            ],
+            'trashed_departments' => Department::onlyTrashed()->count(),
+        ]);
+    }
+
+    /**
+     * Display a listing of trashed departments.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function trash(Request $request) {
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
+        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
+
+        $query = Department::onlyTrashed();
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%$search%")
+                    ->orWhere('descriptions', 'like', "%$search%");
+            });
+        }
+
+        // Handle sorting
+        if (isset($sorting['column']) && isset($sorting['direction'])) {
+            $column = $sorting['column'];
+            $direction = $sorting['direction'];
+            $query->orderBy($column, $direction);
+        }
+
+        $departments = $query->paginate($per_page);
+
+        return Inertia::render('Backend/User/Department/Trash', [
+            'departments' => $departments->items(),
+            'meta' => [
+                'current_page' => $departments->currentPage(),
+                'per_page' => $departments->perPage(),
+                'from' => $departments->firstItem(),
+                'to' => $departments->lastItem(),
+                'total' => $departments->total(),
+                'last_page' => $departments->lastPage(),
+            ],
+            'filters' => [
+                'search' => $search,
                 'sorting' => $sorting,
             ],
         ]);
@@ -241,5 +284,97 @@ class DepartmentController extends Controller {
         }
         
         return back()->with('success', 'Selected departments deleted successfully');
+    }
+
+    /**
+     * Restore the specified department from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function restore(Request $request, $id)
+    {
+        $department = Department::onlyTrashed()->findOrFail($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Restored Department ' . $department->name;
+        $audit->save();
+
+        $department->restore();
+
+        return redirect()->route('departments.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Bulk restore selected departments from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_restore(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $department = Department::onlyTrashed()->findOrFail($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Restored Department ' . $department->name;
+            $audit->save();
+
+            $department->restore();
+        }
+
+        return redirect()->route('departments.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Permanently delete the specified department from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function permanent_destroy(Request $request, $id)
+    {
+        $department = Department::onlyTrashed()->findOrFail($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Permanently Deleted Department ' . $department->name;
+        $audit->save();
+
+        $department->forceDelete();
+
+        return redirect()->route('departments.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    /**
+     * Bulk permanently delete selected departments from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_permanent_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $department = Department::onlyTrashed()->findOrFail($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Permanently Deleted Department ' . $department->name;
+            $audit->save();
+
+            $department->forceDelete();
+        }
+
+        return redirect()->route('departments.trash')->with('success', _lang('Permanently Deleted Successfully'));
     }
 }

@@ -568,6 +568,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('transaction_methods/bulk_destroy', [TransactionMethodController::class, 'bulk_destroy'])->name('transaction_methods.bulk_destroy');
 
 		//HR Module
+		Route::get('departments/trash', [DepartmentController::class, 'trash'])->name('departments.trash');
+		Route::post('departments/{id}/restore', [DepartmentController::class, 'restore'])->name('departments.restore');
+		Route::post('departments/bulk_restore', [DepartmentController::class, 'bulk_restore'])->name('departments.bulk_restore');
+		Route::post('departments/bulk_permanent_destroy', [DepartmentController::class, 'bulk_permanent_destroy'])->name('departments.bulk_permanent_destroy');
+		Route::delete('departments/{id}/permanent_destroy', [DepartmentController::class, 'permanent_destroy'])->name('departments.permanent_destroy');
 		Route::resource('departments', DepartmentController::class);
 		Route::post('departments/bulk_destroy', [DepartmentController::class, 'bulk_destroy'])->name('departments.bulk_destroy');
 		Route::get('designations/get_designations/{deaprtment_id}', [DesignationController::class, 'get_designations']);

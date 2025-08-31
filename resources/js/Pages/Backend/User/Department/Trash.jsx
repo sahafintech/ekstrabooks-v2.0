@@ -20,17 +20,7 @@ import {
   SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { Label } from "@/Components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogTrigger
-} from "@/Components/ui/dialog";
-import { Textarea } from "@/Components/ui/textarea";
-import { Plus, Edit, Trash, Search, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+import { Edit, Trash, ChevronUp, ChevronDown, RotateCcw } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -93,7 +83,63 @@ const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, cou
   </Modal>
 );
 
-export default function List({ departments = [], meta = {}, filters = {}, trashed_departments = 0 }) {
+// Restore Confirmation Modal Component
+const RestoreConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to restore this department?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Restore
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+// Bulk Restore Confirmation Modal Component
+const BulkRestoreConfirmationModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">
+        Are you sure you want to restore {count} selected department{count !== 1 ? 's' : ''}?
+      </h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={processing}
+        >
+          Restore Selected
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+export default function TrashList({ departments = [], meta = {}, filters = {} }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedDepartments, setSelectedDepartments] = useState([]);
@@ -104,23 +150,16 @@ export default function List({ departments = [], meta = {}, filters = {}, trashe
   const [bulkAction, setBulkAction] = useState("");
   const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
 
-  // Form state for Create/Edit dialogs
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingDepartment, setEditingDepartment] = useState(null);
-  const [form, setForm] = useState({
-    name: "",
-    descriptions: ""
-  });
-
-  // Form errors
-  const [errors, setErrors] = useState({});
-
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  const [showBulkRestoreModal, setShowBulkRestoreModal] = useState(false);
   const [departmentToDelete, setDepartmentToDelete] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Restore confirmation modal states
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [departmentToRestore, setDepartmentToRestore] = useState(null);
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -166,7 +205,7 @@ export default function List({ departments = [], meta = {}, filters = {}, trashe
     setSearch(value);
 
     router.get(
-      route("departments.index"),
+      route("departments.trash"),
       { search: value, page: 1, per_page: perPage },
       { preserveState: true }
     );
@@ -175,7 +214,7 @@ export default function List({ departments = [], meta = {}, filters = {}, trashe
   const handlePerPageChange = (value) => {
     setPerPage(value);
     router.get(
-      route("departments.index"),
+      route("departments.trash"),
       { search, page: 1, per_page: value },
       { preserveState: true }
     );
@@ -184,7 +223,7 @@ export default function List({ departments = [], meta = {}, filters = {}, trashe
   const handlePageChange = (page) => {
     setCurrentPage(page);
     router.get(
-      route("departments.index"),
+      route("departments.trash"),
       { search, page, per_page: perPage },
       { preserveState: true }
     );
@@ -204,6 +243,8 @@ export default function List({ departments = [], meta = {}, filters = {}, trashe
 
     if (bulkAction === "delete") {
       setShowBulkDeleteModal(true);
+    } else if (bulkAction === "restore") {
+      setShowBulkRestoreModal(true);
     }
   };
 
@@ -212,11 +253,16 @@ export default function List({ departments = [], meta = {}, filters = {}, trashe
     setShowDeleteModal(true);
   };
 
+  const handleRestoreConfirm = (id) => {
+    setDepartmentToRestore(id);
+    setShowRestoreModal(true);
+  };
+
   const handleDelete = (e) => {
     e.preventDefault();
     setIsProcessing(true);
 
-    router.delete(route("departments.destroy", departmentToDelete), {
+    router.delete(route("departments.permanent_destroy", departmentToDelete), {
       preserveState: true,
       onSuccess: () => {
         setShowDeleteModal(false);
@@ -229,11 +275,11 @@ export default function List({ departments = [], meta = {}, filters = {}, trashe
     });
   };
 
-  const handleBulkDeleteConfirm = (e) => {
+  const handleBulkDelete = (e) => {
     e.preventDefault();
     setIsProcessing(true);
 
-    router.post(route("departments.bulk_destroy"),
+    router.post(route("departments.bulk_permanent_destroy"),
       {
         ids: selectedDepartments
       },
@@ -246,7 +292,48 @@ export default function List({ departments = [], meta = {}, filters = {}, trashe
           setShowBulkDeleteModal(false);
           setIsProcessing(false);
         },
-        onError: (errors) => {
+        onError: () => {
+          setIsProcessing(false);
+        }
+      }
+    );
+  };
+
+  const handleRestore = (e) => {
+    e.preventDefault();
+    setIsProcessing(true);
+
+    router.post(route("departments.restore", departmentToRestore), {
+      preserveState: true,
+      onSuccess: () => {
+        setShowRestoreModal(false);
+        setDepartmentToRestore(null);
+        setIsProcessing(false);
+      },
+      onError: () => {
+        setIsProcessing(false);
+      }
+    });
+  };
+
+  const handleBulkRestore = (e) => {
+    e.preventDefault();
+    setIsProcessing(true);
+
+    router.post(route("departments.bulk_restore"),
+      {
+        ids: selectedDepartments
+      },
+      {
+        preserveState: true,
+        onSuccess: () => {
+          setSelectedDepartments([]);
+          setIsAllSelected(false);
+          setBulkAction("");
+          setShowBulkRestoreModal(false);
+          setIsProcessing(false);
+        },
+        onError: () => {
           setIsProcessing(false);
         }
       }
@@ -260,7 +347,7 @@ export default function List({ departments = [], meta = {}, filters = {}, trashe
     }
     setSorting({ column, direction });
     router.get(
-      route("departments.index"),
+      route("departments.trash"),
       { ...filters, sorting: { column, direction } },
       { preserveState: true }
     );
@@ -310,69 +397,6 @@ export default function List({ departments = [], meta = {}, filters = {}, trashe
     return pages;
   };
 
-  // Create form handlers
-  const openCreateDialog = () => {
-    setForm({
-      name: "",
-      descriptions: ""
-    });
-    setErrors({});
-    setIsCreateDialogOpen(true);
-  };
-
-  const handleCreateSubmit = (e) => {
-    e.preventDefault();
-
-    router.post(route("departments.store"), form, {
-      preserveState: true,
-      onSuccess: () => {
-        setIsCreateDialogOpen(false);
-        setForm({
-          name: "",
-          descriptions: ""
-        });
-      },
-      onError: (errors) => {
-        setErrors(errors);
-      }
-    });
-  };
-
-  // Edit form handlers
-  const openEditDialog = (department) => {
-    setEditingDepartment(department);
-    setForm({
-      name: department.name,
-      descriptions: department.descriptions || ""
-    });
-    setErrors({});
-    setIsEditDialogOpen(true);
-  };
-
-  const handleEditSubmit = (e) => {
-    e.preventDefault();
-
-    router.put(route("departments.update", editingDepartment.id), form, {
-      preserveState: true,
-      onSuccess: () => {
-        setIsEditDialogOpen(false);
-        setEditingDepartment(null);
-      },
-      onError: (errors) => {
-        setErrors(errors);
-      }
-    });
-  };
-
-  // Form input change handler
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setForm({
-      ...form,
-      [name]: value
-    });
-  };
-
   return (
     <AuthenticatedLayout>
       <Toaster />
@@ -380,27 +404,18 @@ export default function List({ departments = [], meta = {}, filters = {}, trashe
         <div className="main-content">
           <PageHeader
             page="Department Management"
-            subpage="List"
+            subpage="Trash"
             url="departments.index"
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-2">
-                <Button onClick={openCreateDialog}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Department
-                </Button>
-                <Link href={route("departments.trash")}>
-                    <Button variant="outline" className="relative">
-                        <Trash2 className="h-8 w-8" />
-                        {trashed_departments > 0 && (
-                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                            {trashed_departments}
-                        </span>
-                        )}
-                    </Button>
-                </Link>
-              </div>
+                <div className="flex flex-col md:flex-row gap-2">
+                    <div>
+                        <div className="text-red-500">
+                            Total trashed departments: {meta.total}
+                        </div>
+                    </div>
+                </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input
                   placeholder="Search departments..."
@@ -418,7 +433,8 @@ export default function List({ departments = [], meta = {}, filters = {}, trashe
                     <SelectValue placeholder="Bulk actions" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="delete">Delete Selected</SelectItem>
+                    <SelectItem value="delete">Permanently Delete Selected</SelectItem>
+                    <SelectItem value="restore">Restore Selected</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button onClick={handleBulkAction} variant="outline">
@@ -478,21 +494,21 @@ export default function List({ departments = [], meta = {}, filters = {}, trashe
                         <TableCell>{department.name}</TableCell>
                         <TableCell>{department.descriptions || "-"}</TableCell>
                         <TableCell className="text-right">
-                          <TableActions
+                        <TableActions
                             actions={[
-                              {
-                                label: "Edit",
-                                icon: <Edit className="h-4 w-4" />,
-                                onClick: () => openEditDialog(department),
-                              },
-                              {
-                                label: "Delete",
+                            {
+                                label: "Restore",
+                                icon: <RotateCcw className="h-4 w-4" />,
+                                onClick: () => handleRestoreConfirm(department.id)
+                            },
+                            {
+                                label: "Permanently Delete",
                                 icon: <Trash className="h-4 w-4" />,
                                 onClick: () => handleDeleteConfirm(department.id),
                                 destructive: true,
-                              },
+                            },
                             ]}
-                          />
+                        />
                         </TableCell>
                       </TableRow>
                     ))
@@ -517,99 +533,6 @@ export default function List({ departments = [], meta = {}, filters = {}, trashe
             )}
           </div>
 
-          {/* Create Dialog */}
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Department</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleCreateSubmit}>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">Name <span className="text-red-500">*</span></Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      value={form.name}
-                      onChange={handleInputChange}
-                      placeholder="Enter department name"
-                    />
-                    {errors.name && (
-                      <p className="text-sm text-red-500">{errors.name}</p>
-                    )}
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="descriptions">Description</Label>
-                    <Textarea
-                      id="descriptions"
-                      name="descriptions"
-                      value={form.descriptions}
-                      onChange={handleInputChange}
-                      placeholder="Enter department description"
-                      rows={3}
-                    />
-                    {errors.descriptions && (
-                      <p className="text-sm text-red-500">{errors.descriptions}</p>
-                    )}
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">Save</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-
-          {/* Edit Dialog */}
-          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Edit Department</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleEditSubmit}>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">Name <span className="text-red-500">*</span></Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      value={form.name}
-                      onChange={handleInputChange}
-                      placeholder="Enter department name"
-                    />
-                    {errors.name && (
-                      <p className="text-sm text-red-500">{errors.name}</p>
-                    )}
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="descriptions">Description</Label>
-                    <Textarea
-                      id="descriptions"
-                      name="descriptions"
-                      value={form.descriptions}
-                      onChange={handleInputChange}
-                      placeholder="Enter department description"
-                      rows={3}
-                    />
-                    {errors.descriptions && (
-                      <p className="text-sm text-red-500">{errors.descriptions}</p>
-                    )}
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit">Update</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-
-          {/* Delete Confirmation Modal */}
           <DeleteConfirmationModal
             show={showDeleteModal}
             onClose={() => setShowDeleteModal(false)}
@@ -617,11 +540,25 @@ export default function List({ departments = [], meta = {}, filters = {}, trashe
             processing={isProcessing}
           />
 
-          {/* Bulk Delete Confirmation Modal */}
           <BulkDeleteConfirmationModal
             show={showBulkDeleteModal}
             onClose={() => setShowBulkDeleteModal(false)}
-            onConfirm={handleBulkDeleteConfirm}
+            onConfirm={handleBulkDelete}
+            processing={isProcessing}
+            count={selectedDepartments.length}
+          />
+
+          <RestoreConfirmationModal
+            show={showRestoreModal}
+            onClose={() => setShowRestoreModal(false)}
+            onConfirm={handleRestore}
+            processing={isProcessing}
+          />
+
+          <BulkRestoreConfirmationModal
+            show={showBulkRestoreModal}
+            onClose={() => setShowBulkRestoreModal(false)}
+            onConfirm={handleBulkRestore}
             processing={isProcessing}
             count={selectedDepartments.length}
           />
