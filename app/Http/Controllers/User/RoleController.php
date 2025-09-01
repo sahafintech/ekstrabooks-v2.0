@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Role;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Validator;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 
 class RoleController extends Controller
 {
@@ -45,7 +47,7 @@ class RoleController extends Controller
         $query->orderBy($sortColumn, $sortDirection);
 
         // Get roles with pagination
-        $roles = $query->paginate($per_page)->withQueryString();
+        $roles = $query->paginate($per_page);
         return Inertia::render('Backend/User/RoleAndPermission/List', [
             'roles' => $roles->items(),
             'meta' => [
@@ -61,7 +63,8 @@ class RoleController extends Controller
             'filters' => [
                 'search' => $search,
                 'sorting' => $sorting
-            ]
+            ],
+            'trashed_roles' => Role::onlyTrashed()->count(),
         ]);
     }
 
@@ -97,8 +100,16 @@ class RoleController extends Controller
         $role              = new Role();
         $role->name        = $request->input('name');
         $role->description = $request->input('description');
+        $role->user_id     = Auth::id();
 
         $role->save();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Created Role ' . $role->name;
+        $audit->save();
 
         return redirect()->route('roles.index')->with('success', _lang('Saved Sucessfully'));
     }
@@ -137,8 +148,14 @@ class RoleController extends Controller
         $role              = Role::findOrFail($id);
         $role->name        = $request->input('name');
         $role->description = $request->input('description');
-
         $role->save();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Updated Role ' . $role->name;
+        $audit->save();
 
         return redirect()->route('roles.index')->with('success', _lang('Updated Sucessfully'));
     }
@@ -152,16 +169,179 @@ class RoleController extends Controller
     public function destroy($id)
     {
         $role = Role::findOrFail($id);
-        $role->delete();
-        return redirect()->route('roles.index')->with('success', _lang('Deleted Sucessfully'));
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Deleted Role ' . $role->name;
+        $audit->save();
+
+        try {
+            $role->delete();
+            return redirect()->route('roles.index')->with('success', _lang('Deleted Successfully'));
+        } catch (\Exception $e) {
+            return redirect()->route('roles.index')->with('error', _lang('This item is already exists in other entity'));
+        }
     }
 
     public function bulk_destroy(Request $request)
     {
-        foreach ($request->ids as $id) {
-            $role = Role::findOrFail($id);
-            $role->delete();
+        $ids = $request->ids;
+        $roles = Role::whereIn('id', $ids)->get();
+        
+        foreach($roles as $role) {
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Deleted Role ' . $role->name;
+            $audit->save();
+
+            try {
+                $role->delete();
+            } catch (\Exception $e) {
+                // Continue with the next role
+            }
         }
-        return redirect()->route('roles.index')->with('success', _lang('Deleted Sucessfully'));
+        
+        return back()->with('success', 'Selected roles deleted successfully');
+    }
+
+    /**
+     * Display a listing of trashed roles.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function trash(Request $request) {
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
+        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
+
+        $query = Role::onlyTrashed();
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%$search%")
+                    ->orWhere('description', 'like', "%$search%");
+            });
+        }
+
+        // Handle sorting
+        if (isset($sorting['column']) && isset($sorting['direction'])) {
+            $column = $sorting['column'];
+            $direction = $sorting['direction'];
+            $query->orderBy($column, $direction);
+        }
+
+        $roles = $query->paginate($per_page);
+
+        return Inertia::render('Backend/User/RoleAndPermission/Trash', [
+            'roles' => $roles->items(),
+            'meta' => [
+                'current_page' => $roles->currentPage(),
+                'per_page' => $roles->perPage(),
+                'from' => $roles->firstItem(),
+                'to' => $roles->lastItem(),
+                'total' => $roles->total(),
+                'last_page' => $roles->lastPage(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'sorting' => $sorting,
+            ],
+        ]);
+    }
+
+    /**
+     * Restore the specified role from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function restore(Request $request, $id)
+    {
+        $role = Role::onlyTrashed()->findOrFail($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Restored Role ' . $role->name;
+        $audit->save();
+
+        $role->restore();
+
+        return redirect()->route('roles.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Bulk restore selected roles from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_restore(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $role = Role::onlyTrashed()->findOrFail($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Restored Role ' . $role->name;
+            $audit->save();
+
+            $role->restore();
+        }
+
+        return redirect()->route('roles.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Permanently delete the specified role from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function permanent_destroy(Request $request, $id)
+    {
+        $role = Role::onlyTrashed()->findOrFail($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Permanently Deleted Role ' . $role->name;
+        $audit->save();
+
+        $role->forceDelete();
+
+        return redirect()->route('roles.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    /**
+     * Bulk permanently delete selected roles from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_permanent_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $role = Role::onlyTrashed()->findOrFail($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Permanently Deleted Role ' . $role->name;
+            $audit->save();
+
+            $role->forceDelete();
+        }
+
+        return redirect()->route('roles.trash')->with('success', _lang('Permanently Deleted Successfully'));
     }
 }

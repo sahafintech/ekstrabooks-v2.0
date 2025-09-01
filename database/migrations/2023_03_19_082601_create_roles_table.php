@@ -15,8 +15,12 @@ class CreateRolesTable extends Migration {
             $table->id();
             $table->string('name', 50);
             $table->text('description')->nullable();
+            $table->bigInteger('created_user_id')->nullable();
+            $table->bigInteger('updated_user_id')->nullable();
+            $table->bigInteger('deleted_user_id')->nullable();
             $table->bigInteger('user_id')->unsigned();
             //$table->bigInteger('business_id')->unsigned();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
