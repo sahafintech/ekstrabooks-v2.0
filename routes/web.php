@@ -220,6 +220,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('permission/store', [PermissionController::class, 'store'])->name('permission.store');
 		Route::resource('roles', RoleController::class)->except('show');
 		Route::post('roles/bulk_destroy', [RoleController::class, 'bulk_destroy'])->name('roles.bulk_destroy');
+		Route::get('roles/trash', [RoleController::class, 'trash'])->name('roles.trash');
+		Route::post('roles/{id}/restore', [RoleController::class, 'restore'])->name('roles.restore');
+		Route::post('roles/bulk_restore', [RoleController::class, 'bulk_restore'])->name('roles.bulk_restore');
+		Route::post('roles/bulk_permanent_destroy', [RoleController::class, 'bulk_permanent_destroy'])->name('roles.bulk_permanent_destroy');
+		Route::delete('roles/{id}/permanent_destroy', [RoleController::class, 'permanent_destroy'])->name('roles.permanent_destroy');
 
 		//User Controller
 		Route::match(['get', 'post'], 'system_users/{userId}/{businessId}/change_role', [SystemUserController::class, 'change_role'])->name('system_users.change_role');
@@ -736,6 +741,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('payslips/bulk_payment', [PayrollController::class, 'bulk_payment'])->name('payslips.bulk_payment');
 
 		//Taxes
+		Route::get('taxes/trash', [TaxController::class, 'trash'])->name('taxes.trash');
+		Route::post('taxes/{id}/restore', [TaxController::class, 'restore'])->name('taxes.restore');
+		Route::post('taxes/bulk_restore', [TaxController::class, 'bulk_restore'])->name('taxes.bulk_restore');
+		Route::post('taxes/bulk_permanent_destroy', [TaxController::class, 'bulk_permanent_destroy'])->name('taxes.bulk_permanent_destroy');
+		Route::delete('taxes/{id}/permanent_destroy', [TaxController::class, 'permanent_destroy'])->name('taxes.permanent_destroy');
 		Route::resource('taxes', TaxController::class);
 		Route::post('taxes/bulk_destroy', [TaxController::class, 'bulk_destroy'])->name('taxes.bulk_destroy');
 

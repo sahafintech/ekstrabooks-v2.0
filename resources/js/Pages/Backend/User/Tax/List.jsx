@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Head, router, usePage } from "@inertiajs/react";
+import { Head, Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -28,7 +28,7 @@ import {
     DialogTitle,
     DialogFooter,
 } from "@/Components/ui/dialog";
-import { Plus, Edit, Trash, Search, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Edit, Trash, Search, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -92,7 +92,7 @@ const BulkDeleteConfirmationModal = ({ show, onClose, onConfirm, processing, cou
     </Modal>
 );
 
-export default function List({ taxs = [], meta = {}, filters = {}, accounts = [] }) {
+export default function List({ taxs = [], meta = {}, filters = {}, accounts = [], trashed_taxes = 0 }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
     const [selectedtaxes, setSelectedTaxes] = useState([]);
@@ -391,11 +391,21 @@ export default function List({ taxs = [], meta = {}, filters = {}, accounts = []
                     />
                     <div className="p-4">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                            <div className="flex flex-col md:flex-row gap-4">
+                            <div className="flex flex-col md:flex-row gap-2">
                                 <Button onClick={openCreateDialog}>
                                     <Plus className="w-4 h-4 mr-2" />
                                     Add Tax
                                 </Button>
+                                <Link href={route("taxes.trash")}>
+                                    <Button variant="outline" className="relative">
+                                        <Trash2 className="h-8 w-8" />
+                                        {trashed_taxes > 0 && (
+                                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
+                                            {trashed_taxes}
+                                        </span>
+                                        )}
+                                    </Button>
+                                </Link>
                             </div>
                             <div className="flex flex-col md:flex-row gap-4 md:items-center">
                                 <Input

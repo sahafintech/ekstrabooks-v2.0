@@ -17,6 +17,7 @@ return new class extends Migration {
             $table->bigInteger('account_id')->unsigned();
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('account_id')->references('id')->on('accounts')->onDelete('cascade');

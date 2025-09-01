@@ -8,7 +8,8 @@ use App\Models\AuditLog;
 use App\Models\Tax;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Validator;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 
 class TaxController extends Controller
 {
@@ -64,7 +65,8 @@ class TaxController extends Controller
             'filters' => [
                 'search' => $request->search,
                 'sorting' => $sorting
-            ]
+            ],
+            'trashed_taxes' => Tax::onlyTrashed()->count(),
         ]);
     }
 
@@ -100,7 +102,7 @@ class TaxController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Created Tax ' . $tax->name;
         $audit->save();
 
@@ -140,7 +142,7 @@ class TaxController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Updated Tax ' . $tax->name;
         $audit->save();
 
@@ -160,7 +162,7 @@ class TaxController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Deleted Tax ' . $tax->name;
         $audit->save();
 
@@ -176,12 +178,155 @@ class TaxController extends Controller
             // audit log
             $audit = new AuditLog();
             $audit->date_changed = date('Y-m-d H:i:s');
-            $audit->changed_by = auth()->user()->id;
+            $audit->changed_by = Auth::id();
             $audit->event = 'Deleted Tax ' . $tax->name;
             $audit->save();
 
             $tax->delete();
         }
         return redirect()->route('taxes.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    /**
+     * Display a listing of trashed taxes.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function trash(Request $request) {
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
+        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
+
+        $query = Tax::onlyTrashed()->with('account');
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%$search%")
+                    ->orWhere('tax_number', 'like', "%$search%");
+            });
+        }
+
+        // Handle sorting
+        if (isset($sorting['column']) && isset($sorting['direction'])) {
+            $column = $sorting['column'];
+            $direction = $sorting['direction'];
+            if ($column === 'account.account_name') {
+                $query->join('accounts', 'taxes.account_id', '=', 'accounts.id')
+                      ->select('taxes.*')
+                      ->orderBy('accounts.account_name', $direction);
+            } else {
+                $query->orderBy($column, $direction);
+            }
+        }
+
+        $taxes = $query->paginate($per_page);
+
+        return Inertia::render('Backend/User/Tax/Trash', [
+            'taxes' => $taxes->items(),
+            'meta' => [
+                'current_page' => $taxes->currentPage(),
+                'per_page' => $taxes->perPage(),
+                'from' => $taxes->firstItem(),
+                'to' => $taxes->lastItem(),
+                'total' => $taxes->total(),
+                'last_page' => $taxes->lastPage(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'sorting' => $sorting,
+            ],
+        ]);
+    }
+
+    /**
+     * Restore the specified tax from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function restore(Request $request, $id)
+    {
+        $tax = Tax::onlyTrashed()->findOrFail($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Restored Tax ' . $tax->name;
+        $audit->save();
+
+        $tax->restore();
+
+        return redirect()->route('taxes.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Bulk restore selected taxes from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_restore(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $tax = Tax::onlyTrashed()->findOrFail($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Restored Tax ' . $tax->name;
+            $audit->save();
+
+            $tax->restore();
+        }
+
+        return redirect()->route('taxes.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Permanently delete the specified tax from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function permanent_destroy(Request $request, $id)
+    {
+        $tax = Tax::onlyTrashed()->findOrFail($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Permanently Deleted Tax ' . $tax->name;
+        $audit->save();
+
+        $tax->forceDelete();
+
+        return redirect()->route('taxes.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    /**
+     * Bulk permanently delete selected taxes from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_permanent_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $tax = Tax::onlyTrashed()->findOrFail($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Permanently Deleted Tax ' . $tax->name;
+            $audit->save();
+
+            $tax->forceDelete();
+        }
+
+        return redirect()->route('taxes.trash')->with('success', _lang('Permanently Deleted Successfully'));
     }
 }
