@@ -253,6 +253,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('business/{id}/pos_settings', [BusinessSettingsController::class, 'store_pos_settings'])->name('business.store_pos_settings');
 
 		//Currency List
+		Route::get('currency/trash', [CurrencyController::class, 'trash'])->name('currency.trash');
+		Route::post('currency/{id}/restore', [CurrencyController::class, 'restore'])->name('currency.restore');
+		Route::post('currency/bulk_restore', [CurrencyController::class, 'bulk_restore'])->name('currency.bulk_restore');
+		Route::post('currency/bulk_permanent_destroy', [CurrencyController::class, 'bulk_permanent_destroy'])->name('currency.bulk_permanent_destroy');
+		Route::delete('currency/{id}/permanent_destroy', [CurrencyController::class, 'permanent_destroy'])->name('currency.permanent_destroy');
 		Route::resource('currency', CurrencyController::class);
 		Route::post('currency/bulk_destroy', [CurrencyController::class, 'bulk_destroy'])->name('currency.bulk_destroy');
 

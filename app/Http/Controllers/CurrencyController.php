@@ -52,23 +52,22 @@ class CurrencyController extends Controller
 
         $query->orderBy($sortColumn, $sortDirection);
 
-        $currencies = $query->paginate($per_page)->withQueryString();
+        $currencies = $query->paginate($per_page);
         return Inertia::render('Backend/User/Currency/List', [
             'currencies' => $currencies->items(),
             'meta' => [
                 'current_page' => $currencies->currentPage(),
+                'per_page' => $currencies->perPage(),
                 'from' => $currencies->firstItem(),
-                'last_page' => $currencies->lastPage(),
-                'per_page' => $per_page,
                 'to' => $currencies->lastItem(),
                 'total' => $currencies->total(),
-                'links' => $currencies->linkCollection(),
-                'path' => $currencies->path(),
+                'last_page' => $currencies->lastPage(),
             ],
             'filters' => [
                 'search' => $search,
                 'sorting' => $sorting,
             ],
+            'trashed_currencies' => Currency::onlyTrashed()->count(),
         ]);
     }
 
@@ -118,6 +117,8 @@ class CurrencyController extends Controller
         $currency->exchange_rate = $request->input('exchange_rate');
         $currency->base_currency = $request->input('base_currency');
         $currency->status        = $request->input('status');
+        $currency->user_id       = auth()->user()->id;
+        $currency->business_id   = $request->activeBusiness->id;
 
         $currency->save();
 
@@ -189,6 +190,8 @@ class CurrencyController extends Controller
         $currency->exchange_rate = $request->input('exchange_rate');
         $currency->base_currency = $request->input('base_currency');
         $currency->status        = $request->input('status');
+        $currency->user_id       = auth()->user()->id;
+        $currency->business_id   = $request->activeBusiness->id;
 
         $currency->save();
 
@@ -251,5 +254,144 @@ class CurrencyController extends Controller
             $currency->delete();
         }
         return redirect()->route('currency.index')->with('success', _lang('Deleted Successfully'));
+    }
+
+    /**
+     * Display a listing of trashed currencies.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function trash(Request $request) {
+        $per_page = $request->get('per_page', 10);
+        $search = $request->get('search', '');
+        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
+
+        $query = Currency::onlyTrashed();
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%$search%")
+                    ->orWhere('description', 'like', "%$search%")
+                    ->orWhere('exchange_rate', 'like', "%$search%")
+                    ->orWhere('base_currency', 'like', "%$search%");
+            });
+        }
+
+        // Handle sorting
+        if (isset($sorting['column']) && isset($sorting['direction'])) {
+            $column = $sorting['column'];
+            $direction = $sorting['direction'];
+            $query->orderBy($column, $direction);
+        }
+
+        $currencies = $query->paginate($per_page);
+
+        return Inertia::render('Backend/User/Currency/Trash', [
+            'currencies' => $currencies->items(),
+            'meta' => [
+                'current_page' => $currencies->currentPage(),
+                'per_page' => $currencies->perPage(),
+                'from' => $currencies->firstItem(),
+                'to' => $currencies->lastItem(),
+                'total' => $currencies->total(),
+                'last_page' => $currencies->lastPage(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'sorting' => $sorting,
+            ],
+        ]);
+    }
+
+    /**
+     * Restore the specified currency from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function restore(Request $request, $id)
+    {
+        $currency = Currency::onlyTrashed()->findOrFail($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Restored Currency ' . $currency->name;
+        $audit->save();
+
+        $currency->restore();
+
+        return redirect()->route('currency.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Bulk restore selected currencies from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_restore(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $currency = Currency::onlyTrashed()->findOrFail($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Restored Currency ' . $currency->name;
+            $audit->save();
+
+            $currency->restore();
+        }
+
+        return redirect()->route('currency.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Permanently delete the specified currency from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function permanent_destroy(Request $request, $id)
+    {
+        $currency = Currency::onlyTrashed()->findOrFail($id);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Permanently Deleted Currency ' . $currency->name;
+        $audit->save();
+
+        $currency->forceDelete();
+
+        return redirect()->route('currency.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    /**
+     * Bulk permanently delete selected currencies from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_permanent_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $currency = Currency::onlyTrashed()->findOrFail($id);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Permanently Deleted Currency ' . $currency->name;
+            $audit->save();
+
+            $currency->forceDelete();
+        }
+
+        return redirect()->route('currency.trash')->with('success', _lang('Permanently Deleted Successfully'));
     }
 }

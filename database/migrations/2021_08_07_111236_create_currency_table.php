@@ -16,12 +16,16 @@ class CreateCurrencyTable extends Migration {
             $table->string('name', 3);
             $table->decimal('exchange_rate');
             $table->tinyInteger('base_currency')->default(0);
-            $table->description('description');
+            $table->text('description');
             $table->tinyInteger('status')->default(1);
             $table->bigInteger('user_id')->unsigned();
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->bigInteger('business_id')->unsigned();
             $table->foreign('business_id')->references('id')->on('business')->onDelete('cascade');
+            $table->bigInteger('created_user_id')->nullable();
+            $table->bigInteger('updated_user_id')->nullable();
+            $table->bigInteger('deleted_user_id')->nullable();
+            $table->softDeletes();
             $table->timestamps();
         });
     }
