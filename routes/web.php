@@ -257,6 +257,13 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 	/** Dynamic Permission **/
 	Route::group(['middleware' => ['permission'], 'prefix' => 'user'], function () {
+		//Business Trash/Restore
+		Route::get('business/trash', [BusinessController::class, 'trash'])->name('business.trash');
+		Route::post('business/{id}/restore', [BusinessController::class, 'restore'])->name('business.restore');
+		Route::post('business/bulk_restore', [BusinessController::class, 'bulk_restore'])->name('business.bulk_restore');
+		Route::post('business/bulk_permanent_destroy', [BusinessController::class, 'bulk_permanent_destroy'])->name('business.bulk_permanent_destroy');
+		Route::delete('business/{id}/permanent_destroy', [BusinessController::class, 'permanent_destroy'])->name('business.permanent_destroy');
+
 
 		//Dashboard Widget
 		Route::get('dashboard/income_widget', [DashboardController::class, 'income_widget'])->name('dashboard.income_widget');

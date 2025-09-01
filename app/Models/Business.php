@@ -7,9 +7,13 @@ use App\Models\BusinessType;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class Business extends Model {
+
+    use SoftDeletes;
 
     /**
      * The table associated with the model.
@@ -19,7 +23,7 @@ class Business extends Model {
     protected $table = 'business';
 
     protected static function booted(): void {
-        if (auth()->check()) {
+        if (Auth::check()) {
             static::addGlobalScope('business_id', function (Builder $builder) {
                 if (request()->has('activeBusiness')) {
                     $builder->whereIn('business.id', request()->businessList->pluck('id'));
@@ -33,7 +37,7 @@ class Business extends Model {
     }
 
     public function scopeOwner($query) {
-        return $query->where('user_id', auth()->id());
+        return $query->where('user_id', Auth::id());
     }
 
     public function business_type() {
@@ -90,7 +94,7 @@ class Business extends Model {
 
         $business                   = new Business();
         $business->name             = 'Default Business';
-        $business->user_id          = auth()->id();
+        $business->user_id          = Auth::id();
         $business->business_type_id = $businesstype->id;
         $business->logo             = 'default/default-company-logo.png';
         $business->status           = 1;

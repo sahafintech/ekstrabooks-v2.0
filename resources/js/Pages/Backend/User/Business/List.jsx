@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { Edit, EyeIcon, Plus, Settings, Trash, Users, ChevronUp, ChevronDown } from "lucide-react";
+import { Edit, EyeIcon, Plus, Settings, Trash, Users, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -96,7 +96,7 @@ const BusinessStatusBadge = ({ status }) => {
   );
 };
 
-export default function List({ businesses = [], meta = {}, filters = {} }) {
+export default function List({ businesses = [], meta = {}, filters = {}, trashed_businesses = 0 }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedBusinesses, setSelectedBusinesses] = useState([]);
@@ -313,11 +313,21 @@ export default function List({ businesses = [], meta = {}, filters = {} }) {
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-              <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex flex-col md:flex-row gap-2">
                 <Link href={route("business.create")}>
                   <Button>
                     <Plus className="w-4 h-4 mr-2" />
                     Add Business
+                  </Button>
+                </Link>
+                <Link href={route("business.trash")}>
+                  <Button variant="outline" className="relative">
+                    <Trash2 className="h-8 w-8" />
+                    {trashed_businesses > 0 && (
+                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
+                        {trashed_businesses}
+                      </span>
+                    )}
                   </Button>
                 </Link>
               </div>

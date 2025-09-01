@@ -14,7 +14,8 @@ use Database\Seeders\BusinessSettingSeeder;
 use Database\Seeders\CurrencySeeder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Validator;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 class BusinessController extends Controller
@@ -96,6 +97,7 @@ class BusinessController extends Controller
                 'search' => $search,
                 'sorting' => $sorting,
             ],
+            'trashed_businesses' => Business::onlyTrashed()->count(),
         ]);
     }
 
@@ -167,7 +169,7 @@ class BusinessController extends Controller
         $business->name             = $request->input('name');
         $business->reg_no           = $request->input('reg_no');
         $business->vat_id           = $request->input('vat_id');
-        $business->user_id          = auth()->id();
+        $business->user_id          = Auth::id();
         $business->business_type_id = $request->input('business_type_id');
         $business->email            = $request->input('email');
         $business->business_email   = $request->input('business_email');
@@ -207,7 +209,7 @@ class BusinessController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Created Business ' . $business->name;
         $audit->save();
 
@@ -294,7 +296,7 @@ class BusinessController extends Controller
 
         if ($currencies->count() <= 0 && $businessSettings->count() <= 0) {
             // Instantiate the seeder with arguments
-            $cseeder = new CurrencySeeder(auth()->user()->id, request()->activeBusiness->id);
+            $cseeder = new CurrencySeeder(Auth::id(), request()->activeBusiness->id);
 
             // Run the seeder
             $cseeder->run();
@@ -403,7 +405,7 @@ class BusinessController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Updated Business ' . $business->name;
         $audit->save();
 
@@ -426,7 +428,7 @@ class BusinessController extends Controller
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
+        $audit->changed_by = Auth::id();
         $audit->event = 'Deleted Business ' . $business->name;
         $audit->save();
 
@@ -445,7 +447,7 @@ class BusinessController extends Controller
             // audit log
             $audit = new AuditLog();
             $audit->date_changed = date('Y-m-d H:i:s');
-            $audit->changed_by = auth()->user()->id;
+            $audit->changed_by = Auth::id();
             $audit->event = 'Deleted Business ' . $business->name;
             $audit->save();
 
@@ -454,10 +456,144 @@ class BusinessController extends Controller
         return redirect()->route('business.index')->with('success', _lang('Deleted Successfully'));
     }
 
+    /**
+     * Display a listing of trashed businesses.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function trash(Request $request)
+    {
+        $per_page = $request->get('per_page', 50);
+        $search = $request->get('search', '');
+        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
+
+        $query = Business::onlyTrashed();
+
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%");
+            });
+        }
+
+        if (isset($sorting['column']) && isset($sorting['direction'])) {
+            $column = $sorting['column'];
+            $direction = $sorting['direction'];
+            $query->orderBy($column, $direction);
+        }
+
+        $businesses = $query->paginate($per_page);
+
+        return Inertia::render('Backend/User/Business/Trash', [
+            'businesses' => $businesses->items(),
+            'meta' => [
+                'current_page' => $businesses->currentPage(),
+                'per_page' => $businesses->perPage(),
+                'from' => $businesses->firstItem(),
+                'to' => $businesses->lastItem(),
+                'total' => $businesses->total(),
+                'last_page' => $businesses->lastPage(),
+            ],
+            'filters' => [
+                'search' => $search,
+                'sorting' => $sorting,
+            ],
+        ]);
+    }
+
+    /**
+     * Restore the specified business from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function restore(Request $request, $id)
+    {
+        $business = Business::onlyTrashed()->findOrFail($id);
+
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Restored Business ' . $business->name;
+        $audit->save();
+
+        $business->restore();
+
+        return redirect()->route('business.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Bulk restore selected businesses from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_restore(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $business = Business::onlyTrashed()->findOrFail($id);
+
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Restored Business ' . $business->name;
+            $audit->save();
+
+            $business->restore();
+        }
+
+        return redirect()->route('business.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    /**
+     * Permanently delete the specified business from trash.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function permanent_destroy(Request $request, $id)
+    {
+        $business = Business::onlyTrashed()->findOrFail($id);
+
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Permanently Deleted Business ' . $business->name;
+        $audit->save();
+
+        $business->forceDelete();
+
+        return redirect()->route('business.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
+    /**
+     * Bulk permanently delete selected businesses from trash.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulk_permanent_destroy(Request $request)
+    {
+        foreach ($request->ids as $id) {
+            $business = Business::onlyTrashed()->findOrFail($id);
+
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Permanently Deleted Business ' . $business->name;
+            $audit->save();
+
+            $business->forceDelete();
+        }
+
+        return redirect()->route('business.trash')->with('success', _lang('Permanently Deleted Successfully'));
+    }
+
     /** Switch Business Account **/
     public function switch_business(Request $request, $id)
     {
-        $user = auth()->user();
+        $user = Auth::user();
         if ($user->user_type != 'user') {
             return back()->with('error', _lang('Permission denied !'));
         }
