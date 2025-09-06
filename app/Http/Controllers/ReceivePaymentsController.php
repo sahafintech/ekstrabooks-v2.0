@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Account;
 use App\Models\Attachment;
 use App\Models\AuditLog;
-use App\Models\Business;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\InvoicePayment;
@@ -410,9 +409,9 @@ class ReceivePaymentsController extends Controller
 		}
 
         $currentTime = Carbon::now();
+        DB::beginTransaction();
 
         for ($i = 0; $i < count($request->invoices); $i++) {
-            DB::beginTransaction();
 
             $invoice = Invoice::find($request->invoices[$i]['invoice_id']);
 
@@ -430,7 +429,7 @@ class ReceivePaymentsController extends Controller
 
             $invoice_payment->forceDelete();
 
-            $transactions = Transaction::where('ref_id', $request->invoices[$i])->where('ref_type', 'invoice payment')->get();
+            $transactions = Transaction::where('ref_id', $request->invoices[$i]['invoice_id'] . ',' . $payment->id)->where('ref_type', 'invoice payment')->get();
 
             foreach ($transactions as $transaction) {
                 $transaction->forceDelete();
@@ -482,8 +481,9 @@ class ReceivePaymentsController extends Controller
             }
             $invoice->save();
 
-            DB::commit();
         }
+        
+        DB::commit();
 
         // audit log
         $audit = new AuditLog();
