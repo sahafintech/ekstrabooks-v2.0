@@ -316,14 +316,13 @@ class DefferedInvoiceController extends Controller
         $invoice->deffered_end    = Carbon::parse($request->input('deffered_end'))->format('Y-m-d');
         $invoice->active_days     = $request->input('active_days');
         $invoice->cost_per_day    = $request->input('cost_per_day');
-        $invoice->created_by      = auth()->user()->id;
         $invoice->save();
 
         // if attachments then upload
         if (isset($request->attachments)) {
             if ($request->attachments != null) {
                 for ($i = 0; $i < count($request->attachments); $i++) {
-                    $theFile = $request->file("attachments.$i.file");
+                    $theFile = $request->file("attachments.$i");
                     if ($theFile == null) {
                         continue;
                     }
@@ -331,7 +330,7 @@ class DefferedInvoiceController extends Controller
                     $theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
 
                     $attachment = new Attachment();
-                    $attachment->file_name = $request->attachments[$i]['file_name'];
+                    $attachment->file_name = $request->attachments[$i]->getClientOriginalName();
                     $attachment->path = "/uploads/media/attachments/" . $theAttachment;
                     $attachment->ref_type = 'invoice';
                     $attachment->ref_id = $invoice->id;
@@ -858,16 +857,14 @@ class DefferedInvoiceController extends Controller
         $invoice->deffered_end    = Carbon::parse($request->input('deffered_end'))->format('Y-m-d');
         $invoice->active_days     = $request->input('active_days');
         $invoice->cost_per_day    = $request->input('cost_per_day');
-        $invoice->updated_by      = auth()->user()->id;
         $invoice->save();
 
         // delete old attachments
         $attachments = Attachment::where('ref_id', $invoice->id)->where('ref_type', 'invoice')->get(); // Get attachments from the database
 
-        foreach ($attachments as $attachment) {
-            // Only delete the file if it exist in the request attachments
-            if (isset($request->attachments)) {
-                if (!$request->attachments == null && !in_array($attachment->path, $request->attachments)) {
+        if (isset($request->attachments)) {
+            foreach ($attachments as $attachment) {
+                if (!in_array($attachment->path, $request->attachments)) {
                     $filePath = public_path($attachment->path);
                     if (file_exists($filePath)) {
                         unlink($filePath); // Delete the file
@@ -881,7 +878,7 @@ class DefferedInvoiceController extends Controller
         if (isset($request->attachments)) {
             if ($request->attachments != null) {
                 for ($i = 0; $i < count($request->attachments); $i++) {
-                    $theFile = $request->file("attachments.$i.file");
+                    $theFile = $request->file("attachments.$i");
                     if ($theFile == null) {
                         continue;
                     }
@@ -889,7 +886,7 @@ class DefferedInvoiceController extends Controller
                     $theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
 
                     $attachment = new Attachment();
-                    $attachment->file_name = $request->attachments[$i]['file_name'];
+                    $attachment->file_name = $request->attachments[$i]->getClientOriginalName();
                     $attachment->path = "/uploads/media/attachments/" . $theAttachment;
                     $attachment->ref_type = 'invoice';
                     $attachment->ref_id = $invoice->id;

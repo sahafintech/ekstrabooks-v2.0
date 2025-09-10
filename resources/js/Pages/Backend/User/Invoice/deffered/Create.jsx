@@ -22,6 +22,7 @@ import {
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { Plus, Trash2, X } from "lucide-react";
+import Attachment from "@/Components/ui/attachment";
 
 export default function Create({ customers = [], products = [], currencies = [], taxes = [], invoice_title, decimalPlace, familySizes = [], benefits = [], base_currency }) {
     const [invoiceItems, setInvoiceItems] = useState([{
@@ -32,13 +33,31 @@ export default function Create({ customers = [], products = [], currencies = [],
         unit_cost: 0,
     }]);
 
-    const [attachments, setAttachments] = useState([{
-        file_name: "",
-        file: null
-    }]);
+    const [attachments, setAttachments] = useState([]);
 
     const [exchangeRate, setExchangeRate] = useState(1);
     const [baseCurrencyInfo, setBaseCurrencyInfo] = useState(null);
+
+    // ------------------------------------------------
+    // Keep Inertia form arrays in sync with our local state
+    const syncFormArrays = () => {
+        setData("product_id", invoiceItems.map(i => i.product_id));
+        setData("product_name", invoiceItems.map(i => i.product_name));
+        setData("description", invoiceItems.map(i => i.description));
+        setData("quantity", invoiceItems.map(i => i.quantity));
+        setData("unit_cost", invoiceItems.map(i => i.unit_cost));
+        setData("sum_insured", invoiceItems.map(i => i.sum_insured));
+        setData("limits", invoiceItems.map(i => i.limits));
+        setData("benefits", invoiceItems.map(i => i.benefits));
+        setData("family_size", invoiceItems.map(i => i.family_size));
+        setData("attachments", attachments);
+    };
+
+    useEffect(() => {
+        syncFormArrays();
+    }, [invoiceItems, attachments]);
+    // ------------------------------------------------
+
 
     const { data, setData, post, processing, errors, reset } = useForm({
         customer_id: "",
@@ -60,7 +79,7 @@ export default function Create({ customers = [], products = [], currencies = [],
         template: 0,
         note: "",
         footer: "",
-        attachments: [],
+        attachments: attachments,
         product_id: [],
         product_name: [],
         description: [],
@@ -375,14 +394,13 @@ export default function Create({ customers = [], products = [], currencies = [],
             limits: invoiceItems.map(item => item.limits),
             benefits: invoiceItems.map(item => item.benefits),
             family_size: invoiceItems.map(item => item.family_size),
-            attachments: attachments.map(attachment => ({
-                file_name: attachment.file_name,
-                file: attachment.file
-            }))
+            // attachments are synced via syncFormArrays
         };
 
         // Log the data being sent to help debug
         console.log("Submitting form with data:", formData);
+        console.log("Current attachments state:", attachments);
+        console.log("Form data.attachments:", data.attachments);
 
         // Post the form data directly instead of using setData first
         post(route("deffered_invoices.store"), formData, {
@@ -889,104 +907,13 @@ export default function Create({ customers = [], products = [], currencies = [],
                             <Label htmlFor="attachments" className="md:col-span-2 col-span-12">
                                 Attachments
                             </Label>
-                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2 space-y-2">
-                                <div className="border rounded-md overflow-hidden">
-                                    <table className="w-full">
-                                        <thead className="bg-gray-50 border-b">
-                                            <tr>
-                                                <th className="text-left py-2 px-4 font-medium text-gray-700 w-1/3">File Name</th>
-                                                <th className="text-left py-2 px-4 font-medium text-gray-700">Attachment</th>
-                                                <th className="text-center py-2 px-4 font-medium text-gray-700 w-24">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {attachments.map((item, index) => (
-                                                <tr key={`attachment-${index}`} className="border-b last:border-b-0">
-                                                    <td className="py-3 px-4">
-                                                        <Input
-                                                            id={`filename-${index}`}
-                                                            type="text"
-                                                            placeholder="Enter file name"
-                                                            value={item.file_name}
-                                                            onChange={(e) => {
-                                                                const newAttachments = [...attachments];
-                                                                newAttachments[index] = {
-                                                                    ...newAttachments[index],
-                                                                    file_name: e.target.value
-                                                                };
-                                                                setAttachments(newAttachments);
-                                                            }}
-                                                            className="w-full"
-                                                        />
-                                                    </td>
-                                                    <td className="py-3 px-4">
-                                                        <Input
-                                                            id={`attachment-${index}`}
-                                                            type="file"
-                                                            onChange={(e) => {
-                                                                const newAttachments = [...attachments];
-                                                                newAttachments[index] = {
-                                                                    ...newAttachments[index],
-                                                                    file: e.target.files[0],
-                                                                };
-                                                                setAttachments(newAttachments);
-                                                            }}
-                                                            className="w-full"
-                                                        />
-                                                        {item.file && (
-                                                            <div className="text-xs text-gray-500 mt-1 flex items-center justify-between truncate">
-                                                                <span className="truncate">
-                                                                    {typeof item.file === 'string'
-                                                                        ? item.file.split('/').pop()
-                                                                        : item.file.name}
-                                                                </span>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        const newAttachments = [...attachments];
-                                                                        newAttachments[index] = { ...newAttachments[index], file: null };
-                                                                        setAttachments(newAttachments);
-                                                                    }}
-                                                                    className="ml-2 text-red-500 hover:text-red-700"
-                                                                    title="Remove file"
-                                                                >
-                                                                    <X className="w-6 h-6" />
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="py-3 px-4 text-center">
-                                                        {attachments.length > 1 && (
-                                                            <Button
-                                                                type="button"
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="text-red-500"
-                                                                onClick={() => {
-                                                                    const newAttachments = [...attachments];
-                                                                    newAttachments.splice(index, 1);
-                                                                    setAttachments(newAttachments);
-                                                                }}
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </Button>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    onClick={() => {
-                                        setAttachments([...attachments, { file_name: "", file: null }]);
-                                    }}
-                                >
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    Add Attachment
-                                </Button>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2 space-y-2 md:w-1/2 w-full">
+                                <Attachment
+                                    files={attachments}
+                                    onAdd={files => setAttachments(prev => [...prev, ...files])}
+                                    onRemove={idx => setAttachments(prev => prev.filter((_, i) => i !== idx))}
+                                    maxSize={20}
+                                />
                                 <InputError message={errors.attachments} className="text-sm" />
                             </div>
                         </div>
@@ -1012,6 +939,7 @@ export default function Create({ customers = [], products = [], currencies = [],
                                             quantity: 1,
                                             unit_cost: 0,
                                         }]);
+                                        setAttachments([]);
                                     }}
                                 >
                                     Reset
