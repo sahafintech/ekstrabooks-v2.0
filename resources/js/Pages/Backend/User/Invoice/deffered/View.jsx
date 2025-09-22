@@ -671,10 +671,6 @@ export default function View({
                                         <TableRow>
                                             <TableHead>Item</TableHead>
                                             <TableHead>Benefit</TableHead>
-                                            {invoice.invoice_category !==
-                                                "other" && (
-                                                <TableHead>Limits</TableHead>
-                                            )}
                                             {invoice.invoice_category ==
                                                 "other" && (
                                                 <TableHead className="text-right">
@@ -714,16 +710,6 @@ export default function View({
                                                 <TableCell>
                                                     {item.benefits}
                                                 </TableCell>
-                                                {invoice.invoice_category !==
-                                                    "other" && (
-                                                    <TableCell>
-                                                        {formatCurrency(
-                                                            item.limits,
-                                                            invoice.currency,
-                                                            decimalPlace
-                                                        )}
-                                                    </TableCell>
-                                                )}
                                                 {invoice.invoice_category ==
                                                     "other" && (
                                                     <TableCell className="text-right">

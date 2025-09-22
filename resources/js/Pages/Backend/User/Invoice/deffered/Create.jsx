@@ -47,7 +47,6 @@ export default function Create({ customers = [], products = [], currencies = [],
         setData("quantity", invoiceItems.map(i => i.quantity));
         setData("unit_cost", invoiceItems.map(i => i.unit_cost));
         setData("sum_insured", invoiceItems.map(i => i.sum_insured));
-        setData("limits", invoiceItems.map(i => i.limits));
         setData("benefits", invoiceItems.map(i => i.benefits));
         setData("family_size", invoiceItems.map(i => i.family_size));
         setData("attachments", attachments);
@@ -86,7 +85,6 @@ export default function Create({ customers = [], products = [], currencies = [],
         quantity: [],
         unit_cost: [],
         sum_insured: [],
-        limits: [],
         benefits: [],
         family_size: [],
         taxes: [],
@@ -114,7 +112,6 @@ export default function Create({ customers = [], products = [], currencies = [],
         setData("quantity", [...data.quantity, 1]);
         setData("unit_cost", [...data.unit_cost, 0]);
         setData("sum_insured", [...data.sum_insured, 0]);
-        setData("limits", [...data.limits, 0]);
         setData("benefits", [...data.benefits, ""]);
         setData("family_size", [...data.family_size, 0]);
     };
@@ -128,7 +125,6 @@ export default function Create({ customers = [], products = [], currencies = [],
         setData("quantity", updatedItems.map(item => item.quantity));
         setData("unit_cost", updatedItems.map(item => item.unit_cost));
         setData("sum_insured", updatedItems.map(item => item.sum_insured));
-        setData("limits", updatedItems.map(item => item.limits));
         setData("benefits", updatedItems.map(item => item.benefits));
         setData("family_size", updatedItems.map(item => item.family_size));
     };
@@ -157,7 +153,6 @@ export default function Create({ customers = [], products = [], currencies = [],
         setData("quantity", updatedItems.map(item => item.quantity));
         setData("unit_cost", updatedItems.map(item => item.unit_cost));
         setData("sum_insured", updatedItems.map(item => item.sum_insured));
-        setData("limits", updatedItems.map(item => item.limits));
         setData("benefits", updatedItems.map(item => item.benefits));
         setData("family_size", updatedItems.map(item => item.family_size));
     };
@@ -391,7 +386,6 @@ export default function Create({ customers = [], products = [], currencies = [],
             quantity: invoiceItems.map(item => item.quantity),
             unit_cost: invoiceItems.map(item => item.unit_cost),
             sum_insured: invoiceItems.map(item => item.sum_insured),
-            limits: invoiceItems.map(item => item.limits),
             benefits: invoiceItems.map(item => item.benefits),
             family_size: invoiceItems.map(item => item.family_size),
             // attachments are synced via syncFormArrays
@@ -415,7 +409,6 @@ export default function Create({ customers = [], products = [], currencies = [],
                     quantity: 1,
                     unit_cost: 0,
                     sum_insured: 0,
-                    limits: 0,
                     benefits: "",
                     family_size: "",
                 }]);
@@ -626,33 +619,22 @@ export default function Create({ customers = [], products = [], currencies = [],
                                             )}
 
                                             <div>
-                                                <Label>Benefits *</Label>
-                                                <SearchableCombobox
-                                                    options={benefits.map(benefit => ({
-                                                        id: benefit.name,
-                                                        name: benefit.name
-                                                    }))}
+                                                <Label>Benefits</Label>
+                                                <Textarea
                                                     value={item.benefits}
-                                                    onChange={(value) => updateInvoiceItem(index, "benefits", value)}
-                                                    placeholder="Select benefits"
+                                                    onChange={(e) => {
+                                                    updateInvoiceItem(index, "benefits", e.target.value);
+                                                    e.target.style.height = 'auto';
+                                                    e.target.style.height = e.target.scrollHeight + 'px';
+                                                    }}
+                                                    className="min-h-[30px] resize-none overflow-hidden"
+                                                    rows={1}
                                                 />
                                             </div>
                                         </div>
 
                                         {/* Second Row */}
                                         <div className="grid grid-cols-1 md:grid-cols-12 lg:grid-cols-4 gap-2">
-                                            {data.invoice_category !== "other" && (
-                                                <div>
-                                                    <Label>Limits</Label>
-                                                    <Input
-                                                        type="number"
-                                                        step="0.01"
-                                                        value={item.limits}
-                                                        onChange={(e) => updateInvoiceItem(index, "limits", parseFloat(e.target.value))}
-                                                    />
-                                                </div>
-                                            )}
-
                                             {data.invoice_category === "other" && (
                                                 <div>
                                                     <Label>Sum Insured</Label>
