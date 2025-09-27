@@ -490,6 +490,9 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('quotations/bulk_destroy', [QuotationController::class, 'bulk_destroy'])->name('quotations.bulk_destroy');
 		Route::resource('quotations', QuotationController::class);
 
+		Route::get('/ai/chat', [AIChatController::class, 'index'])->name('ai.chat');
+		Route::post('/ai/chat/generate', [AIChatController::class, 'generate'])->name('ai.chat.generate')->middleware('throttle:30,1'); // 30 requests per minute
+
 		//Bills
 		Route::match(['get', 'post'], 'bill_invoices/pay_bill', [PurchaseController::class, 'pay_bill'])->name('billI_invoices.pay_bill');
 		Route::get('purchases/{id}/duplicate', [PurchaseController::class, 'duplicate'])->name('bill_invoices.duplicate');
