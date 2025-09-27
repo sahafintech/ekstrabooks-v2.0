@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
+use function Spatie\LaravelPdf\Support\pdf;
 use Validator;
 
 class CashPurchaseController extends Controller
@@ -866,6 +867,15 @@ class CashPurchaseController extends Controller
 			'attachments' => $attachments,
 			'email_templates' => $email_templates,
 		]);
+	}
+
+	public function pdf($id)
+	{
+		$bill = Purchase::with(['business', 'items', 'taxes', 'vendor'])->find($id);
+		return pdf()
+		->view('backend.user.pdf.cash-purchase', compact('bill'))
+		->name('cash-purchase-' . $bill->bill_no . '.pdf')
+		->download();
 	}
 
 	public function show_public_cash_purchase($short_code)

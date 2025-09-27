@@ -22,6 +22,7 @@
         "mollie/mollie-api-php": "*",
         "razorpay/razorpay": "*",
         "spatie/laravel-cookie-consent": "*",
+        "spatie/laravel-pdf": "^1.8",
         "stripe/stripe-php": "*",
         "tightenco/ziggy": "^2.0",
         "twilio/sdk": "*",

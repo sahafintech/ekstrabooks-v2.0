@@ -1281,6 +1281,13 @@ if (!function_exists('formatAmount')) {
 	}
 }
 
+if (!function_exists('formatCurrency')) {
+	function formatCurrency($number)
+	{
+		return get_business_option('currency') . ' ' . formatAmount($number);
+	}
+}
+
 if (!function_exists('business_money_format')) {
 	function business_money_format($number, $businessId = '')
 	{
