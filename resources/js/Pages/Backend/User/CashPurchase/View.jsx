@@ -84,55 +84,7 @@ export default function View({ bill, attachments, decimalPlace }) {
     };
 
     const handleDownloadPDF = async () => {
-        setIsLoading(prev => ({ ...prev, pdf: true }));
-        try {
-            // Dynamically import the required libraries
-            const html2canvas = (await import('html2canvas')).default;
-            const { jsPDF } = await import('jspdf');
-
-            // Get the content element
-            const content = document.querySelector('#printable-area');
-            
-            // Create a canvas from the content
-            const canvas = await html2canvas(content, {
-                scale: 2, // Higher scale for better quality
-                useCORS: true, // Enable CORS for images
-                logging: false,
-                windowWidth: content.scrollWidth,
-                windowHeight: content.scrollHeight
-            });
-
-            // Calculate dimensions
-            const imgWidth = 210; // A4 width in mm
-            const pageHeight = 297; // A4 height in mm
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            
-            // Create PDF
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            let heightLeft = imgHeight;
-            let position = 0;
-            let pageData = canvas.toDataURL('image/jpeg', 1.0);
-
-            // Add first page
-            pdf.addImage(pageData, 'JPEG', 0, position, imgWidth, imgHeight);
-            heightLeft -= pageHeight;
-
-            // Add subsequent pages if content is longer than one page
-            while (heightLeft >= 0) {
-                position = heightLeft - imgHeight;
-                pdf.addPage();
-                pdf.addImage(pageData, 'JPEG', 0, position, imgWidth, imgHeight);
-                heightLeft -= pageHeight;
-            }
-
-            // Save the PDF
-            pdf.save(`Cash_Purchase_${bill.bill_no}.pdf`);
-        } catch (error) {
-            console.error('Error generating PDF:', error);
-            toast.error('Failed to generate PDF. Please try again.');
-        } finally {
-            setIsLoading(prev => ({ ...prev, pdf: false }));
-        }
+            window.open(route('cash_purchases.pdf', bill.id), '_blank');
     };
 
     const handleShareLink = () => {
