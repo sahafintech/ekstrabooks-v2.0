@@ -732,6 +732,15 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('awards/bulk_destroy', [AwardController::class, 'bulk_destroy'])->name('awards.bulk_destroy');
 		Route::resource('awards', AwardController::class);
 
+		// salary advance
+		Route::get('salary_advances/trash', [SalaryAdvanceController::class, 'trash'])->name('salary_advances.trash');
+		Route::post('salary_advances/{id}/restore', [SalaryAdvanceController::class, 'restore'])->name('salary_advances.restore');
+		Route::post('salary_advances/bulk_restore', [SalaryAdvanceController::class, 'bulk_restore'])->name('salary_advances.bulk_restore');
+		Route::post('salary_advances/bulk_permanent_destroy', [SalaryAdvanceController::class, 'bulk_permanent_destroy'])->name('salary_advances.bulk_permanent_destroy');
+		Route::delete('salary_advances/{id}/permanent_destroy', [SalaryAdvanceController::class, 'permanent_destroy'])->name('salary_advances.permanent_destroy');
+		Route::resource('salary_advances', SalaryAdvanceController::class);
+		Route::post('salary_advances/bulk_destroy', [SalaryAdvanceController::class, 'bulk_destroy'])->name('salary_advances.bulk_destroy');
+
 		//Payslip Controller
 		Route::get('payslips/trash', [PayrollController::class, 'trash'])->name('payslips.trash');
 		Route::post('payslips/{id}/restore', [PayrollController::class, 'restore'])->name('payslips.restore');

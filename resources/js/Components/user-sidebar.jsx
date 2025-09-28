@@ -67,6 +67,7 @@ export function UserSidebar({ ...props }) {
     const timeSheetsBase = "/user/timesheets";
     const departmentsBase = "/user/departments";
     const designationsBase = "/user/designations";
+    const salaryAdvancesBase = "/user/salary_advances";
     const payslipsBase = "/user/payslips";
     const holidaysBase = "/user/holidays";
     const leavesBase = "/user/leaves";
@@ -168,6 +169,11 @@ export function UserSidebar({ ...props }) {
                     title: "Inventory Adjustment",
                     url: route("inventory_adjustments.index"),
                     isActive: url.startsWith(invAdjustBase),
+                },
+                {
+                    title: "Inventory Transfer",
+                    url: route("inventory_transfers.index"),
+                    isActive: url.startsWith(invTransferBase),
                 },
             ],
         },
@@ -289,6 +295,7 @@ export function UserSidebar({ ...props }) {
                 url.startsWith(attendanceLogsBase) ||
                 url.startsWith(departmentsBase) ||
                 url.startsWith(designationsBase) ||
+                url.startsWith(salaryAdvancesBase) ||
                 url.startsWith(payslipsBase) ||
                 url.startsWith(holidaysBase) ||
                 url.startsWith(leavesBase) ||
@@ -319,6 +326,11 @@ export function UserSidebar({ ...props }) {
                     title: "Designations",
                     url: route("designations.index"),
                     isActive: url.startsWith(designationsBase),
+                },
+                {
+                    title: "Salary Advances",
+                    url: route("salary_advances.index"),
+                    isActive: url.startsWith(salaryAdvancesBase),
                 },
                 {
                     title: "Manage Payroll",

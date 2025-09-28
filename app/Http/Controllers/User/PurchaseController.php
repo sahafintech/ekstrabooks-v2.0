@@ -2015,7 +2015,10 @@ class PurchaseController extends Controller
 			$bill->save();
 
 			// select from pending transactions and insert into transactions
-			$transactions = PendingTransaction::where('ref_id', $bill->id)->get();
+			$transactions = PendingTransaction::where('ref_id', $bill->id)
+				->where('ref_type', 'bill invoice')
+				->where('ref_type', 'bill invoice tax')
+				->get();
 
 			foreach ($transactions as $transaction) {
 				// Create a new Transaction instance and replicate data from pending

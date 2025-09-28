@@ -69,6 +69,7 @@ export function StaffSidebar(props) {
     const timeSheetsBase = "/user/timesheets";
     const departmentsBase = "/user/departments";
     const designationsBase = "/user/designations";
+    const salaryAdvancesBase = "/user/salary_advances";
     const payslipsBase = "/user/payslips";
     const holidaysBase = "/user/holidays";
     const leavesBase = "/user/leaves";
@@ -351,6 +352,7 @@ export function StaffSidebar(props) {
                 "attendance_logs.index",
                 "departments.index",
                 "designations.index",
+                "salary_advances.index",
                 "payslips.index",
                 "holidays.index",
                 "leaves.index",
@@ -396,6 +398,13 @@ export function StaffSidebar(props) {
                     title: "Designations",
                     url: route("designations.index"),
                     isActive: url.startsWith(designationsBase),
+                });
+            }
+            if (perms.has("salary_advances.index")) {
+                items.push({
+                    title: "Salary Advances",
+                    url: route("salary_advances.index"),
+                    isActive: url.startsWith(salaryAdvancesBase),
                 });
             }
             if (perms.has("payslips.index")) {
