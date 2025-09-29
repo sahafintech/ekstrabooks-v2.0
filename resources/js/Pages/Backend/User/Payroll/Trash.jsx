@@ -157,14 +157,11 @@ const RestoreAllPayrollsModal = ({
 
 const PayrollStatusBadge = ({ status }) => {
     const statusMap = {
-        0: {
-            label: "Pending",
-            className: "text-gray-600 bg-gray-200 px-3 py-1 rounded text-xs",
-        },
-        1: {
-            label: "Approved",
-            className: "text-green-400 bg-green-200 px-3 py-1 rounded text-xs",
-        },
+        0: { label: "Draft", className: "text-gray-600" },
+        1: { label: "Approved", className: "text-blue-600" },
+        2: { label: "Accrued", className: "text-green-600" },
+        3: { label: "Partially Paid", className: "text-yellow-600" },
+        4: { label: "Paid", className: "text-green-600" },
     };
 
     return (

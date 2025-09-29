@@ -11,11 +11,13 @@ return new class extends Migration {
     public function up(): void {
         Schema::create('salary_benefits', function (Blueprint $table) {
             $table->id();
-            $table->bigInteger('employee_benefit_id')->unsigned();
-            $table->date('date')->nullable();
+            $table->bigInteger('employee_id')->unsigned();
+            $table->integer('month');
+            $table->integer('year');
             $table->string('description', 191)->nullable();
             $table->decimal('amount', 28, 8);
-            $table->string('type', 20)->default('add')->comment('add | deduct');
+            $table->string('type', 20)->default('add')->comment('add | deduct | advance');
+            $table->bigInteger('account_id')->unsigned()->nullable();
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
             $table->bigInteger('created_user_id')->nullable();
@@ -24,7 +26,8 @@ return new class extends Migration {
             $table->softDeletes();
             $table->timestamps();
 
-            $table->foreign('employee_benefit_id')->references('id')->on('employee_benefits')->cascadeOnDelete();
+            $table->foreign('employee_id')->references('id')->on('employees')->cascadeOnDelete();
+            $table->foreign('account_id')->references('id')->on('accounts')->onDelete('set null');
             $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
             $table->foreign('business_id')->references('id')->on('business')->cascadeOnDelete();
         });

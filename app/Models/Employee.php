@@ -37,8 +37,12 @@ class Employee extends Model {
 		return $this->hasMany(Attendance::class, 'employee_id');
 	}
 
-	public function employee_benefits() {
-		return $this->hasMany(EmployeeBenefit::class, 'employee_id');
+	public function salary_benefits() {
+		return $this->hasMany(SalaryBenefit::class, 'employee_id');
+	}
+
+	public function advances() {
+		return $this->hasMany(SalaryAdvance::class, 'employee_id');
 	}
 
 	public function documents() {

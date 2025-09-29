@@ -17,7 +17,7 @@ class SalaryBenefit extends Model
      */
     protected $table = 'salary_benefits';
 
-    protected $fillable = ['salary_scale_id', 'employee_benefit_id', 'date', 'description', 'amount', 'type', 'account_id'];
+    protected $fillable = ['employee_id', 'month', 'year', 'description', 'amount', 'type', 'account_id'];
 
     protected function amount(): Attribute{
         $decimal_place = get_business_option('decimal_places', 2);
@@ -32,8 +32,8 @@ class SalaryBenefit extends Model
         return $this->belongsTo(Account::class, 'account_id');
     }
     
-    public function employee_benefit()
+    public function employee()
     {
-        return $this->belongsTo(EmployeeBenefit::class, 'employee_benefit_id');
+        return $this->belongsTo(Employee::class, 'employee_id');
     }
 }

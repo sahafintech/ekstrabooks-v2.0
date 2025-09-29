@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, router, usePage } from "@inertiajs/react";
+import { Link, router, usePage, useForm } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -33,6 +33,7 @@ import {
     MoreVertical,
     Plus,
     Trash,
+    Trash2,
     ChevronUp,
     ChevronDown,
 } from "lucide-react";
@@ -45,6 +46,9 @@ import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { formatAmount, formatCurrency } from "@/lib/utils";
 import { Label } from "@/Components/ui/label";
 import DateTimePicker from "@/Components/DateTimePicker";
+import { DrawerComponent } from "@/Components/DrawerComponent";
+import { Textarea } from "@/Components/ui/textarea";
+import InputError from "@/Components/InputError";
 
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
@@ -205,7 +209,7 @@ const BulkAccrueConfirmationModal = ({
                         />
                     </div>
                 </div>
-                
+
                 <div className="grid grid-cols-12 mt-2">
                     <Label
                         htmlFor="liability_account_id"
@@ -453,6 +457,22 @@ export default function List({
         filters.sorting || { column: "id", direction: "desc" }
     );
     const [paymentAmounts, setPaymentAmounts] = useState({});
+    
+    // Edit drawer states
+    const [editDrawerOpen, setEditDrawerOpen] = useState(false);
+    const [editingPayroll, setEditingPayroll] = useState(null);
+    const [allowanceItems, setAllowanceItems] = useState([]);
+    const [deductionItems, setDeductionItems] = useState([]);
+    const [netSalary, setNetSalary] = useState(0);
+
+    // Edit form
+    const { data: editData, setData: setEditData, put, processing: editProcessing, errors: editErrors, reset: resetEdit } = useForm({
+        advance: "",
+        advance_description: "",
+        deductions: [],
+        allowances: [],
+        _method: "PUT",
+    });
 
     useEffect(() => {
         // Initialize paymentAmounts with the correct due amounts
@@ -480,6 +500,40 @@ export default function List({
             });
         }
     }, [flash, toast, errors]);
+
+    // Populate allowance and deduction items when editing a payroll
+    useEffect(() => {
+        if (editingPayroll && editingPayroll.staff && editingPayroll.staff.salary_benefits) {
+            // Filter salary_benefits by matching month and year
+            const matchingSalaryBenefits = editingPayroll.staff.salary_benefits.filter(
+                salaryBenefit => salaryBenefit.month == month && salaryBenefit.year == year
+            );
+
+            const allowances = [];
+            const deductions = [];
+
+            // Process each matching salary benefit
+            matchingSalaryBenefits.forEach(salaryBenefit => {
+                const item = {
+                    description: salaryBenefit.description || "",
+                    amount: parseFloat(salaryBenefit.amount) || 0
+                };
+
+                if (salaryBenefit.type === 'add') {
+                    allowances.push(item);
+                } else if (salaryBenefit.type === 'deduct') {
+                    deductions.push({
+                        ...item,
+                        account_id: salaryBenefit.account_id || ""
+                    });
+                }
+            });
+
+            // Set the items, or provide default empty items if none found
+            setAllowanceItems(allowances.length > 0 ? allowances : [{ description: "", amount: 0 }]);
+            setDeductionItems(deductions.length > 0 ? deductions : [{ description: "", amount: 0, account_id: "" }]);
+        }
+    }, [editingPayroll, month, year]);
 
     const toggleSelectAll = () => {
         if (isAllSelected) {
@@ -861,6 +915,130 @@ export default function List({
         window.location.href = route("payslips.export");
     };
 
+    const handleGeneratePayroll = () => {
+        router.post(route("payslips.store"), {
+            month: selectedMonth,
+            year: selectedYear,
+            preserveState: true,
+        });
+    };
+
+    // Edit drawer functions
+    const handleEditPayroll = (payroll) => {
+        setEditingPayroll(payroll);
+        
+        // Initialize form data
+        setEditData({
+            advance: payroll.advance || "",
+            advance_description: payroll.advance_description || "",
+            deductions: [],
+            allowances: [],
+            _method: "PUT",
+        });
+
+        // Note: allowanceItems and deductionItems will be populated by the useEffect
+        // that runs when editingPayroll changes
+
+        setNetSalary(payroll.net_salary || 0);
+        setEditDrawerOpen(true);
+    };
+
+    const handleUpdatePayroll = (e) => {
+        e.preventDefault();
+        put(route("payslips.update", editingPayroll.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast({
+                    title: "Success",
+                    description: "Payroll updated successfully",
+                });
+                resetEdit();
+                setEditDrawerOpen(false);
+                setEditingPayroll(null);
+                setAllowanceItems([]);
+                setDeductionItems([]);
+                setNetSalary(0);
+            },
+            onError: () => {
+                toast({
+                    variant: "destructive",
+                    title: "Error", 
+                    description: "Failed to update payroll",
+                });
+            },
+        });
+    };
+
+    const addAllowance = () => {
+        const newItem = { description: "", amount: 0 };
+        const updatedItems = [...allowanceItems, newItem];
+        setAllowanceItems(updatedItems);
+        setEditData("allowances", updatedItems);
+    };
+
+    const addDeduction = () => {
+        const newItem = { description: "", amount: 0, account_id: "" };
+        const updatedItems = [...deductionItems, newItem];
+        setDeductionItems(updatedItems);
+        setEditData("deductions", updatedItems);
+    };
+
+    const removeAllowanceItem = (index) => {
+        const updatedItems = allowanceItems.filter((_, i) => i !== index);
+        setAllowanceItems(updatedItems);
+        setEditData("allowances", updatedItems);
+    };
+
+    const removeDeductionItem = (index) => {
+        const updatedItems = deductionItems.filter((_, i) => i !== index);
+        setDeductionItems(updatedItems);
+        setEditData("deductions", updatedItems);
+    };
+
+    const updateAllowance = (index, field, value) => {
+        const updatedItems = [...allowanceItems];
+        if (field === "amount") {
+            updatedItems[index][field] = value === "" ? "" : parseFloat(value) || 0;
+        } else {
+            updatedItems[index][field] = value;
+        }
+        setAllowanceItems(updatedItems);
+        setEditData("allowances", updatedItems);
+    };
+
+    const updateDeduction = (index, field, value) => {
+        const updatedItems = [...deductionItems];
+        if (field === "amount") {
+            updatedItems[index][field] = value === "" ? "" : parseFloat(value) || 0;
+        } else {
+            updatedItems[index][field] = value;
+        }
+        setDeductionItems(updatedItems);
+        setEditData("deductions", updatedItems);
+    };
+
+    // Calculate net salary when allowances, deductions, or advance changes
+    useEffect(() => {
+        if (!editingPayroll) return;
+
+        const currentSalary = parseFloat(editingPayroll.current_salary) || 0;
+        const totalAllowances = Array.isArray(editData.allowances)
+            ? editData.allowances.reduce(
+                  (sum, item) => sum + (parseFloat(item.amount) || 0),
+                  0
+              )
+            : 0;
+        const totalDeductions = Array.isArray(editData.deductions)
+            ? editData.deductions.reduce(
+                  (sum, item) => sum + (parseFloat(item.amount) || 0),
+                  0
+              )
+            : 0;
+        const advance = parseFloat(editData.advance) || 0;
+        const calculatedNetSalary = currentSalary + totalAllowances - totalDeductions - advance;
+        setNetSalary(calculatedNetSalary);
+    }, [editData.allowances, editData.deductions, editData.advance, editingPayroll]);
+
     return (
         <AuthenticatedLayout>
             <Toaster />
@@ -874,12 +1052,10 @@ export default function List({
                     <div className="p-4">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                             <div className="flex flex-col md:flex-row gap-2">
-                                <Link href={route("payslips.create")}>
-                                    <Button>
-                                        <Plus className="w-4 h-4 mr-2" />
-                                        Generate Payroll
-                                    </Button>
-                                </Link>
+                                <Button onClick={handleGeneratePayroll}>
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Generate Payroll
+                                </Button>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="secondary">
@@ -896,12 +1072,15 @@ export default function List({
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                                 <Link href={route("payslips.trash")}>
-                                    <Button variant="outline" className="relative">
+                                    <Button
+                                        variant="outline"
+                                        className="relative"
+                                    >
                                         <Trash className="h-8 w-8" />
                                         {trashed_payrolls > 0 && (
-                                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                                            {trashed_payrolls}
-                                        </span>
+                                            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
+                                                {trashed_payrolls}
+                                            </span>
                                         )}
                                     </Button>
                                 </Link>
@@ -1819,10 +1998,8 @@ export default function List({
                                                                 icon: (
                                                                     <Edit className="h-4 w-4" />
                                                                 ),
-                                                                href: route(
-                                                                    "payslips.edit",
-                                                                    payroll.id
-                                                                ),
+                                                                onClick: () =>
+                                                                    handleEditPayroll(payroll),
                                                             },
                                                             {
                                                                 label: "Delete",
@@ -1933,6 +2110,291 @@ export default function List({
                         setPaymentDate={setPaymentDate}
                         paymentDate={paymentDate}
                     />
+
+                    {/* Edit Payroll Drawer */}
+                    <DrawerComponent
+                        position="right"
+                        width="w-4/5"
+                        title="Edit Payroll"
+                        open={editDrawerOpen}
+                        onOpenChange={(open) => {
+                            setEditDrawerOpen(open);
+                            if (!open) {
+                                // Clean up state when drawer is closed
+                                setEditingPayroll(null);
+                                setAllowanceItems([]);
+                                setDeductionItems([]);
+                                setNetSalary(0);
+                                resetEdit();
+                            }
+                        }}
+                    >
+                        {editingPayroll && (
+                            <form onSubmit={handleUpdatePayroll}>
+                                <div className="flex flex-col gap-1 mb-4 py-6">
+                                    <div className="text-sm font-medium text-muted-foreground">
+                                        Employee Id:{" "}
+                                        <span className="ml-2 text-primary">
+                                            {editingPayroll?.staff?.employee_id}
+                                        </span>
+                                    </div>
+                                    <div className="text-sm font-medium text-muted-foreground">
+                                        Employee Name:{" "}
+                                        <span className="ml-2 text-primary">
+                                            {editingPayroll?.staff?.name}
+                                        </span>
+                                    </div>
+                                    <div className="text-sm font-medium text-muted-foreground">
+                                        Period:{" "}
+                                        <span className="ml-2 text-primary">
+                                            {editingPayroll?.month}/{editingPayroll?.year}
+                                        </span>
+                                    </div>
+                                    <div className="text-sm font-medium text-muted-foreground">
+                                        Basic Salary:{" "}
+                                        <span className="ml-2 text-primary">
+                                            {formatCurrency({
+                                                amount: editingPayroll?.current_salary,
+                                            })}
+                                        </span>
+                                    </div>
+                                    <div className="text-sm font-medium text-muted-foreground">
+                                        Net Salary:{" "}
+                                        <span className="ml-2 text-primary">
+                                            {formatCurrency({ amount: netSalary })}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-12 mt-2">
+                                    <Label
+                                        htmlFor="advance"
+                                        className="md:col-span-2 col-span-12"
+                                    >
+                                        Advance
+                                    </Label>
+                                    <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                        <Input
+                                            type="number"
+                                            value={editData.advance}
+                                            onChange={(e) =>
+                                                setEditData("advance", e.target.value)
+                                            }
+                                            className="md:w-1/2 w-full"
+                                        />
+                                        <InputError
+                                            message={editErrors.advance}
+                                            className="text-sm"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-12 mt-2">
+                                    <Label
+                                        htmlFor="advance_description"
+                                        className="md:col-span-2 col-span-12"
+                                    >
+                                        Advance Description
+                                    </Label>
+                                    <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                        <Textarea
+                                            value={editData.advance_description}
+                                            onChange={(e) =>
+                                                setEditData(
+                                                    "advance_description",
+                                                    e.target.value
+                                                )
+                                            }
+                                            className="md:w-1/2 w-full"
+                                        />
+                                        <InputError
+                                            message={editErrors.advance_description}
+                                            className="text-sm"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Allowances Section */}
+                                <div className="space-y-4 mt-5">
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="text-lg font-medium">
+                                            Allowances
+                                        </h3>
+                                        <Button
+                                            variant="secondary"
+                                            type="button"
+                                            onClick={addAllowance}
+                                        >
+                                            <Plus className="w-4 h-4 mr-2" />
+                                            Add Item
+                                        </Button>
+                                    </div>
+
+                                    {allowanceItems.map((item, index) => (
+                                        <div
+                                            key={index}
+                                            className="border rounded-lg p-4 space-y-4 bg-gray-50"
+                                        >
+                                            <div className="grid grid-cols-12 gap-2">
+                                                <div className="col-span-12 sm:col-span-4">
+                                                    <Label>Descriptions *</Label>
+                                                    <Textarea
+                                                        className="w-full"
+                                                        value={item.description}
+                                                        onChange={(e) =>
+                                                            updateAllowance(
+                                                                index,
+                                                                "description",
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+
+                                                <div className="col-span-12 sm:col-span-4">
+                                                    <Label>Amount *</Label>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={item.amount}
+                                                        onChange={(e) =>
+                                                            updateAllowance(
+                                                                index,
+                                                                "amount",
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+
+                                                <div className="flex items-center justify-end col-span-12 sm:col-span-1">
+                                                    {allowanceItems.length > 1 && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="text-red-500"
+                                                            onClick={() =>
+                                                                removeAllowanceItem(
+                                                                    index
+                                                                )
+                                                            }
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Deductions Section */}
+                                <div className="space-y-4 mt-5">
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="text-lg font-medium">
+                                            Deductions
+                                        </h3>
+                                        <Button
+                                            variant="secondary"
+                                            type="button"
+                                            onClick={addDeduction}
+                                        >
+                                            <Plus className="w-4 h-4 mr-2" />
+                                            Add Item
+                                        </Button>
+                                    </div>
+
+                                    {deductionItems.map((item, index) => (
+                                        <div
+                                            key={index}
+                                            className="border rounded-lg p-4 space-y-4 bg-gray-50"
+                                        >
+                                            <div className="grid grid-cols-12 gap-2">
+                                                <div className="col-span-12 sm:col-span-3">
+                                                    <Label>Descriptions *</Label>
+                                                    <Textarea
+                                                        className="w-full"
+                                                        value={item.description}
+                                                        onChange={(e) =>
+                                                            updateDeduction(
+                                                                index,
+                                                                "description",
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+
+                                                <div className="col-span-12 sm:col-span-3">
+                                                    <Label>Amount *</Label>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={item.amount}
+                                                        onChange={(e) =>
+                                                            updateDeduction(
+                                                                index,
+                                                                "amount",
+                                                                e.target.value
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+
+                                                <div className="col-span-12 sm:col-span-3">
+                                                    <Label>Account</Label>
+                                                    <SearchableCombobox
+                                                        options={accounts.map(
+                                                            (account) => ({
+                                                                id: account.id,
+                                                                name: account.account_name,
+                                                            })
+                                                        )}
+                                                        value={item.account_id}
+                                                        onChange={(value) =>
+                                                            updateDeduction(
+                                                                index,
+                                                                "account_id",
+                                                                value
+                                                            )
+                                                        }
+                                                        placeholder="Select Account"
+                                                    />
+                                                </div>
+
+                                                <div className="flex items-center justify-end col-span-12 sm:col-span-1">
+                                                    {deductionItems.length > 1 && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="text-red-500"
+                                                            onClick={() =>
+                                                                removeDeductionItem(
+                                                                    index
+                                                                )
+                                                            }
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <Button
+                                    type="submit"
+                                    disabled={editProcessing}
+                                    className="mt-4 mb-32"
+                                >
+                                    {editProcessing ? "Updating..." : "Update Payroll"}
+                                </Button>
+                            </form>
+                        )}
+                    </DrawerComponent>
                 </div>
             </SidebarInset>
         </AuthenticatedLayout>
