@@ -41,7 +41,7 @@ export function UserSidebar({ ...props }) {
     const brandsBase = "/user/brands";
     const unitsBase = "/user/product_units";
     const invAdjustBase = "/user/inventory_adjustments";
-
+    const invTransferBase = "/user/inventory_transfers";
     // Suppliers
     const vendorsBase = "/user/vendors";
     const purchaseOrdersBase = "/user/purchase_orders";

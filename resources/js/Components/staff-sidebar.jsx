@@ -43,6 +43,7 @@ export function StaffSidebar(props) {
     const brandsBase = "/user/brands";
     const unitsBase = "/user/product_units";
     const invAdjustBase = "/user/inventory_adjustments";
+    const invTransferBase = "/user/inventory_transfers";
 
     // Suppliers
     const vendorsBase = "/user/vendors";
@@ -177,6 +178,13 @@ export function StaffSidebar(props) {
                 title: "Inventory Adjustment",
                 url: route("inventory_adjustments.index"),
                 isActive: url.startsWith(invAdjustBase),
+            });
+        }
+        if (perms.has("inventory_transfers.index")) {
+            items.push({
+                title: "Inventory Transfer",
+                url: route("inventory_transfers.index"),
+                isActive: url.startsWith(invTransferBase),
             });
         }
 
