@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Head, Link, router, usePage } from "@inertiajs/react";
+import { Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
 import { Checkbox } from "@/Components/ui/checkbox";
+import { Switch } from "@/Components/ui/switch";
 import {
   Table,
   TableBody,
@@ -388,6 +389,18 @@ export default function List({ employees = [], meta = {}, filters = {}, trashed_
     window.location.href = route("staffs.export");
   };
 
+  const handleStatusToggle = (employeeId, newStatus) => {
+    router.post(route("staffs.change_status", employeeId), 
+      {
+        status: newStatus
+      },
+      {
+        preserveState: true,
+        preserveScroll: true,
+      }
+    );
+  };
+
   return (
     <AuthenticatedLayout>
       <Toaster />
@@ -505,6 +518,9 @@ export default function List({ employees = [], meta = {}, filters = {}, trashed_
                     <TableHead className="cursor-pointer" onClick={() => handleSort("basic_salary")}>
                       Basic Salary {renderSortIcon("basic_salary")}
                     </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("status")}>
+                      Status {renderSortIcon("status")}
+                    </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -525,6 +541,17 @@ export default function List({ employees = [], meta = {}, filters = {}, trashed_
                         <TableCell>{employee.designation?.name || "-"}</TableCell>
                         <TableCell>{formatDate(employee.joining_date)}</TableCell>
                         <TableCell>{formatCurrency({ amount: employee.basic_salary })}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              checked={employee.status === 1}
+                              onCheckedChange={() => handleStatusToggle(employee.id, employee.status === 1 ? 0 : 1)}
+                            />
+                            <span className="text-sm text-gray-600">
+                              {employee.status === 1 ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right">
                           <TableActions
                             actions={[
@@ -551,7 +578,7 @@ export default function List({ employees = [], meta = {}, filters = {}, trashed_
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={9} className="h-24 text-center">
+                      <TableCell colSpan={10} className="h-24 text-center">
                         No staff found.
                       </TableCell>
                     </TableRow>

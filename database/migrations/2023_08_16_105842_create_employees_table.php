@@ -27,6 +27,7 @@ return new class extends Migration {
             $table->bigInteger('designation_id')->unsigned()->nullable();
             $table->date('joining_date');
             $table->date('end_date')->nullable();
+            $table->tinyInteger('status')->default(1)->comment('0: inactive, 1: active');
 
             $table->string('bank_name', 191)->nullable();
             $table->string('branch_name', 191)->nullable();

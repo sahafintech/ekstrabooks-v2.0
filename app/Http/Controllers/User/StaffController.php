@@ -555,4 +555,30 @@ class StaffController extends Controller
     {
         return Excel::download(new StaffsExport, 'staffs ' . now()->format('d m Y') . '.xlsx');
     }
+
+    public function change_status(Request $request, $id)
+    {
+        $employee = Employee::where('business_id', $request->activeBusiness->id)
+            ->findOrFail($id);
+        
+        $employee->status = $request->status;
+        $employee->save();
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = Auth::id();
+        $audit->event = 'Changed Status for Staff ' . $employee->name . ' to ' . ($request->status == 1 ? 'Active' : 'Inactive');
+        $audit->save();
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => _lang('Status Changed Successfully'),
+                'status' => $employee->status
+            ]);
+        }
+
+        return redirect()->route('staffs.index')->with('success', _lang('Status Changed Successfully'));
+    }
 }
