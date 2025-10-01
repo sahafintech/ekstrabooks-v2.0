@@ -51,6 +51,7 @@ use App\Http\Controllers\ProjectBudgetController;
 use App\Http\Controllers\ProjectSubcontractController;
 use App\Http\Controllers\ProjectSubcontractPaymentController;
 use App\Http\Controllers\ProjectTaskController;
+use App\Http\Controllers\SalaryAdvanceController;
 use App\Http\Controllers\TimesheetController;
 use App\Http\Controllers\User\CustomerController;
 use App\Http\Controllers\User\CustomerDocumentController;
