@@ -1507,7 +1507,7 @@ class PurchaseController extends Controller
 			$purchase->bill_no = get_business_option('purchase_number');
 		}
 		$purchase->purchase_date = Carbon::parse($request->input('purchase_date'))->format('Y-m-d');
-		$purchase->due_date = Carbon::parse($request->input('purchase_date'))->format('Y-m-d');
+		$purchase->due_date = Carbon::parse($request->input('due_date'))->format('Y-m-d');
 		$purchase->sub_total = $summary['subTotal'];
 		$purchase->grand_total = $summary['grandTotal'];
 		$purchase->converted_total = $request->input('converted_total');
