@@ -12,6 +12,7 @@ use App\Models\Currency;
 use App\Models\Employee;
 use App\Models\Holiday;
 use App\Models\Payroll;
+use App\Models\SalaryAdvance;
 use App\Models\SalaryBenefit;
 use App\Models\Timesheet;
 use App\Models\Transaction;
@@ -340,6 +341,18 @@ class PayrollController extends Controller
             ->where('month', $month)
             ->where('year', $year)
             ->where('type', 'deduct')->get();
+
+        if(SalaryAdvance::where('employee_id', $employee->id)->where('payroll_month', $month)->where('payroll_year', $year)->sum('amount') > 0) {
+            $salary_benefit = new SalaryBenefit;
+            $salary_benefit->employee_id = $employee->id;
+            $salary_benefit->month = $month;
+            $salary_benefit->year = $year;
+            $salary_benefit->description = 'Salary Advance for ' . $month . '/' . $year;
+            $salary_benefit->amount = SalaryAdvance::where('employee_id', $employee->id)->where('payroll_month', $month)->where('payroll_year', $year)->sum('amount');
+            $salary_benefit->type = 'advance';
+            $salary_benefit->save();
+        }
+
         $advance = $employee->salary_benefits()
             ->where('month', $month)
             ->where('year', $year)
@@ -491,6 +504,17 @@ class PayrollController extends Controller
                     'amount' => $benefit->amount
                 ];
             }
+        }
+
+        if(SalaryAdvance::where('employee_id', $payroll->employee_id)->where('payroll_month', $payroll->month)->where('payroll_year', $payroll->year)->sum('amount') > 0) {
+            $salary_benefit = new SalaryBenefit;
+            $salary_benefit->employee_id = $payroll->employee_id;
+            $salary_benefit->month = $payroll->month;
+            $salary_benefit->year = $payroll->year;
+            $salary_benefit->description = 'Salary Advance for ' . $payroll->month . '/' . $payroll->year;
+            $salary_benefit->amount = SalaryAdvance::where('employee_id', $payroll->employee_id)->where('payroll_month', $payroll->month)->where('payroll_year', $payroll->year)->sum('amount');
+            $salary_benefit->type = 'advance';
+            $salary_benefit->save();
         }
 
         $advance = $payroll->employee->salary_benefits()

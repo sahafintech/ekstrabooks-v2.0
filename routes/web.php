@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountTypeController;
+use App\Http\Controllers\AIChatController;
 use App\Http\Controllers\AttendanceLogController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\BillPaymentsController;
@@ -673,6 +674,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('staffs', StaffController::class);
 		Route::post('import_staffs', [StaffController::class, 'import_staffs'])->name('staffs.import');
 		Route::get('export_staffs', [StaffController::class, 'export_staffs'])->name('staffs.export');
+		Route::post('staffs/{id}', [StaffController::class, 'change_status'])->name('staffs.change_status');
 
 		//Staff Documents
 		Route::get('staff_documents/{employee_id}', [StaffDocumentController::class, 'index'])->name('staff_documents.index');
