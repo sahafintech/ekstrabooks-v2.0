@@ -21,6 +21,7 @@
         "maatwebsite/excel": "*",
         "mollie/mollie-api-php": "*",
         "razorpay/razorpay": "*",
+        "simplesoftwareio/simple-qrcode": "^4.2",
         "spatie/laravel-cookie-consent": "*",
         "spatie/laravel-pdf": "^1.8",
         "stripe/stripe-php": "*",

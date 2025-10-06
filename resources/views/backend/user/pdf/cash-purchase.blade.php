@@ -60,7 +60,7 @@
                     <div class="mt-4 sm:flex sm:justify-end">
                         <!-- QR Code placeholder - you may need to implement QR code generation -->
                         <div class="w-24 h-24 border-2 border-gray-300 border-dashed flex items-center justify-center text-xs text-gray-500">
-                            QR Code
+                            {!! QrCode::size(200)->generate(route('cash_purchases.show_public_cash_purchase', $bill->short_code)) !!}
                         </div>
                     </div>
                 </div>
