@@ -28,6 +28,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
+use function Spatie\LaravelPdf\Support\pdf;
 
 class DefferedInvoiceController extends Controller
 {
@@ -1262,6 +1263,15 @@ class DefferedInvoiceController extends Controller
             'decimalPlaces' => $decimalPlaces,
             'email_templates' => $email_templates
         ]);
+    }
+
+    public function pdf($id)
+    {
+        $invoice = Invoice::with(['business', 'business.bank_accounts', 'items', 'taxes', 'customer'])->find($id);
+        return pdf()
+        ->view('backend.user.pdf.deffered-invoice', compact('invoice'))
+        ->name('deffered-invoice-' . $invoice->invoice_number . '.pdf')
+        ->download();
     }
 
     public function deffered_invoices_filter(Request $request)

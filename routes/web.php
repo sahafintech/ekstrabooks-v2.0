@@ -382,6 +382,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::match(['get', 'post'], 'invoices/receive_payment', [InvoiceController::class, 'receive_payment'])->name('invoices.receive_payment');
 		Route::get('invoices/{id}/duplicate', [InvoiceController::class, 'duplicate'])->name('invoices.duplicate');
 		Route::get('invoices/{id}/get_invoice_link', [InvoiceController::class, 'get_invoice_link'])->name('invoices.get_invoice_link');
+		Route::get('invoices/{id}/pdf', [InvoiceController::class, 'pdf'])->name('invoices.pdf');
 		Route::get('invoices/trash', [InvoiceController::class, 'trash'])->name('invoices.trash');
 		Route::post('invoices/{id}/restore', [InvoiceController::class, 'restore'])->name('invoices.restore');
 		Route::post('invoices/bulk_restore', [InvoiceController::class, 'bulk_restore'])->name('invoices.bulk_restore');
@@ -467,6 +468,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('deffered_invoices/bulk_permanent_destroy', [DefferedInvoiceController::class, 'bulk_permanent_destroy'])->name('deffered_invoices.bulk_permanent_destroy');
 		Route::delete('deffered_invoices/{id}/permanent_destroy', [DefferedInvoiceController::class, 'permanent_destroy'])->name('deffered_invoices.permanent_destroy');
 		Route::resource('deffered_invoices', DefferedInvoiceController::class);
+		Route::get('deffered_invoices/{id}/pdf', [DefferedInvoiceController::class, 'pdf'])->name('deffered_invoices.pdf');
 		Route::get('deffered_invoices/payments/{id}', [DefferedInvoiceController::class, 'payments'])->name('deffered_invoices.payments');
 		Route::get('deffered_invoices/earnings/{id}', [DefferedInvoiceController::class, 'earnings'])->name('deffered_invoices.earnings');
 		Route::post('deffered_invoices/filter', [DefferedInvoiceController::class, 'deffered_invoices_filter'])->name('deffered_invoices.filter');

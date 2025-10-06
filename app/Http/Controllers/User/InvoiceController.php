@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
+use function Spatie\LaravelPdf\Support\pdf;
 
 class InvoiceController extends Controller
 {
@@ -618,6 +619,15 @@ class InvoiceController extends Controller
             'decimalPlaces' => $decimalPlaces,
             'email_templates' => $email_templates
         ]);
+    }
+
+    public function pdf($id)
+    {
+        $invoice = Invoice::with(['business', 'business.bank_accounts', 'items', 'taxes', 'customer', 'project'])->find($id);
+        return pdf()
+        ->view('backend.user.pdf.invoice', compact('invoice'))
+        ->name('invoice-' . $invoice->invoice_number . '.pdf')
+        ->download();
     }
 
     public function get_invoice_link(Request $request, $id)
