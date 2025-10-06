@@ -23,7 +23,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Inertia;
-use Validator;
+use function Spatie\LaravelPdf\Support\pdf;
+use Illuminate\Support\Facades\Validator;
 
 class QuotationController extends Controller
 {
@@ -449,6 +450,15 @@ class QuotationController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
+    public function pdf($id)
+    {
+        $quotation = Quotation::with(['business', 'items', 'taxes', 'customer'])->find($id);
+        return pdf()
+        ->view('backend.user.pdf.quotation', compact('quotation'))
+        ->name('quotation-' . $quotation->quotation_number . '.pdf')
+        ->download();
+    }
+
     public function show_public_quotation($short_code)
     {
         $quotation = Quotation::withoutGlobalScopes()->with(['customer', 'business', 'items', 'taxes'])
