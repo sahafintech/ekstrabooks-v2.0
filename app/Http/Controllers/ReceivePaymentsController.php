@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
+use function Spatie\LaravelPdf\Support\pdf;
 
 class ReceivePaymentsController extends Controller
 {
@@ -580,6 +581,15 @@ class ReceivePaymentsController extends Controller
             'decimalPlace' => $decimalPlace,
             'attachments' => $attachment,
         ]);
+    }
+
+    public function pdf($id)
+    {
+        $payment = ReceivePayment::where('id', $id)->with('invoices', 'customer', 'business', 'account')->first();
+        return pdf()
+            ->view('backend.user.pdf.receive-payment', compact('payment'))
+            ->name('receive-payment-' . $payment->id . '.pdf')
+            ->download();
     }
 
     public function show_public_receive_payment($id)

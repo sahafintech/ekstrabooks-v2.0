@@ -30,6 +30,10 @@ class ReceivePayment extends Model
         return $this->belongsTo(Business::class, 'business_id');
     }
 
+    public function account() {
+        return $this->belongsTo(Account::class, 'account_id');
+    }
+
     protected function date(): Attribute {
         $date_format = get_date_format();
 

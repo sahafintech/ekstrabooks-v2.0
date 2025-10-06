@@ -21,6 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
+use function Spatie\LaravelPdf\Support\pdf;
 
 class SalesReturnController extends Controller
 {
@@ -511,6 +512,15 @@ class SalesReturnController extends Controller
             'sales_return' => $sales_return,
             'attachments' => $attachments,
         ]);
+    }
+
+    public function pdf($id)
+    {
+        $sales_return = SalesReturn::with(['business', 'items', 'taxes', 'customer'])->find($id);
+        return pdf()
+        ->view('backend.user.pdf.sales-return', compact('sales_return'))
+        ->name('sales-return-' . $sales_return->return_number . '.pdf')
+        ->download();
     }
 
     public function show_public_sales_return($short_code)

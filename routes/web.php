@@ -216,6 +216,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('business/{id}/users', [BusinessController::class, 'users'])->name('business.users');
 		Route::resource('business', BusinessController::class)->except('show');
 		Route::post('business/bulk_destroy', [BusinessController::class, 'bulk_destroy'])->name('business.bulk_destroy');
+		Route::get('business/trash', [BusinessController::class, 'trash'])->name('business.trash');
+		Route::post('business/{id}/restore', [BusinessController::class, 'restore'])->name('business.restore');
+		Route::post('business/bulk_restore', [BusinessController::class, 'bulk_restore'])->name('business.bulk_restore');
+		Route::post('business/bulk_permanent_destroy', [BusinessController::class, 'bulk_permanent_destroy'])->name('business.bulk_permanent_destroy');
+		Route::delete('business/{id}/permanent_destroy', [BusinessController::class, 'permanent_destroy'])->name('business.permanent_destroy');
 
 		//Permission Controller
 		Route::get('roles/{role_id?}/access_control', [PermissionController::class, 'show'])->name('permission.show');
@@ -389,6 +394,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('invoices/bulk_permanent_destroy', [InvoiceController::class, 'bulk_permanent_destroy'])->name('invoices.bulk_permanent_destroy');
 		Route::delete('invoices/{id}/permanent_destroy', [InvoiceController::class, 'permanent_destroy'])->name('invoices.permanent_destroy');
 		Route::resource('invoices', InvoiceController::class);
+		Route::get('receive_payments/{id}/pdf', [ReceivePaymentsController::class, 'pdf'])->name('receive_payments.pdf');
 		Route::resource('receive_payments', ReceivePaymentsController::class);
 		Route::post('import_invoices', [InvoiceController::class, 'import_invoices'])->name('invoices.import');
 		Route::post('invoices/filter', [InvoiceController::class, 'invoices_filter'])->name('invoices.filter');
@@ -405,6 +411,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('sales_returns/refund/store/{id}', [SalesReturnController::class, 'refund_store'])->name('sales_returns.refund.store');
 		Route::post('sales_returns/bulk_destroy', [SalesReturnController::class, 'bulk_destroy'])->name('sales_returns.bulk_destroy');
 		Route::match(['get', 'post'], 'sales_returns/{id}/send_email', [SalesReturnController::class, 'send_email'])->name('sales_returns.send_email');
+		Route::get('sales_returns/{id}/pdf', [SalesReturnController::class, 'pdf'])->name('sales_returns.pdf');
 
 		// purchase return
 		Route::get('purchase_returns/trash', [PurchaseReturnController::class, 'trash'])->name('purchase_returns.trash');

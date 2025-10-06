@@ -83,11 +83,7 @@ export default function View({ payment, decimalPlace, attachments }) {
     };
 
     const handleDownloadPDF = () => {
-        setIsLoading(prev => ({ ...prev, pdf: true }));
-        window.open(route('invoices.pdf', invoice.id), '_blank');
-        setTimeout(() => {
-            setIsLoading(prev => ({ ...prev, pdf: false }));
-        }, 1000);
+        window.open(route('receive_payments.pdf', payment.id), '_blank');
     };
 
     const handleShareLink = () => {
