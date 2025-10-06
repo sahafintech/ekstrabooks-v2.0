@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
+use function Spatie\LaravelPdf\Support\pdf;
 
 class BillPaymentsController extends Controller
 {
@@ -816,6 +817,15 @@ class BillPaymentsController extends Controller
             'decimalPlace' => $decimalPlace,
             'attachments' => $attachments
         ]);
+    }
+
+    public function pdf($id)
+    {
+        $payment = BillPayment::where('id', $id)->with('purchases', 'vendor', 'business')->first();
+        return pdf()
+        ->view('backend.user.pdf.bill-payment', compact('payment'))
+        ->name('bill-payment-' . $payment->id . '.pdf')
+        ->download();
     }
 
     public function show_public_bill_payment($id)

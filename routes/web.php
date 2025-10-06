@@ -418,6 +418,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::match(['get', 'post'], 'purchase_returns/{id}/send_email', [PurchaseReturnController::class, 'send_email'])->name('purchase_returns.send_email');
 		Route::post('purchase_returns/bulk_approve', [PurchaseReturnController::class, 'bulk_approve'])->name('purchase_returns.bulk_approve');
 		Route::post('purchase_returns/bulk_reject', [PurchaseReturnController::class, 'bulk_reject'])->name('purchase_returns.bulk_reject');
+		Route::get('purchase_returns/{id}/pdf', [PurchaseReturnController::class, 'pdf'])->name('purchase_returns.pdf');
 
 		// Journal Entry
 		Route::get('journals/trash', [JournalController::class, 'trash'])->name('journals.trash');
@@ -515,6 +516,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::delete('bill_payments/{id}/permanent_destroy', [BillPaymentsController::class, 'permanent_destroy'])->name('bill_payments.permanent_destroy');
 		Route::resource('bill_payments', BillPaymentsController::class);
 		Route::post('bill_payments/bulk_destroy', [BillPaymentsController::class, 'bulk_destroy'])->name('bill_payments.bulk_destroy');
+		Route::get('bill_payments/{id}/pdf', [BillPaymentsController::class, 'pdf'])->name('bill_payments.pdf');
 		Route::get('export_bill_invoices', [PurchaseController::class, 'export_bill_invoices'])->name('bill_invoices.export');
 		Route::post('bill_invoices/bulk_approve', [PurchaseController::class, 'bulk_approve'])->name('bill_invoices.bulk_approve');
 		Route::post('bill_invoices/bulk_reject', [PurchaseController::class, 'bulk_reject'])->name('bill_invoices.bulk_reject');

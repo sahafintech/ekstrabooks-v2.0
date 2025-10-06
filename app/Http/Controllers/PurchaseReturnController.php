@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
+use function Spatie\LaravelPdf\Support\pdf;
 
 class PurchaseReturnController extends Controller
 {
@@ -258,6 +259,15 @@ class PurchaseReturnController extends Controller
         return Inertia::render('Backend/User/PurchaseReturn/View', [
             'purchase_return' => $purchase_return,
         ]);
+    }
+
+    public function pdf($id)
+    {
+        $purchase_return = PurchaseReturn::with(['business', 'items', 'taxes', 'vendor'])->find($id);
+        return pdf()
+        ->view('backend.user.pdf.purchase-return', compact('purchase_return'))
+        ->name('purchase-return-' . $purchase_return->return_number . '.pdf')
+        ->download();
     }
 
     public function show_public_purchase_return($short_code)
