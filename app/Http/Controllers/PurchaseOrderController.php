@@ -28,6 +28,7 @@ use App\Models\PendingTransaction;
 use App\Models\ProjectBudget;
 use App\Models\PurchaseItem;
 use App\Models\PurchaseItemTax;
+use function Spatie\LaravelPdf\Support\pdf;
 
 class PurchaseOrderController extends Controller
 {
@@ -425,6 +426,15 @@ class PurchaseOrderController extends Controller
 			'attachments' => $attachments,
 			'email_templates' => $email_templates,
 		]);
+	}
+
+	public function pdf($id)
+	{
+		$purchase_order = PurchaseOrder::with(['business', 'items', 'taxes', 'vendor'])->find($id);
+		return pdf()
+		->view('backend.user.pdf.purchase-order', compact('purchase_order'))
+		->name('purchase-order-' . $purchase_order->order_number . '.pdf')
+		->download();
 	}
 
 	/**

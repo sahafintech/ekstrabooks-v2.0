@@ -520,6 +520,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('bill_invoices/bulk_reject', [PurchaseController::class, 'bulk_reject'])->name('bill_invoices.bulk_reject');
 		Route::post('bill_invoices/bulk_destroy', [PurchaseController::class, 'bulk_destroy'])->name('bill_invoices.bulk_destroy');
 		Route::post('bill_invoices/send_email/{id}', [PurchaseController::class, 'send_email'])->name('bill_invoices.send_email');
+		Route::get('bill_invoices/{id}/pdf', [PurchaseController::class, 'pdf'])->name('bill_invoices.pdf');
 
 		//Cash Purchases
 		Route::get('cash_purchases/trash', [CashPurchaseController::class, 'trash'])->name('cash_purchases.trash');
@@ -539,6 +540,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('cash_purchases/{id}/pdf', [CashPurchaseController::class, 'pdf'])->name('cash_purchases.pdf');
 
 		// purchase orders
+		Route::get('purchase_orders/{id}/pdf', [PurchaseOrderController::class, 'pdf'])->name('purchase_orders.pdf');
 		Route::get('purchase_orders/{id}/duplicate', [PurchaseOrderController::class, 'duplicate'])->name('purchase_orders.duplicate');
 		Route::get('purchase_orders/trash', [PurchaseOrderController::class, 'trash'])->name('purchase_orders.trash');
 		Route::post('purchase_orders/{id}/restore', [PurchaseOrderController::class, 'restore'])->name('purchase_orders.restore');

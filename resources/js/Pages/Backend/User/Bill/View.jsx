@@ -164,73 +164,8 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
         }
     };
 
-    const handleDownloadPDF = async () => {
-        setIsLoading(prev => ({ ...prev, pdf: true }));
-        try {
-            // Add a class to hide attachments
-            const attachmentsSection = document.querySelector('.attachments-section');
-            if (attachmentsSection) {
-                attachmentsSection.classList.add('pdf-hidden');
-            }
-
-            // Dynamically import the required libraries
-            const html2canvas = (await import('html2canvas')).default;
-            const { jsPDF } = await import('jspdf');
-
-            // Get the content element
-            const content = document.querySelector('#printable-area');
-            
-            // Create a canvas from the content
-            const canvas = await html2canvas(content, {
-                scale: 4,
-                useCORS: true, // Enable CORS for images
-                logging: false,
-                windowWidth: content.scrollWidth,
-                windowHeight: content.scrollHeight,
-                allowTaint: true,
-                backgroundColor: '#ffffff'
-            });
-
-            // Calculate dimensions
-            const imgWidth = 210; // A4 width in mm
-            const pageHeight = 297; // A4 height in mm
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            
-            // Create PDF with higher quality
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            let heightLeft = imgHeight;
-            let position = 0;
-            let pageData = canvas.toDataURL('image/jpeg', 1.0);
-
-            // Add first page
-            pdf.addImage(pageData, 'JPEG', 0, position, imgWidth, imgHeight);
-            heightLeft -= pageHeight;
-
-            // Add subsequent pages if content is longer than one page
-            while (heightLeft >= 0) {
-                position = heightLeft - imgHeight;
-                pdf.addPage();
-                pdf.addImage(pageData, 'JPEG', 0, position, imgWidth, imgHeight);
-                heightLeft -= pageHeight;
-            }
-
-            // Save the PDF
-            pdf.save(`Bill_${bill.bill_no}.pdf`);
-
-            // Remove the class after PDF generation
-            if (attachmentsSection) {
-                attachmentsSection.classList.remove('pdf-hidden');
-            }
-        } catch (error) {
-            console.error('Error generating PDF:', error);
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Failed to generate PDF. Please try again.",
-            });
-        } finally {
-            setIsLoading(prev => ({ ...prev, pdf: false }));
-        }
+    const handleDownloadPDF = () => {
+        window.open(route('bill_invoices.pdf', bill.id), '_blank');
     };
 
     const handleShareLink = () => {
@@ -303,11 +238,10 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
                         <Button
                             variant="outline"
                             onClick={handleDownloadPDF}
-                            disabled={isLoading.pdf}
                             className="flex items-center"
                         >
                             <DownloadIcon className="mr-2 h-4 w-4" />
-                            {isLoading.pdf ? "Downloading..." : "Download PDF"}
+                            Download PDF
                         </Button>
 
                         <DropdownMenu>
