@@ -7,7 +7,6 @@ use App\Http\Controllers\Controller;
 use App\Imports\CashInvoiceImport;
 use App\Models\Account;
 use App\Models\AuditLog;
-use App\Models\Business;
 use App\Models\BusinessSetting;
 use App\Models\Currency;
 use App\Models\Customer;
@@ -32,6 +31,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
+use function Spatie\LaravelPdf\Support\pdf;
 
 class ReceiptController extends Controller
 {
@@ -269,6 +269,15 @@ class ReceiptController extends Controller
         return Inertia::render('Backend/User/CashInvoice/PublicView', [
             'receipt' => $receipt,
         ]);
+    }
+
+    public function pdf($id)
+    {
+        $receipt = Receipt::with(['business', 'business.bank_accounts', 'items', 'taxes', 'customer', 'project'])->find($id);
+        return pdf()
+        ->view('backend.user.pdf.cash-invoice', compact('receipt'))
+        ->name('cash-invoice-' . $receipt->receipt_number . '.pdf')
+        ->download();
     }
 
     public function edit($id)

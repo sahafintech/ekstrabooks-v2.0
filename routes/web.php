@@ -448,6 +448,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('pos/store', [ReceiptController::class, 'pos_store'])->name('receipts.pos_store');
 		Route::post('receipts/bulk_destroy', [ReceiptController::class, 'bulk_destroy'])->name('receipts.bulk_destroy');
 		Route::get('export_receipts', [ReceiptController::class, 'export_receipts'])->name('receipts.export');
+		Route::get('receipts/{id}/pdf', [ReceiptController::class, 'pdf'])->name('receipts.pdf');
 
 		// hold pos invoices
 		Route::resource('hold_pos_invoices', HoldPosInvoiceController::class);
