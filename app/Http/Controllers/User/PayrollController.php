@@ -342,7 +342,7 @@ class PayrollController extends Controller
             ->where('year', $year)
             ->where('type', 'deduct')->get();
 
-        if(SalaryAdvance::where('employee_id', $employee->id)->where('payroll_month', $month)->where('payroll_year', $year)->sum('amount') > 0) {
+        if (SalaryAdvance::where('employee_id', $employee->id)->where('payroll_month', $month)->where('payroll_year', $year)->sum('amount') > 0) {
             $salary_benefit = new SalaryBenefit;
             $salary_benefit->employee_id = $employee->id;
             $salary_benefit->month = $month;
@@ -506,7 +506,7 @@ class PayrollController extends Controller
             }
         }
 
-        if(SalaryAdvance::where('employee_id', $payroll->employee_id)->where('payroll_month', $payroll->month)->where('payroll_year', $payroll->year)->sum('amount') > 0) {
+        if (SalaryAdvance::where('employee_id', $payroll->employee_id)->where('payroll_month', $payroll->month)->where('payroll_year', $payroll->year)->sum('amount') > 0) {
             $salary_benefit = new SalaryBenefit;
             $salary_benefit->employee_id = $payroll->employee_id;
             $salary_benefit->month = $payroll->month;
@@ -682,9 +682,13 @@ class PayrollController extends Controller
                 }
                 $payslip = $payslipMap[$payment['id']];
 
-                if ($payslip->status == 4) {
+                // Only process payslips with status 1 (approved) or 2 (accrued)
+                if (!in_array($payslip->status, [1, 2])) {
                     continue;
                 }
+
+                // Store original status to check if it was accrued
+                $wasAccrued = ($payslip->status == 2);
 
                 $amount = floatval($payment['amount']);
                 $payslip->paid = ($payslip->paid ?? 0) + $amount;
@@ -715,71 +719,11 @@ class PayrollController extends Controller
                 $payslip->transaction_id = $creditTx->id;
                 $payslip->save();
 
-                // If fully paid, create debit and deduction/advance transactions
+                // If fully paid, create debit transactions
                 if ($payslip->status == 4) {
-                    // Get deductions with specific accounts
-                    $deductions = SalaryBenefit::where('employee_id', $payslip->employee_id)
-                        ->where('month', $payslip->month)
-                        ->where('year', $payslip->year)
-                        ->where('type', 'deduct')
-                        ->whereNotNull('account_id')
-                        ->get();
-
-                    $totalDeductions = $deductions->sum('amount');
-                    $hasAdvance = $payslip->advance > 0;
-                    $hasDeductionsOrAdvance = $totalDeductions > 0 || $hasAdvance;
-
-                    if ($hasDeductionsOrAdvance) {
-                        // If deductions or advance exist: Dr Current Salary, Cr Net Salary, Cr Deduction/Advance Accounts
-                        
-                        // Debit current salary
-                        $debitTx = new Transaction();
-                        $debitTx->trans_date = $paymentDate->format('Y-m-d H:i');
-                        $debitTx->account_id = $request->debit_account_id;
-                        $debitTx->dr_cr = 'dr';
-                        $debitTx->transaction_amount = $payslip->current_salary;
-                        $debitTx->currency_rate = $exchange_rate;
-                        $debitTx->base_currency_amount = $payslip->current_salary;
-                        $debitTx->description = _lang('Staff Salary ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
-                        $debitTx->ref_id = $payslip->employee_id;
-                        $debitTx->ref_type = 'payslip';
-                        $debitTx->employee_id = $payslip->employee_id;
-                        $debitTx->save();
-
-                        // Credit deduction accounts
-                        foreach ($deductions as $deduction) {
-                            $deductTx = new Transaction();
-                            $deductTx->trans_date = $paymentDate->format('Y-m-d H:i');
-                            $deductTx->account_id = $deduction->account_id;
-                            $deductTx->dr_cr = 'cr';
-                            $deductTx->transaction_amount = $deduction->amount;
-                            $deductTx->currency_rate = $exchange_rate;
-                            $deductTx->base_currency_amount = $deduction->amount;
-                            $deductTx->description = _lang('Payroll Deduction: ' . $deduction->description . ' - ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
-                            $deductTx->ref_id = $payslip->employee_id;
-                            $deductTx->ref_type = 'payslip deduction';
-                            $deductTx->employee_id = $payslip->employee_id;
-                            $deductTx->save();
-                        }
-
-                        // Credit advance account if any
-                        if ($hasAdvance) {
-                            $advanceTx = new Transaction();
-                            $advanceTx->trans_date = $paymentDate->format('Y-m-d H:i');
-                            $advanceTx->account_id = $request->advance_account_id;
-                            $advanceTx->dr_cr = 'cr';
-                            $advanceTx->transaction_amount = $payslip->advance;
-                            $advanceTx->currency_rate = $exchange_rate;
-                            $advanceTx->base_currency_amount = $payslip->advance;
-                            $advanceTx->description = _lang('Staff Salary Advance ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
-                            $advanceTx->ref_id = $payslip->employee_id;
-                            $advanceTx->ref_type = 'payslip advance';
-                            $advanceTx->employee_id = $payslip->employee_id;
-                            $advanceTx->save();
-                        }
-                        
-                    } else {
-                        // Debit net salary 
+                    if ($wasAccrued) {
+                        // If payslip was already accrued (status = 2), deductions and advances were already posted
+                        // Only post the net salary debit
                         $debitTx = new Transaction();
                         $debitTx->trans_date = $paymentDate->format('Y-m-d H:i');
                         $debitTx->account_id = $request->debit_account_id;
@@ -792,8 +736,85 @@ class PayrollController extends Controller
                         $debitTx->ref_type = 'payslip';
                         $debitTx->employee_id = $payslip->employee_id;
                         $debitTx->save();
-                        
-                        // Note: Net salary credit is already handled above in the main credit transaction
+                    } else {
+                        // Payslip was not accrued, post full accounting entries
+                        // Get deductions with specific accounts
+                        $deductions = SalaryBenefit::where('employee_id', $payslip->employee_id)
+                            ->where('month', $payslip->month)
+                            ->where('year', $payslip->year)
+                            ->where('type', 'deduct')
+                            ->whereNotNull('account_id')
+                            ->get();
+
+                        $totalDeductions = $deductions->sum('amount');
+                        $hasAdvance = $payslip->advance > 0;
+                        $hasDeductionsOrAdvance = $totalDeductions > 0 || $hasAdvance;
+
+                        if ($hasDeductionsOrAdvance) {
+                            // If deductions or advance exist: Dr Current Salary, Cr Net Salary, Cr Deduction/Advance Accounts
+
+                            // Debit current salary
+                            $debitTx = new Transaction();
+                            $debitTx->trans_date = $paymentDate->format('Y-m-d H:i');
+                            $debitTx->account_id = $request->debit_account_id;
+                            $debitTx->dr_cr = 'dr';
+                            $debitTx->transaction_amount = $payslip->current_salary;
+                            $debitTx->currency_rate = $exchange_rate;
+                            $debitTx->base_currency_amount = $payslip->current_salary;
+                            $debitTx->description = _lang('Staff Salary ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
+                            $debitTx->ref_id = $payslip->employee_id;
+                            $debitTx->ref_type = 'payslip';
+                            $debitTx->employee_id = $payslip->employee_id;
+                            $debitTx->save();
+
+                            // Credit deduction accounts
+                            foreach ($deductions as $deduction) {
+                                $deductTx = new Transaction();
+                                $deductTx->trans_date = $paymentDate->format('Y-m-d H:i');
+                                $deductTx->account_id = $deduction->account_id;
+                                $deductTx->dr_cr = 'cr';
+                                $deductTx->transaction_amount = $deduction->amount;
+                                $deductTx->currency_rate = $exchange_rate;
+                                $deductTx->base_currency_amount = $deduction->amount;
+                                $deductTx->description = _lang('Payroll Deduction: ' . $deduction->description . ' - ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
+                                $deductTx->ref_id = $payslip->employee_id;
+                                $deductTx->ref_type = 'payslip deduction';
+                                $deductTx->employee_id = $payslip->employee_id;
+                                $deductTx->save();
+                            }
+
+                            // Credit advance account if any
+                            if ($hasAdvance) {
+                                $advanceTx = new Transaction();
+                                $advanceTx->trans_date = $paymentDate->format('Y-m-d H:i');
+                                $advanceTx->account_id = $request->advance_account_id;
+                                $advanceTx->dr_cr = 'cr';
+                                $advanceTx->transaction_amount = $payslip->advance;
+                                $advanceTx->currency_rate = $exchange_rate;
+                                $advanceTx->base_currency_amount = $payslip->advance;
+                                $advanceTx->description = _lang('Staff Salary Advance ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
+                                $advanceTx->ref_id = $payslip->employee_id;
+                                $advanceTx->ref_type = 'payslip advance';
+                                $advanceTx->employee_id = $payslip->employee_id;
+                                $advanceTx->save();
+                            }
+                        } else {
+                            // Debit net salary 
+                            $debitTx = new Transaction();
+                            $debitTx->trans_date = $paymentDate->format('Y-m-d H:i');
+                            $debitTx->account_id = $request->debit_account_id;
+                            $debitTx->dr_cr = 'dr';
+                            $debitTx->transaction_amount = $payslip->net_salary;
+                            $debitTx->currency_rate = $exchange_rate;
+                            $debitTx->base_currency_amount = $payslip->net_salary;
+                            $debitTx->description = _lang('Staff Salary ' . $payslip->month . '/' . $payslip->year) . ' - ' . $payslip->employee->name;
+                            $debitTx->ref_id = $payslip->employee_id;
+                            $debitTx->ref_type = 'payslip';
+                            $debitTx->employee_id = $payslip->employee_id;
+                            $debitTx->save();
+
+                            // Note: Net salary credit is already handled above in the main credit transaction
+                        }
                     }
                 }
             }
@@ -879,7 +900,7 @@ class PayrollController extends Controller
                 $liabilityTx->employee_id = $payslip->employee_id;
                 $liabilityTx->save();
 
-                if ($hasDeductionsOrAdvance) {                    
+                if ($hasDeductionsOrAdvance) {
                     // Debit expense (current salary)
                     $expenseTx = new Transaction();
                     $expenseTx->trans_date = Carbon::parse($request->accrue_date)->format('Y-m-d H:i:s');
@@ -925,7 +946,7 @@ class PayrollController extends Controller
                         $advanceTx->employee_id = $payslip->employee_id;
                         $advanceTx->save();
                     }
-                } else {                    
+                } else {
                     // Debit expense (net salary)
                     $expenseTx = new Transaction();
                     $expenseTx->trans_date = Carbon::parse($request->accrue_date)->format('Y-m-d H:i:s');
@@ -981,8 +1002,15 @@ class PayrollController extends Controller
         try {
             // Delete related transactions
             Transaction::where('ref_id', $payroll->employee_id)
-                ->whereIn('ref_type', ['payslip', 'payslip_deduction'])
-                ->where('description', 'like', '%' . $payroll->month . '/' . $payroll->year . '%')
+                ->where(function($query) {
+                    $query->where('ref_type', 'payslip')
+                        ->orWhere('ref_type', 'payslip advance')
+                        ->orWhere('ref_type', 'payslip deduction');
+                })
+                ->where(function($query) use ($payroll) {
+                    $query->where('description', 'like', '%' . $payroll->month . '/' . $payroll->year . '%')
+                        ->orWhere('description', 'like', '%' . $payroll->month . ' ' . $payroll->year . '%');
+                })
                 ->delete();
 
             $salaryBenefit = SalaryBenefit::where('employee_id', $payroll->employee_id)
@@ -1142,7 +1170,17 @@ class PayrollController extends Controller
 
         foreach ($payslips as $payslip) {
             // delete transactions
-            $transactions = Transaction::where('ref_id', $payslip->employee_id)->where('ref_type', 'payslip')->where('description', 'like', '%' . $payslip->month . '/' . $payslip->year . '%')->get();
+            $transactions = Transaction::where('ref_id', $payslip->employee_id)
+            ->where(function($query) {
+                $query->where('ref_type', 'payslip')
+                    ->orWhere('ref_type', 'payslip advance')
+                    ->orWhere('ref_type', 'payslip deduction');
+            })
+            ->where(function($query) use ($payslip) {
+                $query->where('description', 'like', '%' . $payslip->month . '/' . $payslip->year . '%')
+                    ->orWhere('description', 'like', '%' . $payslip->month . ' ' . $payslip->year . '%');
+            })
+            ->get();
             foreach ($transactions as $transaction) {
                 $transaction->delete();
             }
@@ -1370,8 +1408,15 @@ class PayrollController extends Controller
             // Permanently delete related transactions
             Transaction::onlyTrashed()
                 ->where('ref_id', $payroll->employee_id)
-                ->whereIn('ref_type', ['payslip', 'payslip_deduction'])
-                ->where('description', 'like', '%' . $payroll->month . '/' . $payroll->year . '%')
+                ->where(function($query) {
+                    $query->where('ref_type', 'payslip')
+                        ->orWhere('ref_type', 'payslip advance')
+                        ->orWhere('ref_type', 'payslip deduction');
+                })
+                ->where(function($query) use ($payroll) {
+                    $query->where('description', 'like', '%' . $payroll->month . '/' . $payroll->year . '%')
+                        ->orWhere('description', 'like', '%' . $payroll->month . ' ' . $payroll->year . '%');
+                })
                 ->forceDelete();
 
             // Permanently delete the employee benefit for this employee/month/year and its salary benefits
@@ -1428,8 +1473,15 @@ class PayrollController extends Controller
             // permanently delete transactions
             $transactions = Transaction::onlyTrashed()
                 ->where('ref_id', $payslip->employee_id)
-                ->where('ref_type', 'payslip')
-                ->where('description', 'like', '%' . $payslip->month . '/' . $payslip->year . '%')
+                ->where(function($query) {
+                    $query->where('ref_type', 'payslip')
+                        ->orWhere('ref_type', 'payslip advance')
+                        ->orWhere('ref_type', 'payslip deduction');
+                })
+                ->where(function($query) use ($payslip) {
+                    $query->where('description', 'like', '%' . $payslip->month . '/' . $payslip->year . '%')
+                        ->orWhere('description', 'like', '%' . $payslip->month . ' ' . $payslip->year . '%');
+                })
                 ->get();
             foreach ($transactions as $transaction) {
                 $transaction->forceDelete();

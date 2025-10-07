@@ -37,8 +37,7 @@ import {
     ChevronUp,
     ChevronDown,
 } from "lucide-react";
-import { Toaster } from "@/Components/ui/toaster";
-import { useToast } from "@/hooks/use-toast";
+import { toast, Toaster } from 'sonner'
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
@@ -183,6 +182,8 @@ const BulkAccrueConfirmationModal = ({
     liabilityAccountId,
     expenseAccountId,
     setLiabilityAccountId,
+    advanceAccountId,
+    setAdvanceAccountId,
     setExpenseAccountId,
     accrueDate,
     setAccrueDate,
@@ -245,6 +246,26 @@ const BulkAccrueConfirmationModal = ({
                             }))}
                             value={expenseAccountId}
                             onChange={(value) => setExpenseAccountId(value)}
+                            placeholder="Select account"
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-12 mt-2">
+                    <Label
+                        htmlFor="advance_account_id"
+                        className="md:col-span-3 col-span-12"
+                    >
+                        Advance Account *
+                    </Label>
+                    <div className="md:col-span-9 col-span-12 md:mt-0 mt-2">
+                        <SearchableCombobox
+                            options={accounts.map((account) => ({
+                                id: account.id,
+                                name: account.account_name,
+                            }))}
+                            value={advanceAccountId}
+                            onChange={(value) => setAdvanceAccountId(value)}
                             placeholder="Select account"
                         />
                     </div>
@@ -428,7 +449,6 @@ export default function List({
     trashed_payrolls = 0,
 }) {
     const { flash = {}, errors = {}, userPackage } = usePage().props;
-    const { toast } = useToast();
     const [selectedPaylips, setSelectedPayslips] = useState([]);
     const [isAllSelected, setIsAllSelected] = useState(false);
     const [search, setSearch] = useState(filters.search || "");
@@ -486,20 +506,29 @@ export default function List({
 
     useEffect(() => {
         if (flash && flash.success) {
-            toast({
-                title: "Success",
-                description: flash.success,
-            });
+          toast("Success Message", {
+            description: flash.success,
+            action: {
+              label: "Close",
+              onClick: () => {
+                toast.dismiss();
+              }
+            }
+          });
         }
-
-        if (errors && errors.error) {
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: errors.error,
-            });
+    
+        if (flash && flash.error) {
+          toast("Error Message", {
+            description: flash.error,
+            action: {
+              label: "Close",
+              onClick: () => {
+                toast.dismiss();
+              }
+            }
+          });
         }
-    }, [flash, toast, errors]);
+    }, [flash, toast]);
 
     // Populate allowance and deduction items when editing a payroll
     useEffect(() => {
@@ -763,6 +792,7 @@ export default function List({
                 ids: selectedPaylips,
                 liability_account_id: liabilityAccountId,
                 expense_account_id: expenseAccountId,
+                advance_account_id: advanceAccountId,
                 accrue_date: accrueDate,
             },
             {
@@ -1041,7 +1071,7 @@ export default function List({
 
     return (
         <AuthenticatedLayout>
-            <Toaster />
+            <Toaster position="top-center" />
             <SidebarInset>
                 <div className="main-content">
                     <PageHeader
@@ -2086,6 +2116,8 @@ export default function List({
                         accounts={accounts}
                         liabilityAccountId={liabilityAccountId}
                         expenseAccountId={expenseAccountId}
+                        advanceAccountId={advanceAccountId}
+                        setAdvanceAccountId={setAdvanceAccountId}
                         setLiabilityAccountId={setLiabilityAccountId}
                         setExpenseAccountId={setExpenseAccountId}
                         accrueDate={accrueDate}

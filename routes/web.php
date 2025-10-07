@@ -769,13 +769,13 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('payslips/store_accrual', [PayrollController::class, 'store_accrual'])->name('payslips.store_accrual');
 		Route::match(['get', 'post'], 'payslips/accrue', [PayrollController::class, 'accrue_payroll'])->name('payslips.accrue');
 		Route::match(['get', 'post'], 'payslips/make_payment', [PayrollController::class, 'make_payment'])->name('payslips.make_payment');
-		Route::resource('payslips', PayrollController::class);
 		Route::get('payslips_export', [PayrollController::class, 'export_payslips'])->name('payslips.export');
 		Route::post('payslips/bulk_approve', [PayrollController::class, 'bulk_approve'])->name('payslips.bulk_approve');
 		Route::post('payslips/bulk_reject', [PayrollController::class, 'bulk_reject'])->name('payslips.bulk_reject');
 		Route::post('payslips/bulk_delete', [PayrollController::class, 'bulk_delete'])->name('payslips.bulk_delete');
 		Route::post('payslips/bulk_accrue', [PayrollController::class, 'bulk_accrue'])->name('payslips.bulk_accrue');
 		Route::post('payslips/bulk_payment', [PayrollController::class, 'bulk_payment'])->name('payslips.bulk_payment');
+		Route::resource('payslips', PayrollController::class);
 
 		//Taxes
 		Route::get('taxes/trash', [TaxController::class, 'trash'])->name('taxes.trash');
