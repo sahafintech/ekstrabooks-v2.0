@@ -38,8 +38,8 @@ class DefferedInvoiceTask
                             $transaction->dr_cr       = 'cr';
                             $transaction->transaction_currency    = $invoice->currency;
                             $transaction->currency_rate = $invoice->exchange_rate;
-                            $transaction->base_currency_amount = convert_currency($invoice->currency, $invoice->business->currency, convert_currency($invoice->business->currency, $invoice->currency, $earning->amount / count($invoice->items)));
-                            $transaction->transaction_amount      = convert_currency($invoice->business->currency, $invoice->currency, $earning->amount);
+                            $transaction->base_currency_amount = $earning->base_currency_amount;
+                            $transaction->transaction_amount      = $earning->transaction_amount;
                             $transaction->description = _lang('Deffered Invoice Income') . ' #' . $invoice->invoice_number;
                             $transaction->ref_id      = $invoice->id;
                             $transaction->ref_type    = 'd invoice income';
@@ -51,8 +51,8 @@ class DefferedInvoiceTask
                             $transaction->dr_cr       = 'dr';
                             $transaction->transaction_currency    = $invoice->currency;
                             $transaction->currency_rate = $invoice->exchange_rate;
-                            $transaction->base_currency_amount = convert_currency($invoice->currency, $invoice->business->currency, convert_currency($invoice->business->currency, $invoice->currency, $earning->amount / count($invoice->items)));
-                            $transaction->transaction_amount      = convert_currency($invoice->business->currency, $invoice->currency, $earning->amount);
+                            $transaction->base_currency_amount = $earning->base_currency_amount;
+                            $transaction->transaction_amount      = $earning->transaction_amount;
                             $transaction->description = _lang('Deffered Invoice Income') . ' #' . $invoice->invoice_number;
                             $transaction->ref_id      = $invoice->id;
                             $transaction->ref_type    = 'd invoice income';

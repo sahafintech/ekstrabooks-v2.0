@@ -217,7 +217,9 @@ export default function Create({ customers = [], products = [], currencies = [],
             start_date: u.sliceStart,
             end_date: u.sliceEnd,
             number_of_days: u.days,
-            amount: +(u.sliceUnits / factor).toFixed(dp)
+            currency: data.currency,
+            exchange_rate: exchangeRate,
+            transaction_amount: +(u.sliceUnits / factor).toFixed(dp)
         }));
 
         // return everything you need
@@ -234,7 +236,7 @@ export default function Create({ customers = [], products = [], currencies = [],
             setData('cost_per_day', +costPerDay.toFixed(decimalPlace));
 
             // (and if you need deferred_total too):
-            const slicedTotal = schedule.reduce((sum, e) => sum + e.amount, 0);
+            const slicedTotal = schedule.reduce((sum, e) => sum + e.transaction_amount, 0);
             setData('deffered_total', +slicedTotal.toFixed(decimalPlace));
         }
     }, [data.deffered_start, data.deffered_end, invoiceItems]);
@@ -773,7 +775,7 @@ export default function Create({ customers = [], products = [], currencies = [],
                                                 <TableCell>{new Date(earning.start_date).toLocaleDateString()}</TableCell>
                                                 <TableCell>{new Date(earning.end_date).toLocaleDateString()}</TableCell>
                                                 <TableCell>{earning.number_of_days}</TableCell>
-                                                <TableCell className="text-right">{formatCurrency({ amount: earning.amount })}</TableCell>
+                                                <TableCell className="text-right">{formatCurrency({ amount: earning.transaction_amount, currency: data.currency })}</TableCell>
                                             </TableRow>
                                         ))
                                     ) : (
@@ -786,7 +788,7 @@ export default function Create({ customers = [], products = [], currencies = [],
                                     <TableRow>
                                         <TableCell>TOTAL:</TableCell>
                                         <TableCell colSpan={9} className="text-right">
-                                            {formatCurrency({ amount: data.deffered_total })}
+                                            {formatCurrency({ amount: data.deffered_total, currency: data.currency })}
                                         </TableCell>
                                     </TableRow>
                                 </TableBody>

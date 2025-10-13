@@ -643,7 +643,7 @@ export default function View({
                                             <span>
                                                 {formatCurrency(
                                                     tax.amount,
-                                                    invoice.business.currency,
+                                                    invoice.currency,
                                                     decimalPlace
                                                 )}
                                             </span>

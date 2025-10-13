@@ -151,7 +151,9 @@ export default function Edit({
                 start_date: parseDateObject(earning.start_date),
                 end_date: parseDateObject(earning.end_date),
                 number_of_days: earning.days,
-                amount: parseFloat(earning.amount),
+                currency: earning.currency,
+                exchange_rate: earning.exchange_rate,
+                transaction_amount: parseFloat(earning.transaction_amount),
                 status: earning.status,
             }));
         }
@@ -169,7 +171,7 @@ export default function Edit({
             family_size: invoice.items.map((item) => item.family_size),
             earnings: formattedEarnings,
             deffered_total: formattedEarnings.reduce(
-                (sum, e) => sum + e.amount,
+                (sum, e) => sum + e.transaction_amount,
                 0
             ),
         }));
@@ -329,7 +331,9 @@ export default function Edit({
             start_date: u.sliceStart,
             end_date: u.sliceEnd,
             number_of_days: u.days,
-            amount: +(u.sliceUnits / factor).toFixed(dp),
+            currency: data.currency,
+            exchange_rate: exchangeRate,
+            transaction_amount: +(u.sliceUnits / factor).toFixed(dp),
         }));
 
         // return everything you need
@@ -358,7 +362,7 @@ export default function Edit({
                     // Ensure values are valid and not NaN
                     const safeCostPerDay = costPerDay ? costPerDay : 0;
                     const safeTotal = schedule.reduce((sum, e) => {
-                        const amount = e.amount ? e.amount : 0;
+                        const amount = e.transaction_amount ? e.transaction_amount : 0;
                         return sum + amount;
                     }, 0);
 
@@ -585,7 +589,7 @@ export default function Edit({
         const unearned = data.earnings.filter(e => e.status !== 1);
 
         // Calculate total earned
-        const totalEarned = earned.reduce((sum, e) => sum + (e.amount || 0), 0);
+        const totalEarned = earned.reduce((sum, e) => sum + (e.transaction_amount || 0), 0);
 
         // Calculate new unearned amount
         const newUnearned = newSubtotal - totalEarned;
@@ -603,7 +607,7 @@ export default function Edit({
                 ? +(newUnearned - distributed).toFixed(2)
                 : perPeriod;
             distributed += amount;
-            return { ...e, amount };
+            return { ...e, transaction_amount: amount };
         });
 
         // Merge back, keeping order
@@ -613,7 +617,7 @@ export default function Edit({
         );
 
         // Update deferred total
-        const deffered_total = updatedEarnings.reduce((sum, e) => sum + (e.amount || 0), 0);
+        const deffered_total = updatedEarnings.reduce((sum, e) => sum + (e.transaction_amount || 0), 0);
 
         setData(prev => ({
             ...prev,
@@ -1167,7 +1171,8 @@ export default function Edit({
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     {formatCurrency({
-                                                        amount: earning.amount,
+                                                        amount: earning.transaction_amount,
+                                                        currency: data.currency
                                                     })}
                                                     {earning.status === 1 && (
                                                         <span className="ml-2 text-xs text-green-600">
@@ -1195,6 +1200,7 @@ export default function Edit({
                                         >
                                             {formatCurrency({
                                                 amount: data.deffered_total,
+                                                currency: data.currency
                                             })}
                                         </TableCell>
                                     </TableRow>

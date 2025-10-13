@@ -17,7 +17,10 @@ return new class extends Migration
             $table->date('start_date');
             $table->date('end_date');
             $table->integer('number_of_days');
-            $table->decimal('amount', 28, 8);
+            $table->string('currency');
+            $table->decimal('exchange_rate', 28, 8);
+            $table->decimal('transaction_amount', 28, 8);
+            $table->decimal('base_currency_amount', 28, 8);
             $table->integer('days');
             $table->tinyInteger('status')->default(0);
             $table->bigInteger('user_id')->unsigned();

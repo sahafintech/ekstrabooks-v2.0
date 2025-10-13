@@ -714,7 +714,7 @@ export default function View({
                                             <span>
                                                 {formatCurrency(
                                                     tax.amount,
-                                                    invoice.business.currency,
+                                                    invoice.currency,
                                                     decimalPlace
                                                 )}
                                             </span>
@@ -832,7 +832,7 @@ export default function View({
                                                         <TableCell>{earning.end_date}</TableCell>
                                                         <TableCell>{earning.days}</TableCell>
                                                         <TableCell className="text-right">
-                                                            {formatCurrency(earning.amount, invoice.currency, decimalPlace)}
+                                                            {formatCurrency(earning.transaction_amount, invoice.currency, decimalPlace)}
                                                             {earning.status === 1 && (
                                                                 <span className="ml-2 text-xs text-green-600">(Earned)</span>
                                                             )}
@@ -844,7 +844,7 @@ export default function View({
                                                     <TableCell colSpan={2}></TableCell>
                                                     <TableCell className="text-right font-bold">
                                                         {formatCurrency(
-                                                            invoice.deffered_earnings.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0),
+                                                            invoice.deffered_earnings.reduce((sum, e) => sum + (parseFloat(e.transaction_amount) || 0), 0),
                                                             invoice.currency,
                                                             decimalPlace
                                                         )}

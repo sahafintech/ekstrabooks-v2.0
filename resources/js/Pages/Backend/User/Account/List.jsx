@@ -508,9 +508,11 @@ export default function List({ accounts = [], meta = {}, filters = {}, trashed_a
                           />
                         </TableCell>
                         <TableCell>{account.account_code}</TableCell>
-                        <Link href={route("accounts.account_statement", account.id)} className="underline text-blue-500">
-                          <TableCell>{account.account_name}</TableCell>
-                        </Link>
+                          <TableCell>
+                            <Link href={route("accounts.account_statement", account.id)} className="underline text-blue-500">
+                              {account.account_name}
+                            </Link>
+                          </TableCell>
                         <TableCell>{account.account_type}</TableCell>
                         <TableCell>{account.opening_date}</TableCell>
                         <TableCell>{account.currency || "-"}</TableCell>
