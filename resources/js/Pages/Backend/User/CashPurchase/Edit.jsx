@@ -1,4 +1,4 @@
-import { useForm } from "@inertiajs/react";
+import { useForm, usePage } from "@inertiajs/react";
 import { Label } from "@/Components/ui/label";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset, SidebarSeparator } from "@/Components/ui/sidebar";
@@ -6,7 +6,7 @@ import PageHeader from "@/Components/PageHeader";
 import { Input } from "@/Components/ui/input";
 import InputError from "@/Components/InputError";
 import { Button } from "@/Components/ui/button";
-import { toast } from "sonner";
+import { toast, Toaster } from 'sonner'
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
 import { Plus, Trash2, X } from "lucide-react";
@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/Components/ui/tooltip
 import Attachment from "@/Components/ui/attachment";
 
 export default function Edit({ vendors = [], products = [], bill, currencies = [], taxes = [], accounts = [], inventory, taxIds, theAttachments, projects = [], cost_codes = [], construction_module, paymentTransactions = [], methods = [] }) {
+  const { flash = {} } = usePage().props;
   const [purchaseItems, setPurchaseItems] = useState([{
     product_id: "",
     product_name: "",
@@ -399,6 +400,32 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
     );
   };
 
+  useEffect(() => {
+    if (flash && flash.success) {
+      toast("Success Message", {
+        description: flash.success,
+        action: {
+          label: "Close",
+          onClick: () => {
+            toast.dismiss();
+          }
+        }
+      });
+    }
+
+    if (flash && flash.error) {
+      toast("Error Message", {
+        description: flash.error,
+        action: {
+          label: "Close",
+          onClick: () => {
+            toast.dismiss();
+          }
+        }
+      });
+    }
+  }, [flash, toast]);
+
   const submit = (e) => {
     e.preventDefault();
 
@@ -482,6 +509,7 @@ export default function Edit({ vendors = [], products = [], bill, currencies = [
 
   return (
     <AuthenticatedLayout>
+      <Toaster position="top-center" />
       <SidebarInset>
         <PageHeader page="Cash Purchases" subpage="Edit Cash Purchase" url="cash_purchases.index" />
 

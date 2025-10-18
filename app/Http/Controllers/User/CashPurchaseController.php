@@ -407,6 +407,11 @@ class CashPurchaseController extends Controller
 			return redirect()->back()->withInput()->with('error', _lang('Unit Cost is required'));
 		}
 
+		// if account_id is null or empty then return with error
+		if (in_array(null, $request->account_id) || in_array('', $request->account_id)) {
+			return redirect()->back()->withInput()->with('error', _lang('Account is required for each item'));
+		}
+
 		$default_accounts = ['Purchase Tax Payable', 'Purchase Discount Allowed', 'Inventory'];
 
 		// if these accounts are not exists then create it
@@ -1065,6 +1070,11 @@ class CashPurchaseController extends Controller
 		// if unit cost is less than 0 or null then return with error
 		if (in_array(null, $request->unit_cost) || in_array('', $request->unit_cost)) {
 			return redirect()->back()->withInput()->with('error', _lang('Unit Cost is required'));
+		}
+
+		// if account_id is null or empty then return with error
+		if (in_array(null, $request->account_id) || in_array('', $request->account_id)) {
+			return redirect()->back()->withInput()->with('error', _lang('Account is required for each item'));
 		}
 
 		$default_accounts = ['Purchase Tax Payable', 'Purchase Discount Allowed', 'Inventory'];

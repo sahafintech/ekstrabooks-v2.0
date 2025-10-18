@@ -1,4 +1,4 @@
-import { useForm } from "@inertiajs/react";
+import { useForm, usePage } from "@inertiajs/react";
 import { Label } from "@/Components/ui/label";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset, SidebarSeparator } from "@/Components/ui/sidebar";
@@ -6,7 +6,7 @@ import PageHeader from "@/Components/PageHeader";
 import { Input } from "@/Components/ui/input";
 import InputError from "@/Components/InputError";
 import { Button } from "@/Components/ui/button";
-import { toast } from "sonner";
+import { toast, Toaster } from 'sonner'
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
 import DateTimePicker from "@/Components/DateTimePicker";
@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/Components/ui/tooltip
 import Attachment from "@/Components/ui/attachment";
 
 export default function Create({ vendors = [], products = [], currencies = [], taxes = [], accounts = [], purchase_title, inventory, base_currency, projects = [], cost_codes = [], construction_module, methods = [] }) {
+  const { flash = {} } = usePage().props;
   const [purchaseItems, setPurchaseItems] = useState([{
     product_id: "",
     product_name: "",
@@ -347,6 +348,32 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     );
   };
 
+  useEffect(() => {
+    if (flash && flash.success) {
+      toast("Success Message", {
+        description: flash.success,
+        action: {
+          label: "Close",
+          onClick: () => {
+            toast.dismiss();
+          }
+        }
+      });
+    }
+
+    if (flash && flash.error) {
+      toast("Error Message", {
+        description: flash.error,
+        action: {
+          label: "Close",
+          onClick: () => {
+            toast.dismiss();
+          }
+        }
+      });
+    }
+  }, [flash, toast]);
+
   const submit = (e) => {
     e.preventDefault();
 
@@ -433,6 +460,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
 
   return (
     <AuthenticatedLayout>
+      <Toaster position="top-center" />
       <SidebarInset>
         <PageHeader page="Cash Purchases" subpage="Create New" url="cash_purchases.index" />
 
