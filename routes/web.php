@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\AccountTypeController;
-use App\Http\Controllers\AIChatController;
 use App\Http\Controllers\AttendanceLogController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\BillPaymentsController;
@@ -17,8 +16,6 @@ use App\Http\Controllers\FaqController;
 use App\Http\Controllers\FeatureController;
 use App\Http\Controllers\HoldPosInvoiceController;
 use App\Http\Controllers\User\InventoryAdjustmentController;
-use App\Http\Controllers\InsuranceBenefitController;
-use App\Http\Controllers\InsuranceFamilySizeController;
 use App\Http\Controllers\JournalController;
 use App\Http\Controllers\LanguageController;
 use App\Http\Controllers\MainCategoryController;
@@ -274,13 +271,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 	/** Dynamic Permission **/
 	Route::group(['middleware' => ['permission'], 'prefix' => 'user'], function () {
-		//Business Trash/Restore
-		Route::get('business/trash', [BusinessController::class, 'trash'])->name('business.trash');
-		Route::post('business/{id}/restore', [BusinessController::class, 'restore'])->name('business.restore');
-		Route::post('business/bulk_restore', [BusinessController::class, 'bulk_restore'])->name('business.bulk_restore');
-		Route::post('business/bulk_permanent_destroy', [BusinessController::class, 'bulk_permanent_destroy'])->name('business.bulk_permanent_destroy');
-		Route::delete('business/{id}/permanent_destroy', [BusinessController::class, 'permanent_destroy'])->name('business.permanent_destroy');
-
 
 		//Dashboard Widget
 		Route::get('dashboard/income_widget', [DashboardController::class, 'income_widget'])->name('dashboard.income_widget');
@@ -461,13 +451,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		// hold pos invoices
 		Route::resource('hold_pos_invoices', HoldPosInvoiceController::class);
 
-		//Recurring Invoice
-		Route::get('recurring_invoices/{id}/convert_recurring', [RecurringInvoiceController::class, 'convert_recurring'])->name('recurring_invoices.convert_recurring');
-		Route::get('recurring_invoices/{id}/end_recurring', [RecurringInvoiceController::class, 'end_recurring'])->name('recurring_invoices.end_recurring');
-		Route::get('recurring_invoices/{id}/duplicate', [RecurringInvoiceController::class, 'duplicate'])->name('recurring_invoices.duplicate');
-		Route::get('recurring_invoices/{id}/approve', [RecurringInvoiceController::class, 'approve'])->name('recurring_invoices.approve');
-		Route::resource('recurring_invoices', RecurringInvoiceController::class);
-
 		// Deffered Invoices
 		Route::get('deffered_invoices/trash', [DefferedInvoiceController::class, 'trash'])->name('deffered_invoices.trash');
 		Route::post('deffered_invoices/{id}/restore', [DefferedInvoiceController::class, 'restore'])->name('deffered_invoices.restore');
@@ -485,12 +468,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		// deffered payments
 		Route::resource('deffered_receive_payments', DefferedPaymentController::class);
 
-		// insurance benefits
-		Route::resource('insurance_benefits', InsuranceBenefitController::class);
-
-		// insurance family sizes
-		Route::resource('insurance_family_sizes', InsuranceFamilySizeController::class);
-
 		//Quotation
 		Route::get('quotations/trash', [QuotationController::class, 'trash'])->name('quotations.trash');
 		Route::post('quotations/{id}/restore', [QuotationController::class, 'restore'])->name('quotations.restore');
@@ -503,9 +480,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('quotations/{id}/duplicate', [QuotationController::class, 'duplicate'])->name('quotations.duplicate');
 		Route::post('quotations/bulk_destroy', [QuotationController::class, 'bulk_destroy'])->name('quotations.bulk_destroy');
 		Route::resource('quotations', QuotationController::class);
-
-		Route::get('/ai/chat', [AIChatController::class, 'index'])->name('ai.chat');
-		Route::post('/ai/chat/generate', [AIChatController::class, 'generate'])->name('ai.chat.generate')->middleware('throttle:30,1'); // 30 requests per minute
 
 		//Bills
 		Route::match(['get', 'post'], 'bill_invoices/pay_bill', [PurchaseController::class, 'pay_bill'])->name('billI_invoices.pay_bill');
