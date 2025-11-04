@@ -733,13 +733,11 @@ class ReportController extends Controller
 
 	public function ledger(Request $request)
 	{
-		// Get request parameters
 		$date1 = $request->date1 ?? Carbon::now()->startOfMonth()->format('Y-m-d');
 		$date2 = $request->date2 ?? Carbon::now()->format('Y-m-d');
 		$search = $request->search ?? '';
 		$per_page = $request->per_page ?? 50;
 
-		// Session storage (keep for backwards compatibility)
 		session(['start_date' => $date1]);
 		session(['end_date' => $date2]);
 
@@ -748,11 +746,11 @@ class ReportController extends Controller
 
 	private function generate_ledger_report($date1, $date2, $search, $per_page)
 	{
-		// Query accounts with transactions in the date range
+		// Get all accounts with transactions (no pagination yet)
 		$accounts_query = Account::with(['transactions' => function ($query) use ($date1, $date2) {
 			$query->whereDate('trans_date', '>=', $date1)
 				->whereDate('trans_date', '<=', $date2)
-				->orderBy('trans_date', 'desc');
+				->orderBy('trans_date', 'asc');
 		}])
 			->whereHas('transactions', function ($query) use ($date1, $date2) {
 				$query->whereDate('trans_date', '>=', $date1)
@@ -769,7 +767,6 @@ class ReportController extends Controller
 					->whereDate('trans_date', '<=', $date2);
 			}], 'base_currency_amount');
 
-		// Apply search filter if provided
 		if (!empty($search)) {
 			$accounts_query->where(function ($query) use ($search) {
 				$query->where('account_name', 'like', '%' . $search . '%')
@@ -777,35 +774,30 @@ class ReportController extends Controller
 			});
 		}
 
-		// Paginate accounts
-		$accounts = $accounts_query->paginate($per_page);
+		$accounts = $accounts_query->get();
 
-		// Process data array - flat list of accounts
-		$data_array = [];
+		// Flatten all rows (beginning balance + transactions + account totals)
+		$all_rows = [];
 		$grand_total_debit = 0;
 		$grand_total_credit = 0;
+		$account_lookup = [];
 
-		// Process each account
 		foreach ($accounts as $account) {
-			// Skip accounts with no transactions
 			if ($account->transactions->isEmpty()) {
 				continue;
 			}
 
-			// Calculate account balance
 			$debit_amount = $account->dr_amount ?? 0;
 			$credit_amount = $account->cr_amount ?? 0;
-			$balance = 0;
+			$balance = $account->dr_cr == 'dr' 
+				? $debit_amount - $credit_amount 
+				: $credit_amount - $debit_amount;
 
-			// Calculate balance based on dr_cr
-			if ($account->dr_cr == 'dr') {
-				$balance = $debit_amount - $credit_amount;
-			} else {
-				$balance = $credit_amount - $debit_amount;
-			}
+			$grand_total_debit += $debit_amount;
+			$grand_total_credit += $credit_amount;
 
-			// Create account data array
-			$account_data = [
+			// Store account info for later
+			$account_lookup[$account->id] = [
 				'id' => $account->id,
 				'account_name' => $account->account_name,
 				'account_number' => $account->account_code,
@@ -813,46 +805,87 @@ class ReportController extends Controller
 				'credit_amount' => $credit_amount,
 				'balance' => $balance,
 				'dr_cr' => $account->dr_cr,
-				'transactions' => []
 			];
 
-			// Add transactions to account data
+			// Add beginning balance row
+			$all_rows[] = [
+				'type' => 'beginning_balance',
+				'account_id' => $account->id,
+			];
+
+			// Add transaction rows
 			foreach ($account->transactions as $transaction) {
-				$account_data['transactions'][] = [
-					'id' => $transaction->id,
-					'trans_date' => $transaction->trans_date,
-					'description' => $transaction->description,
-					'transaction_amount' => $transaction->transaction_amount,
-					'base_currency_amount' => $transaction->base_currency_amount,
-					'ref_type' => $transaction->ref_type,
-					'payee_name' => $transaction->payee_name,
-					'transaction_currency' => $transaction->transaction_currency,
-					'currency_rate' => $transaction->currency_rate,
-					'dr_cr' => $transaction->dr_cr,
+				$all_rows[] = [
+					'type' => 'transaction',
+					'account_id' => $account->id,
+					'transaction_data' => [
+						'id' => $transaction->id,
+						'trans_date' => $transaction->trans_date,
+						'ref_id' => $transaction->ref_id,
+						'ref_type' => $transaction->ref_type,
+						'description' => $transaction->description,
+						'transaction_amount' => $transaction->transaction_amount,
+						'base_currency_amount' => $transaction->base_currency_amount,
+						'dr_cr' => $transaction->dr_cr,
+					],
 				];
 			}
 
-			// Add account to data array
-			$data_array[] = $account_data;
-
-			// Update grand totals
-			$grand_total_debit += $debit_amount;
-			$grand_total_credit += $credit_amount;
+			// Add account total row
+			$all_rows[] = [
+				'type' => 'account_total',
+				'account_id' => $account->id,
+			];
 		}
 
-		// Get currency information
-		$currency = request()->activeBusiness->currency;
+		// Paginate the flattened rows
+		$current_page = request()->input('page', 1);
+		$offset = ($current_page - 1) * $per_page;
+		$total_rows = count($all_rows);
+		$paginated_rows = array_slice($all_rows, $offset, $per_page);
 
-		// Get business information
+		// Group paginated rows back by account
+		$data_array = [];
+		$current_account_id = null;
+		$current_account_data = null;
+
+		foreach ($paginated_rows as $row) {
+			$account_id = $row['account_id'];
+
+			// If we're starting a new account, save the previous one
+			if ($current_account_id !== null && $current_account_id !== $account_id) {
+				$data_array[] = $current_account_data;
+				$current_account_data = null;
+			}
+
+			// Initialize account data if needed
+			if ($current_account_data === null || $current_account_data['id'] !== $account_id) {
+				$current_account_data = $account_lookup[$account_id];
+				$current_account_data['transactions'] = [];
+			}
+
+			// Add transaction data if this is a transaction row
+			if ($row['type'] === 'transaction') {
+				$current_account_data['transactions'][] = $row['transaction_data'];
+			}
+
+			$current_account_id = $account_id;
+		}
+
+		// Add the last account
+		if ($current_account_data !== null) {
+			$data_array[] = $current_account_data;
+		}
+
+		$currency = request()->activeBusiness->currency;
 		$business_name = request()->activeBusiness->name;
 
-		// Return Inertia render with data
 		return Inertia::render('Backend/User/Reports/Ledger', [
 			'report_data' => $data_array,
 			'currency' => $currency,
-			'grand_total_debit' => $grand_total_debit,
-			'grand_total_credit' => $grand_total_credit,
-			'grand_total_balance' => $grand_total_debit - $grand_total_credit,
+			'grand_total_debit' => floatval(round($grand_total_debit, 2)),
+			'grand_total_credit' => floatval(round($grand_total_credit, 2)),
+			'grand_total_balance' => floatval(round($grand_total_debit, 2)) - floatval(round($grand_total_credit, 2)),
 			'business_name' => $business_name,
 			'date1' => $date1,
 			'date2' => $date2,
@@ -860,14 +893,13 @@ class ReportController extends Controller
 				'search' => $search,
 			],
 			'meta' => [
-				'current_page' => $accounts->currentPage(),
-				'last_page' => $accounts->lastPage(),
-				'from' => $accounts->firstItem(),
-				'links' => $accounts->linkCollection(),
-				'path' => $accounts->path(),
-				'per_page' => $accounts->perPage(),
-				'to' => $accounts->lastItem(),
-				'total' => $accounts->total(),
+				'current_page' => $current_page,
+				'last_page' => ceil($total_rows / $per_page),
+				'from' => $offset + 1,
+				'path' => request()->url(),
+				'per_page' => $per_page,
+				'to' => min($offset + $per_page, $total_rows),
+				'total' => $total_rows,
 			],
 		]);
 	}

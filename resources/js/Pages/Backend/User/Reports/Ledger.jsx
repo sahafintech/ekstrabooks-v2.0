@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Head, router, useForm } from "@inertiajs/react";
+import { router, useForm } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -24,7 +24,6 @@ import { Toaster } from "@/Components/ui/toaster";
 import PageHeader from "@/Components/PageHeader";
 import { formatAmount, parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
-import { ChevronDown, ChevronRight } from "lucide-react";
 
 export default function Ledger({
     report_data,
@@ -40,8 +39,7 @@ export default function Ledger({
 }) {
     const [search, setSearch] = useState(filters.search || "");
     const [perPage, setPerPage] = useState(50);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [expandedAccounts, setExpandedAccounts] = useState(new Set());
+    const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
 
     const { data, setData, post, processing } = useForm({
         date1: parseDateObject(date1),
@@ -113,28 +111,72 @@ export default function Ledger({
         );
     };
 
-    const toggleAccountExpansion = (accountId) => {
-        const newExpanded = new Set(expandedAccounts);
-        if (newExpanded.has(accountId)) {
-            newExpanded.delete(accountId);
-        } else {
-            newExpanded.add(accountId);
-        }
-        setExpandedAccounts(newExpanded);
+    // Flatten transactions for display with pre-calculated running balances
+    const flattenTransactions = () => {
+        const flattened = [];
+        
+        report_data.forEach(account => {
+            // Calculate beginning balance
+            const beginningBalance = account.dr_cr === 'dr' ? 
+                (account.debit_amount - account.credit_amount) : 
+                (account.credit_amount - account.debit_amount);
+
+            // Add beginning balance row
+            flattened.push({
+                type: 'beginning_balance',
+                account_id: account.id,
+                account_number: account.account_number,
+                account_name: account.account_name,
+                account_dr_cr: account.dr_cr,
+                account_debit_amount: account.debit_amount,
+                account_credit_amount: account.credit_amount,
+                account_balance: account.balance,
+                beginning_balance: beginningBalance,
+                show_account_name: true
+            });
+
+            // Track running balance for transactions
+            let runningBalance = beginningBalance;
+
+            // Add transactions with running balance
+            account.transactions.forEach((transaction, index) => {
+                // Update running balance based on transaction type
+                if (account.dr_cr === 'dr') {
+                    runningBalance += transaction.dr_cr === 'dr' ? transaction.base_currency_amount : -transaction.base_currency_amount;
+                } else {
+                    runningBalance += transaction.dr_cr === 'cr' ? transaction.base_currency_amount : -transaction.base_currency_amount;
+                }
+
+                flattened.push({
+                    type: 'transaction',
+                    account_id: account.id,
+                    account_number: account.account_number,
+                    account_name: account.account_name,
+                    account_dr_cr: account.dr_cr,
+                    account_debit_amount: account.debit_amount,
+                    account_credit_amount: account.credit_amount,
+                    running_balance: runningBalance,
+                    show_account_name: false,
+                    ...transaction
+                });
+            });
+
+            // Add account total row
+            flattened.push({
+                type: 'account_total',
+                account_id: account.id,
+                account_number: account.account_number,
+                account_name: account.account_name,
+                account_debit_amount: account.debit_amount,
+                account_credit_amount: account.credit_amount,
+                account_balance: account.balance,
+            });
+        });
+
+        return flattened;
     };
 
-    const isAccountExpanded = (accountId) => {
-        return expandedAccounts.has(accountId);
-    };
-
-    const expandAllAccounts = () => {
-        const allAccountIds = report_data.map(account => account.id);
-        setExpandedAccounts(new Set(allAccountIds));
-    };
-
-    const collapseAllAccounts = () => {
-        setExpandedAccounts(new Set());
-    };
+    const flatTransactions = flattenTransactions();
 
     const renderPageNumbers = () => {
         const totalPages = meta.last_page;
@@ -173,16 +215,20 @@ export default function Ledger({
         // Generate CSS for the print window
         const style = `
             <style>
-                body { font-family: Arial, sans-serif; }
-                table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f2f2f2; }
-                h2, h1 { text-align: center; margin-bottom: 20px; }
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 10px; }
+                th { background-color: #f2f2f2; font-weight: bold; }
+                h2, h1 { text-align: center; margin-bottom: 10px; }
                 .text-right { text-align: right; }
                 .total-row { font-weight: bold; background-color: #f9f9f9; }
-                .account-type { margin-top: 20px; font-weight: bold; font-size: 16px; }
-                .account { margin-left: 20px; margin-top: 10px; }
-                .transaction { margin-left: 40px; }
+                .account-name { font-weight: 600; }
+                .grand-total { 
+                    font-weight: bold; 
+                    background-color: #d1d5db; 
+                    border-top: 2px solid #000;
+                }
+                .empty-cell { width: 180px; }
             </style>
         `;
 
@@ -191,113 +237,89 @@ export default function Ledger({
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Ledger Report</title>
+                <title>General Ledger Report</title>
                 ${style}
             </head>
             <body>
                 <h1>${business_name}</h1>
-                <h2>Ledger Report (${data.date1} - ${data.date2})</h2>
-        `;
-
-        // Add table for each account type
-        if (report_data.length > 0) {
-            printContent += `
+                <h2>General Ledger</h2>
+                <p style="text-align: center;">For the Period From ${data.date1} to ${data.date2}</p>
                 <table>
                     <thead>
                         <tr>
-                            <th>Account</th>
-                            <th class="text-right">Debit (${currency})</th>
-                            <th class="text-right">Credit (${currency})</th>
+                            <th class="empty-cell">Account Name</th>
+                            <th>Date</th>
+                            <th>Reference</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                            <th class="text-right">Debit Amount (${currency})</th>
+                            <th class="text-right">Credit Amount (${currency})</th>
                             <th class="text-right">Balance (${currency})</th>
                         </tr>
                     </thead>
                     <tbody>
-            `;
+        `;
 
-            // Add accounts
-            report_data.forEach(account => {
-                printContent += `
-                    <tr>
-                        <td>${account.account_number} - ${account.account_name}</td>
-                        <td class="text-right">${account.debit_amount}</td>
-                        <td class="text-right">${account.credit_amount}</td>
-                        <td class="text-right">${account.balance}</td>
-                    </tr>
-                `;
-
-                // Add transactions
-                if (account.transactions.length > 0) {
+        // Add all flattened transactions
+        if (flatTransactions.length > 0) {
+            flatTransactions.forEach(row => {
+                if (row.type === 'beginning_balance') {
                     printContent += `
-                            <tr>
-                                <td colspan="4">
-                                    <table class="transaction" style="width: 100%;">
-                                        <thead>
-                                            <tr>
-                                                <th>Date</th>
-                                                <th>Description</th>
-                                                <th>Reference</th>
-                                                <th class="text-right">Debit</th>
-                                                <th class="text-right">Credit</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                        `;
-
-                    account.transactions.forEach(transaction => {
-                        printContent += `
-                                <tr>
-                                    <td>${transaction.trans_date}</td>
-                                    <td>${transaction.description}</td>
-                                    <td>${transaction.reference || 'N/A'}</td>
-                                    <td class="text-right">${transaction.debit_amount}</td>
-                                    <td class="text-right">${transaction.credit_amount}</td>
-                                </tr>
-                            `;
-                    });
-
+                        <tr>
+                            <td class="account-name">${row.account_number} - ${row.account_name}</td>
+                            <td colspan="4">Beginning Balance</td>
+                            <td class="text-right"></td>
+                            <td class="text-right"></td>
+                            <td class="text-right">${formatAmount(row.beginning_balance)}</td>
+                        </tr>
+                    `;
+                } else if (row.type === 'transaction') {
                     printContent += `
-                                        </tbody>
-                                    </table>
-                                </td>
-                            </tr>
-                        `;
+                        <tr>
+                            <td></td>
+                            <td>${row.trans_date}</td>
+                            <td>${row.ref_id || 'N/A'}</td>
+                            <td style="text-transform: uppercase;">${row.ref_type || 'N/A'}</td>
+                            <td>${row.description}</td>
+                            <td class="text-right">${row.dr_cr === 'dr' ? formatAmount(row.base_currency_amount) : ''}</td>
+                            <td class="text-right">${row.dr_cr === 'cr' ? formatAmount(row.base_currency_amount) : ''}</td>
+                            <td class="text-right">${formatAmount(row.running_balance)}</td>
+                        </tr>
+                    `;
+                } else if (row.type === 'account_total') {
+                    printContent += `
+                        <tr class="total-row">
+                            <td></td>
+                            <td colspan="4">Total for ${row.account_number} - ${row.account_name}</td>
+                            <td class="text-right">${formatAmount(row.account_debit_amount)}</td>
+                            <td class="text-right">${formatAmount(row.account_credit_amount)}</td>
+                            <td class="text-right">${formatAmount(row.account_balance)}</td>
+                        </tr>
+                    `;
                 }
             });
 
-            // Add account type totals
+            // Add grand totals
             printContent += `
-                    <tr class="total-row">
-                        <td>Total for ${accountType.type}</td>
-                        <td class="text-right">${accountType.total_debit_formatted}</td>
-                        <td class="text-right">${accountType.total_credit_formatted}</td>
-                        <td class="text-right">${accountType.balance}</td>
-                    </tr>
-                `;
-
-            printContent += `
-                            </tbody>
-                        </table>
-                    </div>
-                `;
-            // Add grand totals row for the main table
-            printContent += `
-                <tr class="total-row">
-                    <td>Grand Total</td>
+                <tr class="grand-total">
+                    <td></td>
+                    <td colspan="4">Grand Total</td>
                     <td class="text-right">${grand_total_debit}</td>
                     <td class="text-right">${grand_total_credit}</td>
                     <td class="text-right">${grand_total_balance}</td>
                 </tr>
-                </tbody>
-                </table>
             `;
         } else {
             printContent += `
-                <p style="text-align: center;">No data found.</p>
+                <tr>
+                    <td colspan="8" style="text-align: center;">No data found.</td>
+                </tr>
             `;
         }
 
-        // Complete the HTML content
         printContent += `
+                    </tbody>
+                </table>
             </body>
             </html>
         `;
@@ -316,6 +338,10 @@ export default function Ledger({
             };
         }, 300);
     };
+
+    const handleExport = () => {
+        window.location.href = route('reports.ledger_export')
+    }
 
     return (
         <AuthenticatedLayout>
@@ -364,19 +390,7 @@ export default function Ledger({
                                 <Button variant="outline" onClick={handlePrint}>
                                     Print
                                 </Button>
-                                <a download href={route('reports.ledger_export')}>
-                                    <Button variant="outline">Export</Button>
-                                </a>
-                                {report_data.length > 0 && (
-                                    <>
-                                        <Button variant="outline" onClick={expandAllAccounts}>
-                                            Expand All
-                                        </Button>
-                                        <Button variant="outline" onClick={collapseAllAccounts}>
-                                            Collapse All
-                                        </Button>
-                                    </>
-                                )}
+                                <Button variant="outline" onClick={handleExport}>Export</Button>
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-sm text-gray-500">Show</span>
@@ -396,98 +410,75 @@ export default function Ledger({
                         </div>
 
                         {report_data.length > 0 ? (
-                            <div className="p-4">
+                            <div className="overflow-x-auto">
                                 <ReportTable>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="!text-[10px] font-semibold w-[180px]">Account Name</TableHead>
+                                            <TableHead className="!text-[10px] font-semibold">Date</TableHead>
+                                            <TableHead className="!text-[10px] font-semibold">Reference</TableHead>
+                                            <TableHead className="!text-[10px] font-semibold">Type</TableHead>
+                                            <TableHead className="!text-[10px] font-semibold">Description</TableHead>
+                                            <TableHead className="text-right !text-[10px] font-semibold">Debit Amount ({currency})</TableHead>
+                                            <TableHead className="text-right !text-[10px] font-semibold">Credit Amount ({currency})</TableHead>
+                                            <TableHead className="text-right !text-[10px] font-semibold">Balance ({currency})</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
                                     <TableBody>
-                                        {report_data.map((account) => (
-                                            <React.Fragment key={account.id}>
-                                                <TableRow className="bg-gray-200 !text-[10px]">
-                                                    <TableCell>Account</TableCell>
-                                                    <TableCell className="text-right !text-[10px]">Debit ({currency})</TableCell>
-                                                    <TableCell className="text-right !text-[10px]">Credit ({currency})</TableCell>
-                                                    <TableCell className="text-right !text-[10px]">Balance ({currency})</TableCell>
-                                                </TableRow>
-                                                <TableRow>
-                                                    <TableCell className="bg-gray-100 !text-[10px]">
-                                                        <div className="flex items-center gap-2">
-                                                            {account.transactions.length > 0 && (
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    onClick={() => toggleAccountExpansion(account.id)}
-                                                                    className="h-6 w-6 p-0 hover:bg-gray-200"
-                                                                >
-                                                                    {isAccountExpanded(account.id) ? (
-                                                                        <ChevronDown className="h-4 w-4" />
-                                                                    ) : (
-                                                                        <ChevronRight className="h-4 w-4" />
-                                                                    )}
-                                                                </Button>
-                                                            )}
-                                                            <div className="font-medium">
-                                                                {account.account_number} - {account.account_name}
-                                                                {account.transactions.length > 0 && (
-                                                                    <span className="ml-2 text-xs text-gray-500">
-                                                                        ({account.transactions.length} transactions)
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="text-right bg-gray-100 !text-[10px]">{formatAmount(account.debit_amount)}</TableCell>
-                                                    <TableCell className="text-right bg-gray-100 !text-[10px]">{formatAmount(account.credit_amount)}</TableCell>
-                                                    <TableCell className="text-right bg-gray-100 !text-[10px]">{formatAmount(account.balance)}</TableCell>
-                                                </TableRow>
-
-                                                {account.transactions.length > 0 && isAccountExpanded(account.id) && (
-                                                    <TableRow>
-                                                        <TableCell colSpan={4} className="p-0">
-                                                            <div className="pl-8 pb-4">
-                                                                <ReportTable>
-                                                                    <TableHeader>
-                                                                        <TableRow>
-                                                                            <TableHead className="!text-[10px]">Date</TableHead>
-                                                                            <TableHead className="!text-[10px]">Description</TableHead>
-                                                                            <TableHead className="!text-[10px]">Type</TableHead>
-                                                                            <TableHead className="!text-[10px]">Name</TableHead>
-                                                                            <TableHead className="!text-[10px]">Transaction Currency</TableHead>
-                                                                            <TableHead className="!text-[10px]">Transaction Currency[Debit]</TableHead>
-                                                                            <TableHead className="!text-[10px]">Transaction Currency[Credit]</TableHead>
-                                                                            <TableHead className="!text-[10px]">Currency Rate</TableHead>
-                                                                            <TableHead className="!text-[10px]">Rate</TableHead>
-                                                                            <TableHead className="!text-[10px]">Base Currency</TableHead>
-                                                                            <TableHead className="!text-[10px]">Base Currency[Debit]</TableHead>
-                                                                            <TableHead className="!text-[10px]">Base Currency[Credit]</TableHead>
-                                                                        </TableRow>
-                                                                    </TableHeader>
-                                                                    <TableBody>
-                                                                        {account.transactions.map((transaction) => (
-                                                                            <TableRow key={transaction.id}>
-                                                                                <TableCell className="!text-[10px]">{transaction.trans_date}</TableCell>
-                                                                                <TableCell className="!text-[10px]">{transaction.description}</TableCell>
-                                                                                <TableCell className="!text-[10px]">{transaction.ref_type === 'receipt' ? 'Cash Invoice' : transaction.ref_type}</TableCell>
-                                                                                <TableCell className="!text-[10px]">{transaction.payee_name || 'N/A'}</TableCell>
-                                                                                <TableCell className="!text-[10px]">{transaction.transaction_currency}</TableCell>
-                                                                                <TableCell className="text-right !text-[10px]">{transaction.dr_cr === 'dr' ? formatAmount(transaction.transaction_amount) : 0}</TableCell>
-                                                                                <TableCell className="text-right !text-[10px]">{transaction.dr_cr === 'cr' ? formatAmount(transaction.transaction_amount) : 0}</TableCell>
-                                                                                <TableCell className="text-right !text-[10px]">{transaction.transaction_currency}</TableCell>
-                                                                                <TableCell className="text-right !text-[10px]">{formatAmount(transaction.currency_rate)}</TableCell>
-                                                                                <TableCell className="!text-[10px]">{currency}</TableCell>
-                                                                                <TableCell className="text-right !text-[10px]">{transaction.dr_cr === 'dr' ? formatAmount(transaction.base_currency_amount) : 0}</TableCell>
-                                                                                <TableCell className="text-right !text-[10px]">{transaction.dr_cr === 'cr' ? formatAmount(transaction.base_currency_amount) : 0}</TableCell>
-                                                                            </TableRow>
-                                                                        ))}
-                                                                    </TableBody>
-                                                                </ReportTable>
-                                                            </div>
+                                        {flatTransactions.map((row) => {
+                                            if (row.type === 'beginning_balance') {
+                                                return (
+                                                    <TableRow key={`beginning-${row.account_id}`}>
+                                                        <TableCell className="!text-[10px] font-medium">
+                                                            {row.account_number} - {row.account_name}
+                                                        </TableCell>
+                                                        <TableCell className="!text-[10px]" colSpan={4}>Beginning Balance</TableCell>
+                                                        <TableCell className="!text-[10px]"></TableCell>
+                                                        <TableCell className="!text-[10px]"></TableCell>
+                                                        <TableCell className="text-right !text-[10px] font-medium">
+                                                            {formatAmount(row.beginning_balance)}
                                                         </TableCell>
                                                     </TableRow>
-                                                )}
-                                            </React.Fragment>
-                                        ))}
+                                                );
+                                            } else if (row.type === 'transaction') {
+                                                return (
+                                                    <TableRow key={`transaction-${row.id}`}>
+                                                        <TableCell className="!text-[10px]"></TableCell>
+                                                        <TableCell className="!text-[10px]">{row.trans_date}</TableCell>
+                                                        <TableCell className="!text-[10px]">{row.ref_id || 'N/A'}</TableCell>
+                                                        <TableCell className="!text-[10px] uppercase">{row.ref_type || 'N/A'}</TableCell>
+                                                        <TableCell className="!text-[10px]">{row.description}</TableCell>
+                                                        <TableCell className="text-right !text-[10px]">
+                                                            {row.dr_cr === 'dr' ? formatAmount(row.base_currency_amount) : ''}
+                                                        </TableCell>
+                                                        <TableCell className="text-right !text-[10px]">
+                                                            {row.dr_cr === 'cr' ? formatAmount(row.base_currency_amount) : ''}
+                                                        </TableCell>
+                                                        <TableCell className="text-right !text-[10px]">
+                                                            {formatAmount(row.running_balance)}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            } else if (row.type === 'account_total') {
+                                                return (
+                                                    <TableRow key={`total-${row.account_id}`} className="bg-gray-50 font-medium">
+                                                        <TableCell className="!text-[10px]"></TableCell>
+                                                        <TableCell className="!text-[10px]" colSpan={4}>
+                                                            Total for {row.account_number} - {row.account_name}
+                                                        </TableCell>
+                                                        <TableCell className="text-right !text-[10px]">{formatAmount(row.account_debit_amount)}</TableCell>
+                                                        <TableCell className="text-right !text-[10px]">{formatAmount(row.account_credit_amount)}</TableCell>
+                                                        <TableCell className="text-right !text-[10px]">{formatAmount(row.account_balance)}</TableCell>
+                                                    </TableRow>
+                                                );
+                                            }
+                                            return null;
+                                        })}
 
-                                        <TableRow className="bg-muted/50 font-medium">
-                                            <TableCell className="!text-[10px]">Grand Total</TableCell>
+                                        {/* Grand Total Row */}
+                                        <TableRow className="bg-muted/50 font-bold border-t-2">
+                                            <TableCell className="!text-[10px]"></TableCell>
+                                            <TableCell className="!text-[10px]" colSpan={4}>Grand Total</TableCell>
                                             <TableCell className="text-right !text-[10px]">{grand_total_debit}</TableCell>
                                             <TableCell className="text-right !text-[10px]">{grand_total_credit}</TableCell>
                                             <TableCell className="text-right !text-[10px]">{grand_total_balance}</TableCell>
