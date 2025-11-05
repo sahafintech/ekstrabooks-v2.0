@@ -1,18 +1,15 @@
 @if(isset($report_data))
 @php
-// Helper variables for calculations
+
 $currency = request()->activeBusiness->currency;
 $businessName = request()->activeBusiness->name;
 
-// Sales and Income calculations
 $salesAndIncome = $report_data['sales_and_income'] ?? collect();
 $netSales = $salesAndIncome->sum('cr_amount') - $salesAndIncome->sum('dr_amount');
 
-// Cost of Sale calculations
 $costOfSale = $report_data['cost_of_sale'] ?? collect();
 $netCostOfSale = $costOfSale->sum('dr_amount') - $costOfSale->sum('cr_amount');
 
-// Expense calculations
 $directExpenses = $report_data['direct_expenses'] ?? collect();
 $otherExpenses = $report_data['other_expenses'] ?? collect();
 $taxExpenses = $report_data['tax_expenses'] ?? collect();
@@ -22,12 +19,10 @@ $totalOtherExpenses = $otherExpenses->sum('dr_amount') - $otherExpenses->sum('cr
 $totalTaxExpenses = $taxExpenses->sum('dr_amount') - $taxExpenses->sum('cr_amount');
 $totalExpenses = $totalDirectExpenses + $totalOtherExpenses;
 
-// Income calculations
 $grossIncome = $netSales - $netCostOfSale;
 $netIncomeBeforeTax = $grossIncome - $totalExpenses;
 $netIncomeAfterTax = $netIncomeBeforeTax - $totalTaxExpenses;
 
-// Helper function to calculate account amount
 function calculateAccountAmount($account, $isDiscount = false) {
 $drAmount = $account->transactions->where('dr_cr', 'dr')->sum('base_currency_amount');
 $crAmount = $account->transactions->where('dr_cr', 'cr')->sum('base_currency_amount');

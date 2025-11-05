@@ -3,11 +3,18 @@ import { useForm } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/Components/ui/dropdown-menu";
 import { toast } from "sonner";
 import PageHeader from "@/Components/PageHeader";
 import { formatCurrency, parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { format } from "date-fns";
+import { ChevronDown } from "lucide-react";
 
 const printStyles = `
   @media print {
@@ -114,8 +121,12 @@ export default function IncomeStatement({ report_data, date1, date2, business_na
         date2: parseDateObject(date2),
     });
 
-    const handleExport = () => {
-        window.location.href = route("reports.income_statement_export");
+    const handleExport = (type) => {
+        if (type === 'excel') {
+            window.location.href = route("reports.income_statement_export");
+        } else if (type === 'pdf') {
+            window.location.href = route("reports.income_statement_pdf");
+        }
     };
 
     const handleGenerate = (e) => {
@@ -174,7 +185,22 @@ export default function IncomeStatement({ report_data, date1, date2, business_na
                                 <Button variant="outline" onClick={handlePrint}>
                                     Print
                                 </Button>
-                                <Button variant="outline" onClick={handleExport}>Export</Button>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline">
+                                            Export
+                                            <ChevronDown className="ml-2 h-4 w-4" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent>
+                                        <DropdownMenuItem onClick={() => handleExport('excel')}>
+                                            Excel
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleExport('pdf')}>
+                                            PDF
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             </div>
 
                             <div className="flex items-center justify-center">

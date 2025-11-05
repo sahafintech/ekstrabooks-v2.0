@@ -43,6 +43,8 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 
+use function Spatie\LaravelPdf\Support\pdf;
+
 class ReportController extends Controller
 {
 
@@ -2185,6 +2187,135 @@ class ReportController extends Controller
 	public function income_statement_export()
 	{
 		return Excel::download(new IncomeStatementExport(session('start_date'), session('end_date')), request()->activeBusiness->name . ' - Income statement ' . now()->format('d m Y') . '.xlsx');
+	}
+
+	public function income_statement_pdf(Request $request)
+	{
+		@ini_set('max_execution_time', 0);
+		@set_time_limit(0);
+
+		// Get dates from session
+		$date1 = session('start_date') ?? Carbon::now()->startOfMonth()->format('Y-m-d');
+		$date2 = session('end_date') ?? Carbon::now()->format('Y-m-d');
+
+		$report_data['sales_and_income'] = Account::where(function ($query) {
+			$query->where('account_type', 'Other Income')
+				->orWhere('account_type', 'Sales');
+		})
+			->whereHas('transactions', function ($query) use ($date1, $date2) {
+				$query->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			})
+			->with(['transactions' => function ($query) use ($date1, $date2) {
+				$query->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			}])
+			->withSum(['transactions as cr_amount' => function ($query) use ($date1, $date2) {
+				$query->where('dr_cr', 'cr')
+					->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			}], 'base_currency_amount')
+			->withSum(['transactions as dr_amount' => function ($query) use ($date1, $date2) {
+				$query->where('dr_cr', 'dr')
+					->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			}], 'base_currency_amount')
+			->get();
+
+		$report_data['cost_of_sale'] = Account::where('account_type', 'Cost Of Sale')
+			->whereHas('transactions', function ($query) use ($date1, $date2) {
+				$query->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			})
+			->with(['transactions' => function ($query) use ($date1, $date2) {
+				$query->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			}])
+			->withSum(['transactions as dr_amount' => function ($query) use ($date1, $date2) {
+				$query->where('dr_cr', 'dr')
+					->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			}], 'base_currency_amount')
+			->withSum(['transactions as cr_amount' => function ($query) use ($date1, $date2) {
+				$query->where('dr_cr', 'cr')
+					->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			}], 'base_currency_amount')
+			->get();
+
+		$report_data['direct_expenses'] = Account::where('account_type', 'Direct Expenses')
+			->whereHas('transactions', function ($query) use ($date1, $date2) {
+				$query->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			})
+			->with(['transactions' => function ($query) use ($date1, $date2) {
+				$query->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			}])
+			->withSum(['transactions as dr_amount' => function ($query) use ($date1, $date2) {
+				$query->where('dr_cr', 'dr')
+					->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			}], 'base_currency_amount')
+			->withSum(['transactions as cr_amount' => function ($query) use ($date1, $date2) {
+				$query->where('dr_cr', 'cr')
+					->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			}], 'base_currency_amount')
+			->get();
+
+		$report_data['other_expenses'] = Account::where('account_type', 'Other Expenses')
+			->whereHas('transactions', function ($query) use ($date1, $date2) {
+				$query->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			})
+			->with(['transactions' => function ($query) use ($date1, $date2) {
+				$query->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			}])
+			->withSum(['transactions as dr_amount' => function ($query) use ($date1, $date2) {
+				$query->where('dr_cr', 'dr')
+					->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			}], 'base_currency_amount')
+			->withSum(['transactions as cr_amount' => function ($query) use ($date1, $date2) {
+				$query->where('dr_cr', 'cr')
+					->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			}], 'base_currency_amount')
+			->get();
+
+		$report_data['tax_expenses'] = Account::where('account_type', 'Other Tax Expenses')
+			->whereHas('transactions', function ($query) use ($date1, $date2) {
+				$query->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			})
+			->with(['transactions' => function ($query) use ($date1, $date2) {
+				$query->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			}])
+			->withSum(['transactions as dr_amount' => function ($query) use ($date1, $date2) {
+				$query->where('dr_cr', 'dr')
+					->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			}], 'base_currency_amount')
+			->withSum(['transactions as cr_amount' => function ($query) use ($date1, $date2) {
+				$query->where('dr_cr', 'cr')
+					->whereDate('trans_date', '>=', $date1)
+					->whereDate('trans_date', '<=', $date2);
+			}], 'base_currency_amount')
+			->get();
+
+		$date1 = Carbon::parse($date1);
+		$date2 = Carbon::parse($date2);
+
+		$business_name = $request->activeBusiness->name;
+		$currency = $request->activeBusiness->currency;
+
+		return pdf()
+			->view('backend.user.pdf.income-statement', compact('report_data', 'date1', 'date2', 'business_name', 'currency'))
+			->name('income-statement-' . now()->format('d m Y') . '.pdf')
+			->download();
 	}
 
 	public function receivables_export()

@@ -795,6 +795,9 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::match(['get', 'post'], 'reports/sales_by_product_export', [ReportController::class, 'sales_by_product_export'])->name('reports.sales_by_product_export');
 		Route::get('reports/inventory_summary_export', [ReportController::class, 'inventory_summary_export', 'inventory_summary_export'])->name('reports.inventory_summary_export');
 		Route::get('reports/inventory_details_export', [ReportController::class, 'inventory_details_export'])->name('reports.inventory_details_export');
+
+		// report pdfs
+		Route::get('reports/income_statement_pdf', [ReportController::class, 'income_statement_pdf'])->name('reports.income_statement_pdf');
 	});
 
 	Route::group(['prefix' => 'user'], function () {
