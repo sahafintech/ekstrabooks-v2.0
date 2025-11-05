@@ -55,10 +55,9 @@
                     <td style="font-size: 10px; border: 1px solid #e5e7eb;" colspan="4">Beginning Balance</td>
                     <td style="font-size: 10px; border: 1px solid #e5e7eb;"></td>
                     <td style="font-size: 10px; border: 1px solid #e5e7eb;"></td>
-                    <td style="font-size: 10px; border: 1px solid #e5e7eb; text-align: right; font-weight: 500;">{{ number_format($beginning_balance, 2) }}</td>
+                    <td style="font-size: 10px; border: 1px solid #e5e7eb; text-align: right; font-weight: 500;">{{ $beginning_balance }}</td>
                 </tr>
                 
-                {{-- Transaction Rows --}}
                 @foreach($account['transactions'] as $transaction)
                     @php
                         // Update running balance
@@ -71,30 +70,54 @@
                     <tr>
                         <td style="font-size: 10px; border: 1px solid #e5e7eb;"></td>
                         <td style="font-size: 10px; border: 1px solid #e5e7eb;">{{ $transaction->trans_date }}</td>
-                        <td style="font-size: 10px; border: 1px solid #e5e7eb;">{{ $transaction->ref_id ?? 'N/A' }}</td>
-                        <td style="font-size: 10px; border: 1px solid #e5e7eb; text-transform: uppercase;">{{ $transaction->ref_type ?? 'N/A' }}</td>
+                        <td style="font-size: 10px; border: 1px solid #e5e7eb;">
+                            @if($transaction->ref_type == 'receipt')
+                            {{ $transaction->receipt->receipt_number }}
+                            @elseif($transaction->ref_type == 'bill invoice')
+                            {{ $transaction->purchase->purchase_number }}
+                            @elseif($transaction->ref_type == 'bill payment')
+                            {{ $transaction->purchase->bill_no }}
+                            @elseif($transaction->ref_type == 'journal')
+                            {{ $transaction->journal->journal_number }}
+                            @else
+                            @elseif($transaction->ref_type == 'cash purchase')
+                            {{ $transaction->purchase->bill_no }}
+                            @else
+                            {{ $transaction->ref_id }}
+                            @endif
+                        </td>
+                        <td style="font-size: 10px; border: 1px solid #e5e7eb; text-transform: uppercase;">
+                            @if($transaction->ref_type == 'receipt')
+                            cash invoice
+                            @elseif($transaction->ref_type == 'bill invoice')
+                            credit purchase
+                            @elseif($transaction->ref_type == 'bill payment')
+                            credit purchase payment
+                            @else
+                            {{ $transaction->ref_type }}
+                            @endif
+                        </td>
                         <td style="font-size: 10px; border: 1px solid #e5e7eb;">{{ $transaction->description }}</td>
                         <td style="font-size: 10px; border: 1px solid #e5e7eb; text-align: right;">
                             @if($transaction->dr_cr == 'dr')
-                                {{ number_format($transaction->base_currency_amount, 2) }}
+                                {{ $transaction->base_currency_amount }}
                             @endif
                         </td>
                         <td style="font-size: 10px; border: 1px solid #e5e7eb; text-align: right;">
                             @if($transaction->dr_cr == 'cr')
-                                {{ number_format($transaction->base_currency_amount, 2) }}
+                                {{ $transaction->base_currency_amount }}
                             @endif
                         </td>
-                        <td style="font-size: 10px; border: 1px solid #e5e7eb; text-align: right;">{{ number_format($running_balance, 2) }}</td>
+                        <td style="font-size: 10px; border: 1px solid #e5e7eb; text-align: right;">{{ $running_balance }}</td>
                     </tr>
                 @endforeach
                 
-                {{-- Account Total Row --}}
                 <tr>
                     <td style="background-color: #f9fafb; font-size: 10px; border: 1px solid #e5e7eb;"></td>
                     <td style="background-color: #f9fafb; font-size: 10px; border: 1px solid #e5e7eb; font-weight: 500;" colspan="4">Total for {{ $account['account_number'] }} - {{ $account['account_name'] }}</td>
-                    <td style="background-color: #f9fafb; font-size: 10px; border: 1px solid #e5e7eb; text-align: right; font-weight: 500;">{{ number_format($account['debit_amount'], 2) }}</td>
-                    <td style="background-color: #f9fafb; font-size: 10px; border: 1px solid #e5e7eb; text-align: right; font-weight: 500;">{{ number_format($account['credit_amount'], 2) }}</td>
-                    <td style="background-color: #f9fafb; font-size: 10px; border: 1px solid #e5e7eb; text-align: right; font-weight: 500;">{{ number_format($account['balance'], 2) }}</td>
+                    <td style="background-color: #f9fafb; font-size: 10px; border: 1px solid #e5e7eb; text-align: right; font-weight: 500;">{{ $account['debit_amount'] }}</td>
+                    <td style="background-color: #f9fafb; font-size: 10px; border: 1px solid #e5e7eb; text-align: right; font-weight: 500;">{{ $account['credit_amount'] }}</td>
+                    <td style="background-color: #f9fafb; font-size: 10px; border: 1px solid #e5e7eb; text-align: right; font-weight: 500;">{{ $account['balance'] }}</td>
                 </tr>
             @endforeach
             
@@ -102,9 +125,9 @@
             <tr>
                 <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280;"></td>
                 <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280; font-weight: bold;" colspan="4">Grand Total</td>
-                <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280; text-align: right; font-weight: bold;">{{ number_format($grand_total_debit, 2) }}</td>
-                <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280; text-align: right; font-weight: bold;">{{ number_format($grand_total_credit, 2) }}</td>
-                <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280; text-align: right; font-weight: bold;">{{ number_format($grand_total_balance, 2) }}</td>
+                <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280; text-align: right; font-weight: bold;">{{ $grand_total_debit }}</td>
+                <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280; text-align: right; font-weight: bold;">{{ $grand_total_credit }}</td>
+                <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280; text-align: right; font-weight: bold;">{{ $grand_total_balance }}</td>
             </tr>
         @else
             <tr>

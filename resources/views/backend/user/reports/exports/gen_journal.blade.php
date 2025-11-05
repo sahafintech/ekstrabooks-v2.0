@@ -29,29 +29,29 @@
         </td>
     </tr>
     <tr>
-        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Date') }}</td>
-        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Account') }}</td>
-        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Description') }}</td>
-        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Ref Type') }}</td>
-        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Ref ID') }}</td>
-        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Name') }}</td>
-        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Transaction Currency') }}</td>
-        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Transaction Amount[debit]') }}</td>
-        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Transaction Amount[credit]') }}</td>
-        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Currency Rate') }}</td>
-        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Rate') }}</td>
-        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Base Currency') }}</td>
-        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Base Amount[debit]') }}</td>
-        <td style="background-color: lightgray; font-size: 12px;">{{ _lang('Base Amount[credit]') }}</td>
+        <td style="background-color: #d1d5db; font-size: 11px; font-weight: bold; border: 1px solid #9ca3af;">{{ _lang('Date') }}</td>
+        <td style="background-color: #d1d5db; font-size: 11px; font-weight: bold; border: 1px solid #9ca3af;">{{ _lang('Account') }}</td>
+        <td style="background-color: #d1d5db; font-size: 11px; font-weight: bold; border: 1px solid #9ca3af;">{{ _lang('Description') }}</td>
+        <td style="background-color: #d1d5db; font-size: 11px; font-weight: bold; border: 1px solid #9ca3af;">{{ _lang('Ref Type') }}</td>
+        <td style="background-color: #d1d5db; font-size: 11px; font-weight: bold; border: 1px solid #9ca3af;">{{ _lang('Ref ID') }}</td>
+        <td style="background-color: #d1d5db; font-size: 11px; font-weight: bold; border: 1px solid #9ca3af;">{{ _lang('Name') }}</td>
+        <td style="background-color: #d1d5db; font-size: 11px; font-weight: bold; border: 1px solid #9ca3af;">{{ _lang('Transaction Currency') }}</td>
+        <td style="background-color: #d1d5db; font-size: 11px; font-weight: bold; border: 1px solid #9ca3af; text-align: right;">{{ _lang('Transaction Amount[debit]') }}</td>
+        <td style="background-color: #d1d5db; font-size: 11px; font-weight: bold; border: 1px solid #9ca3af; text-align: right;">{{ _lang('Transaction Amount[credit]') }}</td>
+        <td style="background-color: #d1d5db; font-size: 11px; font-weight: bold; border: 1px solid #9ca3af;">{{ _lang('Currency Rate') }}</td>
+        <td style="background-color: #d1d5db; font-size: 11px; font-weight: bold; border: 1px solid #9ca3af;">{{ _lang('Rate') }}</td>
+        <td style="background-color: #d1d5db; font-size: 11px; font-weight: bold; border: 1px solid #9ca3af;">{{ _lang('Base Currency') }}</td>
+        <td style="background-color: #d1d5db; font-size: 11px; font-weight: bold; border: 1px solid #9ca3af; text-align: right;">{{ _lang('Base Amount[debit]') }}</td>
+        <td style="background-color: #d1d5db; font-size: 11px; font-weight: bold; border: 1px solid #9ca3af; text-align: right;">{{ _lang('Base Amount[credit]') }}</td>
     </tr>
     <tbody>
         @if(isset($report_data))
         @foreach($report_data as $transaction)
         <tr>
-            <td>{{ $transaction->trans_date }}</td>
-            <td>{{ $transaction->account->account_name }}</td>
-            <td>{{ $transaction->description }}</td>
-            <td>
+            <td style="font-size: 10px; border: 1px solid #e5e7eb;">{{ $transaction->trans_date }}</td>
+            <td style="font-size: 10px; border: 1px solid #e5e7eb;">{{ $transaction->account->account_name }}</td>
+            <td style="font-size: 10px; border: 1px solid #e5e7eb;">{{ $transaction->description }}</td>
+            <td style="font-size: 10px; border: 1px solid #e5e7eb;">
                 @if($transaction->ref_type == 'receipt')
                 cash invoice
                 @elseif($transaction->ref_type == 'bill invoice')
@@ -62,78 +62,80 @@
                 {{ $transaction->ref_type }}
                 @endif
             </td>
-            <td>
+            <td style="font-size: 10px; border: 1px solid #e5e7eb;">
                 @if($transaction->ref_type == 'receipt')
                 {{ $transaction->receipt->receipt_number }}
                 @elseif($transaction->ref_type == 'bill invoice')
                 {{ $transaction->purchase->purchase_number }}
                 @elseif($transaction->ref_type == 'bill payment')
-                {{ $transaction->purchase->purchase_number }}
+                {{ $transaction->purchase->bill_no }}
                 @elseif($transaction->ref_type == 'journal')
                 {{ $transaction->journal->journal_number }}
+                @elseif($transaction->ref_type == 'cash purchase')
+                {{ $transaction->purchase->bill_no }}
                 @else
                 {{ $transaction->ref_id }}
                 @endif
             </td>
-            <td>
+            <td style="font-size: 10px; border: 1px solid #e5e7eb;">
                 {{ $transaction->payee_name }}
             </td>
-            <td>
+            <td style="font-size: 10px; border: 1px solid #e5e7eb;">
                 {{ $transaction->transaction_currency }}
             </td>
-            <td>
+            <td style="font-size: 10px; border: 1px solid #e5e7eb; text-align: right;">
                 @if($transaction->dr_cr == 'dr')
                 {{ $transaction->transaction_amount }}
                 @else
-                0
+                {{ 0 }}
                 @endif
             </td>
-            <td>
+            <td style="font-size: 10px; border: 1px solid #e5e7eb; text-align: right;">
                 @if($transaction->dr_cr == 'cr')
                 {{ $transaction->transaction_amount }}
                 @else
-                0
+                {{ 0 }}
                 @endif
             </td>
-            <td>{{ $transaction->transaction_currency }}</td>
-            <td>
+            <td style="font-size: 10px; border: 1px solid #e5e7eb;">{{ $transaction->transaction_currency }}</td>
+            <td style="font-size: 10px; border: 1px solid #e5e7eb;">
                 {{ $transaction->currency_rate }}
             </td>
-            <td>{{ request()->activeBusiness->currency }}</td>
-            <td>
+            <td style="font-size: 10px; border: 1px solid #e5e7eb;">{{ request()->activeBusiness->currency }}</td>
+            <td style="font-size: 10px; border: 1px solid #e5e7eb; text-align: right;">
                 @if($transaction->dr_cr == 'dr')
                 {{ $transaction->base_currency_amount }}
                 @else
-                0
+                {{ 0 }}
                 @endif
             </td>
-            <td>
+            <td style="font-size: 10px; border: 1px solid #e5e7eb; text-align: right;">
                 @if($transaction->dr_cr == 'cr')
                 {{ $transaction->base_currency_amount }}
                 @else
-                0
+                {{ 0 }}
                 @endif
             </td>
         </tr>
         @endforeach
         <tr>
-            <td style="background-color: lightgray; font-size: 12px;"><b>{{ _lang('Total') }}</b></td>
-            <td style="background-color: lightgray;"></td>
-            <td style="background-color: lightgray;"></td>
-            <td style="background-color: lightgray;"></td>
-            <td style="background-color: lightgray;"></td>
-            <td style="background-color: lightgray;"></td>
-            <td style="background-color: lightgray;"></td>
-            <td style="background-color: lightgray;"></td>
-            <td style="background-color: lightgray;"></td>
-            <td style="background-color: lightgray;"></td>
-            <td style="background-color: lightgray;"></td>
-            <td style="background-color: lightgray;"></td>
-            <td style="background-color: lightgray; font-size: 12px;">
-                <b>{{ $report_data->where('dr_cr', 'dr')->sum('base_currency_amount') ?? 0 }}</b>
+            <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280; font-weight: bold;">{{ _lang('Total') }}</td>
+            <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280;"></td>
+            <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280;"></td>
+            <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280;"></td>
+            <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280;"></td>
+            <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280;"></td>
+            <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280;"></td>
+            <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280;"></td>
+            <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280;"></td>
+            <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280;"></td>
+            <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280;"></td>
+            <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280;"></td>
+            <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280; text-align: right; font-weight: bold;">
+                {{ $report_data->where('dr_cr', 'dr')->sum('base_currency_amount') ?? 0 }}
             </td>
-            <td style="background-color: lightgray; font-size: 12px;">
-                <b>{{ $report_data->where('dr_cr', 'cr')->sum('base_currency_amount') ?? 0 }}</b>
+            <td style="background-color: #d1d5db; font-size: 10px; border: 2px solid #6b7280; text-align: right; font-weight: bold;">
+                {{ $report_data->where('dr_cr', 'cr')->sum('base_currency_amount') ?? 0 }}
             </td>
         </tr>
         @endif

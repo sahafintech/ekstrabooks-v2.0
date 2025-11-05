@@ -2174,67 +2174,67 @@ class ReportController extends Controller
 
 	public function ledger_export()
 	{
-		return Excel::download(new LedgerExport(session('start_date'), session('end_date')), 'ledger ' . now()->format('d m Y') . '.xlsx');
+		return Excel::download(new LedgerExport(session('start_date'), session('end_date')), request()->activeBusiness->name . ' - ledger ' . now()->format('d m Y') . '.xlsx');
 	}
 
 	public function gen_journal_export()
 	{
-		return Excel::download(new GenJournalExport(session('start_date'), session('end_date')), 'journal ' . now()->format('d m Y') . '.xlsx');
+		return Excel::download(new GenJournalExport(session('start_date'), session('end_date')), request()->activeBusiness->name . ' - General journal ' . now()->format('d m Y') . '.xlsx');
 	}
 
 	public function income_statement_export()
 	{
-		return Excel::download(new IncomeStatementExport(session('start_date'), session('end_date')), 'income_statement ' . now()->format('d m Y') . '.xlsx');
+		return Excel::download(new IncomeStatementExport(session('start_date'), session('end_date')), request()->activeBusiness->name . ' - Income statement ' . now()->format('d m Y') . '.xlsx');
 	}
 
 	public function receivables_export()
 	{
-		return Excel::download(new ReceivablesExport(session('start_date'), session('end_date'), session('customer_id')), 'receivables ' . now()->format('d m Y') . '.xlsx');
+		return Excel::download(new ReceivablesExport(session('start_date'), session('end_date'), session('customer_id')), request()->activeBusiness->name . ' - Receivables ' . now()->format('d m Y') . '.xlsx');
 	}
 
 	public function payables_export()
 	{
-		return Excel::download(new PayablesExport(session('start_date'), session('end_date'), session('vendor_id')), 'payables ' . now()->format('d m Y') . '.xlsx');
+		return Excel::download(new PayablesExport(session('start_date'), session('end_date'), session('vendor_id')), request()->activeBusiness->name . ' - Payables ' . now()->format('d m Y') . '.xlsx');
 	}
 
 	public function income_by_customer_export()
 	{
-		return Excel::download(new IncomeByCustomerExport(session('start_date'), session('end_date'), session('customer_id')), 'income_by_customer ' . now()->format('d m Y') . '.xlsx');
+		return Excel::download(new IncomeByCustomerExport(session('start_date'), session('end_date'), session('customer_id')), request()->activeBusiness->name . ' - Income by customer ' . now()->format('d m Y') . '.xlsx');
 	}
 
 	public function trial_balance_export()
 	{
-		return Excel::download(new TrialBalanceExport(session('start_date'), session('end_date')), 'trial_balance ' . now()->format('d m Y') . '.xlsx');
+		return Excel::download(new TrialBalanceExport(session('start_date'), session('end_date')), request()->activeBusiness->name . ' - Trial balance ' . now()->format('d m Y') . '.xlsx');
 	}
 
 	public function balance_sheet_export()
 	{
-		return Excel::download(new BalanceSheetExport(session('end_date')), 'balance_sheet ' . now()->format('d m Y') . '.xlsx');
+		return Excel::download(new BalanceSheetExport(session('end_date')), request()->activeBusiness->name . ' - Balance sheet ' . now()->format('d m Y') . '.xlsx');
 	}
 
 	public function sales_by_product_export()
 	{
-		return Excel::download(new SalesByProductExport(session('start_date'), session('end_date'), session('category')), 'sales by product ' . now()->format('d m Y') . '.xlsx');
+		return Excel::download(new SalesByProductExport(session('start_date'), session('end_date'), session('category')), request()->activeBusiness->name . ' - Sales by product ' . now()->format('d m Y') . '.xlsx');
 	}
 
 	public function inventory_details_export()
 	{
-		return Excel::download(new InventoryDetailsExport(session('start_date'), session('end_date'), session('sub_category')), 'inventory details ' . now()->format('d m Y') . '.xlsx');
+		return Excel::download(new InventoryDetailsExport(session('start_date'), session('end_date'), session('sub_category')), request()->activeBusiness->name . ' - Inventory details ' . now()->format('d m Y') . '.xlsx');
 	}
 
 	public function inventory_summary_export()
 	{
-		return Excel::download(new InventorySummaryExport(session('start_date'), session('end_date')), 'inventory summary ' . now()->format('d m Y') . '.xlsx');
+		return Excel::download(new InventorySummaryExport(session('start_date'), session('end_date')), request()->activeBusiness->name . ' - Inventory summary ' . now()->format('d m Y') . '.xlsx');
 	}
 
 	public function payroll_summary_export()
 	{
-		return Excel::download(new PayrollSummaryExport, 'payroll summary ' . now()->format('d m Y') . '.xlsx');
+		return Excel::download(new PayrollSummaryExport, request()->activeBusiness->name . ' - Payroll summary ' . now()->format('d m Y') . '.xlsx');
 	}
 
 	public function payroll_cost_export()
 	{
-		return Excel::download(new PayrollCostExport, 'payroll cost ' . now()->format('d m Y') . '.xlsx');
+		return Excel::download(new PayrollCostExport, request()->activeBusiness->name . ' - Payroll cost ' . now()->format('d m Y') . '.xlsx');
 	}
 
 	public function income_statement(Request $request)
