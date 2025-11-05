@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Head, Link, router, usePage } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -300,7 +300,7 @@ export default function Create({ departments = [] }) {
 
               <div className="grid grid-cols-12 mt-2">
                 <Label htmlFor="working_hours" className="md:col-span-2 col-span-12">
-                  Working Hours
+                  Working Hours *
                 </Label>
                 <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                   <Input
@@ -310,6 +310,7 @@ export default function Create({ departments = [] }) {
                     value={form.working_hours}
                     onChange={handleInputChange}
                     className="md:w-1/2 w-full"
+                    required
                   />
                   <InputError message={errors.working_hours} className="text-sm" />
                 </div>

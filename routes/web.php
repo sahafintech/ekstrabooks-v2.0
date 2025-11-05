@@ -68,7 +68,6 @@ use App\Http\Controllers\User\ProductUnitController;
 use App\Http\Controllers\User\PurchaseController;
 use App\Http\Controllers\User\QuotationController;
 use App\Http\Controllers\User\ReceiptController;
-use App\Http\Controllers\User\RecurringInvoiceController;
 use App\Http\Controllers\User\ReportController;
 use App\Http\Controllers\User\RoleController;
 use App\Http\Controllers\User\SalesReturnController;

@@ -200,6 +200,7 @@ class StaffController extends Controller
             'designation_id'  => 'required',
             'joining_date'    => 'required',
             'basic_salary'    => 'required',
+            'working_hours'   => 'required',
         ]);
 
         if ($validator->fails()) {
@@ -323,6 +324,7 @@ class StaffController extends Controller
             'designation_id'         => 'required_if:update_company_details,1',
             'basic_salary'           => 'required_if:update_company_details,1',
             'joining_date'           => 'required_if:update_company_details,1',
+            'working_hours'          => 'required_if:update_company_details,1',
         ]);
 
         if ($validator->fails()) {
