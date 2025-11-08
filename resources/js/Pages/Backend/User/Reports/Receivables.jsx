@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Head, router, useForm } from "@inertiajs/react";
+import { router, useForm } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -25,8 +25,14 @@ import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { ChevronUp, ChevronDown } from "lucide-react";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/Components/ui/dropdown-menu";
 
-export default function Receivables({ report_data, date1, date2, meta = {}, filters = {}, business_name, currency, grand_total, paid_amount, due_amount, customers = [], customer_id = '' }) {
+export default function Receivables({ report_data, date1, date2, meta = {}, filters = {}, currency, grand_total, paid_amount, due_amount, customers = [], customer_id = '' }) {
     const [perPage, setPerPage] = useState(50);
     const [currentPage, setCurrentPage] = useState(1);
     const [sorting, setSorting] = useState(filters.sorting || { column: 'invoice_date', direction: 'desc' });
@@ -145,101 +151,53 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
         );
     };
 
-    const handlePrint = () => {
-        // Create a new window for printing
-        const printWindow = window.open('', '_blank', 'width=800,height=600');
+    const printStyles = `
+        @media print {
+                body * {
+                    visibility: hidden;
+                }
 
-        // Generate CSS for the print window
-        const style = `
-            <style>
-                body { font-family: Arial, sans-serif; }
-                table { width: 100%; border-collapse: collapse; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f2f2f2; }
-                h2, h1 { text-align: center; margin-bottom: 20px; }
-                .text-right { text-align: right; }
-                .total-row { font-weight: bold; background-color: #f9f9f9; }
-            </style>
+                #printable-area, #printable-area * {
+                    visibility: visible;
+                }
+
+                #printable-area {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    margin: 0;
+                    padding: 0;
+                    border: none;
+                    height: 100%;
+                }
+
+                .group.peer.hidden.text-sidebar-foreground {
+                    display: none !important;
+                }
+
+                @page {
+                    size: auto;
+                    margin: 10mm;
+                }
+
+                body {
+                    margin: 0;
+                    padding: 0;
+                }
+            }
         `;
 
-        // Start building the HTML content for the print window
-        let printContent = `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Receivables</title>
-                ${style}
-            </head>
-            <body>
-                <h1>${business_name}</h1>
-                <h2>Receivables (${data.date1} - ${data.date2})</h2>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Customer</th>
-                            <th class="text-right">Invoice Amount (${currency})</th>
-                            <th class="text-right">Paid Amount (${currency})</th>
-                            <th class="text-right">Due Amount (${currency})</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
-
-        // Add table rows from report_data
-        if (report_data.length > 0) {
-            report_data.forEach(item => {
-                printContent += `
-                    <tr>
-                        <td>${item.customer_name || 'N/A'}</td>
-                        <td class="text-right">${formatCurrency(item.total_income)}</td>
-                        <td class="text-right">${formatCurrency(item.total_paid)}</td>
-                        <td class="text-right">${formatCurrency(item.total_due)}</td>
-                    </tr>
-                `;
-            });
-
-            // Add totals row
-            printContent += `
-                <tr class="total-row">
-                    <td>Total</td>
-                    <td class="text-right">${formatCurrency(grand_total)}</td>
-                    <td class="text-right">${formatCurrency(paid_amount)}</td>
-                    <td class="text-right">${formatCurrency(due_amount)}</td>
-                </tr>
-            `;
-        } else {
-            printContent += `
-                <tr>
-                    <td colspan="4" style="text-align: center;">No data found.</td>
-                </tr>
-            `;
+    const handleExport = (type) => {
+        if (type === 'excel') {
+            window.location.href = route("reports.receivables_export");
+        } else if (type === 'pdf') {
+            window.location.href = route("reports.receivables_pdf");
         }
-
-        // Complete the HTML content
-        printContent += `
-                    </tbody>
-                </table>
-            </body>
-            </html>
-        `;
-
-        // Write the content to the print window and trigger print
-        printWindow.document.open();
-        printWindow.document.write(printContent);
-        printWindow.document.close();
-
-        // Wait for content to load before printing
-        setTimeout(() => {
-            printWindow.print();
-            // Close the window after printing
-            printWindow.onafterprint = function () {
-                printWindow.close();
-            };
-        }, 300);
     };
 
-    const exportReceivables = () => {
-        window.location.href = route("reports.receivables_export")
+    const handlePrint = () => {
+        window.print();
     };
 
     return (
@@ -247,6 +205,7 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
             <Toaster />
             <SidebarInset>
                 <div className="main-content">
+                    <style dangerouslySetInnerHTML={{ __html: printStyles }} />
                     <PageHeader
                         page="Receivables"
                         subpage="Report"
@@ -298,9 +257,22 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                                 <Button variant="outline" onClick={handlePrint}>
                                     Print
                                 </Button>
-                                <Button variant="outline" onClick={exportReceivables}>
-                                    Export
-                                </Button>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline">
+                                            Export
+                                            <ChevronDown className="ml-2 h-4 w-4" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent>
+                                        <DropdownMenuItem onClick={() => handleExport('excel')}>
+                                            Excel
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleExport('pdf')}>
+                                            PDF
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-sm text-gray-500">Show</span>
@@ -319,7 +291,7 @@ export default function Receivables({ report_data, date1, date2, meta = {}, filt
                             </div>
                         </div>
 
-                        <div className="rounded-md border printable-table">
+                        <div id="printable-area" className="rounded-md border">
                             <ReportTable>
                                 <TableHeader>
                                     <TableRow>

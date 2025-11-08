@@ -2323,6 +2323,68 @@ class ReportController extends Controller
 		return Excel::download(new ReceivablesExport(session('start_date'), session('end_date'), session('customer_id')), request()->activeBusiness->name . ' - Receivables ' . now()->format('d m Y') . '.xlsx');
 	}
 
+	public function receivables_pdf(Request $request)
+	{
+		// Get request parameters from session (set by the main receivables method)
+		$date1 = session('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
+		$date2 = session('end_date', Carbon::now()->format('Y-m-d'));
+		$customer_id = session('customer_id', '');
+
+		// Get receivables data using the same logic as the main report
+		$invoices = Invoice::with('customer', 'client')
+			->when($customer_id, function ($query, $customer_id) {
+				return $query->where('customer_id', $customer_id);
+			})
+			->whereRaw("date(invoices.invoice_date) >= '$date1' AND date(invoices.invoice_date) <= '$date2'")
+			->get();
+
+		// Prepare data array for report
+		$report_data = [];
+
+		foreach ($invoices as $invoice) {
+			$due_amount = $invoice->grand_total - $invoice->paid;
+
+			// Skip invoices that are fully paid
+			if ($due_amount <= 0) {
+				continue;
+			}
+
+			$report_data[] = [
+				'id' => $invoice->id,
+				'invoice_number' => $invoice->invoice_number,
+				'customer_id' => $invoice->customer_id,
+				'customer_name' => $invoice->customer->name ?? 'N/A',
+				'client_name' => $invoice->client->name ?? 'N/A',
+				'invoice_date' => $invoice->invoice_date,
+				'due_date' => $invoice->due_date,
+				'grand_total' => $invoice->grand_total,
+				'paid_amount' => $invoice->paid,
+				'due_amount' => $due_amount,
+				'status' => $invoice->status,
+			];
+		}
+
+		// Calculate totals
+		$grand_total = 0;
+		$paid_amount = 0;
+		$due_amount = 0;
+
+		foreach ($report_data as $item) {
+			$grand_total += $item['grand_total'];
+			$paid_amount += $item['paid_amount'];
+			$due_amount += $item['due_amount'];
+		}
+
+		// Get business information
+		$business_name = request()->activeBusiness->name;
+		$currency = request()->activeBusiness->currency;
+
+		return pdf()
+			->view('backend.user.pdf.receivables', compact('report_data', 'date1', 'date2', 'business_name', 'currency', 'grand_total', 'paid_amount', 'due_amount'))
+			->name('receivables-' . now()->format('d-m-Y') . '.pdf')
+			->download();
+	}
+
 	public function payables_export()
 	{
 		return Excel::download(new PayablesExport(session('start_date'), session('end_date'), session('vendor_id')), request()->activeBusiness->name . ' - Payables ' . now()->format('d m Y') . '.xlsx');

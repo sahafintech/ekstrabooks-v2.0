@@ -800,6 +800,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 
 		// report pdfs
 		Route::get('reports/income_statement_pdf', [ReportController::class, 'income_statement_pdf'])->name('reports.income_statement_pdf');
+		Route::get('reports/receivables_pdf', [ReportController::class, 'receivables_pdf'])->name('reports.receivables_pdf');
 	});
 
 	Route::group(['prefix' => 'user'], function () {
