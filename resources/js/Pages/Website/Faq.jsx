@@ -126,7 +126,7 @@ export default function Faq({ pageData }) {
 
     return (
         <WebsiteLayout>
-            <div className="relative">
+            <div className="flex items-center justify-center">
                 {/* Background Pattern */}
                 <div className="absolute inset-0 grid grid-cols-2 -space-x-52 opacity-40 dark:opacity-20">
                     <div className="blur-[106px] h-56 bg-gradient-to-br from-primary to-purple-400 dark:from-blue-700"></div>
