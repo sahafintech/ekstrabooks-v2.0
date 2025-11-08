@@ -26,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { Edit, EyeIcon, FileDown, FileUp, MoreVertical, Plus, Trash, ChevronUp, ChevronDown, Package, DollarSign, AlertCircle, TrendingUp, Trash2 } from "lucide-react";
+import { Edit, EyeIcon, FileDown, FileUp, MoreVertical, Plus, Trash, ChevronUp, ChevronDown, Package, DollarSign, TrendingUp, Trash2 } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -144,70 +144,6 @@ const DeleteAllProductsModal = ({ show, onClose, onConfirm, processing, count })
   </Modal>
 );
 
-// Import Products Modal Component
-const ImportProductsModal = ({ show, onClose, onSubmit, processing }) => (
-  <Modal show={show} onClose={onClose} maxWidth="3xl">
-    <form onSubmit={onSubmit}>
-      <div className="ti-modal-header">
-        <h3 className="text-lg font-bold">Import Products</h3>
-      </div>
-      <div className="ti-modal-body grid grid-cols-12">
-        <div className="col-span-12">
-          <div className="flex items-center justify-between">
-            <label className="block font-medium text-sm text-gray-700">
-              Products File
-            </label>
-            <a href="/uploads/media/default/sample_items.xlsx" download>
-              <Button variant="secondary" size="sm" type="button">
-                Use This Sample File
-              </Button>
-            </a>
-          </div>
-          <input type="file" className="w-full dropify" name="products_file" required />
-        </div>
-        <div className="col-span-12 mt-4">
-          <ul className="space-y-3 text-sm">
-            <li className="flex space-x-3">
-              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
-              <span className="text-gray-800 dark:text-white/70">
-                Maximum File Size: 1 MB
-              </span>
-            </li>
-            <li className="flex space-x-3">
-              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
-              <span className="text-gray-800 dark:text-white/70">
-                File format Supported: CSV, TSV, XLS
-              </span>
-            </li>
-            <li className="flex space-x-3">
-              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
-              <span className="text-gray-800 dark:text-white/70">
-                Make sure the format of the import file matches our sample file by comparing them.
-              </span>
-            </li>
-          </ul>
-        </div>
-      </div>
-      <div className="mt-6 flex justify-end">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={onClose}
-          className="mr-3"
-        >
-          Close
-        </Button>
-        <Button
-          type="submit"
-          disabled={processing}
-        >
-          Import
-        </Button>
-      </div>
-    </form>
-  </Modal>
-);
-
 export default function List({ products = [], meta = {}, filters = {}, summary = {}, trashed_products = 0 }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
@@ -222,7 +158,6 @@ export default function List({ products = [], meta = {}, filters = {}, summary =
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
 
@@ -355,21 +290,6 @@ export default function List({ products = [], meta = {}, filters = {}, summary =
     );
   };
 
-  const handleImport = (e) => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    setProcessing(true);
-
-    router.post(route('products.import'), formData, {
-      onSuccess: () => {
-        setShowImportModal(false);
-        setProcessing(false);
-      },
-      onError: () => {
-        setProcessing(false);
-      }
-    });
-  };
 
   const handleSort = (column) => {
     let direction = "asc";
@@ -469,8 +389,8 @@ export default function List({ products = [], meta = {}, filters = {}, summary =
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setShowImportModal(true)}>
+                    <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => router.visit(route('products.import.page'))}>
                       <FileUp className="mr-2 h-4 w-4" /> Import
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={exportProducts}>
@@ -665,13 +585,6 @@ export default function List({ products = [], meta = {}, filters = {}, summary =
         onConfirm={handleDeleteAll}
         processing={processing}
         count={selectedProducts.length}
-      />
-
-      <ImportProductsModal
-        show={showImportModal}
-        onClose={() => setShowImportModal(false)}
-        onSubmit={handleImport}
-        processing={processing}
       />
     </AuthenticatedLayout>
   );

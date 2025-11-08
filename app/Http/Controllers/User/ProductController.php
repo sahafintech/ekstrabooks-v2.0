@@ -654,14 +654,23 @@ class ProductController extends Controller
         return redirect()->route('products.trash')->with('success', _lang('Restored Successfully'));
     }
 
+    public function import()
+    {
+        return Inertia::render('Backend/User/Product/Import');
+    }
+
     public function import_products(Request $request)
     {
         $request->validate([
-            'products_file' => 'required|mimes:xls,xlsx',
+            'products_file' => 'required|mimes:xls,xlsx,csv,tsv',
         ]);
 
         try {
-            Excel::import(new ProductImport, $request->file('products_file'));
+            $fieldMappings = json_decode($request->input('field_mappings', '{}'), true);
+            $duplicateHandling = $request->input('duplicate_handling', 'skip');
+            $encoding = $request->input('encoding', 'UTF-8');
+
+            Excel::import(new ProductImport($fieldMappings, $duplicateHandling), $request->file('products_file'));
 
             // audit log
             $audit = new AuditLog();
@@ -674,6 +683,239 @@ class ProductController extends Controller
         }
 
         return redirect()->route('products.index')->with('success', _lang('Products Imported'));
+    }
+
+    public function import_map_fields(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:xls,xlsx,csv,tsv',
+        ]);
+
+        try {
+            $file = $request->file('file');
+            $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($file->getRealPath());
+            $reader->setReadDataOnly(true);
+            $spreadsheet = $reader->load($file->getRealPath());
+            $worksheet = $spreadsheet->getActiveSheet();
+            $headers = [];
+            
+            // Get first row as headers
+            $firstRow = $worksheet->getRowIterator(1, 1)->current();
+            foreach ($firstRow->getCellIterator() as $cell) {
+                $value = $cell->getValue();
+                if (!empty($value)) {
+                    $headers[] = trim($value);
+                }
+            }
+
+
+            // Define system fields for products
+            $systemFields = [
+                ['key' => 'id', 'label' => 'ID', 'required' => true],
+                ['key' => 'name', 'label' => 'Item Name', 'required' => true],
+                ['key' => 'type', 'label' => 'Type', 'required' => false],
+                ['key' => 'unit', 'label' => 'Unit', 'required' => false],
+                ['key' => 'purchase_cost', 'label' => 'Purchase Cost', 'required' => false],
+                ['key' => 'selling_price', 'label' => 'Selling Price', 'required' => false],
+                ['key' => 'descriptions', 'label' => 'Description', 'required' => false],
+                ['key' => 'initial_stock', 'label' => 'Initial Stock', 'required' => false],
+                ['key' => 'stock_management', 'label' => 'Stock Management', 'required' => false],
+                ['key' => 'allow_for_selling', 'label' => 'Allow for Selling', 'required' => false],
+                ['key' => 'income_account_name', 'label' => 'Income Account', 'required' => false],
+                ['key' => 'allow_for_purchasing', 'label' => 'Allow for Purchasing', 'required' => false],
+                ['key' => 'expense_account_name', 'label' => 'Expense Account', 'required' => false],
+                ['key' => 'status', 'label' => 'Status', 'required' => false],
+                ['key' => 'expiry_date', 'label' => 'Expiry Date', 'required' => false],
+                ['key' => 'code', 'label' => 'Code', 'required' => false],
+                ['key' => 'image', 'label' => 'Image', 'required' => false],
+                ['key' => 'sub_category', 'label' => 'Sub Category', 'required' => false],
+                ['key' => 'brand', 'label' => 'Brand', 'required' => false],
+            ];
+
+            // Auto-match headers to system fields (simple name matching)
+            $autoMappings = [];
+            foreach ($systemFields as $systemField) {
+                $systemKey = strtolower($systemField['key']);
+                $systemLabel = strtolower($systemField['label']);
+                
+                foreach ($headers as $header) {
+                    $headerLower = strtolower($header);
+                    // Try to match by key or label
+                    if (strpos($headerLower, $systemKey) !== false || 
+                        strpos($headerLower, $systemLabel) !== false ||
+                        strpos($systemLabel, $headerLower) !== false) {
+                        $autoMappings[$systemField['key']] = $header;
+                        break;
+                    }
+                }
+            }
+
+            // Store file temporarily for preview
+            $tempFileName = 'import_' . time() . '_' . $file->getClientOriginalName();
+            $file->storeAs('temp_imports', $tempFileName);
+
+            // Return JSON for API calls (check for JSON accept header or X-Requested-With header)
+            if ($request->wantsJson() || $request->ajax() || $request->expectsJson()) {
+                return response()->json([
+                    'headers' => $headers,
+                    'systemFields' => $systemFields,
+                    'autoMappings' => $autoMappings,
+                    'temp_file' => $tempFileName,
+                ]);
+            }
+
+            // Return Inertia response
+            return back()->with([
+                'headers' => $headers,
+                'systemFields' => $systemFields,
+                'autoMappings' => $autoMappings,
+                'temp_file' => $tempFileName,
+            ]);
+        } catch (\Exception $e) {
+            if ($request->wantsJson() || $request->ajax() || $request->expectsJson()) {
+                return response()->json([
+                    'error' => $e->getMessage(),
+                ], 422);
+            }
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+    }
+
+    public function import_preview(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:xls,xlsx,csv,tsv',
+            'field_mappings' => 'required|json',
+        ]);
+
+        try {
+            $file = $request->file('file');
+            $fieldMappings = json_decode($request->input('field_mappings'), true);
+            $duplicateHandling = $request->input('duplicate_handling', 'skip');
+
+            // Read and validate the file
+            $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($file->getRealPath());
+            $reader->setReadDataOnly(true);
+            $spreadsheet = $reader->load($file->getRealPath());
+            $worksheet = $spreadsheet->getActiveSheet();
+
+            $readyItems = [];
+            $skippedItems = [];
+            $unmappedFields = [];
+            $rowNumber = 1;
+
+            // Get headers
+            $headers = [];
+            $firstRow = $worksheet->getRowIterator(1, 1)->current();
+            foreach ($firstRow->getCellIterator() as $cell) {
+                $value = $cell->getValue();
+                if (!empty($value)) {
+                    $headers[] = trim($value);
+                }
+            }
+
+            // Check for unmapped required fields
+            $requiredFields = ['name'];
+            foreach ($requiredFields as $requiredField) {
+                if (empty($fieldMappings[$requiredField])) {
+                    $unmappedFields[] = $requiredField;
+                }
+            }
+
+            // Process rows (skip header row)
+            foreach ($worksheet->getRowIterator(2) as $row) {
+                $rowNumber++;
+                $rowData = [];
+                $cellIterator = $row->getCellIterator();
+                $cellIterator->setIterateOnlyExistingCells(false);
+
+                $colIndex = 0;
+                foreach ($cellIterator as $cell) {
+                    if ($colIndex < count($headers)) {
+                        $rowData[$headers[$colIndex]] = $cell->getValue();
+                    }
+                    $colIndex++;
+                }
+
+                // Map fields
+                $mappedData = [];
+                foreach ($fieldMappings as $systemField => $fileHeader) {
+                    if (!empty($fileHeader) && isset($rowData[$fileHeader])) {
+                        $mappedData[$systemField] = $rowData[$fileHeader];
+                    }
+                }
+
+                // Validate required fields
+                $isValid = true;
+                $skipReason = '';
+
+                if (empty($mappedData['name'])) {
+                    $isValid = false;
+                    $skipReason = 'Missing required field: Item Name';
+                }
+
+                // Check for duplicates if skip mode
+                if ($isValid && $duplicateHandling === 'skip') {
+                    $existingProduct = Product::where('name', $mappedData['name'])->first();
+                    if ($existingProduct) {
+                        $isValid = false;
+                        $skipReason = 'Duplicate product name';
+                    }
+                }
+
+                if ($isValid) {
+                    $readyItems[] = [
+                        'row' => $rowNumber,
+                        'data' => $mappedData,
+                    ];
+                } else {
+                    $skippedItems[] = [
+                        'row' => $rowNumber,
+                        'reason' => $skipReason,
+                        'data' => $mappedData,
+                    ];
+                }
+            }
+
+            // Store file temporarily for final import
+            $tempFileName = 'import_' . time() . '_' . $file->getClientOriginalName();
+            $file->storeAs('temp_imports', $tempFileName);
+
+            $preview = [
+                'total_items' => count($readyItems) + count($skippedItems),
+                'ready_items' => count($readyItems),
+                'skipped_items' => count($skippedItems),
+                'unmapped_fields' => count($unmappedFields),
+                'ready_details' => array_slice($readyItems, 0, 50), // Limit to 50 for display
+                'skipped_details' => array_slice($skippedItems, 0, 50),
+                'unmapped_fields_list' => $unmappedFields,
+                'temp_file' => $tempFileName,
+            ];
+
+            // Return JSON for API calls (check for JSON accept header or X-Requested-With header)
+            if ($request->wantsJson() || $request->ajax() || $request->expectsJson() || 
+                $request->header('Accept') === 'application/json' ||
+                $request->header('X-Requested-With') === 'XMLHttpRequest') {
+                return response()->json([
+                    'preview' => $preview,
+                ]);
+            }
+
+            // Return Inertia response
+            return back()->with([
+                'preview' => $preview,
+            ]);
+        } catch (\Exception $e) {
+            // Return JSON for API calls
+            if ($request->wantsJson() || $request->ajax() || $request->expectsJson() || 
+                $request->header('Accept') === 'application/json' ||
+                $request->header('X-Requested-With') === 'XMLHttpRequest') {
+                return response()->json([
+                    'error' => $e->getMessage(),
+                ], 422);
+            }
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
     }
 
     public function product_export()

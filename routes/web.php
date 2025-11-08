@@ -316,7 +316,10 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		
 		Route::post('product_units/bulk_destroy', [ProductUnitController::class, 'bulk_destroy'])->name('product_units.bulk_destroy');
 		Route::get('products/export', [ProductController::class, 'product_export'])->name('products.export');
+		Route::get('products/import', [ProductController::class, 'import'])->name('products.import.page');
 		Route::post('import_products', [ProductController::class, 'import_products'])->name('products.import');
+		Route::post('products/import/map_fields', [ProductController::class, 'import_map_fields'])->name('products.import.map_fields');
+		Route::post('products/import/preview', [ProductController::class, 'import_preview'])->name('products.import.preview');
 		Route::post('products/bulk_destroy', [ProductController::class, 'bulk_destroy'])->name('products.bulk_destroy');
 		Route::get('products/trash', [ProductController::class, 'trash'])->name('products.trash');
 		Route::post('products/{id}/restore', [ProductController::class, 'restore'])->name('products.restore');

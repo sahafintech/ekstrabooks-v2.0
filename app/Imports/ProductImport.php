@@ -19,6 +19,15 @@ use PhpOffice\PhpSpreadsheet\Shared\Date;
 
 class ProductImport implements ToCollection, WithHeadingRow, WithValidation, SkipsEmptyRows
 {
+    protected $fieldMappings;
+    protected $duplicateHandling;
+
+    public function __construct($fieldMappings = [], $duplicateHandling = 'skip')
+    {
+        $this->fieldMappings = $fieldMappings;
+        $this->duplicateHandling = $duplicateHandling;
+    }
+
     /**
      * @param array $row
      *
@@ -26,7 +35,7 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
      */
     public function collection(Collection $rows)
     {
-
+        // Ensure required accounts exist (only check once)
         if (!Account::where('account_name', 'Common Shares')->where('business_id', request()->activeBusiness->id)->exists()) {
             $account                  = new Account();
             $account->account_code    = '3000';
@@ -52,159 +61,231 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
         }
 
         foreach ($rows as $row) {
-            if ($row['expiry_date'] == null) {
-                $expiry_date = null;
-            } else {
-                $expiry_date = Date::excelToDateTimeObject($row['expiry_date']);
+            // Map fields if mappings are provided
+            $data = $this->mapRowData($row);
+
+            // Skip if required field is missing
+            if (empty($data['name'])) {
+                continue;
             }
 
-            $product = Product::where('id', $row['id'])->first();
-
-            if ($product == null) {
-                $product = Product::create([
-                    'name' => $row['name'],
-                    'type' => $row['type'],
-                    'product_unit_id' => ProductUnit::where('unit', 'like', '%' . $row['unit'] . '%')->first()->id ?? null,
-                    'purchase_cost' => $row['purchase_cost'] ?? 0,
-                    'selling_price' => $row['selling_price'] ?? 0,
-                    'descriptions' => $row['descriptions'],
-                    'image' => $row['image'] ?? 'default.png',
-                    'stock_management' => $row['stock_management'],
-                    'initial_stock' => $row['initial_stock'] ?? 0,
-                    'stock' => $row['initial_stock'] ?? 0,
-                    'allow_for_selling' => $row['allow_for_selling'],
-                    'income_account_id' => get_account($row['income_account_name'])->id,
-                    'allow_for_purchasing' => $row['allow_for_purchasing'],
-                    'expense_account_id' => get_account($row['expense_account_name'])->id,
-                    'status' => $row['status'],
-                    'expiry_date' => $expiry_date ?? null,
-                    'code' => $row['code'] ?? null,
-                    'reorder_point' => $row['reorder_point'] ?? null,
-                    'brand_id' => Brands::where('name', $row['brand'])->first()->id ?? null,
-                    'sub_category_id' => SubCategory::where('name', $row['sub_category'])->first()->id ?? null,
-                ]);
-
-                if ($row['initial_stock'] > 0) {
-                    $transaction              = new Transaction();
-                    $transaction->trans_date  = now()->format('Y-m-d H:i:s');
-                    $transaction->account_id  = get_account('Inventory')->id;
-                    $transaction->dr_cr       = 'dr';
-                    $transaction->transaction_currency    = request()->activeBusiness->currency;
-                    $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                    $transaction->base_currency_amount    = $product->purchase_cost * $row['initial_stock'];
-                    $transaction->transaction_amount      = $product->purchase_cost * $row['initial_stock'];
-                    $transaction->description = $product->name . ' Opening Stock #' . $row['initial_stock'];
-                    $transaction->ref_id      = $product->id;
-                    $transaction->ref_type    = 'product';
-                    $transaction->save();
-
-                    $transaction              = new Transaction();
-                    $transaction->trans_date  = now()->format('Y-m-d H:i:s');
-                    $transaction->account_id  = get_account('Common Shares')->id;
-                    $transaction->dr_cr       = 'cr';
-                    $transaction->transaction_currency    = request()->activeBusiness->currency;
-                    $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                    $transaction->base_currency_amount    = $product->purchase_cost * $row['initial_stock'];
-                    $transaction->transaction_amount      = $product->purchase_cost * $row['initial_stock'];
-                    $transaction->description = $product->name . ' Opening Stock #' . $row['initial_stock'];
-                    $transaction->ref_id      = $product->id;
-                    $transaction->ref_type    = 'product';
-                    $transaction->save();
+            // Handle duplicate checking
+            $product = null;
+            if ($this->duplicateHandling === 'skip') {
+                $product = Product::where('name', $data['name'])->first();
+                if ($product) {
+                    continue; // Skip duplicates
                 }
             } else {
-                $previous_initial_stock = $product->initial_stock ?? 0;
-                $new_initial_stock = $row['initial_stock'] ?? 0;
+                // Overwrite mode - find existing product by name
+                $product = Product::where('name', $data['name'])->first();
+            }
 
+            // Parse expiry date
+            $expiry_date = null;
+            if (!empty($data['expiry_date'])) {
+                try {
+                    $expiry_date = Date::excelToDateTimeObject($data['expiry_date']);
+                } catch (\Exception $e) {
+                    $expiry_date = null;
+                }
+            }
+
+            if ($product == null) {
+                // Create new product
+                $productData = $this->prepareProductData($data, $expiry_date);
+                $product = Product::create($productData);
+
+                // Create transactions for initial stock
+                $initialStock = $data['initial_stock'] ?? 0;
+                if ($initialStock > 0) {
+                    $this->createStockTransactions($product, $initialStock, 'Opening Stock');
+                }
+            } else {
+                // Update existing product
+                $previous_initial_stock = $product->initial_stock ?? 0;
+                $new_initial_stock = $data['initial_stock'] ?? 0;
                 $stock_difference = $new_initial_stock - $previous_initial_stock;
 
-                $product->update([
-                    'name' => $row['name'],
-                    'type' => $row['type'],
-                    'product_unit_id' => ProductUnit::where('unit', 'like', '%' . $row['unit'] . '%')->first()->id ?? null,
-                    'selling_price' => $row['selling_price'] ?? 0,
-                    'descriptions' => $row['descriptions'],
-                    'stock_management' => $row['stock_management'],
-                    'initial_stock' => $new_initial_stock,
-                    'allow_for_selling' => $row['allow_for_selling'],
-                    'income_account_id' => get_account($row['income_account_name'])->id,
-                    'allow_for_purchasing' => $row['allow_for_purchasing'],
-                    'expense_account_id' => get_account($row['expense_account_name'])->id,
-                    'status' => $row['status'],
-                    'expiry_date' => $expiry_date,
-                    'code' => $row['code'] ?? null,
-                    'reorder_point' => $row['reorder_point'] ?? null,
-                    'brand_id' => Brands::where('name', $row['brand'])->first()->id ?? null,
-                    'sub_category_id' => SubCategory::where('name', $row['sub_category'])->first()->id ?? null,
-                ]);
+                $productData = $this->prepareProductData($data, $expiry_date);
+                $productData['initial_stock'] = $new_initial_stock;
+                $product->update($productData);
 
-                // Update current stock based on the difference in initial stock
-                if($stock_difference != 0) {
-                    $product->stock = $product->stock + $stock_difference;
+                // Update current stock
+                if ($stock_difference != 0) {
+                    $product->stock = ($product->stock ?? 0) + $stock_difference;
                     $product->save();
                 }
 
-                // Handle transactions for initial stock changes
+                // Handle transactions for stock changes
                 if ($stock_difference != 0) {
-                    // Delete previous initial stock transactions
-                    Transaction::where('ref_id', $product->id)->where('ref_type', 'product')->delete();
+                    // Delete previous stock transactions
+                    Transaction::where('ref_id', $product->id)
+                        ->where('ref_type', 'product')
+                        ->where('description', 'like', '%Opening Stock%')
+                        ->delete();
 
                     if ($stock_difference > 0) {
-                        // Add stock - Debit Inventory, Credit Common Shares
-                        $transaction              = new Transaction();
-                        $transaction->trans_date  = now()->format('Y-m-d H:i:s');
-                        $transaction->account_id  = get_account('Inventory')->id;
-                        $transaction->dr_cr       = 'dr';
-                        $transaction->transaction_currency    = request()->activeBusiness->currency;
-                        $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                        $transaction->base_currency_amount    = $product->purchase_cost * $stock_difference;
-                        $transaction->transaction_amount      = $product->purchase_cost * $stock_difference;
-                        $transaction->description = $product->name . ' Opening Stock Adjustment +' . $stock_difference;
-                        $transaction->ref_id      = $product->id;
-                        $transaction->ref_type    = 'product';
-                        $transaction->save();
-
-                        $transaction              = new Transaction();
-                        $transaction->trans_date  = now()->format('Y-m-d H:i:s');
-                        $transaction->account_id  = get_account('Common Shares')->id;
-                        $transaction->dr_cr       = 'cr';
-                        $transaction->transaction_currency    = request()->activeBusiness->currency;
-                        $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                        $transaction->base_currency_amount    = $product->purchase_cost * $stock_difference;
-                        $transaction->transaction_amount      = $product->purchase_cost * $stock_difference;
-                        $transaction->description = $product->name . ' Opening Stock Adjustment +' . $stock_difference;
-                        $transaction->ref_id      = $product->id;
-                        $transaction->ref_type    = 'product';
-                        $transaction->save();
+                        // Increase stock
+                        $this->createStockTransactions($product, $stock_difference, 
+                            'Opening Stock Adjustment +' . $stock_difference, 'increase');
                     } else {
-                        // Reduce stock - Credit Inventory, Debit Common Shares
-                        $transaction              = new Transaction();
-                        $transaction->trans_date  = now()->format('Y-m-d H:i:s');
-                        $transaction->account_id  = get_account('Inventory')->id;
-                        $transaction->dr_cr       = 'cr';
-                        $transaction->transaction_currency    = request()->activeBusiness->currency;
-                        $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                        $transaction->base_currency_amount    = $product->purchase_cost * abs($stock_difference);
-                        $transaction->transaction_amount      = $product->purchase_cost * abs($stock_difference);
-                        $transaction->description = $product->name . ' Opening Stock Adjustment -' . abs($stock_difference);
-                        $transaction->ref_id      = $product->id;
-                        $transaction->ref_type    = 'product';
-                        $transaction->save();
-
-                        $transaction              = new Transaction();
-                        $transaction->trans_date  = now()->format('Y-m-d H:i:s');
-                        $transaction->account_id  = get_account('Common Shares')->id;
-                        $transaction->dr_cr       = 'dr';
-                        $transaction->transaction_currency    = request()->activeBusiness->currency;
-                        $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                        $transaction->base_currency_amount    = $product->purchase_cost * abs($stock_difference);
-                        $transaction->transaction_amount      = $product->purchase_cost * abs($stock_difference);
-                        $transaction->description = $product->name . ' Opening Stock Adjustment -' . abs($stock_difference);
-                        $transaction->ref_id      = $product->id;
-                        $transaction->ref_type    = 'product';
-                        $transaction->save();
+                        // Decrease stock
+                        $this->createStockTransactions($product, abs($stock_difference), 
+                            'Opening Stock Adjustment -' . abs($stock_difference), 'decrease');
                     }
                 }
             }
+        }
+    }
+
+    protected function mapRowData($row)
+    {
+        // If field mappings are provided, map the data
+        if (!empty($this->fieldMappings)) {
+            $mappedData = [];
+            foreach ($this->fieldMappings as $systemField => $fileHeader) {
+                if (!empty($fileHeader) && isset($row[$fileHeader])) {
+                    $mappedData[$systemField] = $row[$fileHeader];
+                }
+            }
+            return $mappedData;
+        }
+
+        // Otherwise, return row as-is (for backward compatibility)
+        return $row;
+    }
+
+    protected function prepareProductData($data, $expiry_date)
+    {
+        // Map field names from import format to database fields
+        $productData = [
+            'name' => $data['name'] ?? '',
+            'type' => $data['type'] ?? $data['item_type'] ?? 'product',
+            'descriptions' => $data['description'] ?? $data['descriptions'] ?? null,
+            'selling_price' => $data['rate'] ?? $data['selling_price'] ?? 0,
+            'purchase_cost' => $data['purchase_rate'] ?? $data['purchase_cost'] ?? 0,
+            'image' => $data['image'] ?? 'default.png',
+            'stock_management' => $data['track_inventory'] ?? $data['stock_management'] ?? 0,
+            'initial_stock' => $data['initial_stock'] ?? 0,
+            'stock' => $data['initial_stock'] ?? 0,
+            'allow_for_selling' => $data['sellable'] ?? $data['allow_for_selling'] ?? 0,
+            'allow_for_purchasing' => $data['purchasable'] ?? $data['allow_for_purchasing'] ?? 0,
+            'status' => $data['status'] ?? 1,
+            'expiry_date' => $expiry_date,
+            'code' => $data['code'] ?? null,
+            'reorder_point' => $data['reorder_point'] ?? null,
+        ];
+
+        // Handle product unit
+        if (!empty($data['usage_unit'] ?? $data['unit'])) {
+            $unitName = $data['usage_unit'] ?? $data['unit'];
+            $unit = ProductUnit::where('unit', 'like', '%' . $unitName . '%')->first();
+            if ($unit) {
+                $productData['product_unit_id'] = $unit->id;
+            }
+        }
+
+        // Handle accounts
+        if (!empty($data['account'] ?? $data['income_account_name'])) {
+            $accountName = $data['account'] ?? $data['income_account_name'];
+            $account = get_account($accountName);
+            if ($account) {
+                $productData['income_account_id'] = $account->id;
+            }
+        }
+
+        if (!empty($data['expense_account_name'])) {
+            $account = get_account($data['expense_account_name']);
+            if ($account) {
+                $productData['expense_account_id'] = $account->id;
+            }
+        }
+
+        // Handle brand
+        if (!empty($data['brand'])) {
+            $brand = Brands::where('name', $data['brand'])->first();
+            if ($brand) {
+                $productData['brand_id'] = $brand->id;
+            }
+        }
+
+        // Handle sub category
+        if (!empty($data['sub_category'])) {
+            $category = SubCategory::where('name', $data['sub_category'])->first();
+            if ($category) {
+                $productData['sub_category_id'] = $category->id;
+            }
+        }
+
+        return $productData;
+    }
+
+    protected function createStockTransactions($product, $quantity, $descriptionSuffix, $type = 'increase')
+    {
+        $purchaseCost = $product->purchase_cost ?? 0;
+        $amount = $purchaseCost * $quantity;
+        $currency = request()->activeBusiness->currency;
+        $exchangeRate = Currency::where('name', $currency)->first()->exchange_rate ?? 1;
+
+        if ($type === 'increase') {
+            // Increase stock: Debit Inventory, Credit Common Shares
+            // Debit Inventory
+            $transaction = new Transaction();
+            $transaction->trans_date = now()->format('Y-m-d H:i:s');
+            $transaction->account_id = get_account('Inventory')->id;
+            $transaction->dr_cr = 'dr';
+            $transaction->transaction_currency = $currency;
+            $transaction->currency_rate = $exchangeRate;
+            $transaction->base_currency_amount = $amount;
+            $transaction->transaction_amount = $amount;
+            $transaction->description = $product->name . ' ' . $descriptionSuffix;
+            $transaction->ref_id = $product->id;
+            $transaction->ref_type = 'product';
+            $transaction->save();
+
+            // Credit Common Shares
+            $transaction = new Transaction();
+            $transaction->trans_date = now()->format('Y-m-d H:i:s');
+            $transaction->account_id = get_account('Common Shares')->id;
+            $transaction->dr_cr = 'cr';
+            $transaction->transaction_currency = $currency;
+            $transaction->currency_rate = $exchangeRate;
+            $transaction->base_currency_amount = $amount;
+            $transaction->transaction_amount = $amount;
+            $transaction->description = $product->name . ' ' . $descriptionSuffix;
+            $transaction->ref_id = $product->id;
+            $transaction->ref_type = 'product';
+            $transaction->save();
+        } else {
+            // Decrease stock: Credit Inventory, Debit Common Shares
+            // Credit Inventory
+            $transaction = new Transaction();
+            $transaction->trans_date = now()->format('Y-m-d H:i:s');
+            $transaction->account_id = get_account('Inventory')->id;
+            $transaction->dr_cr = 'cr';
+            $transaction->transaction_currency = $currency;
+            $transaction->currency_rate = $exchangeRate;
+            $transaction->base_currency_amount = $amount;
+            $transaction->transaction_amount = $amount;
+            $transaction->description = $product->name . ' ' . $descriptionSuffix;
+            $transaction->ref_id = $product->id;
+            $transaction->ref_type = 'product';
+            $transaction->save();
+
+            // Debit Common Shares
+            $transaction = new Transaction();
+            $transaction->trans_date = now()->format('Y-m-d H:i:s');
+            $transaction->account_id = get_account('Common Shares')->id;
+            $transaction->dr_cr = 'dr';
+            $transaction->transaction_currency = $currency;
+            $transaction->currency_rate = $exchangeRate;
+            $transaction->base_currency_amount = $amount;
+            $transaction->transaction_amount = $amount;
+            $transaction->description = $product->name . ' ' . $descriptionSuffix;
+            $transaction->ref_id = $product->id;
+            $transaction->ref_type = 'product';
+            $transaction->save();
         }
     }
 
