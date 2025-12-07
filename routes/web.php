@@ -206,7 +206,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 	});
 
 	/** Subscriber Login **/
-	Route::group(['middleware' => ['business'], 'prefix' => 'user'], function () {
+	Route::group(['middleware' => ['permission'], 'prefix' => 'user'], function () {
 
 		//Business Controller
 		Route::get('business/{id}/users', [BusinessController::class, 'users'])->name('business.users');
