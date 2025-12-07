@@ -1,6 +1,6 @@
 import InputError from "@/Components/InputError";
 import AuthLayout from "@/Layouts/AuthLayout";
-import { Head, Link, useForm } from "@inertiajs/react";
+import { Link, useForm } from "@inertiajs/react";
 import { Button } from "@/Components/ui/button";
 import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
@@ -11,10 +11,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/Components/ui/select";
-import {
-    SocialLoginButton,
-    SocialLoginIcons,
-} from "@/Components/auth/SocialLogin";
 import FormInput from "@/Components/shared/FormInput";
 
 const countryCodes = [
@@ -113,20 +109,7 @@ const RegisterForm = ({ onSubmit, data, setData, errors, processing }) => (
             <Button type="submit" className="w-full" disabled={processing}>
                 Register
             </Button>
-            <div className="relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t after:border-border">
-                <span className="relative z-10 bg-background px-2 text-muted-foreground">
-                    Or continue with
-                </span>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-                {Object.entries(SocialLoginIcons).map(([provider, icon]) => (
-                    <SocialLoginButton
-                        key={provider}
-                        provider={provider}
-                        icon={icon}
-                    />
-                ))}
-            </div>
+
             <div className="text-center text-sm">
                 Already have an account?{" "}
                 <Link
