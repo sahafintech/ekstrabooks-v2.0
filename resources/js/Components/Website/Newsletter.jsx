@@ -113,7 +113,6 @@ export default function Newsletter({ heading, subHeading }) {
                             <img src="/website/assets/logos/amanah.png" alt="Amanah Insurance" className="h-8" />
                             <img src="/website/assets/logos/vision.png" alt="Vision Care" className="h-8" />
                             <img src="/website/assets/logos/smart.jpg" alt="Smart Gradge" className="h-8" />
-                            <img src="/website/assets/logos/horn.png" alt="Horn Ridge" className="h-8" />
                         </div>
                     </div>
 

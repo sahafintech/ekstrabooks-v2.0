@@ -85,7 +85,7 @@ trait MultiTenant
                     }
 
                     if (Schema::hasColumn($table, 'user_id')) {
-                        return $builder->where($table . '.user_id', $user->id);
+                        return $builder->where($table . '.user_id', $activeBusiness->user_id);
                     }
                 }
             });

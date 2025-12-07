@@ -67,8 +67,8 @@ class SystemUserController extends Controller
 			$businessUser = new BusinessUser();
 			$businessUser->user_id = $userId;
 			$businessUser->business_id = $business->id;
-			$businessUser->owner_id = $request->role_id == 'admin' ? $userId : $business->user_id;
-			$businessUser->role_id = $request->role_id == 'admin' ? null : $role->id;
+			$businessUser->owner_id = $business->user_id;
+			$businessUser->role_id = $role->id;
 			$businessUser->is_active = $index === 0 ? 1 : 0;
 			$businessUser->save();
 		}

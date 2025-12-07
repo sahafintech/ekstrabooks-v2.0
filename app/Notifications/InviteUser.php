@@ -25,7 +25,7 @@ class InviteUser extends Notification {
 	public function __construct($invite) {
 		$this->invite = $invite;
 		$this->template = EmailTemplate::where('slug', 'INVITE_USER')->first();
-		Overrider::loadBusinessSettings($this->invite->business_id);
+		Overrider::loadBusinessSettings();
 
 		$businesses = Business::whereIn('id', $this->invite->business_id)->get();
 
