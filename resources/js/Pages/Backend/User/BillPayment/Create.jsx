@@ -72,13 +72,14 @@ export default function Create({ vendors = [], accounts, methods }) {
         setData("invoices", selectedInvoiceData);
     }, [invoices, selectedInvoices, setData]);
 
-    // Determine if all invoices are selected
-    const isAllSelected = invoices.length > 0 && selectedInvoices.length === invoices.length;
+    // Determine if all APPROVED invoices are selected
+    const approvedInvoices = invoices.filter(invoice => invoice.approval_status === 1);
+    const isAllSelected = approvedInvoices.length > 0 && selectedInvoices.length === approvedInvoices.length;
 
-    // Toggle selection for all invoices by using the new checked state
+    // Toggle selection for all APPROVED invoices by using the new checked state
     const toggleSelectAll = (checked) => {
         if (checked) {
-            setSelectedInvoices(invoices.map(invoice => invoice.id));
+            setSelectedInvoices(approvedInvoices.map(invoice => invoice.id));
         } else {
             setSelectedInvoices([]);
         }
@@ -272,6 +273,7 @@ export default function Create({ vendors = [], accounts, methods }) {
                                                 <Checkbox
                                                     checked={selectedInvoices.includes(invoice.id)}
                                                     onCheckedChange={(checked) => toggleSelectInvoice(invoice.id, checked)}
+                                                    disabled={invoice.approval_status !== 1}
                                                 />
                                             </TableCell>
                                             <TableCell>
@@ -281,14 +283,20 @@ export default function Create({ vendors = [], accounts, methods }) {
                                             <TableCell>{invoice.grand_total}</TableCell>
                                             <TableCell>{invoice.grand_total - invoice.paid}</TableCell>
                                             <TableCell>
-                                                <Input
-                                                    type="number"
-                                                    value={invoice.amount !== undefined ? invoice.amount : (invoice.grand_total - invoice.paid)}
-                                                    onChange={(e) =>
-                                                        handleAmountChange(invoice.id, e.target.value)
-                                                    }
-                                                    className="w-full"
-                                                />
+                                                {invoice.approval_status === 1 ? (
+                                                    <Input
+                                                        type="number"
+                                                        value={invoice.amount !== undefined ? invoice.amount : (invoice.grand_total - invoice.paid)}
+                                                        onChange={(e) =>
+                                                            handleAmountChange(invoice.id, e.target.value)
+                                                        }
+                                                        className="w-full"
+                                                    />
+                                                ) : (
+                                                    <span className="text-red-600 font-medium text-sm">
+                                                        Not yet approved
+                                                    </span>
+                                                )}
                                             </TableCell>
                                         </TableRow>
                                     ))}

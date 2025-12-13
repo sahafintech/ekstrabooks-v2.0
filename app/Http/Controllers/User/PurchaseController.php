@@ -1333,7 +1333,6 @@ class PurchaseController extends Controller
 		return Vendor::where('id', $request->id)
 			->with(['purchases' => function ($query) {
 				$query->whereIn('status', [0, 1])
-					->where('approval_status', 1)
 					->where('cash', 0)
 					->where('order', 0);
 			}])
