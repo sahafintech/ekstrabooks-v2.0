@@ -682,13 +682,23 @@ class PayrollController extends Controller
                 }
                 $payslip = $payslipMap[$payment['id']];
 
-                // Only process payslips with status 1 (approved) or 2 (accrued)
-                if (!in_array($payslip->status, [1, 2])) {
+                // Only process payslips with status 1 (approved), 2 (accrued), or 3 (partially paid)
+                if (!in_array($payslip->status, [1, 2, 3])) {
                     continue;
                 }
 
                 // Store original status to check if it was accrued
-                $wasAccrued = ($payslip->status == 2);
+                // Check if this payslip was accrued by looking for existing liability transactions
+                $wasAccrued = ($payslip->status == 2) || 
+                    Transaction::where('ref_id', $payslip->employee_id)
+                        ->where('ref_type', 'payslip')
+                        ->where('description', 'like', '%' . $payslip->month . '/' . $payslip->year . '%')
+                        ->where('dr_cr', 'cr')
+                        ->whereHas('account', function($query) {
+                            // Check if this is a liability account transaction (typical for accruals)
+                            $query->where('account_type', 'like', '%Liability%');
+                        })
+                        ->exists();
 
                 $amount = floatval($payment['amount']);
                 $payslip->paid = ($payslip->paid ?? 0) + $amount;
