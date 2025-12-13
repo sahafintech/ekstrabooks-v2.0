@@ -25,7 +25,6 @@ use App\Models\Tax;
 use App\Models\Transaction;
 use App\Models\Vendor;
 use App\Notifications\SendBillInvoice;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -1333,7 +1332,7 @@ class PurchaseController extends Controller
 	{
 		return Vendor::where('id', $request->id)
 			->with(['purchases' => function ($query) {
-				$query->where('status', 0)->orWhere('status', 1)
+				$query->whereIn('status', [0, 1])
 					->where('approval_status', 1)
 					->where('cash', 0)
 					->where('order', 0);
