@@ -30,6 +30,7 @@ class CreateUsersTable extends Migration {
             $table->string('provider')->nullable(); // Social Login
             $table->string('provider_id')->nullable(); // Social Login
             $table->text('custom_fields')->nullable();
+            $table->tinyInteger('owner')->default(0);
             $table->rememberToken();
             $table->timestamps();
         });

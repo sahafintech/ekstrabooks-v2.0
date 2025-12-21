@@ -24,6 +24,7 @@
         "simplesoftwareio/simple-qrcode": "^4.2",
         "spatie/laravel-cookie-consent": "*",
         "spatie/laravel-pdf": "^1.8",
+        "spatie/laravel-permission": "^6.24",
         "stripe/stripe-php": "*",
         "tightenco/ziggy": "^2.0",
         "twilio/sdk": "*",

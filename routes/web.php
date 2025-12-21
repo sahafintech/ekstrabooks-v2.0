@@ -82,6 +82,9 @@ use App\Http\Controllers\User\VendorDocumentController;
 use App\Http\Controllers\UserPackageController;
 use App\Http\Controllers\UtilityController;
 use App\Http\Controllers\Website\WebsiteController;
+use App\Http\Controllers\UserManagementController;
+use App\Http\Controllers\RolesController;
+use App\Http\Controllers\PermissionsController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -206,7 +209,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 	});
 
 	/** Subscriber Login **/
-	Route::group(['middleware' => ['permission'], 'prefix' => 'user'], function () {
+	Route::group(['prefix' => 'user'], function () {
 
 		//Business Controller
 		Route::get('business/{id}/users', [BusinessController::class, 'users'])->name('business.users');
@@ -229,13 +232,25 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('roles/bulk_permanent_destroy', [RoleController::class, 'bulk_permanent_destroy'])->name('roles.bulk_permanent_destroy');
 		Route::delete('roles/{id}/permanent_destroy', [RoleController::class, 'permanent_destroy'])->name('roles.permanent_destroy');
 
-		//User Controller
-		Route::match(['get', 'post'], 'system_users/{userId}/{businessId}/change_role', [SystemUserController::class, 'change_role'])->name('system_users.change_role');
-		Route::post('system_users/send_invitation', [SystemUserController::class, 'send_invitation'])->name('system_users.send_invitation');
-		Route::delete('system_users/{id}/destroy', [SystemUserController::class, 'destroy'])->name('system_users.destroy');
-		Route::get('system_users/invite/{businessId}', [SystemUserController::class, 'invite'])->name('system_users.invite');
-		Route::get('system_users/{businessId}/invitation_history', [SystemUserController::class, 'invitation_history'])->name('invitation_history.index');
-		Route::delete('invitation_history/{businessId}/destroy_invitation', [SystemUserController::class, 'destroy_invitation'])->name('invitation_history.destroy_invitation');
+		//User Management Controller (Spatie Permissions)
+		Route::get('/business/user-management', [UserManagementController::class, 'index'])->name('business.user-management');
+		Route::post('/business/users/send-invitation', [UserManagementController::class, 'sendInvitation'])->name('business.users.send-invitation');
+		Route::post('/business/users/{user}/roles-and-permissions', [UserManagementController::class, 'updateRolesAndPermissions'])->name('business.users.roles-and-permissions');
+		Route::delete('/business/users/{user}', [UserManagementController::class, 'destroy'])->name('business.users.destroy');
+		Route::post('/business/users/bulk-destroy', [UserManagementController::class, 'bulkDestroy'])->name('business.users.bulk-destroy');
+		Route::post('/business/users/{user}/assign-businesses', [UserManagementController::class, 'assignBusinesses'])->name('business.users.assign-businesses');
+		Route::get('/business/invitations', [UserManagementController::class, 'invitations'])->name('business.invitations');
+		Route::post('/business/invitations/{invitation}/resend', [UserManagementController::class, 'resendInvitation'])->name('business.invitations.resend');
+		Route::delete('/business/invitations/{invitation}', [UserManagementController::class, 'cancelInvitation'])->name('business.invitations.cancel');
+
+		//Roles Controller (Spatie Permissions)
+		Route::get('/business/roles', [RolesController::class, 'index'])->name('business.roles');
+		Route::post('/business/roles', [RolesController::class, 'store'])->name('business.roles.store');
+		Route::put('/business/roles/{role}', [RolesController::class, 'update'])->name('business.roles.update');
+		Route::delete('/business/roles/{role}', [RolesController::class, 'destroy'])->name('business.roles.destroy');
+
+		//Permissions Controller (Spatie Permissions)
+		Route::get('/business/permissions', [PermissionsController::class, 'index'])->name('business.permissions');
 
 		//Business Settings Controller
 		Route::post('business/{id}/send_test_email', [BusinessSettingsController::class, 'send_test_email'])->name('business.send_test_email');
@@ -269,7 +284,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 	});
 
 	/** Dynamic Permission **/
-	Route::group(['middleware' => ['permission'], 'prefix' => 'user'], function () {
+	Route::group(['prefix' => 'user'], function () {
 
 		//Dashboard Widget
 		Route::get('dashboard/income_widget', [DashboardController::class, 'income_widget'])->name('dashboard.income_widget');
@@ -357,7 +372,12 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('import_adjustments', [InventoryAdjustmentController::class, 'import_adjustments'])->name('inventory_adjustments.import');
 		Route::get('export_adjustments', [InventoryAdjustmentController::class, 'export_adjustments'])->name('inventory_adjustments.export');
 
-		// inventory adjustments resource route
+		// inventory transfers resource route
+		Route::get('inventory_transfers/trash', [InventoryTransferController::class, 'trash'])->name('inventory_transfers.trash');
+		Route::post('inventory_transfers/{id}/restore', [InventoryTransferController::class, 'restore'])->name('inventory_transfers.restore');
+		Route::delete('inventory_transfers/{id}/permanent_destroy', [InventoryTransferController::class, 'permanent_destroy'])->name('inventory_transfers.permanent_destroy');
+		Route::post('inventory_transfers/bulk_restore', [InventoryTransferController::class, 'bulk_restore'])->name('inventory_transfers.bulk_restore');
+		Route::post('inventory_transfers/bulk_permanent_destroy', [InventoryTransferController::class, 'bulk_permanent_destroy'])->name('inventory_transfers.bulk_permanent_destroy');
 		Route::resource('inventory_transfers', InventoryTransferController::class);
 		Route::post('inventory_transfers/bulk_destroy', [InventoryTransferController::class, 'bulk_destroy'])->name('inventory_transfers.bulk_destroy');
 
@@ -373,6 +393,13 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::delete('inventory_adjustments/{id}/permanent_destroy', [InventoryAdjustmentController::class, 'permanent_destroy'])->name('inventory_adjustments.permanent_destroy');
 		Route::resource('inventory_adjustments', InventoryAdjustmentController::class);
 		Route::post('inventory_adjustments/bulk_destroy', [InventoryAdjustmentController::class, 'bulk_destroy'])->name('inventory_adjustments.bulk_destroy');
+
+		// inventory transfers resource route
+		Route::post('inventory_transfers/{id}/send', [InventoryTransferController::class, 'send'])->name('inventory_transfers.send');
+		Route::post('inventory_transfers/{id}/receive', [InventoryTransferController::class, 'receive'])->name('inventory_transfers.receive');
+		Route::post('inventory_transfers/{id}/reject', [InventoryTransferController::class, 'reject'])->name('inventory_transfers.reject');
+		Route::post('inventory_transfers/{id}/cancel', [InventoryTransferController::class, 'cancel'])->name('inventory_transfers.cancel');
+		Route::resource('inventory_transfers', InventoryTransferController::class);
 
 		//Invoices
 		Route::match(['get', 'post'], 'invoices/{id}/send_email', [InvoiceController::class, 'send_email'])->name('invoices.send_email');

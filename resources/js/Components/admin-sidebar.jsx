@@ -44,7 +44,8 @@ export function AdminSidebar({ ...props }) {
     const paymentsBase = "/admin/subscription_payments";
     const gatewaysBase = "/admin/payment_gateways";
     const pagesDefaultBase = "/admin/pages/default_pages";
-    const pagesCustomBase = "/admin/pages"; // catches /admin/pages and /admin/pages/*
+    const pagesCustomBase = "/admin/pages";
+    const storageBase = "/admin/storage";
 
     // ─── DASHBOARD MENU ────────────────────────────────────────────
     const dashboardItems = [
@@ -130,10 +131,11 @@ export function AdminSidebar({ ...props }) {
             url: "#",
             icon: Settings2,
             items: [
-                { title: "General", url: "#" },
-                { title: "Team", url: "#" },
-                { title: "Billing", url: "#" },
-                { title: "Limits", url: "#" },
+                { 
+                    title: "Storage",
+                    url: route("storage.index"),
+                    isActive: url.startsWith(storageBase),
+                }
             ],
         },
     ];

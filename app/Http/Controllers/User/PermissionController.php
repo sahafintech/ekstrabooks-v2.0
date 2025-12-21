@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\AccessControl;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
-use App\Models\Role;
+use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 

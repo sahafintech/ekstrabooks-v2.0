@@ -5,6 +5,8 @@ namespace App\Providers;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Database\Eloquent\Model;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -22,5 +24,13 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Paginator::useBootstrap();
+        Model::unguard();
+        Model::preventsLazyLoading();
+        Model::preventAccessingMissingAttributes();
+
+        // Super admins bypass all permission checks
+        Gate::before(static function ($user): ?bool {
+            return $user?->is_super_admin ? true : null;
+        });
     }
 }

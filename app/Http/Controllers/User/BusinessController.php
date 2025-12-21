@@ -9,7 +9,7 @@ use App\Models\BusinessBankAccount;
 use App\Models\BusinessSetting;
 use App\Models\BusinessType;
 use App\Models\Currency;
-use App\Models\Role;
+use Spatie\Permission\Models\Role;
 use Database\Seeders\BusinessSettingSeeder;
 use Database\Seeders\CurrencySeeder;
 use Illuminate\Http\Request;

@@ -1,6 +1,5 @@
 import { AdminSidebar } from "@/Components/admin-sidebar";
 import { UserSidebar } from "@/Components/user-sidebar";
-import { StaffSidebar } from "@/Components/staff-sidebar";
 import { initSettings } from '@/lib/settings';
 import {
     SidebarProvider,
@@ -8,7 +7,7 @@ import {
 import { usePage } from "@inertiajs/react";
 
 export default function AuthenticatedLayout({ children }) {
-    const { auth, isOwner, decimalPlace, decimalSep, thousandSep, baseCurrency, currencyPosition, date_format } = usePage().props;
+    const { auth, decimalPlace, decimalSep, thousandSep, baseCurrency, currencyPosition, date_format } = usePage().props;
 
     initSettings({
         decimalPlace: decimalPlace,
@@ -21,12 +20,9 @@ export default function AuthenticatedLayout({ children }) {
 
     return (
         <SidebarProvider>
-            {
-                auth.user.user_type === 'admin'
-                    ? <AdminSidebar />
-                    : auth.user.user_type === 'user' && isOwner
-                        ? <UserSidebar />
-                        : <StaffSidebar />
+            {auth.user.user_type === 'admin'
+                ? <AdminSidebar />
+                : <UserSidebar />
             }
 
             {children}

@@ -27,8 +27,22 @@ import {
 } from "@/Components/ui/sidebar";
 
 export function UserSidebar({ ...props }) {
-    const { url } = usePage(); // e.g. "/user/products/123/edit"
-    const { auth, activeBusiness, userPackage } = usePage().props;
+    const { url } = usePage();
+    const { auth, activeBusiness, isOwner, permissionList, userPackage } = usePage().props;
+
+    // Convert permissions array to Set for quick lookups
+    const perms = new Set(Array.isArray(permissionList) ? permissionList : []);
+
+    // Helper function to check permission (owners bypass permission checks)
+    const hasPermission = (permission) => {
+        return isOwner || perms.has(permission);
+    };
+
+    // Helper function to check if any permission exists
+    const hasAnyPermission = (permissions) => {
+        return isOwner || permissions.some(p => perms.has(p));
+    };
+
     // ———————————————————————————————
     // Define all your "startsWith" base-paths here:
     // ———————————————————————————————
@@ -42,6 +56,7 @@ export function UserSidebar({ ...props }) {
     const unitsBase = "/user/product_units";
     const invAdjustBase = "/user/inventory_adjustments";
     const invTransferBase = "/user/inventory_transfers";
+
     // Suppliers
     const vendorsBase = "/user/vendors";
     const purchaseOrdersBase = "/user/purchase_orders";
@@ -63,6 +78,7 @@ export function UserSidebar({ ...props }) {
 
     // HR & Payroll
     const staffsBase = "/user/staffs";
+    const attendanceDevicesBase = "/user/attendance_devices";
     const attendanceLogsBase = "/user/attendance_logs";
     const timeSheetsBase = "/user/timesheets";
     const departmentsBase = "/user/departments";
@@ -90,7 +106,9 @@ export function UserSidebar({ ...props }) {
     const taxesBase = "/user/taxes";
     const currencyBase = "/user/currency";
     const auditLogsBase = "/user/audit_logs";
-    const businessSettingsFragment = "/business/settings/"; // we'll use `.includes`
+    const businessSettingsFragment = "/business/settings/";
+    const businessUserManagementFragment = "/business/user-management";
+    const businessInvitationsFragment = "/business/invitations";
 
     // Reports
     const reportsJournalBase = "/user/reports/journal";
@@ -116,7 +134,7 @@ export function UserSidebar({ ...props }) {
     };
 
     // ——————————————————————————————————
-    // Build each section using url.startsWith
+    // Dashboard
     // ——————————————————————————————————
     const dashboardItems = [
         {
@@ -127,416 +145,571 @@ export function UserSidebar({ ...props }) {
         },
     ];
 
-    const navOperationsItems = [
-        {
-            title: "Products",
-            url: "#",
-            icon: Package,
-            isActive:
-                url.startsWith(productsBase) ||
-                url.startsWith(mainCategoryBase) ||
-                url.startsWith(subCategoriesBase) ||
-                url.startsWith(brandsBase) ||
-                url.startsWith(unitsBase) ||
-                url.startsWith(invAdjustBase),
-            items: [
-                {
-                    title: "All Products",
-                    url: route("products.index"),
-                    isActive: url === productsBase,
-                },
-                {
-                    title: "Main Categories",
-                    url: route("main_categories.index"),
-                    isActive: url === mainCategoryBase,
-                },
-                {
-                    title: "Sub Categories",
-                    url: route("sub_categories.index"),
-                    isActive: url.startsWith(subCategoriesBase),
-                },
-                {
-                    title: "Brands",
-                    url: route("brands.index"),
-                    isActive: url.startsWith(brandsBase),
-                },
-                {
-                    title: "Units",
-                    url: route("product_units.index"),
-                    isActive: url.startsWith(unitsBase),
-                },
-                {
-                    title: "Inventory Adjustment",
-                    url: route("inventory_adjustments.index"),
-                    isActive: url.startsWith(invAdjustBase),
-                },
-                {
-                    title: "Inventory Transfer",
-                    url: route("inventory_transfers.index"),
-                    isActive: url.startsWith(invTransferBase),
-                },
-            ],
-        },
-        {
-            title: "Suppliers",
-            url: "#",
-            icon: Users,
-            isActive:
-                url.startsWith(vendorsBase) ||
-                url.startsWith(purchaseOrdersBase) ||
-                url.startsWith(cashPurchasesBase) ||
-                url.startsWith(billInvoicesBase) ||
-                url.startsWith(billPaymentsBase) ||
-                url.startsWith(purchaseReturnsBase),
-            items: [
-                {
-                    title: "All Suppliers",
-                    url: route("vendors.index"),
-                    isActive: url.startsWith(vendorsBase),
-                },
-                {
-                    title: "Purchase Order",
-                    url: route("purchase_orders.index"),
-                    isActive: url.startsWith(purchaseOrdersBase),
-                },
-                {
-                    title: "Cash Purchase",
-                    url: route("cash_purchases.index"),
-                    isActive: url.startsWith(cashPurchasesBase),
-                },
-                {
-                    title: "Credit Purchase",
-                    url: route("bill_invoices.index"),
-                    isActive: url.startsWith(billInvoicesBase),
-                },
-                {
-                    title: "Pay Credit Purchase",
-                    url: route("bill_payments.index"),
-                    isActive: url.startsWith(billPaymentsBase),
-                },
-                {
-                    title: "Purchase Return",
-                    url: route("purchase_returns.index"),
-                    isActive: url.startsWith(purchaseReturnsBase),
-                },
-            ],
-        },
-        {
-            title: "Customers",
-            url: "#",
-            icon: Users,
-            isActive:
-                url.startsWith(customersBase) ||
-                url.startsWith(receiptsBase) ||
-                url.startsWith(creditInvoicesBase) ||
-                url.startsWith(medicalRecordsBase) ||
-                url.startsWith(quotationsBase) ||
-                url.startsWith(deferredInvoicesBase) ||
-                url.startsWith(salesReturnsBase) ||
-                url.startsWith(prescriptionsBase) ||
-                url.startsWith(receivePaymentsBase),
-            items: [
-                {
-                    title: "All Customers",
-                    url: route("customers.index"),
-                    isActive: url.startsWith(customersBase),
-                },
-                {
-                    title: "Cash Invoice",
-                    url: route("receipts.index"),
-                    isActive: url.startsWith(receiptsBase),
-                },
-                {
-                    title: "Credit Invoice",
-                    url: route("invoices.index"),
-                    isActive: url.startsWith(creditInvoicesBase),
-                },
-                ...(userPackage.medical_record === 1 ? [{
-                    title: "Medical Records",
-                    url: route("medical_records.index"),
-                    isActive: url.startsWith(medicalRecordsBase),
-                }] : []),
-                ...(userPackage.prescription === 1 ? [{
-                    title: "Prescriptions",
-                    url: route("prescriptions.index"),
-                    isActive: url.startsWith(prescriptionsBase),
-                }] : []),
-                ...(userPackage.deffered_invoice === 1 ? [{
-                    title: "Deferred Invoice",
-                    url: route("deffered_invoices.index"),
-                    isActive: url.startsWith(deferredInvoicesBase),
-                }] : []),
-                {
-                    title: "Received Payment",
-                    url: route("receive_payments.index"),
-                    isActive: url.startsWith(receivePaymentsBase),
-                },
-                {
-                    title: "Sales Return",
-                    url: route("sales_returns.index"),
-                    isActive: url.startsWith(salesReturnsBase),
-                },
-                {
-                    title: "Quotations",
-                    url: route("quotations.index"),
-                    isActive: url.startsWith(quotationsBase),
-                },
-            ],
-        },
-    ];
+    // ——————————————————————————————————
+    // Build Operations section
+    // ——————————————————————————————————
+    const navOperationsItems = [];
 
-    const navManagementItems = [
-        ...(userPackage.payroll_module === 1 ? [{
-            title: "HR & Payroll",
-            url: "#",
-            icon: GroupIcon,
-            isActive:
-                url.startsWith(staffsBase) ||
-                url.startsWith(attendanceLogsBase) ||
-                url.startsWith(departmentsBase) ||
-                url.startsWith(designationsBase) ||
-                url.startsWith(salaryAdvancesBase) ||
-                url.startsWith(payslipsBase) ||
-                url.startsWith(holidaysBase) ||
-                url.startsWith(leavesBase) ||
-                url.startsWith(awardsBase) ||
-                url.startsWith(timeSheetsBase),
-            items: [
-                {
-                    title: "Staff Management",
-                    url: route("staffs.index"),
-                    isActive: url.startsWith(staffsBase),
-                },
-                ...(userPackage.time_sheet_module === 1 ? [{
-                    title: "Attendance Logs",
-                    url: route("attendance_logs.index"),
-                    isActive: url.startsWith(attendanceLogsBase),
-                }] : []),
-                ...(userPackage.time_sheet_module === 1 ? [{
-                    title: "Time Sheet",
-                    url: route("timesheets.index"),
-                    isActive: url.startsWith(timeSheetsBase),
-                }] : []),
-                {
-                    title: "Departments",
-                    url: route("departments.index"),
-                    isActive: url.startsWith(departmentsBase),
-                },
-                {
-                    title: "Designations",
-                    url: route("designations.index"),
-                    isActive: url.startsWith(designationsBase),
-                },
-                {
-                    title: "Salary Advances",
-                    url: route("salary_advances.index"),
-                    isActive: url.startsWith(salaryAdvancesBase),
-                },
-                {
-                    title: "Manage Payroll",
-                    url: route("payslips.index"),
-                    isActive: url.startsWith(payslipsBase),
-                },
-                {
-                    title: "Holidays",
-                    url: route("holidays.index"),
-                    isActive: url.startsWith(holidaysBase),
-                },
-                {
-                    title: "Leave Management",
-                    url: route("leaves.index"),
-                    isActive: url.startsWith(leavesBase),
-                },
-                {
-                    title: "Awards",
-                    url: route("awards.index"),
-                    isActive: url.startsWith(awardsBase),
-                },
-            ],
-        }] : []),
-        ...(userPackage.construction_module === 1 ? [{
-            title: "Construction",
-            url: "#",
-            icon: Building,
-            isActive:
-                url.startsWith(projectsBase) ||
-                url.startsWith(costCodesBase) ||
-                url.startsWith(projectGroupsBase) ||
-                url.startsWith(projectSubcontractsBase),
-            items: [
-                {
-                    title: "Projects",
-                    url: route("projects.index"),
-                    isActive: url.startsWith(projectsBase),
-                },
-                {
-                    title: "Project Groups",
-                    url: route("project_groups.index"),
-                    isActive: url.startsWith(projectGroupsBase),
-                },
-                {
-                    title: "Cost Codes",
-                    url: route("cost_codes.index"),
-                    isActive: url.startsWith(costCodesBase),
-                },
-                {
-                    title: "Subcontracts",
-                    url: route("project_subcontracts.index"),
-                    isActive: url.startsWith(projectSubcontractsBase),
-                },
-            ],
-        }] : []),
-        {
-            title: "Accounting",
-            url: "#",
-            icon: ChartPieIcon,
-            isActive:
-                url.startsWith(accountsBase) ||
-                url.startsWith(journalsBase) ||
-                url.startsWith(transactionMethodsBase),
-            items: [
-                {
-                    title: "Chart of Accounts",
-                    url: route("accounts.index"),
-                    isActive: url.startsWith(accountsBase),
-                },
-                {
-                    title: "Journal Entry",
-                    url: route("journals.index"),
-                    isActive: url.startsWith(journalsBase),
-                },
-                {
-                    title: "Transaction Methods",
-                    url: route("transaction_methods.index"),
-                    isActive: url.startsWith(transactionMethodsBase),
-                },
-            ],
-        },
-        {
-            title: "Business",
-            url: "#",
-            icon: Building2Icon,
-            isActive:
-                url.startsWith(businessesBase) ||
-                url.startsWith(rolesBase) ||
-                url.startsWith(taxesBase) ||
-                url.startsWith(currencyBase) ||
-                url.startsWith(auditLogsBase) ||
-                url.includes(businessSettingsFragment),
-            items: [
-                {
-                    title: "Manage Businesses",
-                    url: route("business.index"),
-                    isActive: url.startsWith(businessesBase),
-                },
-                {
-                    title: "Roles & Permissions",
-                    url: route("roles.index"),
-                    isActive: url.startsWith(rolesBase),
-                },
-                {
-                    title: "Business Settings",
-                    url: route("business.settings", activeBusiness.id),
-                    isActive: url.includes(businessSettingsFragment),
-                },
-                {
-                    title: "Tax Settings",
-                    url: route("taxes.index"),
-                    isActive: url.startsWith(taxesBase),
-                },
-                {
-                    title: "Currency Settings",
-                    url: route("currency.index"),
-                    isActive: url.startsWith(currencyBase),
-                },
-                {
-                    title: "Audit Logs",
-                    url: route("audit_logs.index"),
-                    isActive: url.startsWith(auditLogsBase),
-                },
-            ],
-        },
-        {
-            title: "Reports",
-            url: "#",
-            icon: Building2Icon,
-            isActive:
-                url.startsWith(reportsJournalBase) ||
-                url.startsWith(reportsLedgerBase) ||
-                url.startsWith(reportsIncomeStatement) ||
-                url.startsWith(reportsTrialBalance) ||
-                url.startsWith(reportsBalanceSheet) ||
-                url.startsWith(reportsReceivables) ||
-                url.startsWith(reportsPayables) ||
-                url.startsWith(reportsPayrollSummary) ||
-                url.startsWith(reportsPayrollCost) ||
-                url.startsWith(reportsIncomeByCustomer) ||
-                url.startsWith(reportsInventoryDetails) ||
-                url.startsWith(reportsInventorySummary),
-            items: [
-                {
-                    title: "General Journal",
-                    url: route("reports.journal"),
-                    isActive: url.startsWith(reportsJournalBase),
-                },
-                {
-                    title: "General Ledger",
-                    url: route("reports.ledger"),
-                    isActive: url.startsWith(reportsLedgerBase),
-                },
-                {
-                    title: "Income Statement",
-                    url: route("reports.income_statement"),
-                    isActive: url.startsWith(reportsIncomeStatement),
-                },
-                {
-                    title: "Trial Balance",
-                    url: route("reports.trial_balance"),
-                    isActive: url.startsWith(reportsTrialBalance),
-                },
-                {
-                    title: "Balance Sheet",
-                    url: route("reports.balance_sheet"),
-                    isActive: url.startsWith(reportsBalanceSheet),
-                },
-                {
-                    title: "Income By Customer",
-                    url: route("reports.income_by_customer"),
-                    isActive: url.startsWith(reportsIncomeByCustomer),
-                },
-                {
-                    title: "Receivables",
-                    url: route("reports.receivables"),
-                    isActive: url.startsWith(reportsReceivables),
-                },
-                {
-                    title: "Payables",
-                    url: route("reports.payables"),
-                    isActive: url.startsWith(reportsPayables),
-                },
-                {
-                    title: "Payroll Summary",
-                    url: route("reports.payroll_summary"),
-                    isActive: url.startsWith(reportsPayrollSummary),
-                },
-                {
-                    title: "Monthly Payroll Cost",
-                    url: route("reports.payroll_cost"),
-                    isActive: url.startsWith(reportsPayrollCost),
-                },
-                {
-                    title: "Inventory Details",
-                    url: route("reports.inventory_details"),
-                    isActive: url.startsWith(reportsInventoryDetails),
-                },
-                {
-                    title: "Inventory Summary",
-                    url: route("reports.inventory_summary"),
-                    isActive: url.startsWith(reportsInventorySummary),
-                },
-            ],
-        },
-    ];
+    // Products
+    if (hasAnyPermission([
+        "products.index", "products.create", "main_categories.index", "sub_categories.index",
+        "brands.index", "product_units.index", "inventory_adjustments.index", "inventory_transfers.index"
+    ])) {
+        const items = [];
+        if (hasPermission("products.index") || hasPermission("products.create")) {
+            items.push({
+                title: "All Products",
+                url: route("products.index"),
+                isActive: url.startsWith(productsBase),
+            });
+        }
+        if (hasPermission("main_categories.index")) {
+            items.push({
+                title: "Main Categories",
+                url: route("main_categories.index"),
+                isActive: url.startsWith(mainCategoryBase),
+            });
+        }
+        if (hasPermission("sub_categories.index")) {
+            items.push({
+                title: "Sub Categories",
+                url: route("sub_categories.index"),
+                isActive: url.startsWith(subCategoriesBase),
+            });
+        }
+        if (hasPermission("brands.index")) {
+            items.push({
+                title: "Brands",
+                url: route("brands.index"),
+                isActive: url.startsWith(brandsBase),
+            });
+        }
+        if (hasPermission("product_units.index")) {
+            items.push({
+                title: "Units",
+                url: route("product_units.index"),
+                isActive: url.startsWith(unitsBase),
+            });
+        }
+        if (hasPermission("inventory_adjustments.index")) {
+            items.push({
+                title: "Inventory Adjustment",
+                url: route("inventory_adjustments.index"),
+                isActive: url.startsWith(invAdjustBase),
+            });
+        }
+        if (hasPermission("inventory_transfers.index")) {
+            items.push({
+                title: "Inventory Transfer",
+                url: route("inventory_transfers.index"),
+                isActive: url.startsWith(invTransferBase),
+            });
+        }
+
+        if (items.length > 0) {
+            navOperationsItems.push({
+                title: "Products",
+                url: "#",
+                icon: Package,
+                isActive: items.some(i => i.isActive),
+                items,
+            });
+        }
+    }
+
+    // Suppliers
+    if (hasAnyPermission([
+        "vendors.index", "purchase_orders.index", "cash_purchases.index",
+        "bill_invoices.index", "bill_payments.index", "purchase_returns.index"
+    ])) {
+        const items = [];
+        if (hasPermission("vendors.index")) {
+            items.push({
+                title: "All Suppliers",
+                url: route("vendors.index"),
+                isActive: url.startsWith(vendorsBase),
+            });
+        }
+        if (hasPermission("purchase_orders.index")) {
+            items.push({
+                title: "Purchase Order",
+                url: route("purchase_orders.index"),
+                isActive: url.startsWith(purchaseOrdersBase),
+            });
+        }
+        if (hasPermission("cash_purchases.index")) {
+            items.push({
+                title: "Cash Purchase",
+                url: route("cash_purchases.index"),
+                isActive: url.startsWith(cashPurchasesBase),
+            });
+        }
+        if (hasPermission("bill_invoices.index")) {
+            items.push({
+                title: "Credit Purchase",
+                url: route("bill_invoices.index"),
+                isActive: url.startsWith(billInvoicesBase),
+            });
+        }
+        if (hasPermission("bill_payments.index")) {
+            items.push({
+                title: "Pay Credit Purchase",
+                url: route("bill_payments.index"),
+                isActive: url.startsWith(billPaymentsBase),
+            });
+        }
+        if (hasPermission("purchase_returns.index")) {
+            items.push({
+                title: "Purchase Return",
+                url: route("purchase_returns.index"),
+                isActive: url.startsWith(purchaseReturnsBase),
+            });
+        }
+
+        if (items.length > 0) {
+            navOperationsItems.push({
+                title: "Suppliers",
+                url: "#",
+                icon: Users,
+                isActive: items.some(i => i.isActive),
+                items,
+            });
+        }
+    }
+
+    // Customers
+    if (hasAnyPermission([
+        "customers.index", "receipts.index", "invoices.index", "medical_records.index",
+        "quotations.index", "deffered_invoices.index", "sales_returns.index",
+        "prescriptions.index", "receive_payments.index"
+    ])) {
+        const items = [];
+        if (hasPermission("customers.index")) {
+            items.push({
+                title: "All Customers",
+                url: route("customers.index"),
+                isActive: url.startsWith(customersBase),
+            });
+        }
+        if (hasPermission("receipts.index")) {
+            items.push({
+                title: "Cash Invoice",
+                url: route("receipts.index"),
+                isActive: url.startsWith(receiptsBase),
+            });
+        }
+        if (hasPermission("invoices.index")) {
+            items.push({
+                title: "Credit Invoice",
+                url: route("invoices.index"),
+                isActive: url.startsWith(creditInvoicesBase),
+            });
+        }
+        if (userPackage?.medical_record === 1 && hasPermission("medical_records.index")) {
+            items.push({
+                title: "Medical Records",
+                url: route("medical_records.index"),
+                isActive: url.startsWith(medicalRecordsBase),
+            });
+        }
+        if (userPackage?.prescription === 1 && hasPermission("prescriptions.index")) {
+            items.push({
+                title: "Prescriptions",
+                url: route("prescriptions.index"),
+                isActive: url.startsWith(prescriptionsBase),
+            });
+        }
+        if (userPackage?.deffered_invoice === 1 && hasPermission("deffered_invoices.index")) {
+            items.push({
+                title: "Deferred Invoice",
+                url: route("deffered_invoices.index"),
+                isActive: url.startsWith(deferredInvoicesBase),
+            });
+        }
+        if (hasPermission("receive_payments.index")) {
+            items.push({
+                title: "Received Payment",
+                url: route("receive_payments.index"),
+                isActive: url.startsWith(receivePaymentsBase),
+            });
+        }
+        if (hasPermission("sales_returns.index")) {
+            items.push({
+                title: "Sales Return",
+                url: route("sales_returns.index"),
+                isActive: url.startsWith(salesReturnsBase),
+            });
+        }
+        if (hasPermission("quotations.index")) {
+            items.push({
+                title: "Quotations",
+                url: route("quotations.index"),
+                isActive: url.startsWith(quotationsBase),
+            });
+        }
+
+        if (items.length > 0) {
+            navOperationsItems.push({
+                title: "Customers",
+                url: "#",
+                icon: Users,
+                isActive: items.some(i => i.isActive),
+                items,
+            });
+        }
+    }
+
+    // ——————————————————————————————————
+    // Build Management section
+    // ——————————————————————————————————
+    const navManagementItems = [];
+
+    // HR & Payroll
+    if (userPackage?.payroll_module === 1 && hasAnyPermission([
+        "staffs.index", "attendance_devices.index", "attendance_logs.index", "timesheets.index",
+        "departments.index", "designations.index", "salary_advances.index", "payslips.index",
+        "holidays.index", "leaves.index", "awards.index"
+    ])) {
+        const items = [];
+        if (hasPermission("staffs.index")) {
+            items.push({
+                title: "Staff Management",
+                url: route("staffs.index"),
+                isActive: url.startsWith(staffsBase),
+            });
+        }
+        if (userPackage?.time_sheet_module === 1 && hasPermission("attendance_devices.index")) {
+            items.push({
+                title: "Attendance Devices",
+                url: route("attendance_devices.index"),
+                isActive: url.startsWith(attendanceDevicesBase),
+            });
+        }
+        if (userPackage?.time_sheet_module === 1 && hasPermission("attendance_logs.index")) {
+            items.push({
+                title: "Attendance Logs",
+                url: route("attendance_logs.index"),
+                isActive: url.startsWith(attendanceLogsBase),
+            });
+        }
+        if (userPackage?.time_sheet_module === 1 && hasPermission("timesheets.index")) {
+            items.push({
+                title: "Time Sheet",
+                url: route("timesheets.index"),
+                isActive: url.startsWith(timeSheetsBase),
+            });
+        }
+        if (hasPermission("departments.index")) {
+            items.push({
+                title: "Departments",
+                url: route("departments.index"),
+                isActive: url.startsWith(departmentsBase),
+            });
+        }
+        if (hasPermission("designations.index")) {
+            items.push({
+                title: "Designations",
+                url: route("designations.index"),
+                isActive: url.startsWith(designationsBase),
+            });
+        }
+        if (hasPermission("salary_advances.index")) {
+            items.push({
+                title: "Salary Advances",
+                url: route("salary_advances.index"),
+                isActive: url.startsWith(salaryAdvancesBase),
+            });
+        }
+        if (hasPermission("payslips.index")) {
+            items.push({
+                title: "Manage Payroll",
+                url: route("payslips.index"),
+                isActive: url.startsWith(payslipsBase),
+            });
+        }
+        if (hasPermission("holidays.index")) {
+            items.push({
+                title: "Holidays",
+                url: route("holidays.index"),
+                isActive: url.startsWith(holidaysBase),
+            });
+        }
+        if (hasPermission("leaves.index")) {
+            items.push({
+                title: "Leave Management",
+                url: route("leaves.index"),
+                isActive: url.startsWith(leavesBase),
+            });
+        }
+        if (hasPermission("awards.index")) {
+            items.push({
+                title: "Awards",
+                url: route("awards.index"),
+                isActive: url.startsWith(awardsBase),
+            });
+        }
+
+        if (items.length > 0) {
+            navManagementItems.push({
+                title: "HR & Payroll",
+                url: "#",
+                icon: GroupIcon,
+                isActive: items.some(i => i.isActive),
+                items,
+            });
+        }
+    }
+
+    // Construction
+    if (userPackage?.construction_module === 1 && hasAnyPermission([
+        "projects.index", "project_groups.index", "cost_codes.index", "project_subcontracts.index"
+    ])) {
+        const items = [];
+        if (hasPermission("projects.index")) {
+            items.push({
+                title: "Projects",
+                url: route("projects.index"),
+                isActive: url.startsWith(projectsBase),
+            });
+        }
+        if (hasPermission("project_groups.index")) {
+            items.push({
+                title: "Project Groups",
+                url: route("project_groups.index"),
+                isActive: url.startsWith(projectGroupsBase),
+            });
+        }
+        if (hasPermission("cost_codes.index")) {
+            items.push({
+                title: "Cost Codes",
+                url: route("cost_codes.index"),
+                isActive: url.startsWith(costCodesBase),
+            });
+        }
+        if (hasPermission("project_subcontracts.index")) {
+            items.push({
+                title: "Subcontracts",
+                url: route("project_subcontracts.index"),
+                isActive: url.startsWith(projectSubcontractsBase),
+            });
+        }
+
+        if (items.length > 0) {
+            navManagementItems.push({
+                title: "Construction",
+                url: "#",
+                icon: Building,
+                isActive: items.some(i => i.isActive),
+                items,
+            });
+        }
+    }
+
+    // Accounting
+    if (hasAnyPermission(["accounts.index", "journals.index", "transaction_methods.index"])) {
+        const items = [];
+        if (hasPermission("accounts.index")) {
+            items.push({
+                title: "Chart of Accounts",
+                url: route("accounts.index"),
+                isActive: url.startsWith(accountsBase),
+            });
+        }
+        if (hasPermission("journals.index")) {
+            items.push({
+                title: "Journal Entry",
+                url: route("journals.index"),
+                isActive: url.startsWith(journalsBase),
+            });
+        }
+        if (hasPermission("transaction_methods.index")) {
+            items.push({
+                title: "Transaction Methods",
+                url: route("transaction_methods.index"),
+                isActive: url.startsWith(transactionMethodsBase),
+            });
+        }
+
+        if (items.length > 0) {
+            navManagementItems.push({
+                title: "Accounting",
+                url: "#",
+                icon: ChartPieIcon,
+                isActive: items.some(i => i.isActive),
+                items,
+            });
+        }
+    }
+
+    // Business
+    if (hasAnyPermission([
+        "business.index", "roles.index", "business.user-management", "business.settings",
+        "taxes.index", "currency.index", "audit_logs.index"
+    ])) {
+        const items = [];
+        if (hasPermission("business.index")) {
+            items.push({
+                title: "Manage Businesses",
+                url: route("business.index"),
+                isActive: url.startsWith(businessesBase),
+            });
+        }
+        if (hasPermission("roles.index")) {
+            items.push({
+                title: "Roles & Permissions",
+                url: route("roles.index"),
+                isActive: url.startsWith(rolesBase),
+            });
+        }
+        if (hasPermission("business.user-management")) {
+            items.push({
+                title: "User Management",
+                url: route("business.user-management"),
+                isActive: url.includes(businessUserManagementFragment) || url.includes(businessInvitationsFragment),
+            });
+        }
+        if (hasPermission("business.settings")) {
+            items.push({
+                title: "Business Settings",
+                url: route("business.settings", activeBusiness?.id),
+                isActive: url.includes(businessSettingsFragment),
+            });
+        }
+        if (hasPermission("taxes.index")) {
+            items.push({
+                title: "Tax Settings",
+                url: route("taxes.index"),
+                isActive: url.startsWith(taxesBase),
+            });
+        }
+        if (hasPermission("currency.index")) {
+            items.push({
+                title: "Currency Settings",
+                url: route("currency.index"),
+                isActive: url.startsWith(currencyBase),
+            });
+        }
+        if (hasPermission("audit_logs.index")) {
+            items.push({
+                title: "Audit Logs",
+                url: route("audit_logs.index"),
+                isActive: url.startsWith(auditLogsBase),
+            });
+        }
+
+        if (items.length > 0) {
+            navManagementItems.push({
+                title: "Business",
+                url: "#",
+                icon: Building2Icon,
+                isActive: items.some(i => i.isActive),
+                items,
+            });
+        }
+    }
+
+    // Reports
+    if (hasAnyPermission([
+        "reports.journal", "reports.ledger", "reports.income_statement", "reports.trial_balance",
+        "reports.balance_sheet", "reports.receivables", "reports.payables", "reports.payroll_summary",
+        "reports.payroll_cost", "reports.income_by_customer", "reports.inventory_details", "reports.inventory_summary"
+    ])) {
+        const items = [];
+        if (hasPermission("reports.journal")) {
+            items.push({
+                title: "General Journal",
+                url: route("reports.journal"),
+                isActive: url.startsWith(reportsJournalBase),
+            });
+        }
+        if (hasPermission("reports.ledger")) {
+            items.push({
+                title: "General Ledger",
+                url: route("reports.ledger"),
+                isActive: url.startsWith(reportsLedgerBase),
+            });
+        }
+        if (hasPermission("reports.income_statement")) {
+            items.push({
+                title: "Income Statement",
+                url: route("reports.income_statement"),
+                isActive: url.startsWith(reportsIncomeStatement),
+            });
+        }
+        if (hasPermission("reports.trial_balance")) {
+            items.push({
+                title: "Trial Balance",
+                url: route("reports.trial_balance"),
+                isActive: url.startsWith(reportsTrialBalance),
+            });
+        }
+        if (hasPermission("reports.balance_sheet")) {
+            items.push({
+                title: "Balance Sheet",
+                url: route("reports.balance_sheet"),
+                isActive: url.startsWith(reportsBalanceSheet),
+            });
+        }
+        if (hasPermission("reports.income_by_customer")) {
+            items.push({
+                title: "Income By Customer",
+                url: route("reports.income_by_customer"),
+                isActive: url.startsWith(reportsIncomeByCustomer),
+            });
+        }
+        if (hasPermission("reports.receivables")) {
+            items.push({
+                title: "Receivables",
+                url: route("reports.receivables"),
+                isActive: url.startsWith(reportsReceivables),
+            });
+        }
+        if (hasPermission("reports.payables")) {
+            items.push({
+                title: "Payables",
+                url: route("reports.payables"),
+                isActive: url.startsWith(reportsPayables),
+            });
+        }
+        if (hasPermission("reports.payroll_summary")) {
+            items.push({
+                title: "Payroll Summary",
+                url: route("reports.payroll_summary"),
+                isActive: url.startsWith(reportsPayrollSummary),
+            });
+        }
+        if (hasPermission("reports.payroll_cost")) {
+            items.push({
+                title: "Monthly Payroll Cost",
+                url: route("reports.payroll_cost"),
+                isActive: url.startsWith(reportsPayrollCost),
+            });
+        }
+        if (hasPermission("reports.inventory_details")) {
+            items.push({
+                title: "Inventory Details",
+                url: route("reports.inventory_details"),
+                isActive: url.startsWith(reportsInventoryDetails),
+            });
+        }
+        if (hasPermission("reports.inventory_summary")) {
+            items.push({
+                title: "Inventory Summary",
+                url: route("reports.inventory_summary"),
+                isActive: url.startsWith(reportsInventorySummary),
+            });
+        }
+
+        if (items.length > 0) {
+            navManagementItems.push({
+                title: "Reports",
+                url: "#",
+                icon: Building2Icon,
+                isActive: items.some(i => i.isActive),
+                items,
+            });
+        }
+    }
 
     return (
         <Sidebar collapsible="icon" {...props}>
@@ -545,8 +718,12 @@ export function UserSidebar({ ...props }) {
             </SidebarHeader>
             <SidebarContent>
                 <NavUserDashboard items={dashboardItems} />
-                <NavOperations items={navOperationsItems} />
-                <NavManagement items={navManagementItems} />
+                {navOperationsItems.length > 0 && (
+                    <NavOperations items={navOperationsItems} />
+                )}
+                {navManagementItems.length > 0 && (
+                    <NavManagement items={navManagementItems} />
+                )}
             </SidebarContent>
             <SidebarFooter>
                 <NavUser user={data.user} />

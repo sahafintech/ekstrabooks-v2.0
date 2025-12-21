@@ -45,13 +45,9 @@ class HandleInertiaRequests extends Middleware
         }
 
         $isOwner = $activeBusiness && $activeBusiness->pivot->owner_id == $user->id ? true : false;
-        $permissionList = $user?->select('permissions.*')
-            ->join('business_users', 'users.id', 'business_users.user_id')
-            ->join('business', 'business_users.business_id', 'business.id')
-            ->join('permissions', 'business_users.role_id', 'permissions.role_id')
-            ->where('business.id', $activeBusiness?->id)
-            ->where('users.id', $user->id)
-            ->get();
+        
+        // Use Spatie's permission system
+        $permissionList = $user ? $user->getAllPermissions()->pluck('name')->toArray() : [];
 
         $userPackage = $activeBusiness ? $activeBusiness->user->package : $user?->package;
 

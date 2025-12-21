@@ -157,12 +157,12 @@ const DrawerComponent = ({
 
         {/* Content */}
         <div className={cn(
-          'flex-1 overflow-auto',
-          (position === 'left' || position === 'right') && 'flex flex-col h-full px-4 pb-4',
-          position === 'bottom' && 'pb-4 px-4',
-          position === 'top' && 'px-4 pb-4',
+          'flex flex-col',
+          (position === 'left' || position === 'right') && 'h-[calc(100%-60px)]',
+          position === 'bottom' && 'max-h-[80vh] pb-4 px-4',
+          position === 'top' && 'max-h-[80vh] px-4 pb-4',
           title && 'pt-0',
-          !title && (position === 'left' || position === 'right') && 'pt-12',
+          !title && (position === 'left' || position === 'right') && 'pt-12 h-full',
           !title && position === 'top' && 'pt-12',
           !title && position === 'bottom' && 'pt-4'
         )}>

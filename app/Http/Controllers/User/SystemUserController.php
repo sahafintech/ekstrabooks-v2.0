@@ -8,7 +8,7 @@ use App\Models\Business;
 use App\Models\BusinessUser;
 use App\Models\EmailTemplate;
 use App\Models\Invite;
-use App\Models\Role;
+use Spatie\Permission\Models\Role;
 use App\Models\User;
 use App\Notifications\InviteUser;
 use Illuminate\Http\Request;
@@ -56,9 +56,19 @@ class SystemUserController extends Controller
 
 		$businesses = Business::whereIn('id', $request->business_id)->get();
 		$role = Role::find($request->role_id);
+		$user = User::find($userId);
 
 		if (!$businesses) {
 			return redirect()->back()->with('error', _lang('No business found'));
+		}
+
+		if (!$user) {
+			return redirect()->back()->with('error', _lang('User not found'));
+		}
+
+		// Sync Spatie role
+		if ($role) {
+			$user->syncRoles([$role->name]);
 		}
 
 		BusinessUser::where('user_id', $userId)->delete();
@@ -77,7 +87,7 @@ class SystemUserController extends Controller
 		$audit = new AuditLog();
 		$audit->date_changed = date('Y-m-d H:i:s');
 		$audit->changed_by = auth()->user()->id;
-		$audit->event = User::find($userId)->name . ' ' . _lang('Role Changed to') . ' ' . $role->name;
+		$audit->event = $user->name . ' ' . _lang('Role Changed to') . ' ' . $role->name;
 		$audit->save();
 
 		return redirect()->back()->with('success', _lang('Role Updated Successfully'));
@@ -206,6 +216,13 @@ class SystemUserController extends Controller
 			$user = User::find($invite->user_id);
 		}
 		$invite->save();
+
+		// Assign Spatie role to user
+		$role = Role::find($invite->role_id);
+		if ($role) {
+			// Sync the role (removes any existing roles and assigns the new one)
+			$user->syncRoles([$role->name]);
+		}
 
 		BusinessUser::where('user_id', $invite->user_id)->delete();
 
