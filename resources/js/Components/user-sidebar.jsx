@@ -152,53 +152,53 @@ export function UserSidebar({ ...props }) {
 
     // Products
     if (hasAnyPermission([
-        "products.index", "products.create", "main_categories.index", "sub_categories.index",
-        "brands.index", "product_units.index", "inventory_adjustments.index", "inventory_transfers.index"
+        "products.view", "products.create", "main_categories.view", "sub_categories.view",
+        "brands.view", "product_units.view", "inventory_adjustments.view", "inventory_transfers.view"
     ])) {
         const items = [];
-        if (hasPermission("products.index") || hasPermission("products.create")) {
+        if (hasPermission("products.view") || hasPermission("products.create")) {
             items.push({
                 title: "All Products",
                 url: route("products.index"),
                 isActive: url.startsWith(productsBase),
             });
         }
-        if (hasPermission("main_categories.index")) {
+        if (hasPermission("main_categories.view")) {
             items.push({
                 title: "Main Categories",
                 url: route("main_categories.index"),
                 isActive: url.startsWith(mainCategoryBase),
             });
         }
-        if (hasPermission("sub_categories.index")) {
+        if (hasPermission("sub_categories.view")) {
             items.push({
                 title: "Sub Categories",
                 url: route("sub_categories.index"),
                 isActive: url.startsWith(subCategoriesBase),
             });
         }
-        if (hasPermission("brands.index")) {
+        if (hasPermission("brands.view")) {
             items.push({
                 title: "Brands",
                 url: route("brands.index"),
                 isActive: url.startsWith(brandsBase),
             });
         }
-        if (hasPermission("product_units.index")) {
+        if (hasPermission("product_units.view")) {
             items.push({
                 title: "Units",
                 url: route("product_units.index"),
                 isActive: url.startsWith(unitsBase),
             });
         }
-        if (hasPermission("inventory_adjustments.index")) {
+        if (hasPermission("inventory_adjustments.view")) {
             items.push({
                 title: "Inventory Adjustment",
                 url: route("inventory_adjustments.index"),
                 isActive: url.startsWith(invAdjustBase),
             });
         }
-        if (hasPermission("inventory_transfers.index")) {
+        if (hasPermission("inventory_transfers.view")) {
             items.push({
                 title: "Inventory Transfer",
                 url: route("inventory_transfers.index"),
@@ -219,46 +219,46 @@ export function UserSidebar({ ...props }) {
 
     // Suppliers
     if (hasAnyPermission([
-        "vendors.index", "purchase_orders.index", "cash_purchases.index",
-        "bill_invoices.index", "bill_payments.index", "purchase_returns.index"
+        "vendors.view", "purchase_orders.view", "cash_purchases.view",
+        "bill_invoices.view", "bill_payments.view", "purchase_returns.view"
     ])) {
         const items = [];
-        if (hasPermission("vendors.index")) {
+        if (hasPermission("vendors.view")) {
             items.push({
                 title: "All Suppliers",
                 url: route("vendors.index"),
                 isActive: url.startsWith(vendorsBase),
             });
         }
-        if (hasPermission("purchase_orders.index")) {
+        if (hasPermission("purchase_orders.view")) {
             items.push({
                 title: "Purchase Order",
                 url: route("purchase_orders.index"),
                 isActive: url.startsWith(purchaseOrdersBase),
             });
         }
-        if (hasPermission("cash_purchases.index")) {
+        if (hasPermission("cash_purchases.view")) {
             items.push({
                 title: "Cash Purchase",
                 url: route("cash_purchases.index"),
                 isActive: url.startsWith(cashPurchasesBase),
             });
         }
-        if (hasPermission("bill_invoices.index")) {
+        if (hasPermission("bill_invoices.view")) {
             items.push({
                 title: "Credit Purchase",
                 url: route("bill_invoices.index"),
                 isActive: url.startsWith(billInvoicesBase),
             });
         }
-        if (hasPermission("bill_payments.index")) {
+        if (hasPermission("bill_payments.view")) {
             items.push({
                 title: "Pay Credit Purchase",
                 url: route("bill_payments.index"),
                 isActive: url.startsWith(billPaymentsBase),
             });
         }
-        if (hasPermission("purchase_returns.index")) {
+        if (hasPermission("purchase_returns.view")) {
             items.push({
                 title: "Purchase Return",
                 url: route("purchase_returns.index"),
@@ -279,68 +279,68 @@ export function UserSidebar({ ...props }) {
 
     // Customers
     if (hasAnyPermission([
-        "customers.index", "receipts.index", "invoices.index", "medical_records.index",
-        "quotations.index", "deffered_invoices.index", "sales_returns.index",
-        "prescriptions.index", "receive_payments.index"
+        "customers.view", "receipts.view", "invoices.view", "medical_records.view",
+        "quotations.view", "deffered_invoices.view", "sales_returns.view",
+        "prescriptions.view", "receive_payments.view"
     ])) {
         const items = [];
-        if (hasPermission("customers.index")) {
+        if (hasPermission("customers.view")) {
             items.push({
                 title: "All Customers",
                 url: route("customers.index"),
                 isActive: url.startsWith(customersBase),
             });
         }
-        if (hasPermission("receipts.index")) {
+        if (hasPermission("receipts.view")) {
             items.push({
                 title: "Cash Invoice",
                 url: route("receipts.index"),
                 isActive: url.startsWith(receiptsBase),
             });
         }
-        if (hasPermission("invoices.index")) {
+        if (hasPermission("invoices.view")) {
             items.push({
                 title: "Credit Invoice",
                 url: route("invoices.index"),
                 isActive: url.startsWith(creditInvoicesBase),
             });
         }
-        if (userPackage?.medical_record === 1 && hasPermission("medical_records.index")) {
+        if (userPackage?.medical_record === 1 && hasPermission("medical_records.view")) {
             items.push({
                 title: "Medical Records",
                 url: route("medical_records.index"),
                 isActive: url.startsWith(medicalRecordsBase),
             });
         }
-        if (userPackage?.prescription === 1 && hasPermission("prescriptions.index")) {
+        if (userPackage?.prescription === 1 && hasPermission("prescriptions.view")) {
             items.push({
                 title: "Prescriptions",
                 url: route("prescriptions.index"),
                 isActive: url.startsWith(prescriptionsBase),
             });
         }
-        if (userPackage?.deffered_invoice === 1 && hasPermission("deffered_invoices.index")) {
+        if (userPackage?.deffered_invoice === 1 && hasPermission("deffered_invoices.view")) {
             items.push({
                 title: "Deferred Invoice",
                 url: route("deffered_invoices.index"),
                 isActive: url.startsWith(deferredInvoicesBase),
             });
         }
-        if (hasPermission("receive_payments.index")) {
+        if (hasPermission("receive_payments.view")) {
             items.push({
                 title: "Received Payment",
                 url: route("receive_payments.index"),
                 isActive: url.startsWith(receivePaymentsBase),
             });
         }
-        if (hasPermission("sales_returns.index")) {
+        if (hasPermission("sales_returns.view")) {
             items.push({
                 title: "Sales Return",
                 url: route("sales_returns.index"),
                 isActive: url.startsWith(salesReturnsBase),
             });
         }
-        if (hasPermission("quotations.index")) {
+        if (hasPermission("quotations.view")) {
             items.push({
                 title: "Quotations",
                 url: route("quotations.index"),
@@ -366,82 +366,82 @@ export function UserSidebar({ ...props }) {
 
     // HR & Payroll
     if (userPackage?.payroll_module === 1 && hasAnyPermission([
-        "staffs.index", "attendance_devices.index", "attendance_logs.index", "timesheets.index",
-        "departments.index", "designations.index", "salary_advances.index", "payslips.index",
-        "holidays.index", "leaves.index", "awards.index"
+        "staffs.view", "attendance_devices.view", "attendance_logs.view", "timesheets.view",
+        "departments.view", "designations.view", "salary_advances.view", "payslips.view",
+        "holidays.view", "leaves.view", "awards.view"
     ])) {
         const items = [];
-        if (hasPermission("staffs.index")) {
+        if (hasPermission("staffs.view")) {
             items.push({
                 title: "Staff Management",
                 url: route("staffs.index"),
                 isActive: url.startsWith(staffsBase),
             });
         }
-        if (userPackage?.time_sheet_module === 1 && hasPermission("attendance_devices.index")) {
+        if (userPackage?.time_sheet_module === 1 && hasPermission("attendance_devices.view")) {
             items.push({
                 title: "Attendance Devices",
                 url: route("attendance_devices.index"),
                 isActive: url.startsWith(attendanceDevicesBase),
             });
         }
-        if (userPackage?.time_sheet_module === 1 && hasPermission("attendance_logs.index")) {
+        if (userPackage?.time_sheet_module === 1 && hasPermission("attendance_logs.view")) {
             items.push({
                 title: "Attendance Logs",
                 url: route("attendance_logs.index"),
                 isActive: url.startsWith(attendanceLogsBase),
             });
         }
-        if (userPackage?.time_sheet_module === 1 && hasPermission("timesheets.index")) {
+        if (userPackage?.time_sheet_module === 1 && hasPermission("timesheets.view")) {
             items.push({
                 title: "Time Sheet",
                 url: route("timesheets.index"),
                 isActive: url.startsWith(timeSheetsBase),
             });
         }
-        if (hasPermission("departments.index")) {
+        if (hasPermission("departments.view")) {
             items.push({
                 title: "Departments",
                 url: route("departments.index"),
                 isActive: url.startsWith(departmentsBase),
             });
         }
-        if (hasPermission("designations.index")) {
+        if (hasPermission("designations.view")) {
             items.push({
                 title: "Designations",
                 url: route("designations.index"),
                 isActive: url.startsWith(designationsBase),
             });
         }
-        if (hasPermission("salary_advances.index")) {
+        if (hasPermission("salary_advances.view")) {
             items.push({
                 title: "Salary Advances",
                 url: route("salary_advances.index"),
                 isActive: url.startsWith(salaryAdvancesBase),
             });
         }
-        if (hasPermission("payslips.index")) {
+        if (hasPermission("payslips.view")) {
             items.push({
                 title: "Manage Payroll",
                 url: route("payslips.index"),
                 isActive: url.startsWith(payslipsBase),
             });
         }
-        if (hasPermission("holidays.index")) {
+        if (hasPermission("holidays.view")) {
             items.push({
                 title: "Holidays",
                 url: route("holidays.index"),
                 isActive: url.startsWith(holidaysBase),
             });
         }
-        if (hasPermission("leaves.index")) {
+        if (hasPermission("leaves.view")) {
             items.push({
                 title: "Leave Management",
                 url: route("leaves.index"),
                 isActive: url.startsWith(leavesBase),
             });
         }
-        if (hasPermission("awards.index")) {
+        if (hasPermission("awards.view")) {
             items.push({
                 title: "Awards",
                 url: route("awards.index"),
@@ -462,31 +462,31 @@ export function UserSidebar({ ...props }) {
 
     // Construction
     if (userPackage?.construction_module === 1 && hasAnyPermission([
-        "projects.index", "project_groups.index", "cost_codes.index", "project_subcontracts.index"
+        "projects.view", "project_groups.view", "cost_codes.view", "project_subcontracts.view"
     ])) {
         const items = [];
-        if (hasPermission("projects.index")) {
+        if (hasPermission("projects.view")) {
             items.push({
                 title: "Projects",
                 url: route("projects.index"),
                 isActive: url.startsWith(projectsBase),
             });
         }
-        if (hasPermission("project_groups.index")) {
+        if (hasPermission("project_groups.view")) {
             items.push({
                 title: "Project Groups",
                 url: route("project_groups.index"),
                 isActive: url.startsWith(projectGroupsBase),
             });
         }
-        if (hasPermission("cost_codes.index")) {
+        if (hasPermission("cost_codes.view")) {
             items.push({
                 title: "Cost Codes",
                 url: route("cost_codes.index"),
                 isActive: url.startsWith(costCodesBase),
             });
         }
-        if (hasPermission("project_subcontracts.index")) {
+        if (hasPermission("project_subcontracts.view")) {
             items.push({
                 title: "Subcontracts",
                 url: route("project_subcontracts.index"),
@@ -506,23 +506,23 @@ export function UserSidebar({ ...props }) {
     }
 
     // Accounting
-    if (hasAnyPermission(["accounts.index", "journals.index", "transaction_methods.index"])) {
+    if (hasAnyPermission(["accounts.view", "journals.view", "transaction_methods.view"])) {
         const items = [];
-        if (hasPermission("accounts.index")) {
+        if (hasPermission("accounts.view")) {
             items.push({
                 title: "Chart of Accounts",
                 url: route("accounts.index"),
                 isActive: url.startsWith(accountsBase),
             });
         }
-        if (hasPermission("journals.index")) {
+        if (hasPermission("journals.view")) {
             items.push({
                 title: "Journal Entry",
                 url: route("journals.index"),
                 isActive: url.startsWith(journalsBase),
             });
         }
-        if (hasPermission("transaction_methods.index")) {
+        if (hasPermission("transaction_methods.view")) {
             items.push({
                 title: "Transaction Methods",
                 url: route("transaction_methods.index"),
@@ -543,18 +543,18 @@ export function UserSidebar({ ...props }) {
 
     // Business
     if (hasAnyPermission([
-        "business.index", "roles.index", "business.user-management", "business.settings",
-        "taxes.index", "currency.index", "audit_logs.index"
+        "business.view", "business.roles-permissions", "business.user-management", "business.settings",
+        "taxes.view", "currency.view", "audit_logs.view"
     ])) {
         const items = [];
-        if (hasPermission("business.index")) {
+        if (hasPermission("business.view")) {
             items.push({
                 title: "Manage Businesses",
                 url: route("business.index"),
                 isActive: url.startsWith(businessesBase),
             });
         }
-        if (hasPermission("roles.index")) {
+        if (hasPermission("business.roles-permissions")) {
             items.push({
                 title: "Roles & Permissions",
                 url: route("roles.index"),
@@ -575,21 +575,21 @@ export function UserSidebar({ ...props }) {
                 isActive: url.includes(businessSettingsFragment),
             });
         }
-        if (hasPermission("taxes.index")) {
+        if (hasPermission("taxes.view")) {
             items.push({
                 title: "Tax Settings",
                 url: route("taxes.index"),
                 isActive: url.startsWith(taxesBase),
             });
         }
-        if (hasPermission("currency.index")) {
+        if (hasPermission("currency.view")) {
             items.push({
                 title: "Currency Settings",
                 url: route("currency.index"),
                 isActive: url.startsWith(currencyBase),
             });
         }
-        if (hasPermission("audit_logs.index")) {
+        if (hasPermission("audit_logs.view")) {
             items.push({
                 title: "Audit Logs",
                 url: route("audit_logs.index"),

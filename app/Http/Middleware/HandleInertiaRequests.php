@@ -47,7 +47,8 @@ class HandleInertiaRequests extends Middleware
         $isOwner = $activeBusiness && $activeBusiness->pivot->owner_id == $user->id ? true : false;
         
         // Use Spatie's permission system
-        $permissionList = $user ? $user->getAllPermissions()->pluck('name')->toArray() : [];
+        // getDirectPermissions() returns ONLY permissions directly assigned to the user (not from roles)
+        $permissionList = $user ? $user->getDirectPermissions()->pluck('name')->toArray() : [];
 
         $userPackage = $activeBusiness ? $activeBusiness->user->package : $user?->package;
 

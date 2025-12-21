@@ -556,6 +556,15 @@ final class RolesAndPermissionsSeeder extends Seeder
             'leaves.reject',
 
             // =====================
+            // HR - ATTENDANCE DEVICES
+            // =====================
+            'attendance_devices.view',
+            'attendance_devices.create',
+            'attendance_devices.edit',
+            'attendance_devices.update',
+            'attendance_devices.delete',
+
+            // =====================
             // HR - ATTENDANCE LOGS
             // =====================
             'attendance_logs.view',
@@ -1023,7 +1032,12 @@ final class RolesAndPermissionsSeeder extends Seeder
             'leaves.approve',
             'leaves.reject',
 
-            // HR - Attendance & Timesheets
+            // HR - Attendance Devices & Timesheets
+            'attendance_devices.view',
+            'attendance_devices.create',
+            'attendance_devices.edit',
+            'attendance_devices.update',
+            'attendance_devices.delete',
             'attendance_logs.view',
             'attendance_logs.create',
             'attendance_logs.csv.import',
@@ -1314,6 +1328,7 @@ final class RolesAndPermissionsSeeder extends Seeder
             'leaves.create',
             'leaves.edit',
             'leaves.update',
+            'attendance_devices.view',
             'attendance_logs.view',
             'attendance_logs.csv.export',
             'timesheets.view',

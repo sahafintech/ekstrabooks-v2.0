@@ -626,11 +626,7 @@ class DashboardController extends Controller
 				->orderBy('trans_date', 'desc')
 				->limit(10)->get();
 
-			if (request('isOwner') == true) {
-				return Inertia::render("Backend/User/Dashboard-User", $data);
-			}
-
-			return Inertia::render("Backend/User/Dashboard-Staff", $data);
+			return Inertia::render("Backend/User/Dashboard", $data);
 		}
 	}
 

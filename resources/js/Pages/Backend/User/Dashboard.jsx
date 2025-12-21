@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { router, useForm } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import {
     Select,
     SelectContent,
@@ -30,11 +30,10 @@ import PageHeader from "@/Components/PageHeader";
 import { formatCurrency, parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { Link } from "@inertiajs/react";
-import { usePage } from "@inertiajs/react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 
-export default function DashboardStaff({
+export default function Dashboard({
     dashboard_type = "accounting",
     custom,
     range,
@@ -45,7 +44,6 @@ export default function DashboardStaff({
     sales_overview,
     recentTransactions,
     topCustomers,
-    receivables_payables,
     cashflow,
     recentCreditInvoices,
 }) {
@@ -53,27 +51,57 @@ export default function DashboardStaff({
     const [customRange, setCustomRange] = useState(custom);
     const [isCustom, setIsCustom] = useState(false);
     const [dashboardType, setDashboardType] = useState(dashboard_type);
-    const { permissionList, auth } = usePage().props;
+    const { permissionList = [], auth, isOwner } = usePage().props;
 
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
 
+    // Helper function to check permissions - owners have all permissions
+    // permissionList now contains only directly assigned permissions (not role-inherited)
+    const hasPermission = (permission) => {
+        if (isOwner) return true;
+        return permissionList.includes(permission);
+    };
+
+    // Individual permission checks for each widget
+    const canViewIncomeWidget = hasPermission("dashboard.income_widget");
+    const canViewExpenseWidget = hasPermission("dashboard.expense_widget");
+    const canViewAccountsReceivableWidget = hasPermission("dashboard.accounts_receivable_amount_widget");
+    const canViewAccountsPayableWidget = hasPermission("dashboard.accounts_payable_amount_widget");
+    const canViewSalesOverviewWidget = hasPermission("dashboard.sales_overview_widget");
+    const canViewRecentTransactionWidget = hasPermission("dashboard.recent_transaction_widget");
+    const canViewCashflowWidget = hasPermission("dashboard.cashflow_widget");
+    const canViewRecentInvoicesWidget = hasPermission("dashboard.recent_invoices_widget");
+    const canViewTopCustomersWidget = hasPermission("dashboard.top_customers_widget");
+
+    // Check if any dashboard widget is accessible (used for fallback welcome message)
+    const hasAnyDashboardWidget = 
+        canViewIncomeWidget ||
+        canViewExpenseWidget ||
+        canViewAccountsReceivableWidget ||
+        canViewAccountsPayableWidget ||
+        canViewSalesOverviewWidget ||
+        canViewRecentTransactionWidget ||
+        canViewCashflowWidget ||
+        canViewRecentInvoicesWidget ||
+        canViewTopCustomersWidget;
+
     useEffect(() => {
         if (flash && flash.success) {
-          toast({
-            title: "Success",
-            description: flash.success,
-          });
+            toast({
+                title: "Success",
+                description: flash.success,
+            });
         }
-    
+
         if (flash && flash.error) {
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: flash.error,
-          });
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: flash.error,
+            });
         }
-      }, [flash, toast]);
+    }, [flash, toast]);
 
     // Transform data for charts
     const monthlyData = Array.from({ length: 12 }, (_, i) => ({
@@ -91,8 +119,8 @@ export default function DashboardStaff({
             "Nov",
             "Dec",
         ][i],
-        income: sales_overview.incomes[i] || 0,
-        expense: sales_overview.expenses[i] || 0,
+        income: sales_overview?.incomes?.[i] || 0,
+        expense: sales_overview?.expenses?.[i] || 0,
     }));
 
     const cashflowData = Array.from({ length: 12 }, (_, i) => ({
@@ -110,9 +138,9 @@ export default function DashboardStaff({
             "Nov",
             "Dec",
         ][i],
-        income: cashflow.cashflow_incomes[i] || 0,
-        expense: cashflow.cashflow_expenses[i] || 0,
-        balance: cashflow.ending_balance[i] || 0,
+        income: cashflow?.cashflow_incomes?.[i] || 0,
+        expense: cashflow?.cashflow_expenses?.[i] || 0,
+        balance: cashflow?.ending_balance?.[i] || 0,
     }));
 
     const chartConfig = {
@@ -188,15 +216,7 @@ export default function DashboardStaff({
                     subpage="Dashboard"
                     url="dashboard.index"
                 />
-                {permissionList?.some(p => p.permission === "dashboard.income_widget") ||
-                    permissionList?.some(p => p.permission === "dashboard.expense_widget") ||
-                    permissionList?.some(p => p.permission === "dashboard.accounts_receivable_amount_widget") ||
-                    permissionList?.some(p => p.permission === "dashboard.accounts_payable_amount_widget") ||
-                    permissionList?.some(p => p.permission === "dashboard.sales_overview_widget") ||
-                    permissionList?.some(p => p.permission === "dashboard.recent_transaction_widget") ||
-                    permissionList?.some(p => p.permission === "dashboard.cash_flow_widget") ||
-                    permissionList?.some(p => p.permission === "dashboard.recent_invoices_widget") ||
-                    permissionList?.some(p => p.permission === "dashboard.top_customers_widget") ? (
+                {hasAnyDashboardWidget ? (
                     <div className="flex flex-1 flex-col gap-2 p-4 pt-0">
                         <div className="main-content space-y-8">
                             <div className="block justify-between page-header md:flex">
@@ -289,8 +309,8 @@ export default function DashboardStaff({
 
                             {/* Dashboard Stats */}
                             <div className="grid auto-rows-min gap-2 md:grid-cols-2 lg:grid-cols-4">
-                                {permissionList?.some(p => p.permission === "dashboard.income_widget") && (
-                                    <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-100">
+                                {canViewIncomeWidget && (
+                                    <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-100 text-primary">
                                         <div className="text-sm">
                                             Total Income
                                         </div>
@@ -304,8 +324,8 @@ export default function DashboardStaff({
                                     </div>
                                 )}
 
-                                {permissionList?.some(p => p.permission === "dashboard.expense_widget") && (
-                                    <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-100">
+                                {canViewExpenseWidget && (
+                                    <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-100 text-primary">
                                         <div className="text-sm">
                                             Total Expense
                                         </div>
@@ -319,8 +339,8 @@ export default function DashboardStaff({
                                     </div>
                                 )}
 
-                                {permissionList?.some(p => p.permission === "dashboard.accounts_receivable_amount_widget") && (
-                                    <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-100">
+                                {canViewAccountsReceivableWidget && (
+                                    <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-100 text-primary">
                                         <div className="text-sm">
                                             Receivable
                                         </div>
@@ -334,8 +354,8 @@ export default function DashboardStaff({
                                     </div>
                                 )}
 
-                                {permissionList?.some(p => p.permission === "dashboard.accounts_payable_amount_widget") && (
-                                    <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-100">
+                                {canViewAccountsPayableWidget && (
+                                    <div className="flex flex-col gap-1 rounded-lg bg-background p-4 shadow-sm bg-neutral-100 text-primary">
                                         <div className="text-sm">
                                             Payable
                                         </div>
@@ -353,7 +373,7 @@ export default function DashboardStaff({
                             {/* Charts Section */}
                             <div className="flex flex-1 flex-col gap-2 pt-0">
                                 <div className="grid auto-rows-min gap-2 md:grid-cols-2">
-                                    {permissionList?.some(p => p.permission === "dashboard.sales_overview_widget") && (
+                                    {canViewSalesOverviewWidget && (
                                         <div className="flex flex-col gap-2 rounded-lg bg-background p-4 shadow-sm">
                                             <div>
                                                 <div className="text-lg font-semibold">
@@ -411,7 +431,7 @@ export default function DashboardStaff({
                                         </div>
                                     )}
 
-                                    {permissionList?.some(p => p.permission === "dashboard.cashflow_widget") && (
+                                    {canViewCashflowWidget && (
                                         <div className="flex flex-col gap-2 rounded-lg bg-background p-4 shadow-sm">
                                             <div>
                                                 <div className="text-lg font-semibold">
@@ -482,11 +502,11 @@ export default function DashboardStaff({
                             </div>
 
                             {/* Recent Transactions */}
-                            {permissionList?.some(p => p.permission === "dashboard.recent_transaction_widget") && (
+                            {canViewRecentTransactionWidget && (
                                 <div className="mt-2">
                                     <TableWrapper>
                                         <RecentTransactionsTable
-                                            transactions={recentTransactions}
+                                            transactions={recentTransactions || []}
                                         />
                                     </TableWrapper>
                                 </div>
@@ -494,7 +514,7 @@ export default function DashboardStaff({
 
                             <div className="flex flex-col md:flex-row gap-2 mb-8">
                                 {/* Recent Invoices */}
-                                {permissionList?.some(p => p.permission === "dashboard.recent_invoices_widget") && (
+                                {canViewRecentInvoicesWidget && (
                                     <div className="flex-1 rounded-lg border bg-white">
                                         <div className="border-b px-6 py-4">
                                             <h2 className="text-lg font-semibold">Recent Invoices</h2>
@@ -589,7 +609,7 @@ export default function DashboardStaff({
                                 )}
 
                                 {/* Top Customers */}
-                                {permissionList?.some(p => p.permission === "dashboard.top_customers_widget") && (
+                                {canViewTopCustomersWidget && (
                                     <div className="flex-1 rounded-lg border bg-white">
                                         <div className="border-b px-6 py-4">
                                             <h2 className="text-lg font-semibold">Top Customers</h2>
@@ -636,7 +656,7 @@ export default function DashboardStaff({
                                 </div>
                             </div>
                         </div>
-                        <h2 className="text-xl font-bold">Welcome ! {auth.user.name}</h2>
+                        <h2 className="text-xl font-bold">Welcome ! {auth?.user?.name}</h2>
                     </div>
                 )}
             </SidebarInset>
@@ -655,25 +675,33 @@ const RecentTransactionsTable = ({ transactions }) => (
             </TableRow>
         </TableHeader>
         <TableBody>
-            {transactions.map((transaction) => (
-                <TableRow
-                    key={transaction.id}
-                    className="cursor-pointer"
-                    onClick={() =>
-                        (window.location.href = route(
-                            "transactions.show",
-                            transaction.id
-                        ))
-                    }
-                >
-                    <TableCell>{transaction.trans_date}</TableCell>
-                    <TableCell>{transaction.account.account_name}</TableCell>
-                    <TableCell>{transaction.description}</TableCell>
-                    <TableCell className="text-right">
-                        {formatCurrency(transaction.base_currency_amount)}
+            {transactions && transactions.length > 0 ? (
+                transactions.map((transaction) => (
+                    <TableRow
+                        key={transaction.id}
+                        className="cursor-pointer"
+                        onClick={() =>
+                            (window.location.href = route(
+                                "transactions.show",
+                                transaction.id
+                            ))
+                        }
+                    >
+                        <TableCell>{transaction.trans_date}</TableCell>
+                        <TableCell>{transaction.account?.account_name}</TableCell>
+                        <TableCell>{transaction.description}</TableCell>
+                        <TableCell className="text-right">
+                            {formatCurrency(transaction.base_currency_amount)}
+                        </TableCell>
+                    </TableRow>
+                ))
+            ) : (
+                <TableRow>
+                    <TableCell colSpan={4} className="text-center">
+                        No recent transactions found.
                     </TableCell>
                 </TableRow>
-            ))}
+            )}
         </TableBody>
     </Table>
 );

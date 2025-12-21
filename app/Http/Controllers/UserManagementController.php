@@ -74,7 +74,7 @@ class UserManagementController extends Controller
                 'email' => $user->email,
                 'is_super_admin' => $user->hasRole('Owner'),
                 'roles' => $user->getRoleNames()->toArray(),
-                'permissions' => $user->getAllPermissions()->pluck('name')->toArray(),
+                'permissions' => $user->getDirectPermissions()->pluck('name')->toArray(),
                 'businesses' => $userBusinesses->map(fn($b) => ['id' => $b->id, 'name' => $b->name])->toArray(),
                 'created_at' => $user->created_at,
             ];
@@ -224,10 +224,10 @@ class UserManagementController extends Controller
             'permissions.*' => ['string', 'exists:permissions,name'],
         ]);
 
-        // Sync roles
+        // Sync roles (the role selected by user)
         $user->syncRoles($validated['roles'] ?? []);
 
-        // Sync direct permissions
+        // Sync direct permissions (the permissions selected/modified by user)
         $user->syncPermissions($validated['permissions'] ?? []);
 
         return redirect()->back()->with('success', 'Roles and permissions updated successfully.');
