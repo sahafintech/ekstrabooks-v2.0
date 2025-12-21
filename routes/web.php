@@ -264,6 +264,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('business/{id}/store_currency_settings', [BusinessSettingsController::class, 'store_currency_settings'])->name('business.store_currency_settings');
 		Route::post('business/{id}/store_general_settings', [BusinessSettingsController::class, 'store_general_settings'])->name('business.store_general_settings');
 		Route::post('business/{id}/store_payroll_settings', [BusinessSettingsController::class, 'store_payroll_settings'])->name('business.store_payroll_settings');
+		Route::post('business/{id}/store_approval_settings', [BusinessSettingsController::class, 'store_approval_settings'])->name('business.store_approval_settings');
 		// Business Settings Route (with tab parameter)
 		Route::get('business/{id}/settings/{tab?}', [BusinessSettingsController::class, 'settings'])->name('business.settings');
 

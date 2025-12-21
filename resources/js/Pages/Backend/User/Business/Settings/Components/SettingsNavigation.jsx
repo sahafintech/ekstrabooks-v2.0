@@ -1,39 +1,40 @@
 import React from "react";
 import { Link } from "@inertiajs/react";
+import { cn } from "@/lib/utils";
+
+const tabs = [
+    { id: "general", label: "General Settings", icon: "⚙️" },
+    { id: "currency", label: "Currency", icon: "💰" },
+    { id: "invoice", label: "Invoice", icon: "📄" },
+    { id: "cash_invoice", label: "Cash Invoice", icon: "💵" },
+    { id: "bill_invoice", label: "Bill", icon: "📑" },
+    { id: "sales_return", label: "Sales Return", icon: "🔄" },
+    { id: "purchase_return", label: "Purchase Return", icon: "⬅️" },
+    { id: "pos_settings", label: "POS Settings", icon: "🖥️" },
+    { id: "payroll", label: "Payroll", icon: "💳" },
+    { id: "approvals", label: "Approvals", icon: "✅" },
+];
 
 export default function SettingsNavigation({ activeTab, businessId }) {
-    const tabs = [
-        { id: "general", label: "General Settings", icon: "🔧" },
-        { id: "currency", label: "Currency Settings", icon: "💱" },
-        { id: "credit_invoice", label: "Credit Invoice Settings", icon: "📃" },
-        { id: "cash_invoice", label: "Cash Invoice Settings", icon: "💵" },
-        { id: "bill_invoice", label: "Bill Invoice Settings", icon: "📄" },
-        { id: "sales_return", label: "Sales Return Settings", icon: "🔄" },
-        {
-            id: "purchase_return",
-            label: "Purchase Return Settings",
-            icon: "🛒",
-        },
-    ];
-
     return (
-        <div className="bg-white shadow mb-6 overflow-x-auto">
-            <div className="flex space-x-1 px-2 py-2">
-                {tabs.map((tab) => (
-                    <Link
-                        key={tab.id}
-                        href={route("business.settings", [businessId, tab.id])}
-                        className={`px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap flex items-center ${
-                            activeTab === tab.id
-                                ? "bg-indigo-100 text-indigo-700"
-                                : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                        }`}
-                    >
-                        <span className="mr-2">{tab.icon}</span>
-                        {tab.label}
-                    </Link>
-                ))}
-            </div>
+        <div className="mr-8">
+            {tabs.map((tab) => (
+                <Link
+                    key={tab.id}
+                    href={route("business.settings", [businessId, tab.id])}
+                    className={cn(
+                        "w-full text-left px-4 py-3 flex items-center rounded-md transition-colors mb-2",
+                        activeTab === tab.id
+                            ? "bg-gray-200 text-gray-700 font-medium"
+                            : "hover:bg-gray-100 text-gray-700 font-medium"
+                    )}
+                >
+                    <span className="mr-2">{tab.icon}</span>
+                    <span className="text-sm md:text-base">{tab.label}</span>
+                </Link>
+            ))}
         </div>
     );
 }
+
+export { tabs };
