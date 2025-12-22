@@ -1566,8 +1566,13 @@ final class RolesAndPermissionsSeeder extends Seeder
         ]);
 
         // Assign Owner role to existing owner users
-        User::where('owner', true)->each(function (User $user): void {
-            $user->assignRole('Owner');
+        User::where('owner', 1)->each(function (User $user): void {
+            if (!$user->hasRole('Owner')) {
+                $user->assignRole('Owner');
+            }
         });
+
+        // Clear permission cache after all assignments
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
     }
 }
