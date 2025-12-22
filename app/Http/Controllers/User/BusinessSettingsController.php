@@ -9,6 +9,7 @@ use App\Models\Business;
 use App\Models\BusinessSetting;
 use App\Models\Currency;
 use App\Models\Tax;
+use App\Models\User;
 use App\Utilities\Overrider;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -124,6 +125,13 @@ class BusinessSettingsController extends Controller
                 return Inertia::render('Backend/User/Business/Settings/PosSettings', $data);
             case 'payroll':
                 return Inertia::render('Backend/User/Business/Settings/Payroll', $data);
+            case 'approvals':
+                // Get users that belong to this business
+                $users = User::whereHas('business', function ($query) use ($id) {
+                    $query->where('business_id', $id);
+                })->select('id', 'name', 'email')->get();
+                $data['users'] = $users;
+                return Inertia::render('Backend/User/Business/Settings/Approvals', $data);
             default:
                 return Inertia::render('Backend/User/Business/Settings/General', $data);
         }
@@ -608,6 +616,34 @@ class BusinessSettingsController extends Controller
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = auth()->user()->id;
         $audit->event = 'Updated POS Settings for ' . $request->activeBusiness->name;
+        $audit->save();
+
+        return back()->with('success', _lang('Saved Successfully'));
+    }
+
+    public function store_approval_settings(Request $request, $businessId)
+    {
+        $validator = Validator::make($request->all(), [
+            'purchase_approval_required_count' => 'required|integer|min:0|max:10',
+            'payroll_approval_required_count' => 'required|integer|min:0|max:10',
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+
+        $settingsData = $request->except($this->ignoreRequests);
+
+        foreach ($settingsData as $key => $value) {
+            $value = is_array($value) ? json_encode($value) : $value;
+            update_business_option($key, $value, $businessId);
+        }
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Updated Approval Settings for ' . $request->activeBusiness->name;
         $audit->save();
 
         return back()->with('success', _lang('Saved Successfully'));

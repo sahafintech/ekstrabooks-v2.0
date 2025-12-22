@@ -72,7 +72,7 @@ class UserManagementController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'is_super_admin' => $user->hasRole('Owner'),
+                'owner' => $user->hasRole('Owner'),
                 'roles' => $user->getRoleNames()->toArray(),
                 'permissions' => $user->getDirectPermissions()->pluck('name')->toArray(),
                 'businesses' => $userBusinesses->map(fn($b) => ['id' => $b->id, 'name' => $b->name])->toArray(),

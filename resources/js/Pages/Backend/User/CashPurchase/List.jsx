@@ -153,71 +153,17 @@ const DeleteAllCashPurchasesModal = ({ show, onClose, onConfirm, processing, cou
   </Modal>
 );
 
-const ApproveAllCashPurchasesModal = ({ show, onClose, onConfirm, processing, count }) => (
-  <Modal show={show} onClose={onClose}>
-    <form onSubmit={onConfirm}>
-      <h2 className="text-lg font-medium">
-        Are you sure you want to approve {count} selected cash purchase{count !== 1 ? 's' : ''}?
-      </h2>
-      <div className="mt-6 flex justify-end">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={onClose}
-          className="mr-3"
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          variant="default"
-          disabled={processing}
-        >
-          Approve Selected
-        </Button>
-      </div>
-    </form>
-  </Modal>
-);
 
-const RejectAllCashPurchasesModal = ({ show, onClose, onConfirm, processing, count }) => (
-  <Modal show={show} onClose={onClose}>
-    <form onSubmit={onConfirm}>
-      <h2 className="text-lg font-medium">
-        Are you sure you want to reject {count} selected cash purchase{count !== 1 ? 's' : ''}?
-      </h2>
-      <div className="mt-6 flex justify-end">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={onClose}
-          className="mr-3"
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          variant="destructive"
-          disabled={processing}
-        >
-          Reject Selected
-        </Button>
-      </div>
-    </form>
-  </Modal>
-);
 
 const PurchaseApprovalStatusBadge = ({ status }) => {
   const statusMap = {
-    0: { label: "Pending", className: "text-gray-400" },
-    1: { label: "Approved", className: "text-green-400" },
+    0: { label: "Pending", className: "text-gray-600 bg-gray-200 px-3 py-1 rounded text-xs" },
+    1: { label: "Approved", className: "text-green-400 bg-green-200 px-3 py-1 rounded text-xs" },
   };
 
-  const { label, className } = statusMap[status] || statusMap[0];
-
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${className}`}>
-      {label}
+    <span className={statusMap[status].className}>
+      {statusMap[status].label}
     </span>
   );
 };
@@ -293,8 +239,7 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
-  const [showApproveAllModal, setShowApproveAllModal] = useState(false);
-  const [showRejectAllModal, setShowRejectAllModal] = useState(false);
+
   const [purchaseToDelete, setPurchaseToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
 
@@ -374,48 +319,7 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
       });
   };
 
-  const handleApproveAll = (e) => {
-    e.preventDefault();
-    setProcessing(true);
 
-    router.post(route("cash_purchases.bulk_approve"),
-      {
-        ids: selectedPurchases,
-      },
-      {
-        onSuccess: () => {
-          setShowApproveAllModal(false);
-          setProcessing(false);
-          setSelectedPurchases([]);
-          setIsAllSelected(false);
-        },
-        onError: () => {
-          setProcessing(false);
-        }
-      });
-  };
-
-  const handleRejectAll = (e) => {
-    e.preventDefault();
-    setProcessing(true);
-
-    router.post(
-      route("cash_purchases.bulk_reject"),
-      {
-        ids: selectedPurchases,
-      },
-      {
-        onSuccess: () => {
-          setShowRejectAllModal(false);
-          setProcessing(false);
-          setSelectedPurchases([]);
-          setIsAllSelected(false);
-        },
-        onError: () => {
-          setProcessing(false);
-        }
-      });
-  };
 
   const handleImport = (e) => {
     e.preventDefault();
@@ -475,12 +379,6 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
   const handleBulkAction = () => {
     if (bulkAction === "delete" && selectedPurchases.length > 0) {
       setShowDeleteAllModal(true);
-    }
-    if (bulkAction === "approve" && selectedPurchases.length > 0) {
-      setShowApproveAllModal(true);
-    }
-    if (bulkAction === "reject" && selectedPurchases.length > 0) {
-      setShowRejectAllModal(true);
     }
   };
 
@@ -637,8 +535,6 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="delete">Delete Selected</SelectItem>
-                    <SelectItem value="approve">Approve Selected</SelectItem>
-                    <SelectItem value="reject">Reject Selected</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button onClick={handleBulkAction} variant="outline">
@@ -723,7 +619,11 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
                             onCheckedChange={() => toggleSelectPurchase(purchase.id)}
                           />
                         </TableCell>
-                        <TableCell>{purchase.bill_no}</TableCell>
+                        <TableCell>
+                          <Link href={route("cash_purchases.show", purchase.id)} className="text-blue-500 underline">
+                            {purchase.bill_no}
+                          </Link>
+                        </TableCell>
                         <TableCell>{purchase.vendor ? purchase.vendor.name : "-"}</TableCell>
                         <TableCell>{purchase.purchase_date}</TableCell>
                         <TableCell className="text-right">
@@ -832,22 +732,6 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
         show={showDeleteAllModal}
         onClose={() => setShowDeleteAllModal(false)}
         onConfirm={handleDeleteAll}
-        processing={processing}
-        count={selectedPurchases.length}
-      />
-
-      <ApproveAllCashPurchasesModal
-        show={showApproveAllModal}
-        onClose={() => setShowApproveAllModal(false)}
-        onConfirm={handleApproveAll}
-        processing={processing}
-        count={selectedPurchases.length}
-      />
-
-      <RejectAllCashPurchasesModal
-        show={showRejectAllModal}
-        onClose={() => setShowRejectAllModal(false)}
-        onConfirm={handleRejectAll}
         processing={processing}
         count={selectedPurchases.length}
       />

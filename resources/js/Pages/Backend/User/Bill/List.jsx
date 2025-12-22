@@ -38,8 +38,8 @@ import {
     ChevronDown,
     Receipt,
     DollarSign,
-    CreditCard,
-    AlertCircle,
+    CheckCircle,
+    Clock,
 } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
@@ -186,69 +186,6 @@ const DeleteAllBillsModal = ({
     </Modal>
 );
 
-const ApproveAllBillsModal = ({
-    show,
-    onClose,
-    onConfirm,
-    processing,
-    count,
-}) => (
-    <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
-            <h2 className="text-lg font-medium">
-                Are you sure you want to approve {count} selected bill
-                {count !== 1 ? "s" : ""}?
-            </h2>
-            <div className="mt-6 flex justify-end">
-                <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={onClose}
-                    className="mr-3"
-                >
-                    Cancel
-                </Button>
-                <Button type="submit" variant="default" disabled={processing}>
-                    Approve Selected
-                </Button>
-            </div>
-        </form>
-    </Modal>
-);
-
-const RejectAllBillsModal = ({
-    show,
-    onClose,
-    onConfirm,
-    processing,
-    count,
-}) => (
-    <Modal show={show} onClose={onClose}>
-        <form onSubmit={onConfirm}>
-            <h2 className="text-lg font-medium">
-                Are you sure you want to reject {count} selected bill
-                {count !== 1 ? "s" : ""}?
-            </h2>
-            <div className="mt-6 flex justify-end">
-                <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={onClose}
-                    className="mr-3"
-                >
-                    Cancel
-                </Button>
-                <Button
-                    type="submit"
-                    variant="destructive"
-                    disabled={processing}
-                >
-                    Reject Selected
-                </Button>
-            </div>
-        </form>
-    </Modal>
-);
 
 const BillApprovalStatusBadge = ({ status }) => {
     const statusMap = {
@@ -310,17 +247,17 @@ const SummaryCards = ({ summary = {} }) => {
             iconColor: "text-green-500"
         },
         {
-            title: "Total Paid",
-            value: formatCurrency({ amount: summary.total_paid || 0 }),
-            description: "Total amount paid",
-            icon: CreditCard,
+            title: "Total Approved",
+            value: summary.total_approved || 0,
+            description: "Approved bills",
+            icon: CheckCircle,
             iconColor: "text-purple-500"
         },
         {
-            title: "Total Due",
-            value: formatCurrency({ amount: (summary.total_amount || 0) - (summary.total_paid || 0) }),
-            description: "Total amount due",
-            icon: AlertCircle,
+            title: "Total Pending",
+            value: summary.total_pending || 0,
+            description: "Pending bills",
+            icon: Clock,
             iconColor: "text-orange-500"
         }
     ];
@@ -378,8 +315,6 @@ export default function List({
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
     const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
-    const [showApproveAllModal, setShowApproveAllModal] = useState(false);
-    const [showRejectAllModal, setShowRejectAllModal] = useState(false);
     const [billToDelete, setBillToDelete] = useState(null);
     const [processing, setProcessing] = useState(false);
 
@@ -471,51 +406,6 @@ export default function List({
         );
     };
 
-    const handleApproveAll = (e) => {
-        e.preventDefault();
-        setProcessing(true);
-
-        router.post(
-            route("bill_invoices.bulk_approve"),
-            {
-                ids: selectedBills,
-            },
-            {
-                onSuccess: () => {
-                    setShowApproveAllModal(false);
-                    setProcessing(false);
-                    setSelectedBills([]);
-                    setIsAllSelected(false);
-                },
-                onError: () => {
-                    setProcessing(false);
-                },
-            }
-        );
-    };
-
-    const handleRejectAll = (e) => {
-        e.preventDefault();
-        setProcessing(true);
-
-        router.post(
-            route("bill_invoices.bulk_reject"),
-            {
-                ids: selectedBills,
-            },
-            {
-                onSuccess: () => {
-                    setShowRejectAllModal(false);
-                    setProcessing(false);
-                    setSelectedBills([]);
-                    setIsAllSelected(false);
-                },
-                onError: () => {
-                    setProcessing(false);
-                },
-            }
-        );
-    };
 
     const handleImport = (e) => {
         e.preventDefault();
@@ -670,12 +560,6 @@ export default function List({
         if (bulkAction === "delete" && selectedBills.length > 0) {
             setShowDeleteAllModal(true);
         }
-        if (bulkAction === "approve" && selectedBills.length > 0) {
-            setShowApproveAllModal(true);
-        }
-        if (bulkAction === "reject" && selectedBills.length > 0) {
-            setShowRejectAllModal(true);
-        }
     };
 
     const handleExport = () => {
@@ -826,12 +710,6 @@ export default function List({
                                     <SelectContent>
                                         <SelectItem value="delete">
                                             Delete Selected
-                                        </SelectItem>
-                                        <SelectItem value="approve">
-                                            Approve Selected
-                                        </SelectItem>
-                                        <SelectItem value="reject">
-                                            Reject Selected
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -1016,7 +894,15 @@ export default function List({
                                                     />
                                                 </TableCell>
                                                 <TableCell>
-                                                    {bill.bill_no}
+                                                    <Link
+                                                        href={route(
+                                                            "bill_invoices.show",
+                                                            bill.id
+                                                        )}
+                                                        className="text-blue-500 underline"
+                                                    >
+                                                        {bill.bill_no}
+                                                    </Link>
                                                 </TableCell>
                                                 <TableCell>
                                                     {bill.vendor
@@ -1197,21 +1083,6 @@ export default function List({
                 count={selectedBills.length}
             />
 
-            <ApproveAllBillsModal
-                show={showApproveAllModal}
-                onClose={() => setShowApproveAllModal(false)}
-                onConfirm={handleApproveAll}
-                processing={processing}
-                count={selectedBills.length}
-            />
-
-            <RejectAllBillsModal
-                show={showRejectAllModal}
-                onClose={() => setShowRejectAllModal(false)}
-                onConfirm={handleRejectAll}
-                processing={processing}
-                count={selectedBills.length}
-            />
 
             <ImportBillsModal
                 show={showImportModal}

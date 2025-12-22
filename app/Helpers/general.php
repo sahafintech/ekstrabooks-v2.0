@@ -159,7 +159,7 @@ if (!function_exists('user_count')) {
 if (!function_exists('has_permission')) {
 	function has_permission($name)
 	{
-		$permission_list = request()->permissionList;
+		$permission_list = collect(request()->permissionList);
 		$permission = $permission_list->firstWhere('permission', $name);
 
 		if ($permission != null) {

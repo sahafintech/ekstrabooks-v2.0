@@ -107,10 +107,13 @@ class PurchaseController extends Controller
 
 		// Get summary data before pagination
 		$summaryQuery = clone $query;
+		$summaryData = $summaryQuery->get();
 		$summary = [
-			'total_bills' => $summaryQuery->count(),
-			'total_amount' => $summaryQuery->sum('grand_total'),
-			'total_paid' => $summaryQuery->sum('paid'),
+			'total_bills' => $summaryData->count(),
+			'total_amount' => $summaryData->sum('grand_total'),
+			'total_paid' => $summaryData->sum('paid'),
+			'total_approved' => $summaryData->where('approval_status', 1)->count(),
+			'total_pending' => $summaryData->where('approval_status', 0)->count(),
 		];
 
 		$bills = $query->with('vendor', 'business')->paginate($perPage)->withQueryString();
@@ -196,10 +199,13 @@ class PurchaseController extends Controller
 
 		// Get summary data before pagination
 		$summaryQuery = clone $query;
+		$summaryData = $summaryQuery->get();
 		$summary = [
-			'total_bills' => $summaryQuery->count(),
-			'total_amount' => $summaryQuery->sum('grand_total'),
-			'total_paid' => $summaryQuery->sum('paid'),
+			'total_bills' => $summaryData->count(),
+			'total_amount' => $summaryData->sum('grand_total'),
+			'total_paid' => $summaryData->sum('paid'),
+			'total_approved' => $summaryData->where('approval_status', 1)->count(),
+			'total_pending' => $summaryData->where('approval_status', 0)->count(),
 		];
 
 		$bills = $query->with('vendor', 'business')->paginate($perPage)->withQueryString();
@@ -391,17 +397,10 @@ class PurchaseController extends Controller
 		$purchase->note = $request->input('note');
 		$purchase->withholding_tax = $request->input('withholding_tax') ?? 0;
 		$purchase->footer = $request->input('footer');
-		if (has_permission('bill_invoices.bulk_approve') || request()->isOwner) {
-			$purchase->approval_status = 1;
-		} else {
-			$purchase->approval_status = 0;
-		}
+		// All bills start as pending - must go through approval workflow
+		$purchase->approval_status = 0;
 		$purchase->created_by = auth()->user()->id;
-		if (has_permission('bill_invoices.bulk_approve') || request()->isOwner) {
-			$purchase->approved_by = auth()->user()->id;
-		} else {
-			$purchase->approved_by = null;
-		}
+		$purchase->approved_by = null;
 		$purchase->short_code = rand(100000, 9999999) . uniqid();
 
 		$purchase->save();
@@ -1341,16 +1340,50 @@ class PurchaseController extends Controller
 
 	public function show($id)
 	{
-		$bill = Purchase::with(['business', 'items', 'taxes', 'vendor'])->find($id);
+		$bill = Purchase::with(['business', 'items', 'taxes', 'vendor', 'approvals.actionUser'])->find($id);
 		$attachments = Attachment::where('ref_type', 'bill invoice')->where('ref_id', $id)->get();
 		$email_templates = EmailTemplate::whereIn('slug', ['NEW_BILL_CREATED'])
 			->where('email_status', 1)
 			->get();
 
+		// Check if there are configured approval users for this business
+		$purchaseApprovalUsersJson = get_business_option('purchase_approval_users', '[]');
+		$approvalUsersCount = 0;
+		$hasConfiguredApprovers = false;
+		$configuredUserIds = [];
+		
+		$usersArray = json_decode($purchaseApprovalUsersJson, true);
+		if (is_array($usersArray) && count($usersArray) > 0) {
+			$approvalUsersCount = count($usersArray);
+			$hasConfiguredApprovers = true;
+			$configuredUserIds = $usersArray;
+		}
+
+		// Only create approval records if there are configured approvers
+		// AND the bill doesn't have any approvals yet
+		// This preserves existing approval decisions (approved/rejected/pending)
+		if ($bill->approvals->isEmpty() && $hasConfiguredApprovers) {
+			
+			// Create approval records for each configured approver
+			foreach ($configuredUserIds as $userId) {
+				$bill->approvals()->create([
+					'ref_name' => 'purchase',
+					'action_user' => $userId,
+					'status' => 0, // pending
+				]);
+			}
+			
+			// Reload approvals with actionUser relationship
+			$bill->load('approvals.actionUser');
+		}
+
 		return Inertia::render('Backend/User/Bill/View', [
 			'bill' => $bill,
 			'attachments' => $attachments,
 			'email_templates' => $email_templates,
+			'decimalPlace' => get_business_option('decimal_places', 2),
+			'approvalUsersCount' => $bill->approvals->count(), // Actual approval records for this purchase
+			'hasConfiguredApprovers' => $hasConfiguredApprovers,
 		]);
 	}
 
@@ -2032,10 +2065,12 @@ class PurchaseController extends Controller
 			$bill->approved_by = auth()->user()->id;
 			$bill->save();
 
-			// select from pending transactions and insert into transactions
+		// select from pending transactions and insert into transactions
 			$transactions = PendingTransaction::where('ref_id', $bill->id)
-				->where('ref_type', 'bill invoice')
-				->where('ref_type', 'bill invoice tax')
+				->where(function ($query) {
+					$query->where('ref_type', 'bill invoice')
+						->orWhere('ref_type', 'bill invoice tax');
+				})
 				->get();
 
 			foreach ($transactions as $transaction) {
@@ -2098,4 +2133,264 @@ class PurchaseController extends Controller
 
 		return redirect()->route('bill_invoices.index')->with('success', _lang('Rejected Successfully'));
 	}
+
+/**
+ * Approve a bill invoice (single user approval)
+ */
+public function approve(Request $request, $id)
+{
+	$request->validate([
+		'comment' => ['nullable', 'string', 'max:1000'],
+	]);
+
+	$purchase = Purchase::with('approvals')->find($id);
+
+	if (!$purchase) {
+		return back()->with('error', _lang('Bill not found'));
+	}
+
+	$currentUserId = auth()->id();
+
+	// Check if there are any configured approval users for this business
+	$approvalUsersJson = get_business_option('purchase_approval_users', '[]');
+	$configuredUserIds = json_decode($approvalUsersJson, true);
+	$hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
+
+	// If no approvers configured, tell user to configure them first
+	if (!$hasConfiguredApprovers) {
+		return back()->with('error', _lang('No approvers are configured. Please configure approvers in business settings first.'));
+	}
+
+	// Check if current user is in the configured approvers list
+	if (!in_array($currentUserId, $configuredUserIds)) {
+		return back()->with('error', _lang('You are not assigned as an approver for this bill'));
+	}
+
+	// Find the approval record by action_user (who is assigned as approver)
+	$approval = $purchase->approvals()
+		->where('action_user', $currentUserId)
+		->first();
+
+	if (!$approval) {
+		return back()->with('error', _lang('You are not assigned as an approver for this bill'));
+	}
+
+	// Update the approval record (action_user remains the same - it's already the approver)
+	$approval->update([
+		'status' => 1, // Approved
+		'comment' => $request->input('comment'),
+		'action_date' => now(),
+	]);
+
+	// Check if purchase should be marked as approved based on required approvals
+	$this->checkAndUpdateBillStatus($purchase);
+
+	// Audit log
+	$audit = new AuditLog();
+	$audit->date_changed = date('Y-m-d H:i:s');
+	$audit->changed_by = $currentUserId;
+	$audit->event = 'Approved Bill Invoice ' . $purchase->bill_no . ' by ' . auth()->user()->name;
+	$audit->save();
+
+	return back()->with('success', _lang('Bill approved successfully'));
+}
+
+/**
+ * Reject a bill invoice (single user approval)
+ */
+public function reject(Request $request, $id)
+{
+	$request->validate([
+		'comment' => ['required', 'string', 'max:1000'],
+	], [
+		'comment.required' => _lang('Comment is required when rejecting'),
+	]);
+
+	$purchase = Purchase::with('approvals')->find($id);
+
+	if (!$purchase) {
+		return back()->with('error', _lang('Bill not found'));
+	}
+
+	$currentUserId = auth()->id();
+
+	// Check if there are any configured approval users for this business
+	$approvalUsersJson = get_business_option('purchase_approval_users', '[]');
+	$configuredUserIds = json_decode($approvalUsersJson, true);
+	$hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
+
+	// If no approvers configured, tell user to configure them first
+	if (!$hasConfiguredApprovers) {
+		return back()->with('error', _lang('No approvers are configured. Please configure approvers in business settings first.'));
+	}
+
+	// Check if current user is in the configured approvers list
+	if (!in_array($currentUserId, $configuredUserIds)) {
+		return back()->with('error', _lang('You are not assigned as an approver for this bill'));
+	}
+
+	// Find the approval record by action_user (who is assigned as approver)
+	$approval = $purchase->approvals()
+		->where('action_user', $currentUserId)
+		->first();
+
+	if (!$approval) {
+		return back()->with('error', _lang('You are not assigned as an approver for this bill'));
+	}
+
+	// Update the approval record (action_user remains the same - it's already the approver)
+	$approval->update([
+		'status' => 2, // Rejected
+		'comment' => $request->input('comment'),
+		'action_date' => now(),
+	]);
+
+	// Check if purchase should be marked as rejected (or reset to pending if votes changed)
+	$this->checkAndUpdateBillStatus($purchase);
+
+	// Audit log
+	$audit = new AuditLog();
+	$audit->date_changed = date('Y-m-d H:i:s');
+	$audit->changed_by = $currentUserId;
+	$audit->event = 'Rejected Bill Invoice ' . $purchase->bill_no . ' by ' . auth()->user()->name;
+	$audit->save();
+
+	return back()->with('success', _lang('Bill rejection recorded'));
+}
+
+/**
+ * Check and update bill status based on all approval records
+ * - Approved: Required count of approvers reached (from settings)
+ * - Rejected: ALL assigned users rejected (unanimous rejection)
+ * - Pending: Not enough approvals yet
+ */
+private function checkAndUpdateBillStatus(Purchase $purchase): void
+{
+	// Reload approvals to get the most current state
+	$purchase->load('approvals');
+	$approvals = $purchase->approvals;
+	
+	// If no approvals configured, nothing to check
+	if ($approvals->isEmpty()) {
+		return;
+	}
+
+	// Get the required approval count from settings for the current business
+	// Default to 1 if not set (any single approver can approve the purchase)
+	$requiredApprovalCount = (int) get_business_option('purchase_approval_required_count', 1);
+
+	$totalApprovers = $approvals->count();
+	$approvedCount = $approvals->where('status', 1)->count();
+	$rejectedCount = $approvals->where('status', 2)->count();
+	$pendingCount = $approvals->where('status', 0)->count();
+	
+	// Ensure required count doesn't exceed total approvers
+	$requiredApprovalCount = min($requiredApprovalCount, $totalApprovers);
+	
+	// Store previous status to detect changes
+	$previousStatus = $purchase->approval_status;
+
+	// First check: If purchase was previously approved but now doesn't have enough approvals
+	// (e.g., someone changed their vote from approve to reject), reset to pending immediately
+	if ($previousStatus == 1 && $approvedCount < $requiredApprovalCount) {
+		$purchase->update([
+			'approval_status' => 0, // Back to Pending
+			'approved_by' => null,
+		]);
+		
+		// Move transactions back to pending_transactions
+		$this->moveBillTransactionsToPending($purchase);
+		return; // Exit early
+	}
+
+	// Second check: If ALL assigned users have rejected (unanimous rejection)
+	if ($rejectedCount === $totalApprovers) {
+		// Ensure it stays pending/rejected
+		if ($previousStatus == 1) {
+			// Was approved, now all rejected - move transactions back
+			$purchase->update([
+				'approval_status' => 0, // Rejected (stay pending)
+				'approved_by' => null,
+			]);
+			$this->moveBillTransactionsToPending($purchase);
+		} else {
+			$purchase->update([
+				'approval_status' => 0, // Rejected (stay pending)
+			]);
+		}
+		return;
+	}
+
+	// Third check: If we have enough approvals AND not everyone rejected
+	// This ensures we only approve when criteria is met and there's no blocking rejection
+	if ($approvedCount >= $requiredApprovalCount && $rejectedCount < $totalApprovers) {
+		// Only process if not already approved
+		if ($previousStatus != 1) {
+			$purchase->update([
+				'approval_status' => 1, // Approved
+				'approved_by' => auth()->id(),
+			]);
+			
+			// Move pending transactions to transactions table
+			$this->moveBillPendingTransactionsToTransactions($purchase);
+		}
+		return;
+	}
+
+	// Default: Not enough approvals yet - ensure it stays pending
+	if ($previousStatus == 1) {
+		// Was approved but no longer meets criteria
+		$purchase->update([
+			'approval_status' => 0,
+			'approved_by' => null,
+		]);
+		$this->moveBillTransactionsToPending($purchase);
+	}
+}
+
+/**
+ * Move pending transactions to the transactions table when bill is approved
+ */
+private function moveBillPendingTransactionsToTransactions(Purchase $purchase): void
+{
+	$transactions = PendingTransaction::where('ref_id', $purchase->id)
+		->where(function ($query) {
+			$query->where('ref_type', 'bill invoice')
+				->orWhere('ref_type', 'bill invoice tax');
+		})
+		->get();
+
+	foreach ($transactions as $transaction) {
+		// Create a new Transaction instance and replicate data from pending
+		$new_transaction = $transaction->replicate();
+		$new_transaction->setTable('transactions'); // Change the table to 'transactions'
+		$new_transaction->save();
+
+		// Delete the pending transaction
+		$transaction->forceDelete();
+	}
+}
+
+/**
+ * Move transactions back to pending_transactions when bill approval is revoked
+ */
+private function moveBillTransactionsToPending(Purchase $purchase): void
+{
+	$transactions = Transaction::where('ref_id', $purchase->id)
+		->where(function ($query) {
+			$query->where('ref_type', 'bill invoice')
+				->orWhere('ref_type', 'bill invoice tax');
+		})
+		->get();
+
+	foreach ($transactions as $transaction) {
+		// Create a new PendingTransaction instance and replicate data
+		$new_pending = $transaction->replicate();
+		$new_pending->setTable('pending_transactions'); // Change the table to 'pending_transactions'
+		$new_pending->save();
+
+		// Delete the transaction
+		$transaction->forceDelete();
+	}
+}
 }

@@ -1,4 +1,4 @@
-import { Link, useForm, usePage } from "@inertiajs/react";
+import { Link, useForm, usePage, router } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset, SidebarSeparator } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -22,7 +22,11 @@ import {
     Facebook,
     MessageCircle,
     Copy,
-    PaperclipIcon
+    PaperclipIcon,
+    CheckCircle,
+    XCircle,
+    Clock,
+    Users
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Table, TableBody, TableHeader, TableRow, TableHead, TableCell } from "@/Components/ui/table";
@@ -34,6 +38,9 @@ import InputError from "@/Components/InputError";
 import RichTextEditor from "@/Components/RichTextEditor";
 import { QRCodeSVG } from 'qrcode.react';
 import { Badge } from "@/Components/ui/badge";
+import DrawerComponent from "@/Components/DrawerComponent";
+import { Textarea } from "@/Components/ui/textarea";
+import { toast } from "sonner";
 
 const printStyles = `
   @media print {
@@ -72,9 +79,9 @@ const printStyles = `
     }
 `;
 
-export default function View({ bill, attachments, decimalPlace, email_templates }) {
+export default function View({ bill, attachments, decimalPlace, email_templates, approvalUsersCount, hasConfiguredApprovers }) {
     const { flash = {} } = usePage().props;
-    const { toast } = useToast();
+    const { toast: toastHook } = useToast();
     const [isLoading, setIsLoading] = useState({
         print: false,
         email: false,
@@ -83,6 +90,11 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isAttachmentsModalOpen, setIsAttachmentsModalOpen] = useState(false);
+    const [isApprovalsDrawerOpen, setIsApprovalsDrawerOpen] = useState(false);
+    const [isApproveRejectModalOpen, setIsApproveRejectModalOpen] = useState(false);
+    const [approvalAction, setApprovalAction] = useState(null); // 'approve' or 'reject'
+    const [approvalComment, setApprovalComment] = useState('');
+    const [isSubmittingApproval, setIsSubmittingApproval] = useState(false);
     const [shareLink, setShareLink] = useState('');
 
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -91,6 +103,55 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
         message: "",
         template: "",
     });
+
+    const handleApprovalAction = (action) => {
+        setApprovalAction(action);
+        setApprovalComment('');
+        setIsApproveRejectModalOpen(true);
+    };
+
+    const submitApprovalAction = () => {
+        if (approvalAction === 'reject' && !approvalComment.trim()) {
+            toast.error("Comment is required when rejecting");
+            return;
+        }
+
+        setIsSubmittingApproval(true);
+
+        router.post(route(`bill_invoices.${approvalAction}`, bill.id), {
+            comment: approvalComment
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setIsApproveRejectModalOpen(false);
+                setApprovalComment('');
+                setIsSubmittingApproval(false);
+                toast.success(`Bill ${approvalAction}d successfully`);
+            },
+            onError: (errors) => {
+                setIsSubmittingApproval(false);
+                if (errors.comment) {
+                    toast.error(errors.comment);
+                } else {
+                    toast.error(`Failed to ${approvalAction} bill`);
+                }
+            }
+        });
+    };
+
+    // Get current user's approval status
+    const userApproval = bill.approvals?.find(approval => approval.action_user?.id === usePage().props.auth.user.id);
+    // User can only take approval actions if:
+    // 1. There are configured approvers in the system
+    // 2. AND the user is one of the assigned approvers
+    const canApprove = hasConfiguredApprovers && userApproval !== undefined;
+    const currentStatus = userApproval?.status || null;
+    // Check individual user's approval status:
+    // - status 0 (pending): Show both Approve and Reject buttons
+    // - status 1 (approved): Show only Reject button (to change vote)
+    // - status 2 (rejected): Show only Approve button (to change vote)
+    const hasAlreadyApproved = currentStatus === 1;
+    const hasAlreadyRejected = currentStatus === 2;
 
     const handlePrint = () => {
         setIsLoading(prev => ({ ...prev, print: true }));
@@ -102,20 +163,20 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
 
     useEffect(() => {
         if (flash && flash.success) {
-          toast({
+          toastHook({
             title: "Success",
             description: flash.success,
           });
         }
     
         if (flash && flash.error) {
-          toast({
+          toastHook({
             variant: "destructive",
             title: "Error",
             description: flash.error,
           });
         }
-      }, [flash, toast]);
+      }, [flash, toastHook]);
 
       const BillStatusBadge = ({ status }) => {
         const statusMap = {
@@ -176,7 +237,7 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
 
     const handleCopyLink = () => {
         navigator.clipboard.writeText(shareLink);
-        toast({
+        toastHook({
             title: "Success",
             description: "Link copied to clipboard",
         });
@@ -213,6 +274,19 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
                             >
                                 <PaperclipIcon className="mr-2 h-4 w-4" />
                                 Attachments ({attachments.length})
+                            </Button>
+                        )}
+                        {approvalUsersCount > 0 && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setIsApprovalsDrawerOpen(true)}
+                                className="flex items-center"
+                            >
+                                <Users className="mr-2 h-4 w-4" />
+                                Approvals
+                                <Badge variant="secondary" className="ml-2">
+                                    {approvalUsersCount}
+                                </Badge>
                             </Button>
                         )}
                         <Button
@@ -261,9 +335,45 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
                                         <span>Edit Credit Purchase</span>
                                     </Link>
                                 </DropdownMenuItem>
+                                {canApprove && (
+                                    <>
+                                        {!hasAlreadyApproved && (
+                                            <DropdownMenuItem onClick={() => handleApprovalAction('approve')}>
+                                                <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
+                                                <span>Approve</span>
+                                            </DropdownMenuItem>
+                                        )}
+                                        {!hasAlreadyRejected && (
+                                            <DropdownMenuItem onClick={() => handleApprovalAction('reject')}>
+                                                <XCircle className="mr-2 h-4 w-4 text-red-600" />
+                                                <span>Reject</span>
+                                            </DropdownMenuItem>
+                                        )}
+                                    </>
+                                )}
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
+
+                    {/* Warning banner when no approvers are configured */}
+                    {!hasConfiguredApprovers && bill.approval_status === 0 && (
+                        <div className="p-4 rounded-lg border border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-600 print:hidden">
+                            <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0 mt-0.5">
+                                    <svg className="h-5 w-5 text-yellow-600 dark:text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">No Approvers Assigned</h3>
+                                    <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                                        This bill cannot be approved or rejected until approvers are configured.
+                                        Go to <span className="font-medium">Settings → Business Settings → Approval Workflows</span> to assign approvers.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Email Modal */}
                     <Modal
@@ -655,6 +765,153 @@ export default function View({ bill, attachments, decimalPlace, email_templates 
                     </div>
                 </div>
             </SidebarInset>
+
+            {/* Approvals Drawer */}
+            <DrawerComponent
+                open={isApprovalsDrawerOpen}
+                onOpenChange={setIsApprovalsDrawerOpen}
+                title="Bill Approvals"
+                position="right"
+                width="w-4xl"
+            >
+                <div className="p-4">
+                    <div className="mb-4">
+                        <p className="text-sm text-gray-600">
+                            View approval status from all assigned approvers
+                        </p>
+                    </div>
+
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Comment</TableHead>
+                                <TableHead>Date</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {bill.approvals && bill.approvals.length > 0 ? (
+                                bill.approvals.map((approval, index) => (
+                                    <TableRow key={index}>
+                                        <TableCell className="font-medium">
+                                            {approval.action_user?.name || 'N/A'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {approval.action_user?.email || 'N/A'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {approval.status === 0 && (
+                                                <Badge variant="outline" className="flex items-center w-fit">
+                                                    <Clock className="h-3 w-3 mr-1" />
+                                                    Pending
+                                                </Badge>
+                                            )}
+                                            {approval.status === 1 && (
+                                                <Badge variant="outline" className="flex items-center w-fit text-green-600 border-green-600">
+                                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                                    Approved
+                                                </Badge>
+                                            )}
+                                            {approval.status === 2 && (
+                                                <Badge variant="outline" className="flex items-center w-fit text-red-600 border-red-600">
+                                                    <XCircle className="h-3 w-3 mr-1" />
+                                                    Rejected
+                                                </Badge>
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            {approval.comment || '-'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {approval.action_date ? new Date(approval.action_date).toLocaleDateString() : '-'}
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center py-8">
+                                        <div className="flex flex-col items-center">
+                                            <Users className="h-10 w-10 text-yellow-500 mb-3" />
+                                            <p className="font-medium text-yellow-700 dark:text-yellow-400 mb-2">No Approvers Assigned</p>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                                This bill cannot be approved until approvers are configured.
+                                            </p>
+                                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                                Go to <span className="font-medium">Settings → Business Settings → Approval Workflows</span> to assign approvers.
+                                            </p>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+            </DrawerComponent>
+
+            {/* Approve/Reject Modal */}
+            <Modal
+                show={isApproveRejectModalOpen}
+                onClose={() => setIsApproveRejectModalOpen(false)}
+                maxWidth="md"
+            >
+                <div className="mb-6">
+                    <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center">
+                        {approvalAction === 'approve' ? (
+                            <>
+                                <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
+                                Approve Bill
+                            </>
+                        ) : (
+                            <>
+                                <XCircle className="h-5 w-5 mr-2 text-red-600" />
+                                Reject Bill
+                            </>
+                        )}
+                    </h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {approvalAction === 'approve'
+                            ? 'Add an optional comment for this approval'
+                            : 'Please provide a reason for rejecting this bill'}
+                    </p>
+                </div>
+
+                <div className="mb-6">
+                    <label className="block text-sm font-medium mb-2">
+                        Comment {approvalAction === 'reject' && <span className="text-red-600">*</span>}
+                    </label>
+                    <Textarea
+                        value={approvalComment}
+                        onChange={(e) => setApprovalComment(e.target.value)}
+                        placeholder={approvalAction === 'approve' ? "Add a comment (optional)" : "Explain why you're rejecting this bill"}
+                        rows={4}
+                        className="w-full"
+                    />
+                </div>
+
+                <div className="flex justify-end space-x-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsApproveRejectModalOpen(false)}
+                        disabled={isSubmittingApproval}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="button"
+                        onClick={submitApprovalAction}
+                        disabled={isSubmittingApproval}
+                        className={approvalAction === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
+                    >
+                        {isSubmittingApproval 
+                            ? (approvalAction === 'approve' ? 'Approving...' : 'Rejecting...') 
+                            : (approvalAction === 'approve' ? 'Approve' : 'Reject')
+                        }
+                    </Button>
+                </div>
+            </Modal>
         </AuthenticatedLayout>
     );
 }

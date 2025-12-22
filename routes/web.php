@@ -538,6 +538,8 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('bill_invoices/bulk_destroy', [PurchaseController::class, 'bulk_destroy'])->name('bill_invoices.bulk_destroy');
 		Route::post('bill_invoices/send_email/{id}', [PurchaseController::class, 'send_email'])->name('bill_invoices.send_email');
 		Route::get('bill_invoices/{id}/pdf', [PurchaseController::class, 'pdf'])->name('bill_invoices.pdf');
+		Route::post('bill_invoices/{id}/approve', [PurchaseController::class, 'approve'])->name('bill_invoices.approve');
+		Route::post('bill_invoices/{id}/reject', [PurchaseController::class, 'reject'])->name('bill_invoices.reject');
 
 		//Cash Purchases
 		Route::get('cash_purchases/trash', [CashPurchaseController::class, 'trash'])->name('cash_purchases.trash');
@@ -550,11 +552,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('all_bills', [CashPurchaseController::class, 'bills_all'])->name('cash_purchases.all');
 		Route::get('export_cash_purchases', [CashPurchaseController::class, 'export_cash_purchases'])->name('cash_purchases.export');
 		Route::get('cash_purchases/voucher/{id}', [CashPurchaseController::class, 'voucher'])->name('cash_purchases.voucher');
-		Route::post('cash_purchases/bulk_approve', [CashPurchaseController::class, 'bulk_approve'])->name('cash_purchases.bulk_approve');
-		Route::post('cash_purchases/bulk_reject', [CashPurchaseController::class, 'bulk_reject'])->name('cash_purchases.bulk_reject');
 		Route::post('cash_purchases/bulk_destroy', [CashPurchaseController::class, 'bulk_destroy'])->name('cash_purchases.bulk_destroy');
 		Route::post('cash_purchases/{id}/send_email', [CashPurchaseController::class, 'send_email'])->name('cash_purchases.send_email');
 		Route::get('cash_purchases/{id}/pdf', [CashPurchaseController::class, 'pdf'])->name('cash_purchases.pdf');
+		Route::post('cash_purchases/{id}/approve', [CashPurchaseController::class, 'approve'])->name('cash_purchases.approve');
+		Route::post('cash_purchases/{id}/reject', [CashPurchaseController::class, 'reject'])->name('cash_purchases.reject');
 
 		// purchase orders
 		Route::get('purchase_orders/{id}/pdf', [PurchaseOrderController::class, 'pdf'])->name('purchase_orders.pdf');

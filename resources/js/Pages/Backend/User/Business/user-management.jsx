@@ -149,8 +149,8 @@ export default function UserManagement({ users = [], roles = [], permissions = {
     }, [flash, toast]);
 
     // Count super admins for protection
-    const superAdminCount = useMemo(() => {
-        return users.filter(u => u.is_super_admin).length;
+    const ownerCount = useMemo(() => {
+        return users.filter(u => u.is_owner).length;
     }, [users]);
 
     // Selection handlers
@@ -648,7 +648,7 @@ export default function UserManagement({ users = [], roles = [], permissions = {
                                                                 icon: <Trash className="h-4 w-4" />,
                                                                 onClick: () => handleDeleteConfirm(user),
                                                                 destructive: true,
-                                                                disabled: user.is_super_admin && superAdminCount <= 1,
+                                                                disabled: user.owner && ownerCount <= 1,
                                                             },
                                                         ]}
                                                     />
@@ -741,8 +741,8 @@ export default function UserManagement({ users = [], roles = [], permissions = {
                             >
                                 {roles.filter(role => role.name.toLowerCase() !== 'contact').map((role) => {
                                     const isOwnerRole = role.name === 'Owner';
-                                    const isEditingOwner = editingUser?.is_super_admin;
-                                    const isDisabled = isSaving || (isOwnerRole && isEditingOwner && superAdminCount <= 1 && selectedRole === 'Owner');
+                                    const isEditingOwner = editingUser?.owner;
+                                    const isDisabled = isSaving || (isOwnerRole && isEditingOwner && ownerCount <= 1 && selectedRole === 'Owner');
 
                                     return (
                                         <label

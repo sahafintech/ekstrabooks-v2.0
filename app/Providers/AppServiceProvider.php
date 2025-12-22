@@ -30,7 +30,7 @@ class AppServiceProvider extends ServiceProvider
 
         // Super admins bypass all permission checks
         Gate::before(static function ($user): ?bool {
-            return $user?->is_super_admin ? true : null;
+            return $user?->owner ? true : null;
         });
     }
 }

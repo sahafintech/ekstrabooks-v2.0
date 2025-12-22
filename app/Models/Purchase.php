@@ -39,6 +39,10 @@ class Purchase extends Model {
         return $this->hasMany(Transaction::class, 'ref_id')->where('ref_type', 'purchase')->withoutGlobalScopes();
     }
 
+    public function approvals() {
+        return $this->hasMany(Approvals::class, 'ref_id')->where('ref_name', 'purchase')->withoutGlobalScopes();
+    }
+
     protected function subTotal(): Attribute {
         $decimal_place = get_business_option('decimal_places', 2);
 
