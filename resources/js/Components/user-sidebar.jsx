@@ -554,14 +554,14 @@ export function UserSidebar({ ...props }) {
                 isActive: url.startsWith(businessesBase),
             });
         }
-        if (hasPermission("business.roles-permissions")) {
+        if (hasPermission("business.roles.view")) {
             items.push({
                 title: "Roles & Permissions",
-                url: route("roles.index"),
+                url: route("business.roles"),
                 isActive: url.startsWith(rolesBase),
             });
         }
-        if (hasPermission("business.user-management")) {
+        if (hasPermission("business.user.view")) {
             items.push({
                 title: "User Management",
                 url: route("business.user-management"),

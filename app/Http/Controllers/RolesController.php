@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class RolesController extends Controller
 {
@@ -14,6 +16,10 @@ class RolesController extends Controller
      */
     public function index()
     {
+        if (Gate::denies('roles.view')) {
+            return redirect()->back()->with('error', _lang('Permission denied!'));
+        }
+
         $roles = Role::where('guard_name', 'web')
             ->withCount('users', 'permissions')
             ->get()
@@ -56,6 +62,10 @@ class RolesController extends Controller
      */
     public function store(Request $request)
     {
+        if (Gate::denies('roles.create')) {
+            return redirect()->back()->with('error', _lang('Permission denied!'));
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', 'unique:roles,name'],
             'permissions' => ['array'],
@@ -71,7 +81,10 @@ class RolesController extends Controller
             $role->syncPermissions($validated['permissions']);
         }
 
-        return redirect()->back()->with('success', 'Role created successfully.');
+        // Clear permission cache
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
+        return redirect()->back()->with('success', _lang('Role created successfully.'));
     }
 
     /**
@@ -79,6 +92,10 @@ class RolesController extends Controller
      */
     public function update(Request $request, $id)
     {
+        if (Gate::denies('roles.edit')) {
+            return redirect()->back()->with('error', _lang('Permission denied!'));
+        }
+
         $role = Role::findOrFail($id);
 
         // Prevent editing Owner role name
@@ -102,7 +119,13 @@ class RolesController extends Controller
             $role->syncPermissions($validated['permissions']);
         }
 
-        return redirect()->back()->with('success', 'Role updated successfully.');
+        // Clear permission cache for all users with this role
+        foreach ($role->users()->get() as $user) {
+            $user->forgetCachedPermissions();
+        }
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
+        return redirect()->back()->with('success', _lang('Role updated successfully.'));
     }
 
     /**
@@ -110,15 +133,56 @@ class RolesController extends Controller
      */
     public function destroy($id)
     {
+        if (Gate::denies('roles.delete')) {
+            return redirect()->back()->with('error', _lang('Permission denied!'));
+        }
+
         $role = Role::findOrFail($id);
 
         // Prevent deleting Owner role
         if ($role->name === 'Owner') {
-            return redirect()->back()->with('error', 'Cannot delete the Owner role.');
+            return redirect()->back()->with('error', _lang('Cannot delete the Owner role.'));
+        }
+
+        // Check if role has users
+        if ($role->users()->count() > 0) {
+            return redirect()->back()->with('error', _lang('Cannot delete role that is assigned to users.'));
         }
 
         $role->delete();
 
-        return redirect()->back()->with('success', 'Role deleted successfully.');
+        // Clear permission cache
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
+        return redirect()->back()->with('success', _lang('Role deleted successfully.'));
+    }
+
+    /**
+     * Bulk destroy roles.
+     */
+    public function bulk_destroy(Request $request)
+    {
+        if (Gate::denies('roles.delete')) {
+            return redirect()->back()->with('error', _lang('Permission denied!'));
+        }
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array'],
+            'ids.*' => ['integer', 'exists:roles,id'],
+        ]);
+
+        $roles = Role::whereIn('id', $validated['ids'])
+            ->where('name', '!=', 'Owner')
+            ->get();
+
+        foreach ($roles as $role) {
+            if ($role->users()->count() === 0) {
+                $role->delete();
+            }
+        }
+
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
+        return redirect()->back()->with('success', _lang('Roles deleted successfully.'));
     }
 }

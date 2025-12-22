@@ -69,7 +69,6 @@ use App\Http\Controllers\User\PurchaseController;
 use App\Http\Controllers\User\QuotationController;
 use App\Http\Controllers\User\ReceiptController;
 use App\Http\Controllers\User\ReportController;
-use App\Http\Controllers\User\RoleController;
 use App\Http\Controllers\User\SalesReturnController;
 use App\Http\Controllers\User\StaffController;
 use App\Http\Controllers\User\StaffDocumentController;
@@ -224,13 +223,6 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		//Permission Controller
 		Route::get('roles/{role_id?}/access_control', [PermissionController::class, 'show'])->name('permission.show');
 		Route::post('permission/store', [PermissionController::class, 'store'])->name('permission.store');
-		Route::resource('roles', RoleController::class)->except('show');
-		Route::post('roles/bulk_destroy', [RoleController::class, 'bulk_destroy'])->name('roles.bulk_destroy');
-		Route::get('roles/trash', [RoleController::class, 'trash'])->name('roles.trash');
-		Route::post('roles/{id}/restore', [RoleController::class, 'restore'])->name('roles.restore');
-		Route::post('roles/bulk_restore', [RoleController::class, 'bulk_restore'])->name('roles.bulk_restore');
-		Route::post('roles/bulk_permanent_destroy', [RoleController::class, 'bulk_permanent_destroy'])->name('roles.bulk_permanent_destroy');
-		Route::delete('roles/{id}/permanent_destroy', [RoleController::class, 'permanent_destroy'])->name('roles.permanent_destroy');
 
 		//User Management Controller (Spatie Permissions)
 		Route::get('/business/user-management', [UserManagementController::class, 'index'])->name('business.user-management');
@@ -248,6 +240,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('/business/roles', [RolesController::class, 'store'])->name('business.roles.store');
 		Route::put('/business/roles/{role}', [RolesController::class, 'update'])->name('business.roles.update');
 		Route::delete('/business/roles/{role}', [RolesController::class, 'destroy'])->name('business.roles.destroy');
+		Route::post('/business/roles/bulk-destroy', [RolesController::class, 'bulk_destroy'])->name('business.roles.bulk-destroy');
 
 		//Permissions Controller (Spatie Permissions)
 		Route::get('/business/permissions', [PermissionsController::class, 'index'])->name('business.permissions');

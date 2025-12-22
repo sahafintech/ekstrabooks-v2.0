@@ -271,8 +271,8 @@ export default function Roles({ roles = [], permissions = {} }) {
         e.preventDefault();
 
         const url = editingRole
-            ? `/business/roles/${editingRole.id}`
-            : "/business/roles";
+            ? `/user/business/roles/${editingRole.id}`
+            : "/user/business/roles";
 
         const method = editingRole ? "put" : "post";
 
@@ -304,7 +304,7 @@ export default function Roles({ roles = [], permissions = {} }) {
         e.preventDefault();
         setProcessing(true);
 
-        router.delete(`/business/roles/${deletingRole.id}`, {
+        router.delete(`/user/business/roles/${deletingRole.id}`, {
             preserveScroll: true,
             onSuccess: () => {
                 setShowDeleteModal(false);
@@ -321,23 +321,19 @@ export default function Roles({ roles = [], permissions = {} }) {
         e.preventDefault();
         setProcessing(true);
 
-        // For now, delete each role individually
-        // You can create a bulk delete endpoint in the backend if needed
-        Promise.all(
-            selectedRoles.map(id =>
-                new Promise((resolve) => {
-                    router.delete(`/business/roles/${id}`, {
-                        preserveScroll: true,
-                        onSuccess: resolve,
-                        onError: resolve,
-                    });
-                })
-            )
-        ).then(() => {
-            setShowDeleteAllModal(false);
-            setSelectedRoles([]);
-            setIsAllSelected(false);
-            setProcessing(false);
+        router.post('/user/business/roles/bulk-destroy', {
+            ids: selectedRoles
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setShowDeleteAllModal(false);
+                setSelectedRoles([]);
+                setIsAllSelected(false);
+                setProcessing(false);
+            },
+            onError: () => {
+                setProcessing(false);
+            }
         });
     };
 

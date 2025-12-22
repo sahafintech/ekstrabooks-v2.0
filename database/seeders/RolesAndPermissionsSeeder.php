@@ -39,24 +39,24 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'business.view',
             'business.create',
-            'business.edit',
             'business.update',
             'business.delete',
             'business.restore',
             'business.settings',
-            'business.user-management',
-            'business.users.store',
-            'business.users.assign-roles',
-            'business.users.assign-permissions',
-            'business.users.assign-roles-and-permissions',
-            'business.roles-permissions',
+            'business.user.view',
+            'business.user.create',
+            'business.user.update',
+            'business.user.delete',
+            'business.roles.view',
+            'business.roles.create',
+            'business.roles.update',
+            'business.roles.delete',
 
             // =====================
             // CURRENCY
             // =====================
             'currency.view',
             'currency.create',
-            'currency.edit',
             'currency.update',
             'currency.delete',
             'currency.restore',
@@ -71,7 +71,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'customers.view',
             'customers.create',
-            'customers.edit',
             'customers.update',
             'customers.delete',
             'customers.restore',
@@ -83,7 +82,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'vendors.view',
             'vendors.create',
-            'vendors.edit',
             'vendors.update',
             'vendors.delete',
             'vendors.restore',
@@ -95,7 +93,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'products.view',
             'products.create',
-            'products.edit',
             'products.update',
             'products.delete',
             'products.restore',
@@ -107,7 +104,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'product_units.view',
             'product_units.create',
-            'product_units.edit',
             'product_units.update',
             'product_units.delete',
             'product_units.restore',
@@ -117,7 +113,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'main_categories.view',
             'main_categories.create',
-            'main_categories.edit',
             'main_categories.update',
             'main_categories.delete',
             'main_categories.restore',
@@ -127,7 +122,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'sub_categories.view',
             'sub_categories.create',
-            'sub_categories.edit',
             'sub_categories.update',
             'sub_categories.delete',
             'sub_categories.restore',
@@ -137,7 +131,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'brands.view',
             'brands.create',
-            'brands.edit',
             'brands.update',
             'brands.delete',
             'brands.restore',
@@ -147,7 +140,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'inventory_adjustments.view',
             'inventory_adjustments.create',
-            'inventory_adjustments.edit',
             'inventory_adjustments.update',
             'inventory_adjustments.delete',
             'inventory_adjustments.restore',
@@ -159,7 +151,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'inventory_transfers.view',
             'inventory_transfers.create',
-            'inventory_transfers.edit',
             'inventory_transfers.update',
             'inventory_transfers.delete',
             'inventory_transfers.restore',
@@ -175,7 +166,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'invoices.view',
             'invoices.create',
-            'invoices.edit',
             'invoices.update',
             'invoices.delete',
             'invoices.restore',
@@ -190,7 +180,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'receive_payments.view',
             'receive_payments.create',
-            'receive_payments.edit',
             'receive_payments.update',
             'receive_payments.delete',
             'receive_payments.pdf',
@@ -200,7 +189,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'sales_returns.view',
             'sales_returns.create',
-            'sales_returns.edit',
             'sales_returns.update',
             'sales_returns.delete',
             'sales_returns.restore',
@@ -213,7 +201,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'purchase_returns.view',
             'purchase_returns.create',
-            'purchase_returns.edit',
             'purchase_returns.update',
             'purchase_returns.delete',
             'purchase_returns.restore',
@@ -228,7 +215,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'journals.view',
             'journals.create',
-            'journals.edit',
             'journals.update',
             'journals.delete',
             'journals.restore',
@@ -242,7 +228,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'receipts.view',
             'receipts.create',
-            'receipts.edit',
             'receipts.update',
             'receipts.delete',
             'receipts.restore',
@@ -257,7 +242,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'hold_pos_invoices.view',
             'hold_pos_invoices.create',
-            'hold_pos_invoices.edit',
             'hold_pos_invoices.update',
             'hold_pos_invoices.delete',
 
@@ -266,7 +250,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'deffered_invoices.view',
             'deffered_invoices.create',
-            'deffered_invoices.edit',
             'deffered_invoices.update',
             'deffered_invoices.delete',
             'deffered_invoices.restore',
@@ -278,7 +261,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'deffered_receive_payments.view',
             'deffered_receive_payments.create',
-            'deffered_receive_payments.edit',
             'deffered_receive_payments.update',
             'deffered_receive_payments.delete',
 
@@ -287,7 +269,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'quotations.view',
             'quotations.create',
-            'quotations.edit',
             'quotations.update',
             'quotations.delete',
             'quotations.restore',
@@ -301,7 +282,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'bill_invoices.view',
             'bill_invoices.create',
-            'bill_invoices.edit',
             'bill_invoices.update',
             'bill_invoices.delete',
             'bill_invoices.restore',
@@ -318,7 +298,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'bill_payments.view',
             'bill_payments.create',
-            'bill_payments.edit',
             'bill_payments.update',
             'bill_payments.delete',
             'bill_payments.restore',
@@ -329,7 +308,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'cash_purchases.view',
             'cash_purchases.create',
-            'cash_purchases.edit',
             'cash_purchases.update',
             'cash_purchases.delete',
             'cash_purchases.restore',
@@ -345,7 +323,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'purchase_orders.view',
             'purchase_orders.create',
-            'purchase_orders.edit',
             'purchase_orders.update',
             'purchase_orders.delete',
             'purchase_orders.restore',
@@ -362,7 +339,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'medical_records.view',
             'medical_records.create',
-            'medical_records.edit',
             'medical_records.update',
             'medical_records.delete',
             'medical_records.restore',
@@ -372,7 +348,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'prescriptions.view',
             'prescriptions.create',
-            'prescriptions.edit',
             'prescriptions.update',
             'prescriptions.delete',
             'prescriptions.restore',
@@ -383,7 +358,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'accounts.view',
             'accounts.create',
-            'accounts.edit',
             'accounts.update',
             'accounts.delete',
             'accounts.restore',
@@ -396,7 +370,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'transaction_methods.view',
             'transaction_methods.create',
-            'transaction_methods.edit',
             'transaction_methods.update',
             'transaction_methods.delete',
             'transaction_methods.restore',
@@ -406,7 +379,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'departments.view',
             'departments.create',
-            'departments.edit',
             'departments.update',
             'departments.delete',
             'departments.restore',
@@ -416,7 +388,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'designations.view',
             'designations.create',
-            'designations.edit',
             'designations.update',
             'designations.delete',
             'designations.restore',
@@ -426,7 +397,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             // 'cost_codes.view',
             // 'cost_codes.create',
-            // 'cost_codes.edit',
             // 'cost_codes.update',
             // 'cost_codes.delete',
             // 'cost_codes.csv.import',
@@ -437,7 +407,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             // 'projects.view',
             // 'projects.create',
-            // 'projects.edit',
             // 'projects.update',
             // 'projects.delete',
             // 'projects.csv.import',
@@ -448,7 +417,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             // 'project_tasks.view',
             // 'project_tasks.create',
-            // 'project_tasks.edit',
             // 'project_tasks.update',
             // 'project_tasks.delete',
             // 'project_tasks.csv.import',
@@ -459,7 +427,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             // 'project_budgets.view',
             // 'project_budgets.create',
-            // 'project_budgets.edit',
             // 'project_budgets.update',
             // 'project_budgets.delete',
             // 'project_budgets.csv.import',
@@ -470,7 +437,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             // 'project_groups.view',
             // 'project_groups.create',
-            // 'project_groups.edit',
             // 'project_groups.update',
             // 'project_groups.delete',
             // 'project_groups.csv.import',
@@ -481,7 +447,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             // 'project_subcontracts.view',
             // 'project_subcontracts.create',
-            // 'project_subcontracts.edit',
             // 'project_subcontracts.update',
             // 'project_subcontracts.delete',
             // 'project_subcontracts.send_email',
@@ -508,7 +473,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'staffs.view',
             'staffs.create',
-            'staffs.edit',
             'staffs.update',
             'staffs.delete',
             'staffs.restore',
@@ -520,7 +484,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'staff_documents.view',
             'staff_documents.create',
-            'staff_documents.edit',
             'staff_documents.update',
             'staff_documents.delete',
 
@@ -529,7 +492,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'holidays.view',
             'holidays.create',
-            'holidays.edit',
             'holidays.update',
             'holidays.delete',
             'holidays.restore',
@@ -539,7 +501,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'leave_types.view',
             'leave_types.create',
-            'leave_types.edit',
             'leave_types.update',
             'leave_types.delete',
 
@@ -548,7 +509,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'leaves.view',
             'leaves.create',
-            'leaves.edit',
             'leaves.update',
             'leaves.delete',
             'leaves.restore',
@@ -560,7 +520,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'attendance_devices.view',
             'attendance_devices.create',
-            'attendance_devices.edit',
             'attendance_devices.update',
             'attendance_devices.delete',
 
@@ -577,7 +536,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'timesheets.view',
             'timesheets.create',
-            'timesheets.edit',
             'timesheets.update',
             'timesheets.delete',
 
@@ -586,7 +544,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'awards.view',
             'awards.create',
-            'awards.edit',
             'awards.update',
             'awards.delete',
             'awards.restore',
@@ -596,7 +553,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'salary_advances.view',
             'salary_advances.create',
-            'salary_advances.edit',
             'salary_advances.update',
             'salary_advances.delete',
             'salary_advances.restore',
@@ -606,7 +562,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'payslips.view',
             'payslips.create',
-            'payslips.edit',
             'payslips.update',
             'payslips.delete',
             'payslips.restore',
@@ -621,7 +576,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // =====================
             'taxes.view',
             'taxes.create',
-            'taxes.edit',
             'taxes.update',
             'taxes.delete',
             'taxes.restore',
@@ -703,22 +657,22 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Business
             'business.view',
             'business.create',
-            'business.edit',
             'business.update',
             'business.delete',
             'business.restore',
             'business.settings',
-            'business.user-management',
-            'business.users.store',
-            'business.users.assign-roles',
-            'business.users.assign-permissions',
-            'business.users.assign-roles-and-permissions',
-            'business.roles-permissions',
+            'business.user.view',
+            'business.user.create',
+            'business.user.update',
+            'business.user.delete',
+            'business.roles.view',
+            'business.roles.create',
+            'business.roles.update',
+            'business.roles.delete',
 
             // Currency
             'currency.view',
             'currency.create',
-            'currency.edit',
             'currency.update',
             'currency.delete',
             'currency.restore',
@@ -729,7 +683,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Customers
             'customers.view',
             'customers.create',
-            'customers.edit',
             'customers.update',
             'customers.delete',
             'customers.restore',
@@ -739,7 +692,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Vendors
             'vendors.view',
             'vendors.create',
-            'vendors.edit',
             'vendors.update',
             'vendors.delete',
             'vendors.restore',
@@ -749,7 +701,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Products
             'products.view',
             'products.create',
-            'products.edit',
             'products.update',
             'products.delete',
             'products.restore',
@@ -759,7 +710,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Product Units
             'product_units.view',
             'product_units.create',
-            'product_units.edit',
             'product_units.update',
             'product_units.delete',
             'product_units.restore',
@@ -767,13 +717,11 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Categories
             'main_categories.view',
             'main_categories.create',
-            'main_categories.edit',
             'main_categories.update',
             'main_categories.delete',
             'main_categories.restore',
             'sub_categories.view',
             'sub_categories.create',
-            'sub_categories.edit',
             'sub_categories.update',
             'sub_categories.delete',
             'sub_categories.restore',
@@ -781,7 +729,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Brands
             'brands.view',
             'brands.create',
-            'brands.edit',
             'brands.update',
             'brands.delete',
             'brands.restore',
@@ -789,7 +736,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Inventory
             'inventory_adjustments.view',
             'inventory_adjustments.create',
-            'inventory_adjustments.edit',
             'inventory_adjustments.update',
             'inventory_adjustments.delete',
             'inventory_adjustments.restore',
@@ -797,7 +743,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             'inventory_adjustments.csv.export',
             'inventory_transfers.view',
             'inventory_transfers.create',
-            'inventory_transfers.edit',
             'inventory_transfers.update',
             'inventory_transfers.delete',
             'inventory_transfers.restore',
@@ -811,7 +756,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Invoices
             'invoices.view',
             'invoices.create',
-            'invoices.edit',
             'invoices.update',
             'invoices.delete',
             'invoices.restore',
@@ -824,7 +768,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Receive Payments
             'receive_payments.view',
             'receive_payments.create',
-            'receive_payments.edit',
             'receive_payments.update',
             'receive_payments.delete',
             'receive_payments.pdf',
@@ -832,7 +775,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Sales Returns
             'sales_returns.view',
             'sales_returns.create',
-            'sales_returns.edit',
             'sales_returns.update',
             'sales_returns.delete',
             'sales_returns.restore',
@@ -843,7 +785,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Purchase Returns
             'purchase_returns.view',
             'purchase_returns.create',
-            'purchase_returns.edit',
             'purchase_returns.update',
             'purchase_returns.delete',
             'purchase_returns.restore',
@@ -856,7 +797,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Journals
             'journals.view',
             'journals.create',
-            'journals.edit',
             'journals.update',
             'journals.delete',
             'journals.restore',
@@ -868,7 +808,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Receipts / POS
             'receipts.view',
             'receipts.create',
-            'receipts.edit',
             'receipts.update',
             'receipts.delete',
             'receipts.restore',
@@ -879,14 +818,12 @@ final class RolesAndPermissionsSeeder extends Seeder
             'receipts.csv.export',
             'hold_pos_invoices.view',
             'hold_pos_invoices.create',
-            'hold_pos_invoices.edit',
             'hold_pos_invoices.update',
             'hold_pos_invoices.delete',
 
             // Deferred Invoices
             'deffered_invoices.view',
             'deffered_invoices.create',
-            'deffered_invoices.edit',
             'deffered_invoices.update',
             'deffered_invoices.delete',
             'deffered_invoices.restore',
@@ -894,14 +831,12 @@ final class RolesAndPermissionsSeeder extends Seeder
             'deffered_invoices.pdf',
             'deffered_receive_payments.view',
             'deffered_receive_payments.create',
-            'deffered_receive_payments.edit',
             'deffered_receive_payments.update',
             'deffered_receive_payments.delete',
 
             // Quotations
             'quotations.view',
             'quotations.create',
-            'quotations.edit',
             'quotations.update',
             'quotations.delete',
             'quotations.restore',
@@ -913,7 +848,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Bill Invoices
             'bill_invoices.view',
             'bill_invoices.create',
-            'bill_invoices.edit',
             'bill_invoices.update',
             'bill_invoices.delete',
             'bill_invoices.restore',
@@ -928,7 +862,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Bill Payments
             'bill_payments.view',
             'bill_payments.create',
-            'bill_payments.edit',
             'bill_payments.update',
             'bill_payments.delete',
             'bill_payments.restore',
@@ -937,7 +870,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Cash Purchases
             'cash_purchases.view',
             'cash_purchases.create',
-            'cash_purchases.edit',
             'cash_purchases.update',
             'cash_purchases.delete',
             'cash_purchases.restore',
@@ -951,7 +883,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Purchase Orders
             'purchase_orders.view',
             'purchase_orders.create',
-            'purchase_orders.edit',
             'purchase_orders.update',
             'purchase_orders.delete',
             'purchase_orders.restore',
@@ -966,7 +897,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Accounts
             'accounts.view',
             'accounts.create',
-            'accounts.edit',
             'accounts.update',
             'accounts.delete',
             'accounts.restore',
@@ -977,7 +907,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Transaction Methods
             'transaction_methods.view',
             'transaction_methods.create',
-            'transaction_methods.edit',
             'transaction_methods.update',
             'transaction_methods.delete',
             'transaction_methods.restore',
@@ -985,13 +914,11 @@ final class RolesAndPermissionsSeeder extends Seeder
             // HR - Departments & Designations
             'departments.view',
             'departments.create',
-            'departments.edit',
             'departments.update',
             'departments.delete',
             'departments.restore',
             'designations.view',
             'designations.create',
-            'designations.edit',
             'designations.update',
             'designations.delete',
             'designations.restore',
@@ -999,7 +926,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // HR - Staff
             'staffs.view',
             'staffs.create',
-            'staffs.edit',
             'staffs.update',
             'staffs.delete',
             'staffs.restore',
@@ -1007,25 +933,21 @@ final class RolesAndPermissionsSeeder extends Seeder
             'staffs.csv.export',
             'staff_documents.view',
             'staff_documents.create',
-            'staff_documents.edit',
             'staff_documents.update',
             'staff_documents.delete',
 
             // HR - Holidays & Leaves
             'holidays.view',
             'holidays.create',
-            'holidays.edit',
             'holidays.update',
             'holidays.delete',
             'holidays.restore',
             'leave_types.view',
             'leave_types.create',
-            'leave_types.edit',
             'leave_types.update',
             'leave_types.delete',
             'leaves.view',
             'leaves.create',
-            'leaves.edit',
             'leaves.update',
             'leaves.delete',
             'leaves.restore',
@@ -1035,7 +957,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // HR - Attendance Devices & Timesheets
             'attendance_devices.view',
             'attendance_devices.create',
-            'attendance_devices.edit',
             'attendance_devices.update',
             'attendance_devices.delete',
             'attendance_logs.view',
@@ -1044,20 +965,17 @@ final class RolesAndPermissionsSeeder extends Seeder
             'attendance_logs.csv.export',
             'timesheets.view',
             'timesheets.create',
-            'timesheets.edit',
             'timesheets.update',
             'timesheets.delete',
 
             // HR - Awards & Salary Advances
             'awards.view',
             'awards.create',
-            'awards.edit',
             'awards.update',
             'awards.delete',
             'awards.restore',
             'salary_advances.view',
             'salary_advances.create',
-            'salary_advances.edit',
             'salary_advances.update',
             'salary_advances.delete',
             'salary_advances.restore',
@@ -1065,7 +983,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Payroll
             'payslips.view',
             'payslips.create',
-            'payslips.edit',
             'payslips.update',
             'payslips.delete',
             'payslips.restore',
@@ -1078,7 +995,6 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Taxes
             'taxes.view',
             'taxes.create',
-            'taxes.edit',
             'taxes.update',
             'taxes.delete',
             'taxes.restore',
@@ -1125,13 +1041,11 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Medical
             'medical_records.view',
             'medical_records.create',
-            'medical_records.edit',
             'medical_records.update',
             'medical_records.delete',
             'medical_records.restore',
             'prescriptions.view',
             'prescriptions.create',
-            'prescriptions.edit',
             'prescriptions.update',
             'prescriptions.delete',
             'prescriptions.restore',
@@ -1155,116 +1069,130 @@ final class RolesAndPermissionsSeeder extends Seeder
             'dashboard.recent_invoices_widget',
             'dashboard.receivables_vs_payables_widget',
 
-            // Business
-            'business.view',
-
-            // Customers & Vendors (view and create only)
+            // Customers
             'customers.view',
             'customers.create',
-            'customers.edit',
             'customers.update',
+            'customers.csv.import',
             'customers.csv.export',
+
+            // Vendors
             'vendors.view',
             'vendors.create',
-            'vendors.edit',
             'vendors.update',
+            'vendors.csv.import',
             'vendors.csv.export',
 
             // Products
             'products.view',
             'products.create',
-            'products.edit',
             'products.update',
+            'products.csv.import',
             'products.csv.export',
+
+            // Product Units
             'product_units.view',
+            'product_units.create',
+            'product_units.update',
+
+            // Categories
             'main_categories.view',
+            'main_categories.create',
+            'main_categories.update',
             'sub_categories.view',
+            'sub_categories.create',
+            'sub_categories.update',
+
+            // Brands
             'brands.view',
+            'brands.create',
+            'brands.update',
 
             // Inventory
             'inventory_adjustments.view',
             'inventory_adjustments.create',
-            'inventory_adjustments.edit',
             'inventory_adjustments.update',
+            'inventory_adjustments.csv.import',
             'inventory_adjustments.csv.export',
             'inventory_transfers.view',
             'inventory_transfers.create',
-            'inventory_transfers.edit',
             'inventory_transfers.update',
             'inventory_transfers.send',
             'inventory_transfers.receive',
+            'inventory_transfers.reject',
+            'inventory_transfers.cancel',
+            'inventory_transfers.csv.import',
             'inventory_transfers.csv.export',
 
             // Invoices
             'invoices.view',
             'invoices.create',
-            'invoices.edit',
             'invoices.update',
             'invoices.send_email',
             'invoices.duplicate',
             'invoices.pdf',
+            'invoices.csv.import',
             'invoices.csv.export',
 
             // Receive Payments
             'receive_payments.view',
             'receive_payments.create',
-            'receive_payments.edit',
             'receive_payments.update',
             'receive_payments.pdf',
 
-            // Sales & Purchase Returns
+            // Sales Returns
             'sales_returns.view',
             'sales_returns.create',
-            'sales_returns.edit',
             'sales_returns.update',
             'sales_returns.refund',
             'sales_returns.send_email',
             'sales_returns.pdf',
+
+            // Purchase Returns
             'purchase_returns.view',
             'purchase_returns.create',
-            'purchase_returns.edit',
             'purchase_returns.update',
+            'purchase_returns.approve',
+            'purchase_returns.reject',
             'purchase_returns.refund',
             'purchase_returns.send_email',
             'purchase_returns.pdf',
 
-            // Journals (view only, no approval)
+            // Journals
             'journals.view',
             'journals.create',
-            'journals.edit',
             'journals.update',
+            'journals.approve',
+            'journals.reject',
+            'journals.csv.import',
             'journals.csv.export',
 
             // Receipts / POS
             'receipts.view',
             'receipts.create',
-            'receipts.edit',
             'receipts.update',
             'receipts.send_email',
             'receipts.pos',
             'receipts.pdf',
+            'receipts.csv.import',
             'receipts.csv.export',
             'hold_pos_invoices.view',
             'hold_pos_invoices.create',
-            'hold_pos_invoices.edit',
             'hold_pos_invoices.update',
 
             // Deferred Invoices
             'deffered_invoices.view',
             'deffered_invoices.create',
-            'deffered_invoices.edit',
             'deffered_invoices.update',
             'deffered_invoices.send_email',
             'deffered_invoices.pdf',
             'deffered_receive_payments.view',
             'deffered_receive_payments.create',
-            'deffered_receive_payments.edit',
             'deffered_receive_payments.update',
 
             // Quotations
             'quotations.view',
             'quotations.create',
-            'quotations.edit',
             'quotations.update',
             'quotations.send_email',
             'quotations.pdf',
@@ -1274,74 +1202,122 @@ final class RolesAndPermissionsSeeder extends Seeder
             // Bill Invoices
             'bill_invoices.view',
             'bill_invoices.create',
-            'bill_invoices.edit',
             'bill_invoices.update',
+            'bill_invoices.approve',
+            'bill_invoices.reject',
             'bill_invoices.duplicate',
             'bill_invoices.send_email',
             'bill_invoices.pdf',
+            'bill_invoices.csv.import',
             'bill_invoices.csv.export',
 
             // Bill Payments
             'bill_payments.view',
             'bill_payments.create',
-            'bill_payments.edit',
             'bill_payments.update',
             'bill_payments.pdf',
 
             // Cash Purchases
             'cash_purchases.view',
             'cash_purchases.create',
-            'cash_purchases.edit',
             'cash_purchases.update',
+            'cash_purchases.approve',
+            'cash_purchases.reject',
             'cash_purchases.send_email',
             'cash_purchases.pdf',
+            'cash_purchases.csv.import',
             'cash_purchases.csv.export',
 
             // Purchase Orders
             'purchase_orders.view',
             'purchase_orders.create',
-            'purchase_orders.edit',
             'purchase_orders.update',
             'purchase_orders.duplicate',
             'purchase_orders.send_email',
             'purchase_orders.pdf',
             'purchase_orders.convert_to_bill',
             'purchase_orders.convert_to_cash_purchase',
+            'purchase_orders.csv.import',
             'purchase_orders.csv.export',
 
             // Accounts
             'accounts.view',
+            'accounts.create',
+            'accounts.update',
             'accounts.statement',
+            'accounts.csv.import',
             'accounts.csv.export',
 
             // Transaction Methods
             'transaction_methods.view',
+            'transaction_methods.create',
+            'transaction_methods.update',
 
-            // HR
+            // HR - Departments & Designations
             'departments.view',
+            'departments.create',
+            'departments.update',
             'designations.view',
+            'designations.create',
+            'designations.update',
+
+            // HR - Staff
             'staffs.view',
+            'staffs.create',
+            'staffs.update',
+            'staffs.csv.import',
             'staffs.csv.export',
+            'staff_documents.view',
+            'staff_documents.create',
+            'staff_documents.update',
+
+            // HR - Holidays & Leaves
             'holidays.view',
+            'holidays.create',
+            'holidays.update',
             'leave_types.view',
+            'leave_types.create',
+            'leave_types.update',
             'leaves.view',
             'leaves.create',
-            'leaves.edit',
             'leaves.update',
+            'leaves.approve',
+            'leaves.reject',
+
+            // HR - Attendance Devices & Timesheets
             'attendance_devices.view',
+            'attendance_devices.create',
+            'attendance_devices.update',
             'attendance_logs.view',
+            'attendance_logs.create',
+            'attendance_logs.csv.import',
             'attendance_logs.csv.export',
             'timesheets.view',
             'timesheets.create',
-            'timesheets.edit',
             'timesheets.update',
+
+            // HR - Awards & Salary Advances
             'awards.view',
+            'awards.create',
+            'awards.update',
             'salary_advances.view',
+            'salary_advances.create',
+            'salary_advances.update',
+
+            // Payroll
             'payslips.view',
+            'payslips.create',
+            'payslips.update',
+            'payslips.approve',
+            'payslips.reject',
+            'payslips.accrue',
+            'payslips.make_payment',
             'payslips.csv.export',
 
             // Taxes
             'taxes.view',
+            'taxes.create',
+            'taxes.update',
 
             // Reports
             'reports.account_balances',
@@ -1384,7 +1360,12 @@ final class RolesAndPermissionsSeeder extends Seeder
 
             // Medical
             'medical_records.view',
+            'medical_records.create',
+            'medical_records.update',
             'prescriptions.view',
+            'prescriptions.create',
+            'prescriptions.update',
+            'prescriptions.change_status',
         ]);
 
         // User Role - Basic operational access
@@ -1394,69 +1375,194 @@ final class RolesAndPermissionsSeeder extends Seeder
             'dashboard.view',
             'dashboard.income_widget',
             'dashboard.expense_widget',
+            'dashboard.accounts_receivable_amount_widget',
+            'dashboard.accounts_payable_amount_widget',
             'dashboard.cashflow_widget',
+            'dashboard.top_customers_widget',
+            'dashboard.sales_overview_widget',
+            'dashboard.sales_value_widget',
             'dashboard.recent_transaction_widget',
             'dashboard.recent_invoices_widget',
+            'dashboard.receivables_vs_payables_widget',
 
-            // Business (minimal)
-            'business.view',
-
-            // Customers & Vendors (view only)
+            // Customers
             'customers.view',
+            'customers.create',
+            'customers.update',
+            'customers.csv.import',
+            'customers.csv.export',
+
+            // Vendors
             'vendors.view',
+            'vendors.create',
+            'vendors.update',
+            'vendors.csv.import',
+            'vendors.csv.export',
 
-            // Products (view only)
+            // Products
             'products.view',
+            'products.create',
+            'products.update',
+            'products.csv.import',
+            'products.csv.export',
+
+            // Product Units
             'product_units.view',
+            'product_units.create',
+            'product_units.update',
+
+            // Categories
             'main_categories.view',
+            'main_categories.create',
+            'main_categories.update',
             'sub_categories.view',
+            'sub_categories.create',
+            'sub_categories.update',
+
+            // Brands
             'brands.view',
+            'brands.create',
+            'brands.update',
 
-            // Inventory (view only)
+            // Inventory
             'inventory_adjustments.view',
+            'inventory_adjustments.create',
+            'inventory_adjustments.update',
+            'inventory_adjustments.csv.import',
+            'inventory_adjustments.csv.export',
             'inventory_transfers.view',
+            'inventory_transfers.create',
+            'inventory_transfers.update',
+            'inventory_transfers.send',
+            'inventory_transfers.receive',
+            'inventory_transfers.reject',
+            'inventory_transfers.cancel',
+            'inventory_transfers.csv.import',
+            'inventory_transfers.csv.export',
 
-            // Invoices (view, create, pdf)
+            // Invoices
             'invoices.view',
             'invoices.create',
+            'invoices.update',
+            'invoices.send_email',
+            'invoices.duplicate',
             'invoices.pdf',
+            'invoices.csv.import',
+            'invoices.csv.export',
 
-            // Receive Payments (view only)
+            // Receive Payments
             'receive_payments.view',
+            'receive_payments.create',
+            'receive_payments.update',
             'receive_payments.pdf',
 
-            // Receipts / POS (basic access)
+            // Sales Returns
+            'sales_returns.view',
+            'sales_returns.create',
+            'sales_returns.update',
+            'sales_returns.refund',
+            'sales_returns.send_email',
+            'sales_returns.pdf',
+
+            // Purchase Returns
+            'purchase_returns.view',
+            'purchase_returns.create',
+            'purchase_returns.update',
+            'purchase_returns.approve',
+            'purchase_returns.reject',
+            'purchase_returns.refund',
+            'purchase_returns.send_email',
+            'purchase_returns.pdf',
+
+            // Receipts / POS
             'receipts.view',
             'receipts.create',
+            'receipts.update',
+            'receipts.send_email',
             'receipts.pos',
             'receipts.pdf',
+            'receipts.csv.import',
+            'receipts.csv.export',
             'hold_pos_invoices.view',
             'hold_pos_invoices.create',
+            'hold_pos_invoices.update',
 
             // Quotations
             'quotations.view',
             'quotations.create',
+            'quotations.update',
+            'quotations.send_email',
             'quotations.pdf',
+            'quotations.duplicate',
+            'quotations.convert_to_invoice',
 
-            // Accounts (view only)
-            'accounts.view',
-            'accounts.statement',
+            // Bill Invoices
+            'bill_invoices.view',
+            'bill_invoices.create',
+            'bill_invoices.update',
+            'bill_invoices.approve',
+            'bill_invoices.reject',
+            'bill_invoices.duplicate',
+            'bill_invoices.send_email',
+            'bill_invoices.pdf',
+            'bill_invoices.csv.import',
+            'bill_invoices.csv.export',
 
-            // Transaction Methods (view only)
+            // Bill Payments
+            'bill_payments.view',
+            'bill_payments.create',
+            'bill_payments.update',
+            'bill_payments.pdf',
+
+            // Cash Purchases
+            'cash_purchases.view',
+            'cash_purchases.create',
+            'cash_purchases.update',
+            'cash_purchases.approve',
+            'cash_purchases.reject',
+            'cash_purchases.send_email',
+            'cash_purchases.pdf',
+            'cash_purchases.csv.import',
+            'cash_purchases.csv.export',
+
+            // Purchase Orders
+            'purchase_orders.view',
+            'purchase_orders.create',
+            'purchase_orders.update',
+            'purchase_orders.duplicate',
+            'purchase_orders.send_email',
+            'purchase_orders.pdf',
+            'purchase_orders.convert_to_bill',
+            'purchase_orders.convert_to_cash_purchase',
+            'purchase_orders.csv.import',
+            'purchase_orders.csv.export',
+
+            // Transaction Methods
             'transaction_methods.view',
+            'transaction_methods.create',
+            'transaction_methods.update',
 
-            // HR (view own data)
-            'leaves.view',
-            'leaves.create',
-            'attendance_logs.view',
-            'timesheets.view',
-            'timesheets.create',
-            'holidays.view',
-            'payslips.view',
+            // Reports
+            'reports.receivables',
+            'reports.receivables.export',
+            'reports.receivables.pdf',
+            'reports.payables',
+            'reports.payables.export',
+            'reports.inventory_details',
+            'reports.inventory_details.export',
+            'reports.inventory_summary',
+            'reports.inventory_summary.export',
+            'reports.sales_by_product',
+            'reports.sales_by_product.export',
 
-            // Reports (basic view - no exports for User role)
-            'reports.account_balances',
-            'reports.account_statement',
+            // Medical
+            'medical_records.view',
+            'medical_records.create',
+            'medical_records.update',
+            'prescriptions.view',
+            'prescriptions.create',
+            'prescriptions.update',
+            'prescriptions.change_status',
         ]);
 
         // Assign Owner role to existing owner users
