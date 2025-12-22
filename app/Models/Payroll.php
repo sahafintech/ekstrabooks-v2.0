@@ -40,6 +40,14 @@ class Payroll extends Model
         return $this->belongsTo(TaxCalculationMethod::class);
     }
 
+    /**
+     * Get the approvals for this payroll
+     */
+    public function approvals()
+    {
+        return $this->hasMany(Approvals::class, 'ref_id')->where('ref_name', 'payroll');
+    }
+
     protected function currentSalary(): Attribute{
         $decimal_place = get_business_option('decimal_places', 2);
 

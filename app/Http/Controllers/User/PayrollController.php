@@ -66,11 +66,18 @@ class PayrollController extends Controller
         // Store month and year in session
         session(['month' => $month, 'year' => $year]);
 
+        // Check if current user is a configured approver
+        $currentUserId = auth()->id();
+        $approvalUsersJson = get_business_option('payroll_approval_users', '[]');
+        $configuredUserIds = json_decode($approvalUsersJson, true);
+        $hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
+        $isCurrentUserApprover = $hasConfiguredApprovers && in_array($currentUserId, $configuredUserIds);
+
         $query = Payroll::query()
             ->where('payslips.business_id', $request->activeBusiness->id)
             ->where('month', $month)
             ->where('year', $year)
-            ->with('staff', 'staff.salary_benefits');
+            ->with('staff', 'staff.salary_benefits', 'approvals.actionUser');
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -132,6 +139,8 @@ class PayrollController extends Controller
             'accounts' => Account::where('business_id', $request->activeBusiness->id)->get(),
             'methods' => TransactionMethod::where('business_id', $request->activeBusiness->id)->get(),
             'trashed_payrolls' => Payroll::onlyTrashed()->where('business_id', $request->activeBusiness->id)->count(),
+            'hasConfiguredApprovers' => $hasConfiguredApprovers,
+            'isCurrentUserApprover' => $isCurrentUserApprover,
         ]);
     }
 
@@ -252,6 +261,28 @@ class PayrollController extends Controller
 
         $payroll = $this->createPayrollRecord($employee, $month, $year, $calculationData, $benefitsData, $businessSettings);
         $payroll->save();
+
+        // Create approval records for configured approvers
+        $this->createPayrollApprovalRecords($payroll);
+    }
+
+    /**
+     * Create approval records for a payroll
+     */
+    private function createPayrollApprovalRecords(Payroll $payroll): void
+    {
+        $approvalUsersJson = get_business_option('payroll_approval_users', '[]');
+        $configuredUserIds = json_decode($approvalUsersJson, true);
+        
+        if (is_array($configuredUserIds) && count($configuredUserIds) > 0) {
+            foreach ($configuredUserIds as $userId) {
+                $payroll->approvals()->create([
+                    'ref_name' => 'payroll',
+                    'action_user' => $userId,
+                    'status' => 0, // pending
+                ]);
+            }
+        }
     }
 
     /**
@@ -465,10 +496,41 @@ class PayrollController extends Controller
      */
     public function show($id)
     {
-        $payroll = Payroll::with('staff', 'staff.department', 'staff.designation')->find($id);
+        $payroll = Payroll::with('staff', 'staff.department', 'staff.designation', 'approvals.actionUser')->find($id);
 
         if (!$payroll) {
             abort(404, 'Payroll not found');
+        }
+
+        // Check if there are configured approval users for this business
+        $payrollApprovalUsersJson = get_business_option('payroll_approval_users', '[]');
+        $approvalUsersCount = 0;
+        $hasConfiguredApprovers = false;
+        $configuredUserIds = [];
+        
+        $usersArray = json_decode($payrollApprovalUsersJson, true);
+        if (is_array($usersArray) && count($usersArray) > 0) {
+            $approvalUsersCount = count($usersArray);
+            $hasConfiguredApprovers = true;
+            $configuredUserIds = $usersArray;
+        }
+
+        // Only create approval records if there are configured approvers
+        // AND the payroll doesn't have any approvals yet
+        // AND the payroll is still in draft status (status = 0)
+        if ($payroll->approvals->isEmpty() && $hasConfiguredApprovers && $payroll->status == 0) {
+            
+            // Create approval records for each configured approver
+            foreach ($configuredUserIds as $userId) {
+                $payroll->approvals()->create([
+                    'ref_name' => 'payroll',
+                    'action_user' => $userId,
+                    'status' => 0, // pending
+                ]);
+            }
+            
+            // Reload approvals with actionUser relationship
+            $payroll->load('approvals.actionUser');
         }
 
         $working_days = Attendance::whereMonth('date', $payroll->month)
@@ -539,6 +601,8 @@ class PayrollController extends Controller
             'deductions' => $deductions,
             'advance' => $advance,
             'actual_working_hours' => $actual_working_hours,
+            'approvalUsersCount' => $payroll->approvals->count(),
+            'hasConfiguredApprovers' => $hasConfiguredApprovers,
         ]);
     }
 
@@ -1065,17 +1129,54 @@ class PayrollController extends Controller
 
     public function bulk_approve(Request $request)
     {
-        $payrolls = Payroll::where('status', 0)
+        $currentUserId = auth()->id();
+        
+        // Check if current user is a configured approver
+        $approvalUsersJson = get_business_option('payroll_approval_users', '[]');
+        $configuredUserIds = json_decode($approvalUsersJson, true);
+        $hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
+        
+        if (!$hasConfiguredApprovers) {
+            return back()->with('error', _lang('No approvers are configured. Please configure approvers in business settings first.'));
+        }
+        
+        if (!in_array($currentUserId, $configuredUserIds)) {
+            return back()->with('error', _lang('You are not assigned as an approver for payrolls'));
+        }
+
+        $payrolls = Payroll::with('approvals')
+            ->where('status', 0)
             ->whereIn('id', $request->ids)
             ->get();
 
         if ($payrolls->count() == 0) {
-            return back()->with('error', _lang('No payslip found to approve'));
+            return back()->with('error', _lang('No draft payslips found to approve'));
         }
 
+        $approvedCount = 0;
         foreach ($payrolls as $payroll) {
-            $payroll->status = 1;
-            $payroll->save();
+            // Ensure approval records exist (for payrolls created before this feature)
+            if ($payroll->approvals->isEmpty()) {
+                $this->createPayrollApprovalRecords($payroll);
+                $payroll->load('approvals');
+            }
+            
+            // Find this user's approval record
+            $approval = $payroll->approvals()
+                ->where('action_user', $currentUserId)
+                ->first();
+            
+            if ($approval) {
+                $approval->update([
+                    'status' => 1, // Approved
+                    'comment' => 'Bulk approved',
+                    'action_date' => now(),
+                ]);
+                
+                // Check and update payroll status
+                $this->checkAndUpdatePayrollStatus($payroll);
+                $approvedCount++;
+            }
         }
 
         @ini_set('max_execution_time', 0);
@@ -1083,7 +1184,7 @@ class PayrollController extends Controller
 
         Overrider::load("BusinessSettings");
 
-        $payroll = Payroll::where('status', 1)->where('month', session('month'))->where('year', session('year'))->get();
+        $approvedPayrolls = Payroll::where('status', 1)->where('month', session('month'))->where('year', session('year'))->get();
 
         //Send Email
         $email   = $request->activeBusiness->email;
@@ -1091,8 +1192,8 @@ class PayrollController extends Controller
         $message .= 'We are pleased to inform you that the payroll for the period ' . date('F', mktime(0, 0, 0, session('month'), 10)) . ' ' . session('year') . ' has been successfully approved.<br><br>
         Details:<br>
         Approval Date:' . now()->format(get_date_format()) . '<br>
-        Total Amount:' . currency_symbol($request->activeBusiness->currency) . $payroll->sum('net_salary') . '<br>
-        Number of Employees Paid:' . count($payroll) . '<br><br>';
+        Total Amount:' . currency_symbol($request->activeBusiness->currency) . $approvedPayrolls->sum('net_salary') . '<br>
+        Number of Employees Paid:' . count($approvedPayrolls) . '<br><br>';
 
         $mail          = new \stdClass();
         $mail->subject = "Payroll Approved";
@@ -1102,30 +1203,67 @@ class PayrollController extends Controller
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Approved Payslip for ' . count($payroll) . ' employees';
+        $audit->event = 'Bulk approved ' . $approvedCount . ' payslips';
         $audit->save();
 
         try {
             Mail::to($email)->send(new GeneralMail($mail));
-            return back()->with('success', _lang('Payroll approved and email notification sent sucessfully'));
+            return back()->with('success', _lang('Your approval has been recorded for ' . $approvedCount . ' payslips'));
         } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage());
+            return back()->with('success', _lang('Your approval has been recorded for ' . $approvedCount . ' payslips'));
         }
     }
 
     public function bulk_reject(Request $request)
     {
-        $payrolls = Payroll::whereIn('id', $request->ids)
-            ->where('status', 1)
+        $currentUserId = auth()->id();
+        
+        // Check if current user is a configured approver
+        $approvalUsersJson = get_business_option('payroll_approval_users', '[]');
+        $configuredUserIds = json_decode($approvalUsersJson, true);
+        $hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
+        
+        if (!$hasConfiguredApprovers) {
+            return back()->with('error', _lang('No approvers are configured. Please configure approvers in business settings first.'));
+        }
+        
+        if (!in_array($currentUserId, $configuredUserIds)) {
+            return back()->with('error', _lang('You are not assigned as an approver for payrolls'));
+        }
+
+        $payrolls = Payroll::with('approvals')
+            ->whereIn('id', $request->ids)
+            ->where('status', 0) // Only draft payrolls can be rejected
             ->get();
 
         if ($payrolls->count() == 0) {
-            return back()->with('error', _lang('No payslip found to reject'));
+            return back()->with('error', _lang('No draft payslips found to reject'));
         }
 
+        $rejectedCount = 0;
         foreach ($payrolls as $payroll) {
-            $payroll->status = 0;
-            $payroll->save();
+            // Ensure approval records exist (for payrolls created before this feature)
+            if ($payroll->approvals->isEmpty()) {
+                $this->createPayrollApprovalRecords($payroll);
+                $payroll->load('approvals');
+            }
+            
+            // Find this user's approval record
+            $approval = $payroll->approvals()
+                ->where('action_user', $currentUserId)
+                ->first();
+            
+            if ($approval) {
+                $approval->update([
+                    'status' => 2, // Rejected
+                    'comment' => 'Bulk rejected',
+                    'action_date' => now(),
+                ]);
+                
+                // Check and update payroll status
+                $this->checkAndUpdatePayrollStatus($payroll);
+                $rejectedCount++;
+            }
         }
 
         @ini_set('max_execution_time', 0);
@@ -1152,15 +1290,199 @@ class PayrollController extends Controller
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Rejected Payslip for ' . count($payroll) . ' employees';
+        $audit->event = 'Bulk rejected ' . $rejectedCount . ' payslips';
         $audit->save();
 
         try {
             Mail::to($email)->send(new GeneralMail($mail));
-            return back()->with('success', _lang('Payroll rejected email notification sent sucessfully'));
+            return back()->with('success', _lang('Your rejection has been recorded for ' . $rejectedCount . ' payslips'));
         } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage());
+            return back()->with('success', _lang('Your rejection has been recorded for ' . $rejectedCount . ' payslips'));
         }
+    }
+
+    /**
+     * Approve a payroll (single user approval)
+     */
+    public function approve(Request $request, $id)
+    {
+        $request->validate([
+            'comment' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $payroll = Payroll::with('approvals')->find($id);
+
+        if (!$payroll) {
+            return back()->with('error', _lang('Payroll not found'));
+        }
+
+        // Only allow approval actions on draft payrolls (status = 0)
+        if ($payroll->status != 0) {
+            return back()->with('error', _lang('Only draft payrolls can be approved'));
+        }
+
+        $currentUserId = auth()->id();
+
+        // Check if there are any configured approval users for this business
+        $approvalUsersJson = get_business_option('payroll_approval_users', '[]');
+        $configuredUserIds = json_decode($approvalUsersJson, true);
+        $hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
+
+        // If no approvers configured, tell user to configure them first
+        if (!$hasConfiguredApprovers) {
+            return back()->with('error', _lang('No approvers are configured. Please configure approvers in business settings first.'));
+        }
+
+        // Check if current user is in the configured approvers list
+        if (!in_array($currentUserId, $configuredUserIds)) {
+            return back()->with('error', _lang('You are not assigned as an approver for this payroll'));
+        }
+
+        // Find the approval record by action_user (who is assigned as approver)
+        $approval = $payroll->approvals()
+            ->where('action_user', $currentUserId)
+            ->first();
+
+        if (!$approval) {
+            return back()->with('error', _lang('You are not assigned as an approver for this payroll'));
+        }
+
+        // Update the approval record
+        $approval->update([
+            'status' => 1, // Approved
+            'comment' => $request->input('comment'),
+            'action_date' => now(),
+        ]);
+
+        // Check if payroll should be marked as approved based on required approvals
+        $this->checkAndUpdatePayrollStatus($payroll);
+
+        // Audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = $currentUserId;
+        $audit->event = 'Approved Payroll for ' . $payroll->employee->name . ' (' . $payroll->month . '/' . $payroll->year . ')';
+        $audit->save();
+
+        return back()->with('success', _lang('Payroll approved successfully'));
+    }
+
+    /**
+     * Reject a payroll (single user approval)
+     */
+    public function reject(Request $request, $id)
+    {
+        $request->validate([
+            'comment' => ['required', 'string', 'max:1000'],
+        ], [
+            'comment.required' => _lang('Comment is required when rejecting'),
+        ]);
+
+        $payroll = Payroll::with('approvals')->find($id);
+
+        if (!$payroll) {
+            return back()->with('error', _lang('Payroll not found'));
+        }
+
+        // Only allow rejection on draft payrolls (status = 0)
+        if ($payroll->status != 0) {
+            return back()->with('error', _lang('Only draft payrolls can be rejected'));
+        }
+
+        $currentUserId = auth()->id();
+
+        // Check if there are any configured approval users for this business
+        $approvalUsersJson = get_business_option('payroll_approval_users', '[]');
+        $configuredUserIds = json_decode($approvalUsersJson, true);
+        $hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
+
+        // If no approvers configured, tell user to configure them first
+        if (!$hasConfiguredApprovers) {
+            return back()->with('error', _lang('No approvers are configured. Please configure approvers in business settings first.'));
+        }
+
+        // Check if current user is in the configured approvers list
+        if (!in_array($currentUserId, $configuredUserIds)) {
+            return back()->with('error', _lang('You are not assigned as an approver for this payroll'));
+        }
+
+        // Find the approval record by action_user (who is assigned as approver)
+        $approval = $payroll->approvals()
+            ->where('action_user', $currentUserId)
+            ->first();
+
+        if (!$approval) {
+            return back()->with('error', _lang('You are not assigned as an approver for this payroll'));
+        }
+
+        // Update the approval record
+        $approval->update([
+            'status' => 2, // Rejected
+            'comment' => $request->input('comment'),
+            'action_date' => now(),
+        ]);
+
+        // Check if payroll status should be updated
+        $this->checkAndUpdatePayrollStatus($payroll);
+
+        // Audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = $currentUserId;
+        $audit->event = 'Rejected Payroll for ' . $payroll->employee->name . ' (' . $payroll->month . '/' . $payroll->year . ')';
+        $audit->save();
+
+        return back()->with('success', _lang('Payroll rejection recorded'));
+    }
+
+    /**
+     * Check and update payroll status based on all approval records
+     * - Approved (status=1): Required count of approvers reached
+     * - Draft (status=0): Not enough approvals yet or rejected
+     */
+    private function checkAndUpdatePayrollStatus(Payroll $payroll): void
+    {
+        // Reload approvals to get the most current state
+        $payroll->load('approvals');
+        $approvals = $payroll->approvals;
+        
+        // If no approvals configured, nothing to check
+        if ($approvals->isEmpty()) {
+            return;
+        }
+
+        // Get the required approval count from settings for the current business
+        // Default to 1 if not set (any single approver can approve)
+        $requiredApprovalCount = (int) get_business_option('payroll_approval_required_count', 1);
+
+        $totalApprovers = $approvals->count();
+        $approvedCount = $approvals->where('status', 1)->count();
+        $rejectedCount = $approvals->where('status', 2)->count();
+        
+        // Ensure required count doesn't exceed total approvers
+        $requiredApprovalCount = min($requiredApprovalCount, $totalApprovers);
+        
+        // Store previous status to detect changes
+        $previousStatus = $payroll->status;
+
+        // If ALL assigned users have rejected (unanimous rejection), keep as draft
+        if ($rejectedCount === $totalApprovers) {
+            // Stay in draft status
+            return;
+        }
+
+        // If we have enough approvals AND not everyone rejected
+        if ($approvedCount >= $requiredApprovalCount && $rejectedCount < $totalApprovers) {
+            // Only update if not already approved (status 1 or higher)
+            if ($previousStatus == 0) {
+                $payroll->update([
+                    'status' => 1, // Approved
+                ]);
+            }
+            return;
+        }
+
+        // Default: Not enough approvals yet - stay in draft
     }
 
     public function bulk_delete(Request $request)

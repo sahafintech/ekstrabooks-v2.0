@@ -553,6 +553,8 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('export_cash_purchases', [CashPurchaseController::class, 'export_cash_purchases'])->name('cash_purchases.export');
 		Route::get('cash_purchases/voucher/{id}', [CashPurchaseController::class, 'voucher'])->name('cash_purchases.voucher');
 		Route::post('cash_purchases/bulk_destroy', [CashPurchaseController::class, 'bulk_destroy'])->name('cash_purchases.bulk_destroy');
+		Route::post('cash_purchases/bulk_approve', [CashPurchaseController::class, 'bulk_approve'])->name('cash_purchases.bulk_approve');
+		Route::post('cash_purchases/bulk_reject', [CashPurchaseController::class, 'bulk_reject'])->name('cash_purchases.bulk_reject');
 		Route::post('cash_purchases/{id}/send_email', [CashPurchaseController::class, 'send_email'])->name('cash_purchases.send_email');
 		Route::get('cash_purchases/{id}/pdf', [CashPurchaseController::class, 'pdf'])->name('cash_purchases.pdf');
 		Route::post('cash_purchases/{id}/approve', [CashPurchaseController::class, 'approve'])->name('cash_purchases.approve');
@@ -776,6 +778,8 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::match(['get', 'post'], 'payslips/accrue', [PayrollController::class, 'accrue_payroll'])->name('payslips.accrue');
 		Route::match(['get', 'post'], 'payslips/make_payment', [PayrollController::class, 'make_payment'])->name('payslips.make_payment');
 		Route::get('payslips_export', [PayrollController::class, 'export_payslips'])->name('payslips.export');
+		Route::post('payslips/{id}/approve', [PayrollController::class, 'approve'])->name('payslips.approve');
+		Route::post('payslips/{id}/reject', [PayrollController::class, 'reject'])->name('payslips.reject');
 		Route::post('payslips/bulk_approve', [PayrollController::class, 'bulk_approve'])->name('payslips.bulk_approve');
 		Route::post('payslips/bulk_reject', [PayrollController::class, 'bulk_reject'])->name('payslips.bulk_reject');
 		Route::post('payslips/bulk_delete', [PayrollController::class, 'bulk_delete'])->name('payslips.bulk_delete');

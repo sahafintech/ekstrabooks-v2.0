@@ -40,6 +40,9 @@ import {
     DollarSign,
     CheckCircle,
     Clock,
+    AlertTriangle,
+    CheckCheck,
+    XCircle,
 } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
@@ -186,6 +189,75 @@ const DeleteAllBillsModal = ({
     </Modal>
 );
 
+const BulkApproveModal = ({ show, onClose, onConfirm, processing, count }) => (
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
+            <div className="flex items-center gap-3 mb-4">
+                <div className="p-3 bg-green-100 rounded-full">
+                    <CheckCheck className="h-6 w-6 text-green-600" />
+                </div>
+                <h2 className="text-lg font-medium">
+                    Confirm Bulk Approval
+                </h2>
+            </div>
+            <p className="text-gray-600 mb-6">
+                Are you sure you want to approve {count} selected bill{count !== 1 ? "s" : ""}? 
+                This will update your approval status for these bills.
+            </p>
+            <div className="flex justify-end gap-3">
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={onClose}
+                >
+                    Cancel
+                </Button>
+                <Button
+                    type="submit"
+                    className="bg-green-600 hover:bg-green-700"
+                    disabled={processing}
+                >
+                    {processing ? "Approving..." : "Approve Selected"}
+                </Button>
+            </div>
+        </form>
+    </Modal>
+);
+
+const BulkRejectModal = ({ show, onClose, onConfirm, processing, count }) => (
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
+            <div className="flex items-center gap-3 mb-4">
+                <div className="p-3 bg-red-100 rounded-full">
+                    <XCircle className="h-6 w-6 text-red-600" />
+                </div>
+                <h2 className="text-lg font-medium">
+                    Confirm Bulk Rejection
+                </h2>
+            </div>
+            <p className="text-gray-600 mb-6">
+                Are you sure you want to reject {count} selected bill{count !== 1 ? "s" : ""}? 
+                This will update your rejection status for these bills.
+            </p>
+            <div className="flex justify-end gap-3">
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={onClose}
+                >
+                    Cancel
+                </Button>
+                <Button
+                    type="submit"
+                    variant="destructive"
+                    disabled={processing}
+                >
+                    {processing ? "Rejecting..." : "Reject Selected"}
+                </Button>
+            </div>
+        </form>
+    </Modal>
+);
 
 const BillApprovalStatusBadge = ({ status }) => {
     const statusMap = {
@@ -288,6 +360,8 @@ export default function List({
     vendors = [],
     summary = {},
     trashed_bills = 0,
+    hasConfiguredApprovers = false,
+    currentUserId = null,
 }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
@@ -315,6 +389,8 @@ export default function List({
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
     const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+    const [showBulkApproveModal, setShowBulkApproveModal] = useState(false);
+    const [showBulkRejectModal, setShowBulkRejectModal] = useState(false);
     const [billToDelete, setBillToDelete] = useState(null);
     const [processing, setProcessing] = useState(false);
 
@@ -559,7 +635,53 @@ export default function List({
     const handleBulkAction = () => {
         if (bulkAction === "delete" && selectedBills.length > 0) {
             setShowDeleteAllModal(true);
+        } else if (bulkAction === "approve" && selectedBills.length > 0) {
+            setShowBulkApproveModal(true);
+        } else if (bulkAction === "reject" && selectedBills.length > 0) {
+            setShowBulkRejectModal(true);
         }
+    };
+
+    const handleBulkApprove = (e) => {
+        e.preventDefault();
+        setProcessing(true);
+        router.post(
+            route("bill_invoices.bulk_approve"),
+            { ids: selectedBills },
+            {
+                onSuccess: () => {
+                    setProcessing(false);
+                    setSelectedBills([]);
+                    setIsAllSelected(false);
+                    setBulkAction("");
+                    setShowBulkApproveModal(false);
+                },
+                onError: () => {
+                    setProcessing(false);
+                }
+            }
+        );
+    };
+
+    const handleBulkReject = (e) => {
+        e.preventDefault();
+        setProcessing(true);
+        router.post(
+            route("bill_invoices.bulk_reject"),
+            { ids: selectedBills },
+            {
+                onSuccess: () => {
+                    setProcessing(false);
+                    setSelectedBills([]);
+                    setIsAllSelected(false);
+                    setBulkAction("");
+                    setShowBulkRejectModal(false);
+                },
+                onError: () => {
+                    setProcessing(false);
+                }
+            }
+        );
     };
 
     const handleExport = () => {
@@ -698,6 +820,17 @@ export default function List({
                             </div>
                         </div>
 
+                        {/* Warning banner if no approvers configured */}
+                        {!hasConfiguredApprovers && (
+                            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3">
+                                <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                                <div>
+                                    <p className="text-sm font-medium text-yellow-800">No Approvers Configured</p>
+                                    <p className="text-xs text-yellow-600">Configure purchase approval users in business settings to enable the approval workflow.</p>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="mb-4 flex flex-col md:flex-row gap-4 justify-between">
                             <div className="flex flex-wrap items-center gap-2">
                                 <Select
@@ -711,6 +844,22 @@ export default function List({
                                         <SelectItem value="delete">
                                             Delete Selected
                                         </SelectItem>
+                                        {hasConfiguredApprovers && (
+                                            <>
+                                                <SelectItem value="approve">
+                                                    <span className="flex items-center gap-2">
+                                                        <CheckCheck className="h-4 w-4 text-green-600" />
+                                                        Approve Selected
+                                                    </span>
+                                                </SelectItem>
+                                                <SelectItem value="reject">
+                                                    <span className="flex items-center gap-2">
+                                                        <XCircle className="h-4 w-4 text-red-600" />
+                                                        Reject Selected
+                                                    </span>
+                                                </SelectItem>
+                                            </>
+                                        )}
                                     </SelectContent>
                                 </Select>
                                 <Button
@@ -1089,6 +1238,22 @@ export default function List({
                 onClose={() => setShowImportModal(false)}
                 onSubmit={handleImport}
                 processing={processing}
+            />
+
+            <BulkApproveModal
+                show={showBulkApproveModal}
+                onClose={() => setShowBulkApproveModal(false)}
+                onConfirm={handleBulkApprove}
+                processing={processing}
+                count={selectedBills.length}
+            />
+
+            <BulkRejectModal
+                show={showBulkRejectModal}
+                onClose={() => setShowBulkRejectModal(false)}
+                onConfirm={handleBulkReject}
+                processing={processing}
+                count={selectedBills.length}
             />
         </AuthenticatedLayout>
     );

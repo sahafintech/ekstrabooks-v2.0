@@ -26,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown, ShoppingCart, DollarSign, CheckCircle, Clock } from "lucide-react";
+import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown, ShoppingCart, DollarSign, CheckCircle, Clock, AlertTriangle, CheckCheck, XCircle } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -153,7 +153,75 @@ const DeleteAllCashPurchasesModal = ({ show, onClose, onConfirm, processing, cou
   </Modal>
 );
 
+const BulkApproveModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="p-3 bg-green-100 rounded-full">
+          <CheckCheck className="h-6 w-6 text-green-600" />
+        </div>
+        <h2 className="text-lg font-medium">
+          Confirm Bulk Approval
+        </h2>
+      </div>
+      <p className="text-gray-600 mb-6">
+        Are you sure you want to approve {count} selected cash purchase{count !== 1 ? 's' : ''}? 
+        This will update your approval status for these purchases.
+      </p>
+      <div className="flex justify-end gap-3">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          className="bg-green-600 hover:bg-green-700"
+          disabled={processing}
+        >
+          {processing ? "Approving..." : "Approve Selected"}
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
 
+const BulkRejectModal = ({ show, onClose, onConfirm, processing, count }) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="p-3 bg-red-100 rounded-full">
+          <XCircle className="h-6 w-6 text-red-600" />
+        </div>
+        <h2 className="text-lg font-medium">
+          Confirm Bulk Rejection
+        </h2>
+      </div>
+      <p className="text-gray-600 mb-6">
+        Are you sure you want to reject {count} selected cash purchase{count !== 1 ? 's' : ''}? 
+        This will update your rejection status for these purchases.
+      </p>
+      <div className="flex justify-end gap-3">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="destructive"
+          disabled={processing}
+        >
+          {processing ? "Rejecting..." : "Reject Selected"}
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
 
 const PurchaseApprovalStatusBadge = ({ status }) => {
   const statusMap = {
@@ -221,7 +289,7 @@ const SummaryCards = ({ summary = {} }) => {
   );
 };
 
-export default function List({ purchases = [], meta = {}, filters = {}, vendors = [], summary = {}, trashed_cash_purchases = 0 }) {
+export default function List({ purchases = [], meta = {}, filters = {}, vendors = [], summary = {}, trashed_cash_purchases = 0, hasConfiguredApprovers = false, currentUserId = null }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedPurchases, setSelectedPurchases] = useState([]);
@@ -239,6 +307,8 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [showBulkApproveModal, setShowBulkApproveModal] = useState(false);
+  const [showBulkRejectModal, setShowBulkRejectModal] = useState(false);
 
   const [purchaseToDelete, setPurchaseToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
@@ -379,7 +449,53 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
   const handleBulkAction = () => {
     if (bulkAction === "delete" && selectedPurchases.length > 0) {
       setShowDeleteAllModal(true);
+    } else if (bulkAction === "approve" && selectedPurchases.length > 0) {
+      setShowBulkApproveModal(true);
+    } else if (bulkAction === "reject" && selectedPurchases.length > 0) {
+      setShowBulkRejectModal(true);
     }
+  };
+
+  const handleBulkApprove = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+    router.post(
+      route("cash_purchases.bulk_approve"),
+      { ids: selectedPurchases },
+      {
+        onSuccess: () => {
+          setProcessing(false);
+          setSelectedPurchases([]);
+          setIsAllSelected(false);
+          setBulkAction("");
+          setShowBulkApproveModal(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
+      }
+    );
+  };
+
+  const handleBulkReject = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+    router.post(
+      route("cash_purchases.bulk_reject"),
+      { ids: selectedPurchases },
+      {
+        onSuccess: () => {
+          setProcessing(false);
+          setSelectedPurchases([]);
+          setIsAllSelected(false);
+          setBulkAction("");
+          setShowBulkRejectModal(false);
+        },
+        onError: () => {
+          setProcessing(false);
+        }
+      }
+    );
   };
 
   const handleSort = (column) => {
@@ -527,6 +643,17 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
               </div>
             </div>
 
+            {/* Warning banner if no approvers configured */}
+            {!hasConfiguredApprovers && (
+              <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3">
+                <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                <div>
+                  <p className="text-sm font-medium text-yellow-800">No Approvers Configured</p>
+                  <p className="text-xs text-yellow-600">Configure purchase approval users in business settings to enable the approval workflow.</p>
+                </div>
+              </div>
+            )}
+
             <div className="mb-4 flex flex-col md:flex-row gap-2 justify-between">
               <div className="flex flex-col md:flex-row gap-2">
                 <Select value={bulkAction} onValueChange={setBulkAction}>
@@ -535,6 +662,22 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="delete">Delete Selected</SelectItem>
+                    {hasConfiguredApprovers && (
+                      <>
+                        <SelectItem value="approve">
+                          <span className="flex items-center gap-2">
+                            <CheckCheck className="h-4 w-4 text-green-600" />
+                            Approve Selected
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="reject">
+                          <span className="flex items-center gap-2">
+                            <XCircle className="h-4 w-4 text-red-600" />
+                            Reject Selected
+                          </span>
+                        </SelectItem>
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
                 <Button onClick={handleBulkAction} variant="outline">
@@ -741,6 +884,22 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
         onClose={() => setShowImportModal(false)}
         onSubmit={handleImport}
         processing={processing}
+      />
+
+      <BulkApproveModal
+        show={showBulkApproveModal}
+        onClose={() => setShowBulkApproveModal(false)}
+        onConfirm={handleBulkApprove}
+        processing={processing}
+        count={selectedPurchases.length}
+      />
+
+      <BulkRejectModal
+        show={showBulkRejectModal}
+        onClose={() => setShowBulkRejectModal(false)}
+        onConfirm={handleBulkReject}
+        processing={processing}
+        count={selectedPurchases.length}
       />
     </AuthenticatedLayout>
   );

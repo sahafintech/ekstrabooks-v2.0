@@ -5,6 +5,7 @@ namespace App\Http\Controllers\User;
 use App\Exports\CashPurchaseExport;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
+use App\Models\Approvals;
 use App\Models\Attachment;
 use App\Models\AuditLog;
 use App\Models\BusinessSetting;
@@ -127,6 +128,11 @@ class CashPurchaseController extends Controller
 
 		$vendors = Vendor::orderBy('name', 'asc')->get();
 
+		// Check if there are configured approval users for this business
+		$purchaseApprovalUsersJson = get_business_option('purchase_approval_users', '[]');
+		$approvalUsersArray = json_decode($purchaseApprovalUsersJson, true);
+		$hasConfiguredApprovers = is_array($approvalUsersArray) && count($approvalUsersArray) > 0;
+
 		return Inertia::render('Backend/User/CashPurchase/List', [
 			'purchases' => $purchases->items(),
 			'meta' => [
@@ -150,6 +156,8 @@ class CashPurchaseController extends Controller
 			'vendors' => $vendors,
 			'summary' => $summary,
 			'trashed_cash_purchases' => Purchase::onlyTrashed()->where('cash', 1)->count(),
+			'hasConfiguredApprovers' => $hasConfiguredApprovers,
+			'currentUserId' => auth()->id(),
 		]);
 	}
 
@@ -500,6 +508,9 @@ class CashPurchaseController extends Controller
 		$purchase->status = 2;
 
 		$purchase->save();
+
+		// Create approval records for configured approvers
+		$this->createPurchaseApprovalRecords($purchase);
 
 		// if attachments then upload
 		if (isset($request->attachments)) {
@@ -875,8 +886,9 @@ class CashPurchaseController extends Controller
 
 		// Only create approval records if there are configured approvers
 		// AND the purchase doesn't have any approvals yet
+		// AND the purchase is not already approved
 		// This preserves existing approval decisions (approved/rejected/pending)
-		if ($bill->approvals->isEmpty() && $hasConfiguredApprovers) {
+		if ($bill->approvals->isEmpty() && $hasConfiguredApprovers && $bill->approval_status != 1) {
 			
 			// Create approval records for each configured approver
 			foreach ($configuredUserIds as $userId) {
@@ -2110,37 +2122,63 @@ class CashPurchaseController extends Controller
 
 	public function bulk_approve(Request $request)
 	{
+		$currentUserId = auth()->id();
+
+		// Check if there are any configured approval users for this business
+		$approvalUsersJson = get_business_option('purchase_approval_users', '[]');
+		$configuredUserIds = json_decode($approvalUsersJson, true);
+		$hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
+
+		if (!$hasConfiguredApprovers) {
+			return redirect()->route('cash_purchases.index')->with('error', _lang('No approvers are configured. Please configure approvers in business settings first.'));
+		}
+
+		// Check if current user is in the configured approvers list
+		if (!in_array($currentUserId, $configuredUserIds)) {
+			return redirect()->route('cash_purchases.index')->with('error', _lang('You are not assigned as an approver for purchases'));
+		}
+
 		foreach ($request->ids as $id) {
-			$bill = Purchase::find($id);
-			$bill->approval_status = 1;
-			$bill->approved_by = auth()->user()->id;
-			$bill->save();
-
-			// select from pending transactions and insert into transactions
-			$transactions = PendingTransaction::where('ref_id', $bill->id)
-				->where(function ($query) {
-					$query->where('ref_type', 'cash purchase')
-						->orWhere('ref_type', 'cash purchase tax')
-						->orWhere('ref_type', 'cash purchase payment');
-				})
-			->get();
-
-			foreach ($transactions as $transaction) {
-				// Create a new Transaction instance and replicate data from pending
-				$new_transaction = $transaction->replicate();
-				$new_transaction->setTable('transactions'); // Change the table to 'transactions'
-				$new_transaction->save();
-
-				// Delete the pending transaction
-				$transaction->forceDelete();
+			$purchase = Purchase::with('approvals')->find($id);
+			
+			if (!$purchase) {
+				continue;
 			}
 
+			// Skip if already approved
+			if ($purchase->approval_status == 1) {
+				continue;
+			}
+
+			// Ensure approval records exist for this purchase
+			if ($purchase->approvals->isEmpty()) {
+				$this->createPurchaseApprovalRecords($purchase);
+				$purchase->load('approvals');
+			}
+
+			// Find the current user's approval record
+			$approval = $purchase->approvals()
+				->where('action_user', $currentUserId)
+				->first();
+
+			if (!$approval) {
+				continue; // User is not an approver for this purchase
+			}
+
+			// Update the approval record
+			$approval->update([
+				'status' => 1, // Approved
+				'action_date' => now(),
+			]);
+
+			// Check if purchase should be marked as approved based on required approvals
+			$this->checkAndUpdatePurchaseStatus($purchase);
 
 			// audit log
 			$audit = new AuditLog();
 			$audit->date_changed = date('Y-m-d H:i:s');
-			$audit->changed_by = auth()->user()->id;
-			$audit->event = 'Approved Cash Purchase ' . $bill->bill_no;
+			$audit->changed_by = $currentUserId;
+			$audit->event = 'Bulk Approved Cash Purchase ' . $purchase->bill_no;
 			$audit->save();
 		}
 
@@ -2149,47 +2187,61 @@ class CashPurchaseController extends Controller
 
 	public function bulk_reject(Request $request)
 	{
+		$currentUserId = auth()->id();
+
+		// Check if there are any configured approval users for this business
+		$approvalUsersJson = get_business_option('purchase_approval_users', '[]');
+		$configuredUserIds = json_decode($approvalUsersJson, true);
+		$hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
+
+		if (!$hasConfiguredApprovers) {
+			return redirect()->route('cash_purchases.index')->with('error', _lang('No approvers are configured. Please configure approvers in business settings first.'));
+		}
+
+		// Check if current user is in the configured approvers list
+		if (!in_array($currentUserId, $configuredUserIds)) {
+			return redirect()->route('cash_purchases.index')->with('error', _lang('You are not assigned as an approver for purchases'));
+		}
+
 		foreach ($request->ids as $id) {
-			$bill = Purchase::find($id);
-			if ($bill->approval_status == 0) {
+			$purchase = Purchase::with('approvals')->find($id);
+			
+			if (!$purchase) {
 				continue;
 			}
-			$bill->approval_status = 0;
-			$bill->approved_by = null;
-			$bill->save();
 
-
-			// delete all transactions
-			$transactions = Transaction::where('ref_id', $bill->id)
-				->where(function ($query) {
-					$query->where('ref_type', 'cash purchase')
-						->orWhere('ref_type', 'cash purchase tax')
-						->orWhere('ref_type', 'cash purchase payment');
-				})
-				->get();
-
-			foreach ($transactions as $transaction) {
-				$new_transaction = $transaction->replicate();
-				$new_transaction->setTable('pending_transactions');
-				$new_transaction->save();
-
-				$transaction->forceDelete();
+			// Ensure approval records exist for this purchase
+			if ($purchase->approvals->isEmpty()) {
+				$this->createPurchaseApprovalRecords($purchase);
+				$purchase->load('approvals');
 			}
 
-			// bill invoice payment
-			$transaction = Transaction::where('ref_id', $bill->id)->where('ref_type', 'cash purchase payment')->get();
-			foreach ($transaction as $data) {
-				$data->forceDelete();
+			// Find the current user's approval record
+			$approval = $purchase->approvals()
+				->where('action_user', $currentUserId)
+				->first();
+
+			if (!$approval) {
+				continue; // User is not an approver for this purchase
 			}
 
+			// Update the approval record
+			$approval->update([
+				'status' => 2, // Rejected
+				'action_date' => now(),
+			]);
+
+			// Check if purchase status should change based on approval records
+			$this->checkAndUpdatePurchaseStatus($purchase);
 
 			// audit log
 			$audit = new AuditLog();
 			$audit->date_changed = date('Y-m-d H:i:s');
-			$audit->changed_by = auth()->user()->id;
-			$audit->event = 'Rejected Cash Purchase ' . $bill->bill_no;
+			$audit->changed_by = $currentUserId;
+			$audit->event = 'Bulk Rejected Cash Purchase ' . $purchase->bill_no;
 			$audit->save();
 		}
+
 		return redirect()->route('cash_purchases.index')->with('success', _lang('Rejected Successfully'));
 	}
 
@@ -2452,6 +2504,36 @@ class CashPurchaseController extends Controller
 
 			// Delete the transaction
 			$transaction->forceDelete();
+		}
+	}
+
+	/**
+	 * Create approval records for all configured approvers for a given purchase
+	 */
+	private function createPurchaseApprovalRecords(Purchase $purchase): void
+	{
+		$purchaseApprovalUsersJson = get_business_option('purchase_approval_users', '[]');
+		$configuredUserIds = json_decode($purchaseApprovalUsersJson, true);
+
+		if (!is_array($configuredUserIds) || empty($configuredUserIds)) {
+			return;
+		}
+
+		foreach ($configuredUserIds as $userId) {
+			// Check if approval record already exists for this user
+			$existingApproval = Approvals::where('ref_id', $purchase->id)
+				->where('ref_name', 'purchase')
+				->where('action_user', $userId)
+				->first();
+
+			if (!$existingApproval) {
+				Approvals::create([
+					'ref_id' => $purchase->id,
+					'ref_name' => 'purchase',
+					'action_user' => $userId,
+					'status' => 0, // pending
+				]);
+			}
 		}
 	}
 }
