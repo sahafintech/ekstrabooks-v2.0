@@ -635,11 +635,11 @@ final class RolesAndPermissionsSeeder extends Seeder
 
         // Create roles and assign permissions
         $owner = Role::firstOrCreate(['name' => 'Owner', 'guard_name' => 'web']);
-        $owner->givePermissionTo(Permission::all());
+        $owner->syncPermissions(Permission::all());
 
         // Admin Role - Full access to most business operations
         $admin = Role::firstOrCreate(['name' => 'Admin', 'guard_name' => 'web']);
-        $admin->givePermissionTo([
+        $admin->syncPermissions([
             // Dashboard
             'dashboard.view',
             'dashboard.income_widget',
@@ -1054,7 +1054,7 @@ final class RolesAndPermissionsSeeder extends Seeder
 
         // Manager Role - Operational access, no delete/restore, limited approvals
         $manager = Role::firstOrCreate(['name' => 'Manager', 'guard_name' => 'web']);
-        $manager->givePermissionTo([
+        $manager->syncPermissions([
             // Dashboard
             'dashboard.view',
             'dashboard.income_widget',
@@ -1370,7 +1370,7 @@ final class RolesAndPermissionsSeeder extends Seeder
 
         // User Role - Basic operational access
         $user = Role::firstOrCreate(['name' => 'User', 'guard_name' => 'web']);
-        $user->givePermissionTo([
+        $user->syncPermissions([
             // Dashboard
             'dashboard.view',
             'dashboard.income_widget',
