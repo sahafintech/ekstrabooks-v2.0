@@ -9,7 +9,6 @@ use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\EmployeeDepartmentHistory;
 use App\Models\Department;
-use App\Models\Designation;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +17,7 @@ use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Gate;
 
 class StaffController extends Controller
 {
@@ -50,6 +50,7 @@ class StaffController extends Controller
      */
     public function index(Request $request)
     {
+        Gate::authorize('staffs.view');
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
         $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
@@ -105,6 +106,7 @@ class StaffController extends Controller
 
     public function trash(Request $request)
     {
+        Gate::authorize('staffs.view');
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
         $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
@@ -164,6 +166,7 @@ class StaffController extends Controller
      */
     public function create()
     {
+        Gate::authorize('staffs.create');
         $departments = Department::with('designations')->get();
 
         return Inertia::render('Backend/User/Staff/Create', [
@@ -179,6 +182,7 @@ class StaffController extends Controller
      */
     public function store(Request $request)
     {
+        Gate::authorize('staffs.create');
         $validator = Validator::make($request->all(), [
             'employee_id'     => [
                 'required',
@@ -300,6 +304,7 @@ class StaffController extends Controller
      */
     public function update(Request $request, $id)
     {
+        Gate::authorize('staffs.update');
         $validator = Validator::make($request->all(), [
             'name'                   => 'required|max:50',
             'date_of_birth'          => 'nullable',
@@ -390,6 +395,7 @@ class StaffController extends Controller
      */
     public function destroy(Request $request, $id)
     {
+        Gate::authorize('staffs.delete');
         $employee = Employee::where('business_id', $request->activeBusiness->id)
             ->findOrFail($id);
 
@@ -407,6 +413,7 @@ class StaffController extends Controller
 
     public function bulk_destroy(Request $request)
     {
+        Gate::authorize('staffs.delete');
         foreach ($request->ids as $id) {
             $employee = Employee::where('business_id', $request->activeBusiness->id)
                 ->findOrFail($id);
@@ -426,6 +433,7 @@ class StaffController extends Controller
 
     public function permanent_destroy(Request $request, $id)
     {
+        Gate::authorize('staffs.delete');
         $employee = Employee::onlyTrashed()->where('business_id', $request->activeBusiness->id)
             ->findOrFail($id);
 
@@ -443,6 +451,7 @@ class StaffController extends Controller
 
     public function bulk_permanent_destroy(Request $request)
     {
+        Gate::authorize('staffs.delete');
         foreach ($request->ids as $id) {
             $employee = Employee::onlyTrashed()->where('business_id', $request->activeBusiness->id)
                 ->findOrFail($id);
@@ -462,6 +471,7 @@ class StaffController extends Controller
 
     public function restore(Request $request, $id)
     {
+        Gate::authorize('staffs.restore');
         $employee = Employee::onlyTrashed()->where('business_id', $request->activeBusiness->id)
             ->findOrFail($id);
 
@@ -479,6 +489,7 @@ class StaffController extends Controller
 
     public function bulk_restore(Request $request)
     {
+        Gate::authorize('staffs.restore');
         foreach ($request->ids as $id) {
             $employee = Employee::onlyTrashed()->where('business_id', $request->activeBusiness->id)
                 ->findOrFail($id);
@@ -504,6 +515,7 @@ class StaffController extends Controller
      */
     public function bulkDelete(Request $request)
     {
+        Gate::authorize('staffs.delete');
         $validator = Validator::make($request->all(), [
             'ids' => 'required|array',
             'ids.*' => 'required|integer',
@@ -533,6 +545,7 @@ class StaffController extends Controller
 
     public function import_staffs(Request $request)
     {
+        Gate::authorize('staffs.import');
         $request->validate([
             'staffs_file' => 'required|mimes:xls,xlsx',
         ]);

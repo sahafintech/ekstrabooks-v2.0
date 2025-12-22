@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Gate;
 
 class LeaveController extends Controller
 {
@@ -31,6 +32,7 @@ class LeaveController extends Controller
      */
     public function index(Request $request)
     {
+        Gate::authorize('leaves.view');
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
         $date = $request->get('date', '');
@@ -128,6 +130,7 @@ class LeaveController extends Controller
      * @return \Illuminate\Http\Response
      */
     public function trash(Request $request) {
+        Gate::authorize('leaves.view');
         $per_page = $request->get('per_page', 10);
         $search = $request->get('search', '');
         $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
@@ -184,6 +187,7 @@ class LeaveController extends Controller
      */
     public function create()
     {
+        Gate::authorize('leaves.create');
         // Get staff for dropdown
         $staff = Employee::select('id', 'name')->get();
 
@@ -200,6 +204,7 @@ class LeaveController extends Controller
      */
     public function store(Request $request)
     {
+        Gate::authorize('leaves.create');
         $validator = Validator::make($request->all(), [
             'employee_id' => 'required',
             'leave_type' => 'required',
@@ -243,6 +248,7 @@ class LeaveController extends Controller
      */
     public function show(Request $request, $id)
     {
+        Gate::authorize('leaves.view');
         $leave = Leave::with('staff')->find($id);
 
         return Inertia::render('Backend/User/Leave/View', [
@@ -258,6 +264,7 @@ class LeaveController extends Controller
      */
     public function edit($id)
     {
+        Gate::authorize('leaves.view');
         $leave = Leave::findOrFail($id);
         $staff = Employee::select('id', 'name')->get();
 
@@ -276,6 +283,7 @@ class LeaveController extends Controller
      */
     public function update(Request $request, $id)
     {
+        Gate::authorize('leaves.update');
         $validator = Validator::make($request->all(), [
             'employee_id' => 'required',
             'leave_type' => 'required',
@@ -323,6 +331,7 @@ class LeaveController extends Controller
      */
     public function destroy($id)
     {
+        Gate::authorize('leaves.delete');
         $leave = Leave::find($id);
 
         // audit log
@@ -344,6 +353,7 @@ class LeaveController extends Controller
      */
     public function bulk_destroy(Request $request)
     {
+        Gate::authorize('leaves.delete');
         $validator = Validator::make($request->all(), [
             'ids' => 'required|array',
             'ids.*' => 'exists:leaves,id',
@@ -381,6 +391,7 @@ class LeaveController extends Controller
      */
     public function restore(Request $request, $id)
     {
+        Gate::authorize('leaves.restore');
         $leave = Leave::onlyTrashed()->findOrFail($id);
 
         // audit log
@@ -403,6 +414,7 @@ class LeaveController extends Controller
      */
     public function bulk_restore(Request $request)
     {
+        Gate::authorize('leaves.restore');
         foreach ($request->ids as $id) {
             $leave = Leave::onlyTrashed()->findOrFail($id);
 
@@ -427,6 +439,7 @@ class LeaveController extends Controller
      */
     public function permanent_destroy(Request $request, $id)
     {
+        Gate::authorize('leaves.delete');
         $leave = Leave::onlyTrashed()->findOrFail($id);
 
         // audit log
@@ -449,6 +462,7 @@ class LeaveController extends Controller
      */
     public function bulk_permanent_destroy(Request $request)
     {
+        Gate::authorize('leaves.delete');
         foreach ($request->ids as $id) {
             $leave = Leave::onlyTrashed()->findOrFail($id);
 
@@ -467,6 +481,7 @@ class LeaveController extends Controller
 
     public function bulk_approve(Request $request)
     {
+        Gate::authorize('leaves.approve');
         $validator = Validator::make($request->all(), [
             'ids' => 'required|array',
             'ids.*' => 'exists:leaves,id',
@@ -491,6 +506,7 @@ class LeaveController extends Controller
 
     public function bulk_reject(Request $request)
     {
+        Gate::authorize('leaves.reject');
         $validator = Validator::make($request->all(), [
             'ids' => 'required|array',
             'ids.*' => 'exists:leaves,id',

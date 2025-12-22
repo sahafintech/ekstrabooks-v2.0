@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 
 class BusinessController extends Controller
@@ -52,6 +53,7 @@ class BusinessController extends Controller
      */
     public function index(Request $request)
     {
+        Gate::authorize('business.view');
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
@@ -106,8 +108,9 @@ class BusinessController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create(Request $request)
+    public function create()
     {
+        Gate::authorize('business.create');
         $business_types = BusinessType::all();
         $currencies = Currency::all();
         $countriesJson = file_get_contents(app_path() . '/Helpers/country.json');
@@ -138,6 +141,7 @@ class BusinessController extends Controller
      */
     public function store(Request $request)
     {
+        Gate::authorize('business.create');
         $validator = Validator::make($request->all(), [
             'name'             => 'required',
             'business_type_id' => 'required',
@@ -274,6 +278,7 @@ class BusinessController extends Controller
      */
     public function edit($id)
     {
+        Gate::authorize('business.view');
         $business  = Business::with('bank_accounts')->find($id);
 
         $currencies = Currency::all();
@@ -326,6 +331,7 @@ class BusinessController extends Controller
      */
     public function update(Request $request, $id)
     {
+        Gate::authorize('business.update');
         $validator = Validator::make($request->all(), [
             'name'             => 'required',
             'business_type_id' => 'required',
@@ -420,6 +426,7 @@ class BusinessController extends Controller
      */
     public function destroy($id)
     {
+        Gate::authorize('business.delete');
         $business = Business::find($id);
         if ($business->default == 1 || Business::count() == 1) {
             return redirect()->route('business.index')->with('error', _lang('Sorry, You will not be able to delete default business!'));
@@ -438,6 +445,7 @@ class BusinessController extends Controller
 
     public function bulk_destroy(Request $request)
     {
+        Gate::authorize('business.delete');
         foreach ($request->ids as $id) {
             $business = Business::find($id);
             if ($business->default == 1 || Business::count() == 1) {
@@ -463,6 +471,7 @@ class BusinessController extends Controller
      */
     public function trash(Request $request)
     {
+        Gate::authorize('business.view');
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
         $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
@@ -510,6 +519,7 @@ class BusinessController extends Controller
      */
     public function restore(Request $request, $id)
     {
+        Gate::authorize('business.view');
         $business = Business::onlyTrashed()->findOrFail($id);
 
         $audit = new AuditLog();
@@ -531,6 +541,7 @@ class BusinessController extends Controller
      */
     public function bulk_restore(Request $request)
     {
+        Gate::authorize('business.view');
         foreach ($request->ids as $id) {
             $business = Business::onlyTrashed()->findOrFail($id);
 
@@ -554,6 +565,7 @@ class BusinessController extends Controller
      */
     public function permanent_destroy(Request $request, $id)
     {
+        Gate::authorize('business.delete');
         $business = Business::onlyTrashed()->findOrFail($id);
 
         $audit = new AuditLog();
@@ -575,6 +587,7 @@ class BusinessController extends Controller
      */
     public function bulk_permanent_destroy(Request $request)
     {
+        Gate::authorize('business.delete');
         foreach ($request->ids as $id) {
             $business = Business::onlyTrashed()->findOrFail($id);
 

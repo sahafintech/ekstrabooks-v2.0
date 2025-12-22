@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\LeaveType;
 use Illuminate\Http\Request;
 use Validator;
+use Illuminate\Support\Facades\Gate;
 
 class LeaveTypeController extends Controller {
 
@@ -36,6 +37,7 @@ class LeaveTypeController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function index() {
+        Gate::authorize('leave_types.view');
         $assets     = ['datatable'];
         $leavetypes = LeaveType::all()->sortByDesc("id");
         return view('backend.user.leave_types.list', compact('leavetypes', 'assets'));
@@ -47,6 +49,7 @@ class LeaveTypeController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function create(Request $request) {
+        Gate::authorize('leave_types.create');
         if (!$request->ajax()) {
             return back();
         } else {
@@ -61,6 +64,7 @@ class LeaveTypeController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function store(Request $request) {
+        Gate::authorize('leave_types.create');
         $validator = Validator::make($request->all(), [
             'title' => 'required|max:50',
         ]);
@@ -102,6 +106,7 @@ class LeaveTypeController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function edit(Request $request, $id) {
+        Gate::authorize('leave_types.view');
         $leavetype = LeaveType::find($id);
         if (!$request->ajax()) {
             return back();
@@ -119,6 +124,7 @@ class LeaveTypeController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function update(Request $request, $id) {
+        Gate::authorize('leave_types.update');
         $validator = Validator::make($request->all(), [
             'title' => 'required|max:50',
         ]);
@@ -159,6 +165,7 @@ class LeaveTypeController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function destroy($id) {
+        Gate::authorize('leave_types.delete');
         $leavetype = LeaveType::find($id);
 
         // audit log

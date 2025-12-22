@@ -7,6 +7,7 @@ use App\Models\Project;
 use App\Models\Timesheet;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Gate;
 
 class TimesheetController extends Controller
 {
@@ -38,6 +39,7 @@ class TimesheetController extends Controller
 	 */
 	public function index(Request $request)
 	{
+		Gate::authorize('timesheets.view');
 		$query = Timesheet::with('employee', 'project');
 
 		// Apply search if provided
@@ -152,6 +154,7 @@ class TimesheetController extends Controller
 
 	public function store(Request $request)
 	{
+		Gate::authorize('timesheets.create');
 		$request->validate([
 			'employee_id' => 'required',
 			'project_id' => 'required',
@@ -177,6 +180,7 @@ class TimesheetController extends Controller
 
 	public function update(Request $request, $id)
 	{
+		Gate::authorize('timesheets.update');
 		$request->validate([
 			'employee_id' => 'required',
 			'project_id' => 'required',

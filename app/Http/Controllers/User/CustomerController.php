@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Facades\Gate;
 
 class CustomerController extends Controller
 {
@@ -50,6 +51,8 @@ class CustomerController extends Controller
      */
     public function index(Request $request)
     {
+        Gate::authorize('customers.view');
+
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
@@ -99,6 +102,8 @@ class CustomerController extends Controller
 
     public function trash(Request $request)
     {
+        Gate::authorize('customers.view');
+
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
@@ -152,6 +157,8 @@ class CustomerController extends Controller
      */
     public function create(Request $request)
     {
+        Gate::authorize('customers.create');
+
         return Inertia::render('Backend/User/Customer/Create');
     }
 
@@ -163,6 +170,8 @@ class CustomerController extends Controller
      */
     public function store(Request $request)
     {
+        Gate::authorize('customers.create');
+
         $validator = Validator::make($request->all(), [
             'name'            => 'required|max:50',
             'email'           => [
@@ -222,6 +231,8 @@ class CustomerController extends Controller
      */
     public function show($id)
     {
+        Gate::authorize('customers.view');
+
         $data             = array();
         $data['alert_col'] = 'col-lg-8 offset-lg-2';
         $data['customer'] = Customer::find($id);
@@ -286,6 +297,8 @@ class CustomerController extends Controller
      */
     public function edit(Request $request, $id)
     {
+        Gate::authorize('customers.update');
+
         $customer  = Customer::find($id);
         return inertia('Backend/User/Customer/Edit', compact('customer', 'id'));
     }
@@ -299,6 +312,8 @@ class CustomerController extends Controller
      */
     public function update(Request $request, $id)
     {
+        Gate::authorize('customers.update');
+
         $validator = Validator::make($request->all(), [
             'name'            => 'required|max:50',
             'email'           => [
@@ -357,6 +372,8 @@ class CustomerController extends Controller
      */
     public function destroy($id)
     {
+        Gate::authorize('customers.delete');
+
         $customer = Customer::find($id);
 
         // audit log
@@ -372,6 +389,8 @@ class CustomerController extends Controller
 
     public function bulk_destroy(Request $request)
     {
+        Gate::authorize('customers.delete');
+
         foreach ($request->ids as $id) {
             $customer = Customer::find($id);
 
@@ -390,6 +409,8 @@ class CustomerController extends Controller
 
     public function permanent_destroy($id)
     {
+        Gate::authorize('customers.delete');
+
         $customer = Customer::onlyTrashed()->find($id);
 
         // audit log
@@ -405,6 +426,8 @@ class CustomerController extends Controller
 
     public function bulk_permanent_destroy(Request $request)
     {
+        Gate::authorize('customers.delete');
+
         foreach ($request->ids as $id) {
             $customer = Customer::onlyTrashed()->find($id);
 
@@ -423,6 +446,8 @@ class CustomerController extends Controller
 
     public function restore($id)
     {
+        Gate::authorize('customers.restore');
+
         $customer = Customer::onlyTrashed()->find($id);
 
         // audit log
@@ -438,6 +463,8 @@ class CustomerController extends Controller
 
     public function bulk_restore(Request $request)
     {
+        Gate::authorize('customers.restore');
+
         foreach ($request->ids as $id) {
             $customer = Customer::onlyTrashed()->find($id);
 
@@ -456,6 +483,8 @@ class CustomerController extends Controller
 
     public function import_customers(Request $request)
     {
+        Gate::authorize('customers.csv.import');
+
         $request->validate([
             'customers_file' => 'required|mimes:xls,xlsx',
         ]);
@@ -478,6 +507,8 @@ class CustomerController extends Controller
 
     public function export_customers()
     {
+        Gate::authorize('customers.csv.export');
+
         return Excel::download(new CustomerExport, 'customers export ' . now()->format('d m Y') . '.xlsx');
 
         // audit log

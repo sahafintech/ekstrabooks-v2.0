@@ -5,7 +5,6 @@ namespace App\Http\Controllers\User;
 use App\Exports\SupplierExport;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
-use DataTables;
 use App\Models\Vendor;
 use App\Models\Purchase;
 use App\Models\Transaction;
@@ -16,6 +15,7 @@ use App\Imports\SupplierImport;
 use App\Models\AuditLog;
 use Maatwebsite\Excel\Facades\Excel;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Gate;
 
 class VendorController extends Controller
 {
@@ -34,6 +34,7 @@ class VendorController extends Controller
      */
     public function index(Request $request)
     {
+        Gate::authorize('vendors.view');
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
         $sorting = $request->get('sorting', []);
@@ -80,6 +81,7 @@ class VendorController extends Controller
 
     public function trash(Request $request)
     {
+        Gate::authorize('vendors.view');
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
         $sorting = $request->get('sorting', []);
@@ -130,6 +132,9 @@ class VendorController extends Controller
      */
     public function create(Request $request)
     {
+        if(!Gate::allows('vendors.create')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         return Inertia::render('Backend/User/Vendor/Create');
     }
 
@@ -141,6 +146,7 @@ class VendorController extends Controller
      */
     public function store(Request $request)
     {
+        Gate::authorize('vendors.create');
         $validator = Validator::make($request->all(), [
             'name'            => 'required|max:50',
             'email'           => [
@@ -201,6 +207,7 @@ class VendorController extends Controller
      */
     public function show(Request $request, $id)
     {
+        Gate::authorize('vendors.view');
         $vendor = Vendor::find($id);
         $data = ['vendor' => $vendor];
 
@@ -257,6 +264,9 @@ class VendorController extends Controller
      */
     public function edit(Request $request, $id)
     {
+        if(!Gate::allows('vendors.update')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $vendor = Vendor::find($id);
         return Inertia::render('Backend/User/Vendor/Edit', [
             'vendor' => $vendor
@@ -272,6 +282,7 @@ class VendorController extends Controller
      */
     public function update(Request $request, $id)
     {
+        Gate::authorize('vendors.update');
         $validator = Validator::make($request->all(), [
             'name'            => 'required|max:50',
             'email'           => [
@@ -329,6 +340,7 @@ class VendorController extends Controller
      */
     public function destroy($id)
     {
+        Gate::authorize('vendors.delete');
         $vendor = Vendor::find($id);
         $vendor->delete();
 
@@ -344,6 +356,7 @@ class VendorController extends Controller
 
     public function permanent_destroy($id)
     {
+        Gate::authorize('vendors.delete');
         $vendor = Vendor::onlyTrashed()->find($id);
         $vendor->forceDelete();
 
@@ -359,6 +372,7 @@ class VendorController extends Controller
 
     public function restore($id)
     {
+        Gate::authorize('vendors.restore');
         $vendor = Vendor::onlyTrashed()->find($id);
         $vendor->restore();
 
@@ -381,6 +395,7 @@ class VendorController extends Controller
 
     public function import_vendors(Request $request)
     {
+        Gate::authorize('vendors.import');
         if ($request->hasFile('vendors_file')) {
             try {
                 Excel::import(new SupplierImport, $request->file('vendors_file'));
@@ -411,6 +426,7 @@ class VendorController extends Controller
      */
     public function export_vendors($type)
     {
+        Gate::authorize('vendors.export');
         $filename = date('Y-m-d') . '_vendors.' . $type;
 
         // audit log
@@ -425,6 +441,9 @@ class VendorController extends Controller
 
     public function bulk_destroy(Request $request)
     {
+        if(!Gate::allows('vendors.delete')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $vendors = Vendor::whereIn('id', $request->ids)->get();
 
         // audit log
@@ -443,6 +462,7 @@ class VendorController extends Controller
 
     public function bulk_permanent_destroy(Request $request)
     {
+        Gate::authorize('vendors.delete');
         $vendors = Vendor::onlyTrashed()->whereIn('id', $request->ids)->get();
 
         // audit log
@@ -461,6 +481,7 @@ class VendorController extends Controller
 
     public function bulk_restore(Request $request)
     {
+        Gate::authorize('vendors.restore');
         $vendors = Vendor::onlyTrashed()->whereIn('id', $request->ids)->get();
 
         // audit log

@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Inertia;
 use function Spatie\LaravelPdf\Support\pdf;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 
 class QuotationController extends Controller
@@ -70,6 +71,8 @@ class QuotationController extends Controller
      */
     public function index(Request $request)
     {
+        Gate::authorize('quotations.view');
+
         $query = Quotation::with('customer');
 
         // Apply search filter
@@ -190,6 +193,8 @@ class QuotationController extends Controller
 
     public function trash(Request $request)
     {
+        Gate::authorize('quotations.view');
+
         $query = Quotation::onlyTrashed()->with('customer');
 
         // Apply search filter
@@ -270,6 +275,8 @@ class QuotationController extends Controller
      */
     public function create()
     {
+        Gate::authorize('quotations.create');
+
         $quotation_title = get_business_option('quotation_title', 'Quotation');
         $customers = Customer::all();
         $currencies = Currency::all();
@@ -294,6 +301,8 @@ class QuotationController extends Controller
      */
     public function store(Request $request)
     {
+        Gate::authorize('quotations.create');
+
         $validator = Validator::make($request->all(), [
             'customer_id'      => 'required',
             'title'            => 'required',
@@ -396,6 +405,8 @@ class QuotationController extends Controller
      */
     public function show(Request $request, $id)
     {
+        Gate::authorize('quotations.view');
+
         $quotation = quotation::with(['business', 'items', 'customer', 'taxes'])->find($id);
         $email_templates = EmailTemplate::whereIn('slug', ['NEW_QUOTATION_CREATED'])
             ->where('email_status', 1)->get();
@@ -408,6 +419,8 @@ class QuotationController extends Controller
 
     public function get_quotation_link(Request $request, $id)
     {
+        Gate::authorize('quotations.view');
+
         $quotation = quotation::find($id);
         if ($request->ajax()) {
             return view('backend.user.quotation.modal.share-link', compact('quotation', 'id'));
@@ -417,6 +430,8 @@ class QuotationController extends Controller
 
     public function send_email(Request $request, $id)
     {
+        Gate::authorize('quotations.send_email');
+
             $validator = Validator::make($request->all(), [
                 'email'   => 'required',
                 'subject' => 'required',
@@ -452,6 +467,8 @@ class QuotationController extends Controller
      */
     public function pdf($id)
     {
+        Gate::authorize('quotations.pdf');
+
         $quotation = Quotation::with(['business', 'items', 'taxes', 'customer'])->find($id);
         return pdf()
         ->view('backend.user.pdf.quotation', compact('quotation'))
@@ -478,6 +495,8 @@ class QuotationController extends Controller
      */
     public function edit(Request $request, $id)
     {
+        Gate::authorize('quotations.update');
+
         $quotation = Quotation::with('items')->find($id);
         $taxIds = $quotation->taxes
             ->pluck('tax_id')
@@ -512,6 +531,8 @@ class QuotationController extends Controller
      */
     public function update(Request $request, $id)
     {
+        Gate::authorize('quotations.update');
+
         $validator = Validator::make($request->all(), [
             'customer_id'      => 'required',
             'title'            => 'required',
@@ -607,6 +628,8 @@ class QuotationController extends Controller
     /** Duplicate Invoice */
     public function duplicate($id)
     {
+        Gate::authorize('quotations.duplicate');
+
         DB::beginTransaction();
         $quotation                      = Quotation::find($id);
         $newQuotation                   = $quotation->replicate();
@@ -638,6 +661,8 @@ class QuotationController extends Controller
     /** Convert to Invoice **/
     public function convert_to_invoice(Request $request, $id)
     {
+        Gate::authorize('quotations.convert_to_invoice');
+
         DB::beginTransaction();
 
         $quotation = Quotation::find($id);
@@ -818,6 +843,8 @@ class QuotationController extends Controller
      */
     public function destroy($id)
     {
+        Gate::authorize('quotations.delete');
+
         $quotation = Quotation::find($id);
 
         // audit log
@@ -833,6 +860,8 @@ class QuotationController extends Controller
 
     public function bulk_destroy(Request $request)
     {
+        Gate::authorize('quotations.delete');
+
         foreach ($request->ids as $id) {
             $quotation = Quotation::find($id);
 
@@ -850,6 +879,8 @@ class QuotationController extends Controller
 
     public function permanent_destroy($id)
     {
+        Gate::authorize('quotations.delete');
+
         $quotation = Quotation::onlyTrashed()->find($id);
 
         // audit log
@@ -865,6 +896,8 @@ class QuotationController extends Controller
 
     public function bulk_permanent_destroy(Request $request)
     {
+        Gate::authorize('quotations.delete');
+
         foreach ($request->ids as $id) {
             $quotation = Quotation::onlyTrashed()->find($id);
 
@@ -882,6 +915,8 @@ class QuotationController extends Controller
 
     public function restore($id)
     {
+        Gate::authorize('quotations.restore');
+
         $quotation = Quotation::onlyTrashed()->find($id);
 
         // audit log
@@ -897,6 +932,8 @@ class QuotationController extends Controller
 
     public function bulk_restore(Request $request)
     {
+        Gate::authorize('quotations.restore');
+
         foreach ($request->ids as $id) {
             $quotation = Quotation::onlyTrashed()->find($id);
 

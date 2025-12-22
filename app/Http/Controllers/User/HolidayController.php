@@ -6,13 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Holiday;
 use Carbon\Carbon;
-use DataTables;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Gate;
 
 class HolidayController extends Controller
 {
@@ -45,6 +44,7 @@ class HolidayController extends Controller
      */
     public function index(Request $request)
     {
+        Gate::authorize('holidays.view');
         $query = Holiday::select('holidays.*')
             ->whereRaw('YEAR(date)=?', [date('Y')]);
 
@@ -98,6 +98,7 @@ class HolidayController extends Controller
      */
     public function create(Request $request)
     {
+        Gate::authorize('holidays.create');
         return Inertia::render('Backend/User/Holiday/Create');
     }
 
@@ -109,7 +110,7 @@ class HolidayController extends Controller
      */
     public function store(Request $request)
     {
-
+        Gate::authorize('holidays.create');
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:191',
             'date'  => 'required|unique:holidays,date|date',
@@ -140,8 +141,9 @@ class HolidayController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit(Request $request, $id)
+    public function edit($id)
     {
+        Gate::authorize('holidays.view');
         $holiday = Holiday::find($id);
 
         return Inertia::render('Backend/User/Holiday/Edit', [
@@ -158,6 +160,7 @@ class HolidayController extends Controller
      */
     public function update(Request $request, $id)
     {
+        Gate::authorize('holidays.update');
         $validator = Validator::make($request->all(), [
             'title' => 'required|max:191',
             'date'  => [
@@ -224,6 +227,7 @@ class HolidayController extends Controller
      */
     public function destroy($id)
     {
+        Gate::authorize('holidays.delete');
         $holiday = Holiday::find($id);
         $holiday->delete();
         return redirect()->route('holidays.index')->with('success', _lang('Deleted Successfully'));
@@ -237,6 +241,7 @@ class HolidayController extends Controller
      */
     public function bulk_delete(Request $request)
     {
+        Gate::authorize('holidays.delete');
         // Validate the request
         $validator = Validator::make($request->all(), [
             'ids' => 'required|array',
@@ -270,6 +275,7 @@ class HolidayController extends Controller
      */
     public function trash(Request $request)
     {
+        Gate::authorize('holidays.view');
         $per_page = $request->get('per_page', 10);
         $search = $request->get('search', '');
         $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
@@ -317,6 +323,7 @@ class HolidayController extends Controller
      */
     public function restore(Request $request, $id)
     {
+        Gate::authorize('holidays.restore');
         $holiday = Holiday::onlyTrashed()->findOrFail($id);
 
         // audit log
@@ -339,6 +346,7 @@ class HolidayController extends Controller
      */
     public function bulk_restore(Request $request)
     {
+        Gate::authorize('holidays.restore');
         foreach ($request->ids as $id) {
             $holiday = Holiday::onlyTrashed()->findOrFail($id);
 
@@ -363,6 +371,7 @@ class HolidayController extends Controller
      */
     public function permanent_destroy(Request $request, $id)
     {
+        Gate::authorize('holidays.delete');
         $holiday = Holiday::onlyTrashed()->findOrFail($id);
 
         // audit log
@@ -385,6 +394,7 @@ class HolidayController extends Controller
      */
     public function bulk_permanent_destroy(Request $request)
     {
+        Gate::authorize('holidays.delete');
         foreach ($request->ids as $id) {
             $holiday = Holiday::onlyTrashed()->findOrFail($id);
 

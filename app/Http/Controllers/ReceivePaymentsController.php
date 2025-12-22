@@ -14,6 +14,7 @@ use App\Models\TransactionMethod;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use function Spatie\LaravelPdf\Support\pdf;
@@ -22,6 +23,8 @@ class ReceivePaymentsController extends Controller
 {
     public function index(Request $request)
     {
+        Gate::authorize('receive_payments.view');
+
         $per_page = $request->get('per_page', 10);
         $search = $request->get('search', '');
         $sorting = $request->get('sorting', []);
@@ -92,6 +95,8 @@ class ReceivePaymentsController extends Controller
 
     public function create()
     {
+        Gate::authorize('receive_payments.create');
+
         $customers = Customer::all();
         $accounts = Account::where(function ($query) {
             $query->where('account_type', 'Bank')
@@ -108,6 +113,8 @@ class ReceivePaymentsController extends Controller
 
     public function store(Request $request)
     {
+        Gate::authorize('receive_payments.create');
+
         $validator = Validator::make($request->all(), [
             'trans_date' => 'required',
             'account_id' => 'required',
@@ -285,6 +292,8 @@ class ReceivePaymentsController extends Controller
 
     public function update(Request $request, $id)
     {
+        Gate::authorize('receive_payments.update');
+
         $validator = Validator::make($request->all(), [
             'trans_date' => 'required',
             'account_id' => 'required',
@@ -498,6 +507,8 @@ class ReceivePaymentsController extends Controller
 
     public function edit($id)
     {
+        Gate::authorize('receive_payments.update');
+
         $payment = ReceivePayment::where('id', $id)->with('invoices')->first();
         $customers = Customer::all();
         $accounts = Account::where(function ($query) {
@@ -518,6 +529,8 @@ class ReceivePaymentsController extends Controller
 
     public function destroy(Request $request, $id)
     {
+        Gate::authorize('receive_payments.delete');
+
         $payment = ReceivePayment::find($id);
         $invoices_payments = InvoicePayment::where('payment_id', $id)->get();
 
@@ -572,6 +585,8 @@ class ReceivePaymentsController extends Controller
 
     public function show($id)
     {
+        Gate::authorize('receive_payments.view');
+
         $payment = ReceivePayment::where('id', $id)->with('invoices', 'customer', 'business')->first();
         $decimalPlace = get_business_option('decimal_place', 2);
         $attachment = Attachment::where('ref_id', $payment->id)->where('ref_type', 'receive payment')->get();
@@ -585,6 +600,8 @@ class ReceivePaymentsController extends Controller
 
     public function pdf($id)
     {
+        Gate::authorize('receive_payments.pdf');
+
         $payment = ReceivePayment::where('id', $id)->with('invoices', 'customer', 'business', 'account')->first();
         return pdf()
             ->view('backend.user.pdf.receive-payment', compact('payment'))

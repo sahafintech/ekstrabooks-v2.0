@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 
 class DesignationController extends Controller {
 
@@ -39,6 +40,7 @@ class DesignationController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function index(Request $request) {
+        Gate::authorize('designations.view');
         $search = $request->search;
         $per_page = $request->per_page ?? 10;
 
@@ -97,6 +99,7 @@ class DesignationController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function trash(Request $request) {
+        Gate::authorize('designations.view');
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
         $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
@@ -153,6 +156,7 @@ class DesignationController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function create(Request $request) {
+        Gate::authorize('designations.create');
         if (!$request->ajax()) {
             return back();
         } else {
@@ -167,6 +171,7 @@ class DesignationController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function store(Request $request) {
+        Gate::authorize('designations.create');
         $validator = Validator::make($request->all(), [
             'name'          => 'required',
             'department_id' => 'required',
@@ -202,6 +207,7 @@ class DesignationController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function show(Request $request, $id) {
+        Gate::authorize('designations.view');
         $designation = Designation::find($id);
         if (!$request->ajax()) {
             return back();
@@ -217,6 +223,7 @@ class DesignationController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function edit(Request $request, $id) {
+        Gate::authorize('designations.update');
         $designation = Designation::find($id);
         if (!$request->ajax()) {
             return back();
@@ -234,6 +241,7 @@ class DesignationController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function update(Request $request, $id) {
+        Gate::authorize('designations.update');
         $validator = Validator::make($request->all(), [
             'name'          => 'required',
             'department_id' => 'required',
@@ -274,6 +282,7 @@ class DesignationController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function destroy($id) {
+        Gate::authorize('designations.delete');
         $designation = Designation::find($id);
 
         // audit log
@@ -298,6 +307,7 @@ class DesignationController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function bulk_destroy(Request $request) {
+        Gate::authorize('designations.delete');
         $ids = $request->ids;
         $designations = Designation::whereIn('id', $ids)->get();
         
@@ -326,6 +336,7 @@ class DesignationController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function permanent_destroy(Request $request, $id) {
+        Gate::authorize('designations.delete');
         $designation = Designation::onlyTrashed()->where('business_id', $request->activeBusiness->id)
             ->findOrFail($id);
 
@@ -348,6 +359,7 @@ class DesignationController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function bulk_permanent_destroy(Request $request) {
+        Gate::authorize('designations.delete');
         foreach ($request->ids as $id) {
             $designation = Designation::onlyTrashed()->where('business_id', $request->activeBusiness->id)
                 ->findOrFail($id);
@@ -394,6 +406,7 @@ class DesignationController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function bulk_restore(Request $request) {
+        Gate::authorize('designations.restore');
         foreach ($request->ids as $id) {
             $designation = Designation::onlyTrashed()->where('business_id', $request->activeBusiness->id)
                 ->findOrFail($id);

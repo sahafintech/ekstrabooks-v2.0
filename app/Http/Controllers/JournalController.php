@@ -14,6 +14,7 @@ use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Maatwebsite\Excel\Facades\Excel;
 use Inertia\Inertia;
 use App\Models\Account;
@@ -27,6 +28,8 @@ class JournalController extends Controller
 {
     public function index(Request $request)
     {
+        Gate::authorize('journals.view');
+
         $search = $request->input('search', '');
         $perPage = $request->input('per_page', 50);
         $status = $request->input('status', '');

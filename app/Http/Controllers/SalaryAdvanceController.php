@@ -14,11 +14,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Gate;
 
 class SalaryAdvanceController extends Controller
 {
     public function index(Request $request)
     {
+        Gate::authorize('salary_advances.view');
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
@@ -76,6 +78,7 @@ class SalaryAdvanceController extends Controller
 
     public function trash(Request $request)
     {
+        Gate::authorize('salary_advances.view');
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
@@ -126,6 +129,7 @@ class SalaryAdvanceController extends Controller
 
     public function store(Request $request)
     {
+        Gate::authorize('salary_advances.create');
         $request->validate([
             'employee_id' => 'required',
             'amount' => 'required',
@@ -231,6 +235,7 @@ class SalaryAdvanceController extends Controller
 
     public function update(Request $request, $id)
     {
+        Gate::authorize('salary_advances.update');
         $request->validate([
             'employee_id' => 'required',
             'amount' => 'required',
@@ -346,6 +351,7 @@ class SalaryAdvanceController extends Controller
 
     public function destroy($id)
     {
+        Gate::authorize('salary_advances.delete');
         $salaryAdvance = SalaryAdvance::find($id);
         $salaryAdvance->delete();
 
@@ -371,6 +377,7 @@ class SalaryAdvanceController extends Controller
 
     public function bulk_destroy(Request $request)
     {
+        Gate::authorize('salary_advances.delete');
         foreach ($request->ids as $id) {
             $salaryAdvance = SalaryAdvance::find($id);
             $salaryAdvance->delete();
@@ -398,6 +405,7 @@ class SalaryAdvanceController extends Controller
 
     public function bulk_approve(Request $request)
     {
+        Gate::authorize('salary_advances.approve');
         foreach ($request->ids as $id) {
             $salaryAdvance = SalaryAdvance::find($id);
             $salaryAdvance->approval_status = 1;
@@ -430,6 +438,7 @@ class SalaryAdvanceController extends Controller
 
     public function bulk_reject(Request $request)
     {
+        Gate::authorize('salary_advances.reject');
         foreach ($request->ids as $id) {
             $salaryAdvance = SalaryAdvance::find($id);
             $salaryAdvance->approval_status = 2;
@@ -462,6 +471,7 @@ class SalaryAdvanceController extends Controller
 
     public function restore($id)
     {
+        Gate::authorize('salary_advances.restore');
         $salaryAdvance = SalaryAdvance::onlyTrashed()->find($id);
         $salaryAdvance->restore();
 
@@ -487,6 +497,7 @@ class SalaryAdvanceController extends Controller
 
     public function bulk_restore(Request $request)
     {
+        Gate::authorize('salary_advances.restore');
         foreach ($request->ids as $id) {
             $salaryAdvance = SalaryAdvance::onlyTrashed()->find($id);
             $salaryAdvance->restore();
@@ -514,6 +525,7 @@ class SalaryAdvanceController extends Controller
 
     public function permanent_destroy($id)
     {
+        Gate::authorize('salary_advances.delete');
         $salaryAdvance = SalaryAdvance::onlyTrashed()->find($id);
         $salaryAdvance->forceDelete();
 
@@ -539,6 +551,7 @@ class SalaryAdvanceController extends Controller
 
     public function bulk_permanent_destroy(Request $request)
     {
+        Gate::authorize('salary_advances.delete');
         foreach ($request->ids as $id) {
             $salaryAdvance = SalaryAdvance::onlyTrashed()->find($id);
             $salaryAdvance->forceDelete();

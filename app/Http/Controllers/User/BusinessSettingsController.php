@@ -11,8 +11,8 @@ use App\Models\Currency;
 use App\Models\Tax;
 use App\Models\User;
 use App\Utilities\Overrider;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
@@ -38,6 +38,7 @@ class BusinessSettingsController extends Controller
      */
     public function settings($id, $tab = 'general')
     {
+        Gate::authorize('business.settings');
         $business = Business::with('systemSettings')->find($id);
 
         // Provide common data for all settings pages
@@ -139,6 +140,7 @@ class BusinessSettingsController extends Controller
 
     public function store_general_settings(Request $request, $businessId)
     {
+        Gate::authorize('business.settings');
         $settingsData = $request->except($this->ignoreRequests);
 
         foreach ($settingsData as $key => $value) {
@@ -158,6 +160,7 @@ class BusinessSettingsController extends Controller
 
     public function store_payroll_settings(Request $request, $businessId)
     {
+        Gate::authorize('business.settings');
         $settingsData = $request->except($this->ignoreRequests);
 
         foreach ($settingsData as $key => $value) {
@@ -177,6 +180,7 @@ class BusinessSettingsController extends Controller
 
     public function store_currency_settings(Request $request, $businessId)
     {
+        Gate::authorize('business.settings');
         $validator = Validator::make($request->all(), [
             'currency_position' => 'required',
             //'thousand_sep'      => 'required',
@@ -206,6 +210,7 @@ class BusinessSettingsController extends Controller
 
     public function store_invoice_settings(Request $request, $businessId)
     {
+        Gate::authorize('business.settings');
         $validator = Validator::make($request->all(), [
             'invoice_title'    => 'required',
             'invoice_number'   => 'required|integer',
@@ -234,6 +239,7 @@ class BusinessSettingsController extends Controller
 
     public function store_receipt_settings(Request $request, $businessId)
     {
+        Gate::authorize('business.settings');
         $validator = Validator::make($request->all(), [
             'receipt_title'    => 'required',
             'receipt_number'   => 'required|integer',
@@ -262,6 +268,7 @@ class BusinessSettingsController extends Controller
 
     public function store_purchase_settings(Request $request, $businessId)
     {
+        Gate::authorize('business.settings');
         $validator = Validator::make($request->all(), [
             'purchase_title'    => 'required',
             'purchase_number'   => 'required|integer',
@@ -290,6 +297,7 @@ class BusinessSettingsController extends Controller
 
     public function store_sales_return_settings(Request $request, $businessId)
     {
+        Gate::authorize('business.settings');
         $validator = Validator::make($request->all(), [
             'sales_return_title'    => 'required',
             'sales_return_number'   => 'required|integer',
@@ -318,6 +326,7 @@ class BusinessSettingsController extends Controller
 
     public function store_purchase_return_settings(Request $request, $businessId)
     {
+        Gate::authorize('business.settings');
         $validator = Validator::make($request->all(), [
             'purchase_return_title'    => 'required',
             'purchase_return_number'   => 'required|integer',
@@ -346,6 +355,7 @@ class BusinessSettingsController extends Controller
 
     public function store_payment_gateway_settings(Request $request, $businessId)
     {
+        Gate::authorize('business.settings');
         $slug     = $request->slug;
         $rules    = [$slug . '.status' => 'required'];
         $messages = [];
@@ -382,6 +392,7 @@ class BusinessSettingsController extends Controller
 
     public function store_email_settings(Request $request, $businessId)
     {
+        Gate::authorize('business.settings');
         $validator = Validator::make($request->all(), [
             'from_email'      => 'required_if:mail_type,smtp,sendmail',
             'from_name'       => 'required_if:mail_type,smtp,sendmail',
@@ -415,6 +426,7 @@ class BusinessSettingsController extends Controller
 
     public function send_test_email(Request $request, $businessId)
     {
+        Gate::authorize('business.settings');
         @ini_set('max_execution_time', 0);
         @set_time_limit(0);
 
@@ -454,8 +466,9 @@ class BusinessSettingsController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function currencySettings(Request $request, $id)
+    public function currencySettings($id)
     {
+        Gate::authorize('business.settings');
         $business = Business::with('systemSettings')->find($id);
 
         return Inertia::render('Backend/User/Business/Settings/Currency', [
@@ -471,8 +484,9 @@ class BusinessSettingsController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function invoiceSettings(Request $request, $id)
+    public function invoiceSettings($id)
     {
+        Gate::authorize('business.settings');
         $business = Business::with('systemSettings')->find($id);
 
         return Inertia::render('Backend/User/Business/Settings/Invoice', [
@@ -488,8 +502,9 @@ class BusinessSettingsController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function creditInvoiceSettings(Request $request, $id)
+    public function creditInvoiceSettings($id)
     {
+        Gate::authorize('business.settings');
         $business = Business::with('systemSettings')->find($id);
 
         return Inertia::render('Backend/User/Business/Settings/CreditInvoice', [
@@ -505,8 +520,9 @@ class BusinessSettingsController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function cashInvoiceSettings(Request $request, $id)
+    public function cashInvoiceSettings($id)
     {
+        Gate::authorize('business.settings');
         $business = Business::with('systemSettings')->find($id);
 
         return Inertia::render('Backend/User/Business/Settings/CashInvoice', [
@@ -522,8 +538,9 @@ class BusinessSettingsController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function billSettings(Request $request, $id)
+    public function billSettings($id)
     {
+        Gate::authorize('business.settings');
         $business = Business::with('systemSettings')->find($id);
 
         return Inertia::render('Backend/User/Business/Settings/Bill', [
@@ -539,8 +556,9 @@ class BusinessSettingsController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function salesReturnSettings(Request $request, $id)
+    public function salesReturnSettings($id)
     {
+        Gate::authorize('business.settings');
         $business = Business::with('systemSettings')->find($id);
 
         return Inertia::render('Backend/User/Business/Settings/SalesReturn', [
@@ -556,8 +574,9 @@ class BusinessSettingsController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function purchaseReturnSettings(Request $request, $id)
+    public function purchaseReturnSettings($id)
     {
+        Gate::authorize('business.settings');
         $business = Business::with('systemSettings')->find($id);
 
         return Inertia::render('Backend/User/Business/Settings/PurchaseReturn', [
@@ -573,8 +592,9 @@ class BusinessSettingsController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function emailSettings(Request $request, $id)
+    public function emailSettings($id)
     {
+        Gate::authorize('business.settings');
         $business = Business::with('systemSettings')->find($id);
 
         return Inertia::render('Backend/User/Business/Settings/Email', [
@@ -586,12 +606,14 @@ class BusinessSettingsController extends Controller
 
     public function pos_settings($id)
     {
+        Gate::authorize('business.settings');
         $business = Business::find($id);
         return view('backend.user.business.pos_settings', compact('business', 'id'));
     }
 
     public function store_pos_settings(Request $request)
     {
+        Gate::authorize('business.settings');
         $settingsData = $request->except($this->ignoreRequests);
 
         foreach ($settingsData as $key => $value) {
@@ -623,6 +645,7 @@ class BusinessSettingsController extends Controller
 
     public function store_approval_settings(Request $request, $businessId)
     {
+        Gate::authorize('business.settings');
         $validator = Validator::make($request->all(), [
             'purchase_approval_required_count' => 'required|integer|min:0|max:10',
             'payroll_approval_required_count' => 'required|integer|min:0|max:10',

@@ -6,11 +6,15 @@ use App\Models\AuditLog;
 use App\Models\Brands;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Gate;
 
 class BrandsController extends Controller
 {
     public function index(Request $request)
     {
+        if(!Gate::allows('brands.view')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
         $sorting = $request->get('sorting', []);
@@ -53,6 +57,9 @@ class BrandsController extends Controller
 
     public function trash(Request $request)
     {
+        if(!Gate::allows('brands.view')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
         $sorting = $request->get('sorting', []);
@@ -94,6 +101,9 @@ class BrandsController extends Controller
 
     public function store(Request $request)
     {
+        if(!Gate::allows('brands.create')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $data = $request->validate([
             'name' => 'required',
         ]);
@@ -114,6 +124,9 @@ class BrandsController extends Controller
 
     public function destroy($id)
     {
+        if(!Gate::allows('brands.delete')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $brand = Brands::find($id);
 
         // audit log
@@ -130,6 +143,9 @@ class BrandsController extends Controller
 
     public function permanent_destroy($id)
     {
+        if(!Gate::allows('brands.delete')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $brand = Brands::onlyTrashed()->find($id);
 
         // audit log
@@ -146,6 +162,9 @@ class BrandsController extends Controller
 
     public function restore($id)
     {
+        if(!Gate::allows('brands.restore')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $brand = Brands::onlyTrashed()->find($id);
 
         // audit log
@@ -162,6 +181,9 @@ class BrandsController extends Controller
 
     public function bulk_destroy(Request $request)
     {
+        if(!Gate::allows('brands.delete')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         if ($request->has('ids')) {
             $ids = $request->ids;
             $brands = Brands::whereIn('id', $ids)->get();
@@ -185,6 +207,9 @@ class BrandsController extends Controller
 
     public function bulk_permanent_destroy(Request $request)
     {
+        if(!Gate::allows('brands.delete')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         if ($request->has('ids')) {
             $ids = $request->ids;
             $brands = Brands::whereIn('id', $ids)->get();
@@ -208,6 +233,9 @@ class BrandsController extends Controller
 
     public function bulk_restore(Request $request)
     {
+        if(!Gate::allows('brands.restore')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         if ($request->has('ids')) {
             $ids = $request->ids;
             $brands = Brands::onlyTrashed()->whereIn('id', $ids)->get();
@@ -231,6 +259,9 @@ class BrandsController extends Controller
 
     public function update(Request $request, $id)
     {
+        if(!Gate::allows('brands.update')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $request->validate([
             'name' => 'required',
         ]);

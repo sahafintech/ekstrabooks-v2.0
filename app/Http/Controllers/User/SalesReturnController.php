@@ -19,6 +19,7 @@ use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use function Spatie\LaravelPdf\Support\pdf;
@@ -32,6 +33,8 @@ class SalesReturnController extends Controller
      */
     public function index(Request $request)
     {
+        Gate::authorize('sales_returns.view');
+
         $query = SalesReturn::with('customer');
 
         // Apply search filter
@@ -142,6 +145,8 @@ class SalesReturnController extends Controller
 
     public function trash(Request $request)
     {
+        Gate::authorize('sales_returns.view');
+
         $query = SalesReturn::onlyTrashed()->with('customer');
 
         // Apply search filter
@@ -218,6 +223,8 @@ class SalesReturnController extends Controller
      */
     public function create()
     {
+        Gate::authorize('sales_returns.create');
+
         $sales_return_title = get_business_option('sales_return_title', 'Return');
         $customers = Customer::all();
         $currencies = Currency::all();
@@ -244,6 +251,8 @@ class SalesReturnController extends Controller
      */
     public function store(Request $request)
     {
+        Gate::authorize('sales_returns.create');
+
         $validator = Validator::make($request->all(), [
             'customer_id'    => $request->type == 'credit' ? 'required' : 'nullable',
             'title'          => 'required',
@@ -497,6 +506,8 @@ class SalesReturnController extends Controller
      */
     public function show($id)
     {
+        Gate::authorize('sales_returns.view');
+
         $sales_return = SalesReturn::with([
             'business',
             'items',
@@ -516,6 +527,8 @@ class SalesReturnController extends Controller
 
     public function pdf($id)
     {
+        Gate::authorize('sales_returns.pdf');
+
         $sales_return = SalesReturn::with(['business', 'items', 'taxes', 'customer'])->find($id);
         return pdf()
         ->view('backend.user.pdf.sales-return', compact('sales_return'))
@@ -540,6 +553,8 @@ class SalesReturnController extends Controller
 
     public function refund_store(Request $request, $id)
     {
+        Gate::authorize('sales_returns.refund');
+
         $request->validate(
             [
                 'refund_date' => 'required',
@@ -714,6 +729,8 @@ class SalesReturnController extends Controller
      */
     public function edit($id)
     {
+        Gate::authorize('sales_returns.update');
+
         $sales_return = SalesReturn::with('items')
             ->where('id', $id)
             ->where('status', '!=', 1)
@@ -760,6 +777,8 @@ class SalesReturnController extends Controller
      */
     public function update(Request $request, $id)
     {
+        Gate::authorize('sales_returns.update');
+
         $validator = Validator::make($request->all(), [
             'customer_id'    => $request->type == 'credit' ? 'required' : 'nullable',
             'title'          => 'required',
@@ -1079,6 +1098,8 @@ class SalesReturnController extends Controller
      */
     public function destroy($id)
     {
+        Gate::authorize('sales_returns.delete');
+
         $return = SalesReturn::find($id);
 
         // audit log
@@ -1119,6 +1140,8 @@ class SalesReturnController extends Controller
 
     public function bulk_destroy(Request $request)
     {
+        Gate::authorize('sales_returns.delete');
+
         foreach ($request->ids as $id) {
             $return = SalesReturn::find($id);
 
@@ -1161,6 +1184,8 @@ class SalesReturnController extends Controller
 
     public function permanent_destroy($id)
     {
+        Gate::authorize('sales_returns.delete');
+
         $return = SalesReturn::onlyTrashed()->find($id);
 
         // audit log
@@ -1193,6 +1218,8 @@ class SalesReturnController extends Controller
 
     public function bulk_permanent_destroy(Request $request)
     {
+        Gate::authorize('sales_returns.delete');
+
         foreach ($request->ids as $id) {
             $return = SalesReturn::onlyTrashed()->find($id);
 
@@ -1227,6 +1254,8 @@ class SalesReturnController extends Controller
 
     public function restore($id)
     {
+        Gate::authorize('sales_returns.restore');
+
         $return = SalesReturn::onlyTrashed()->find($id);
 
         // audit log
@@ -1259,6 +1288,8 @@ class SalesReturnController extends Controller
 
     public function bulk_restore(Request $request)
     {
+        Gate::authorize('sales_returns.restore');
+
         foreach ($request->ids as $id) {
             $return = SalesReturn::onlyTrashed()->find($id);
 
@@ -1338,6 +1369,8 @@ class SalesReturnController extends Controller
 
     public function get_returns(Request $request)
     {
+        Gate::authorize('sales_returns.view');
+
         $salesReturns = SalesReturn::with('customer')->where('customer_id', $request->id)->get();
         return $salesReturns;
     }

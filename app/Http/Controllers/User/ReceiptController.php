@@ -28,6 +28,7 @@ use App\Models\TransactionMethod;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
@@ -58,6 +59,8 @@ class ReceiptController extends Controller
 
     public function index(Request $request)
     {
+        Gate::authorize('receipts.view');
+
         $search = $request->get('search', '');
         $perPage = $request->get('per_page', 50);
         $sorting = $request->get('sorting', []);

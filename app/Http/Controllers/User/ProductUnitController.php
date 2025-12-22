@@ -6,9 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\ProductUnit;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
-use Validator;
+use Illuminate\Support\Facades\Gate;
 
 class ProductUnitController extends Controller
 {
@@ -26,6 +25,9 @@ class ProductUnitController extends Controller
      */
     public function index(Request $request)
     {
+        if(!Gate::allows('product_units.view')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
@@ -69,6 +71,9 @@ class ProductUnitController extends Controller
 
     public function trash(Request $request)
     {
+        if(!Gate::allows('product_units.view')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
@@ -116,6 +121,9 @@ class ProductUnitController extends Controller
      */
     public function create(Request $request)
     {
+        if(!Gate::allows('product_units.create')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         if (!$request->ajax()) {
             return back();
         } else {
@@ -131,6 +139,9 @@ class ProductUnitController extends Controller
      */
     public function store(Request $request)
     {
+        if(!Gate::allows('product_units.create')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $request->validate([
             'unit' => 'required|max:30',
         ]);
@@ -158,6 +169,9 @@ class ProductUnitController extends Controller
      */
     public function update(Request $request, $id)
     {
+        if(!Gate::allows('product_units.update')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $request->validate([
             'unit' => 'required|max:30',
         ]);
@@ -184,6 +198,9 @@ class ProductUnitController extends Controller
      */
     public function destroy($id)
     {
+        if(!Gate::allows('product_units.delete')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $productunit = ProductUnit::find($id);
 
         // audit log
@@ -205,6 +222,9 @@ class ProductUnitController extends Controller
      */
     public function bulk_destroy(Request $request)
     {
+        if(!Gate::allows('product_units.delete')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         if ($request->has('ids')) {
             $ids = $request->ids;
             $units = ProductUnit::whereIn('id', $ids)->get();
@@ -228,6 +248,9 @@ class ProductUnitController extends Controller
 
     public function permanent_destroy($id)
     {
+        if(!Gate::allows('product_units.delete')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $productunit = ProductUnit::onlyTrashed()->find($id);
 
         // audit log
@@ -249,6 +272,9 @@ class ProductUnitController extends Controller
      */
     public function bulk_permanent_destroy(Request $request)
     {
+        if(!Gate::allows('product_units.delete')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         if ($request->has('ids')) {
             $ids = $request->ids;
             $units = ProductUnit::onlyTrashed()->whereIn('id', $ids)->get();
@@ -272,6 +298,9 @@ class ProductUnitController extends Controller
 
     public function restore($id)
     {
+        if(!Gate::allows('product_units.restore')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $productunit = ProductUnit::onlyTrashed()->find($id);
 
         // audit log
@@ -293,6 +322,9 @@ class ProductUnitController extends Controller
      */
     public function bulk_restore(Request $request)
     {
+        if(!Gate::allows('product_units.restore')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         if ($request->has('ids')) {
             $ids = $request->ids;
             $units = ProductUnit::onlyTrashed()->whereIn('id', $ids)->get();

@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 
 class DepartmentController extends Controller {
 
@@ -38,6 +39,7 @@ class DepartmentController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function index(Request $request) {
+        Gate::authorize('departments.view');
         $per_page = $request->get('per_page', 10);
         $search = $request->get('search', '');
 
@@ -86,6 +88,7 @@ class DepartmentController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function trash(Request $request) {
+        Gate::authorize('departments.view');
         $per_page = $request->get('per_page', 10);
         $search = $request->get('search', '');
         $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
@@ -131,6 +134,7 @@ class DepartmentController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function create(Request $request) {
+        Gate::authorize('departments.create');
         if (!$request->ajax()) {
             return back();
         } else {
@@ -145,6 +149,7 @@ class DepartmentController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function store(Request $request) {
+        Gate::authorize('departments.create');
         $validator = Validator::make($request->all(), [
             'name' => 'required',
         ]);
@@ -178,6 +183,7 @@ class DepartmentController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function show(Request $request, $id) {
+        Gate::authorize('departments.view');
         $department = Department::find($id);
         if (!$request->ajax()) {
             return back();
@@ -194,6 +200,7 @@ class DepartmentController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function edit(Request $request, $id) {
+        Gate::authorize('departments.update');
         $department = Department::find($id);
         if (!$request->ajax()) {
             return back();
@@ -210,6 +217,7 @@ class DepartmentController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function update(Request $request, $id) {
+        Gate::authorize('departments.update');
         $validator = Validator::make($request->all(), [
             'name' => 'required',
         ]);
@@ -241,6 +249,7 @@ class DepartmentController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function destroy($id) {
+        Gate::authorize('departments.delete');
         $department = Department::find($id);
 
         // audit log
@@ -265,6 +274,7 @@ class DepartmentController extends Controller {
      * @return \Illuminate\Http\Response
      */
     public function bulk_destroy(Request $request) {
+        Gate::authorize('departments.delete');
         $ids = $request->ids;
         $departments = Department::whereIn('id', $ids)->get();
         
@@ -294,6 +304,7 @@ class DepartmentController extends Controller {
      */
     public function restore(Request $request, $id)
     {
+        Gate::authorize('departments.restore');
         $department = Department::onlyTrashed()->findOrFail($id);
 
         // audit log
@@ -316,6 +327,7 @@ class DepartmentController extends Controller {
      */
     public function bulk_restore(Request $request)
     {
+        Gate::authorize('departments.restore');
         foreach ($request->ids as $id) {
             $department = Department::onlyTrashed()->findOrFail($id);
 
@@ -340,6 +352,7 @@ class DepartmentController extends Controller {
      */
     public function permanent_destroy(Request $request, $id)
     {
+        Gate::authorize('departments.delete');
         $department = Department::onlyTrashed()->findOrFail($id);
 
         // audit log
@@ -362,6 +375,7 @@ class DepartmentController extends Controller {
      */
     public function bulk_permanent_destroy(Request $request)
     {
+        Gate::authorize('departments.delete');
         foreach ($request->ids as $id) {
             $department = Department::onlyTrashed()->findOrFail($id);
 

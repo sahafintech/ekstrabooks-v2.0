@@ -5,20 +5,20 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\Currency;
 use App\Models\Customer;
-use App\Models\Invoice;
 use App\Models\Prescription;
 use App\Models\PrescriptionProduct;
 use App\Models\PrescriptionProductItem;
 use App\Models\Product;
-use App\Models\Receipt;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Gate;
 
 class PrescriptionController extends Controller
 {
     public function index(Request $request)
     {
+        Gate::authorize('prescriptions.view');
         $query = Prescription::with('customer', 'medical_record');
 
         // handle search
@@ -71,6 +71,7 @@ class PrescriptionController extends Controller
 
     public function trash(Request $request)
     {
+        Gate::authorize('prescriptions.view');
         $query = Prescription::onlyTrashed()->with('customer', 'medical_record');
 
         // handle search
@@ -122,6 +123,7 @@ class PrescriptionController extends Controller
 
     public function create()
     {
+        Gate::authorize('prescriptions.create');
         $customers = Customer::all();
         $products = Product::all();
 
@@ -133,6 +135,7 @@ class PrescriptionController extends Controller
 
     public function store(Request $request)
     {
+        Gate::authorize('prescriptions.create');
         $request->validate([
             'customer_id' => 'required',
             'date' => 'required',
@@ -216,6 +219,7 @@ class PrescriptionController extends Controller
 
     public function edit($id)
     {
+        Gate::authorize('prescriptions.update');
         $prescription = Prescription::with("items")->find($id);
         $customers = Customer::all();
         $products = Product::all();
@@ -230,6 +234,7 @@ class PrescriptionController extends Controller
 
     public function update(Request $request, $id)
     {
+        Gate::authorize('prescriptions.update');
         $request->validate([
             'customer_id' => 'required',
             'date' => 'required',
@@ -312,6 +317,7 @@ class PrescriptionController extends Controller
 
     public function destroy($id)
     {
+        Gate::authorize('prescriptions.delete');
         $prescription = Prescription::find($id);
         $prescription->delete();
 
@@ -327,6 +333,7 @@ class PrescriptionController extends Controller
 
     public function permanent_destroy($id)
     {
+        Gate::authorize('prescriptions.delete');
         $prescription = Prescription::onlyTrashed()->find($id);
         $prescription->forceDelete();
 
@@ -342,6 +349,7 @@ class PrescriptionController extends Controller
 
     public function restore($id)
     {
+        Gate::authorize('prescriptions.restore');
         $prescription = Prescription::onlyTrashed()->find($id);
         $prescription->restore();
 
@@ -357,6 +365,7 @@ class PrescriptionController extends Controller
 
     public function bulk_destroy(Request $request)
     {
+        Gate::authorize('prescriptions.delete');
         $prescriptions = Prescription::whereIn('id', $request->ids)->get();
         foreach ($prescriptions as $prescription) {
             $prescription->delete();
@@ -374,6 +383,7 @@ class PrescriptionController extends Controller
 
     public function bulk_permanent_destroy(Request $request)
     {
+        Gate::authorize('prescriptions.delete');
         $prescriptions = Prescription::onlyTrashed()->whereIn('id', $request->ids)->get();
         foreach ($prescriptions as $prescription) {
             $prescription->forceDelete();
@@ -391,6 +401,7 @@ class PrescriptionController extends Controller
 
     public function bulk_restore(Request $request)
     {
+        Gate::authorize('prescriptions.restore');
         $prescriptions = Prescription::onlyTrashed()->whereIn('id', $request->ids)->get();
         foreach ($prescriptions as $prescription) {
             $prescription->restore();
@@ -408,6 +419,7 @@ class PrescriptionController extends Controller
 
     public function show($id)
     {
+        Gate::authorize('prescriptions.view');
         $prescription = Prescription::with(['customer', 'items.product'])->findOrFail($id);
         $customer = $prescription->customer;
         $prescriptionProduct = PrescriptionProduct::where('prescription_id', $prescription->id)->with('items')->first();

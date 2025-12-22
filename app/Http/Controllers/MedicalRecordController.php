@@ -8,6 +8,7 @@ use App\Models\MedicalRecord;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Gate;
 
 class MedicalRecordController extends Controller
 {
@@ -28,6 +29,7 @@ class MedicalRecordController extends Controller
     }
 
     public function index(Request $request) {
+        Gate::authorize('medical_records.view');
         $query = MedicalRecord::select('medical_records.*')->with('customer');
 
         // handle search
@@ -92,6 +94,7 @@ class MedicalRecordController extends Controller
     }
 
     public function trash(Request $request) {
+        Gate::authorize('medical_records.view');
         $query = MedicalRecord::onlyTrashed()->select('medical_records.*')->with('customer');
 
         // handle search
@@ -155,6 +158,7 @@ class MedicalRecordController extends Controller
     }
 
     public function create() {
+        Gate::authorize('medical_records.create');
         $customers = Customer::all();
         return Inertia::render('Backend/User/MedicalRecord/Create', [
             'customers' => $customers
@@ -162,6 +166,7 @@ class MedicalRecordController extends Controller
     }
 
     public function store(Request $request) {
+        Gate::authorize('medical_records.create');
         $data = $request->validate([
             'customer_id' => 'required',
             'patient_id' => 'nullable',
@@ -281,6 +286,7 @@ class MedicalRecordController extends Controller
     }
 
     public function show($id) {
+        Gate::authorize('medical_records.view');
         $record = MedicalRecord::find($id);
         $customer = Customer::find($record->customer_id);
         
@@ -291,6 +297,7 @@ class MedicalRecordController extends Controller
     }
 
     public function edit($id) {
+        Gate::authorize('medical_records.update');
         $medicalRecord = MedicalRecord::find($id);
         $customers = Customer::all();
         return Inertia::render('Backend/User/MedicalRecord/Edit', [
@@ -301,6 +308,7 @@ class MedicalRecordController extends Controller
     }
 
     public function update(Request $request, $id) {
+        Gate::authorize('medical_records.update');
         $data = $request->validate([
             'customer_id' => 'required',
             'patient_id' => 'nullable',
@@ -420,6 +428,7 @@ class MedicalRecordController extends Controller
     }
 
     public function destroy($id) {
+        Gate::authorize('medical_records.delete');
         $record = MedicalRecord::find($id);
 
         // audit log
@@ -434,6 +443,7 @@ class MedicalRecordController extends Controller
     }
 
     public function permanent_destroy($id) {
+        Gate::authorize('medical_records.delete');
         $record = MedicalRecord::onlyTrashed()->find($id);
 
         // audit log
@@ -448,6 +458,7 @@ class MedicalRecordController extends Controller
     }
 
     public function restore($id) {
+        Gate::authorize('medical_records.restore');
         $record = MedicalRecord::onlyTrashed()->find($id);
 
         // audit log
@@ -462,6 +473,7 @@ class MedicalRecordController extends Controller
     }
 
     public function bulk_destroy(Request $request) {
+        Gate::authorize('medical_records.delete');
         $records = MedicalRecord::whereIn('id', $request->ids)->get();
 
         // audit log
@@ -479,6 +491,7 @@ class MedicalRecordController extends Controller
     }
 
     public function bulk_permanent_destroy(Request $request) {
+        Gate::authorize('medical_records.delete');
         $records = MedicalRecord::onlyTrashed()->whereIn('id', $request->ids)->get();
 
         // audit log
@@ -496,6 +509,7 @@ class MedicalRecordController extends Controller
     }
 
     public function bulk_restore(Request $request) {
+        Gate::authorize('medical_records.restore');
         $records = MedicalRecord::onlyTrashed()->whereIn('id', $request->ids)->get();
 
         // audit log

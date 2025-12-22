@@ -29,6 +29,7 @@ use App\Notifications\SendBillInvoice;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
@@ -52,6 +53,7 @@ class PurchaseController extends Controller
 	 */
 	public function index(Request $request)
 	{
+		Gate::authorize('bill_invoices.view');
 		$search = $request->get('search', '');
 		$perPage = $request->get('per_page', 50);
 		$sorting = $request->get('sorting', []);
@@ -151,6 +153,7 @@ class PurchaseController extends Controller
 
 	public function trash(Request $request)
 	{
+		Gate::authorize('bill_invoices.view');
 		$search = $request->get('search', '');
 		$perPage = $request->get('per_page', 50);
 		$sorting = $request->get('sorting', []);
@@ -247,6 +250,7 @@ class PurchaseController extends Controller
 	 */
 	public function create(Request $request)
 	{
+		Gate::authorize('bill_invoices.create');
 		$vendors = Vendor::where('business_id', $request->activeBusiness->id)
 			->orderBy('id', 'desc')
 			->get();
@@ -290,6 +294,7 @@ class PurchaseController extends Controller
 	 */
 	public function store(Request $request)
 	{
+		Gate::authorize('bill_invoices.create');
 		$validator = Validator::make($request->all(), [
 			'vendor_id' => 'required',
 			'title' => 'required',
@@ -1400,6 +1405,7 @@ class PurchaseController extends Controller
 
 	public function pdf($id)
 	{
+		Gate::authorize('bill_invoices.view');
 		$bill = Purchase::with(['business', 'items', 'taxes', 'vendor'])->find($id);
 		return pdf()
 		->view('backend.user.pdf.bill-invoice', compact('bill'))
@@ -1424,6 +1430,7 @@ class PurchaseController extends Controller
 
 	public function edit($id)
 	{
+		Gate::authorize('bill_invoices.update');
 		$bill = Purchase::with(['business', 'items', 'taxes', 'vendor'])->find($id);
 
 		if (!has_permission('bill_invoices.bulk_approve') && !request()->isOwner && $bill->approval_status == 1) {
@@ -1472,6 +1479,7 @@ class PurchaseController extends Controller
 	 */
 	public function update(Request $request, $id)
 	{
+		Gate::authorize('bill_invoices.update');
 		$validator = Validator::make($request->all(), [
 			'vendor_id' => 'required',
 			'title' => 'required',
@@ -1964,6 +1972,7 @@ class PurchaseController extends Controller
 
 	public function send_email(Request $request, $id)
 	{
+		Gate::authorize('bill_invoices.send_email');
 		$validator = Validator::make($request->all(), [
 			'email'   => 'required|email',
 			'subject' => 'required',
@@ -2006,6 +2015,7 @@ class PurchaseController extends Controller
 
 	public function import_bills(Request $request)
 	{
+		Gate::authorize('bill_invoices.csv.import');
 		$request->validate([
 			'bills_file' => 'required|mimes:xls,xlsx',
 		]);
@@ -2028,6 +2038,7 @@ class PurchaseController extends Controller
 
 	public function bill_invoices_filter(Request $request)
 	{
+		Gate::authorize('bill_invoices.view');
 		$from =  explode('to', $request->date_range)[0] ?? '';
 		$to = explode('to', $request->date_range)[1] ?? '';
 
@@ -2058,6 +2069,7 @@ class PurchaseController extends Controller
 
 	public function export_purchases()
 	{
+		Gate::authorize('bill_invoices.csv.export');
 		// audit log
 		$audit = new AuditLog();
 		$audit->date_changed = date('Y-m-d H:i:s');
@@ -2070,6 +2082,7 @@ class PurchaseController extends Controller
 
 	public function bulk_approve(Request $request)
 	{
+		Gate::authorize('bill_invoices.bulk_approve');
 		$currentUserId = auth()->id();
 
 		// Check if there are any configured approval users for this business
@@ -2135,8 +2148,8 @@ class PurchaseController extends Controller
 
 	public function bulk_reject(Request $request)
 	{
+		Gate::authorize('bill_invoices.reject');
 		$currentUserId = auth()->id();
-
 		// Check if there are any configured approval users for this business
 		$approvalUsersJson = get_business_option('purchase_approval_users', '[]');
 		$configuredUserIds = json_decode($approvalUsersJson, true);
@@ -2198,6 +2211,7 @@ class PurchaseController extends Controller
  */
 public function approve(Request $request, $id)
 {
+	Gate::authorize('bill_invoices.approve');
 	$request->validate([
 		'comment' => ['nullable', 'string', 'max:1000'],
 	]);
@@ -2259,6 +2273,7 @@ public function approve(Request $request, $id)
  */
 public function reject(Request $request, $id)
 {
+	Gate::authorize('bill_invoices.reject');
 	$request->validate([
 		'comment' => ['required', 'string', 'max:1000'],
 	], [
@@ -2341,7 +2356,6 @@ private function checkAndUpdateBillStatus(Purchase $purchase): void
 	$totalApprovers = $approvals->count();
 	$approvedCount = $approvals->where('status', 1)->count();
 	$rejectedCount = $approvals->where('status', 2)->count();
-	$pendingCount = $approvals->where('status', 0)->count();
 	
 	// Ensure required count doesn't exceed total approvers
 	$requiredApprovalCount = min($requiredApprovalCount, $totalApprovers);

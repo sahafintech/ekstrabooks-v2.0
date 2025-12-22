@@ -14,6 +14,7 @@ use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Illuminate\Support\Facades\Gate;
 
 class UserManagementController extends Controller
 {
@@ -22,6 +23,7 @@ class UserManagementController extends Controller
      */
     public function index(Request $request)
     {
+        Gate::authorize('business.user.view');
         $currentUser = auth()->user();
         $perPage = $request->get('per_page', 50);
         
@@ -153,6 +155,7 @@ class UserManagementController extends Controller
      */
     public function sendInvitation(Request $request)
     {
+        Gate::authorize('business.user.create');
         $validated = $request->validate([
             'email' => ['required', 'string', 'email', 'max:255'],
             'business_ids' => ['required', 'array', 'min:1'],
@@ -217,6 +220,7 @@ class UserManagementController extends Controller
      */
     public function updateRolesAndPermissions(Request $request, User $user)
     {
+        Gate::authorize('business.user.update');
         $validated = $request->validate([
             'roles' => ['array'],
             'roles.*' => ['string', 'exists:roles,name'],
@@ -238,6 +242,7 @@ class UserManagementController extends Controller
      */
     public function destroy(User $user)
     {
+        Gate::authorize('business.user.delete');
         // Prevent deleting the last Owner
         if ($user->hasRole('Owner')) {
             $ownerCount = User::role('Owner')->count();
@@ -256,6 +261,7 @@ class UserManagementController extends Controller
      */
     public function bulkDestroy(Request $request)
     {
+        Gate::authorize('business.user.delete');
         $validated = $request->validate([
             'ids' => ['required', 'array'],
             'ids.*' => ['integer', 'exists:users,id'],
@@ -293,6 +299,7 @@ class UserManagementController extends Controller
      */
     public function assignBusinesses(Request $request, User $user)
     {
+        Gate::authorize('business.user.assign-businesses');
         $validated = $request->validate([
             'business_ids' => ['array'],
             'business_ids.*' => ['integer', 'exists:business,id'],
@@ -337,6 +344,7 @@ class UserManagementController extends Controller
      */
     public function invitations(Request $request)
     {
+        Gate::authorize('business.invitations.view');
         $currentUser = auth()->user();
         $perPage = $request->get('per_page', 50);
 
@@ -411,6 +419,7 @@ class UserManagementController extends Controller
      */
     public function resendInvitation(Invite $invitation)
     {
+        Gate::authorize('business.invitations.resend');
         $currentUser = auth()->user();
 
         // Verify ownership
@@ -443,6 +452,7 @@ class UserManagementController extends Controller
      */
     public function cancelInvitation(Invite $invitation)
     {
+        Gate::authorize('business.invitations.cancel');
         $currentUser = auth()->user();
 
         // Verify ownership

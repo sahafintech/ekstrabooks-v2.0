@@ -56,6 +56,7 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'auth' => [
                 'user' => $user,
+                'has_password' => $user ? !empty($user->password) : false,
             ],
             'businesses' => $businesses,
             'activeBusiness' => $activeBusiness,

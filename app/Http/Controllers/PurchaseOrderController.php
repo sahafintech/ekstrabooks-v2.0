@@ -29,6 +29,7 @@ use App\Models\ProjectBudget;
 use App\Models\PurchaseItem;
 use App\Models\PurchaseItemTax;
 use function Spatie\LaravelPdf\Support\pdf;
+use Illuminate\Support\Facades\Gate;
 
 class PurchaseOrderController extends Controller
 {
@@ -46,6 +47,9 @@ class PurchaseOrderController extends Controller
 	 */
 	public function index(Request $request)
 	{
+		if(!Gate::allows('purchase_orders.view')) {
+			return back()->with('error', _lang('You are not authorized to access this page'));
+		}
 		$search = $request->get('search', '');
 		$perPage = $request->get('per_page', 50);
 		$sortColumn = $request->get('sorting.column', 'id');
@@ -121,6 +125,9 @@ class PurchaseOrderController extends Controller
 
 	public function trash(Request $request)
 	{
+		if(!Gate::allows('purchase_orders.view')) {
+			return back()->with('error', _lang('You are not authorized to access this page'));
+		}
 		$search = $request->get('search', '');
 		$perPage = $request->get('per_page', 50);
 		$sortColumn = $request->get('sorting.column', 'id');
@@ -190,6 +197,9 @@ class PurchaseOrderController extends Controller
 	 */
 	public function create(Request $request)
 	{
+		if(!Gate::allows('purchase_orders.create')) {
+			return back()->with('error', _lang('You are not authorized to access this page'));
+		}
 		$vendors = Vendor::where('business_id', $request->activeBusiness->id)
 			->orderBy('id', 'desc')
 			->get();
@@ -234,6 +244,9 @@ class PurchaseOrderController extends Controller
 	 */
 	public function store(Request $request)
 	{
+		if(!Gate::allows('purchase_orders.create')) {
+			return back()->with('error', _lang('You are not authorized to access this page'));
+		}
 		$validator = Validator::make($request->all(), [
 			'vendor_id' => 'required',
 			'title' => 'required',
@@ -487,6 +500,9 @@ class PurchaseOrderController extends Controller
 	 */
 	public function update(Request $request, $id)
 	{
+		if(!Gate::allows('purchase_orders.update')) {
+			return back()->with('error', _lang('You are not authorized to access this page'));
+		}
 		$validator = Validator::make($request->all(), [
 			'vendor_id' => 'required',
 			'title' => 'required',
@@ -688,6 +704,9 @@ class PurchaseOrderController extends Controller
 	 */
 	public function destroy($id)
 	{
+		if(!Gate::allows('purchase_orders.delete')) {
+			return back()->with('error', _lang('You are not authorized to access this page'));
+		}
 		$purchase = PurchaseOrder::find($id);
 
 		// audit log
@@ -703,6 +722,9 @@ class PurchaseOrderController extends Controller
 
 	public function permanent_destroy($id)
 	{
+		if(!Gate::allows('purchase_orders.delete')) {
+			return back()->with('error', _lang('You are not authorized to access this page'));
+		}
 		$purchase = PurchaseOrder::onlyTrashed()->find($id);
 
 		// audit log
@@ -728,6 +750,9 @@ class PurchaseOrderController extends Controller
 
 	public function restore($id)
 	{
+		if(!Gate::allows('purchase_orders.restore')) {
+			return back()->with('error', _lang('You are not authorized to access this page'));
+		}
 		$purchase = PurchaseOrder::onlyTrashed()->find($id);
 
 		// audit log
@@ -743,6 +768,9 @@ class PurchaseOrderController extends Controller
 
 	public function bulk_destroy(Request $request)
 	{
+		if(!Gate::allows('purchase_orders.delete')) {
+			return back()->with('error', _lang('You are not authorized to access this page'));
+		}
 		$purchases = PurchaseOrder::whereIn('id', $request->ids)->get();
 
 		// audit log
@@ -761,6 +789,9 @@ class PurchaseOrderController extends Controller
 
 	public function bulk_permanent_destroy(Request $request)
 	{
+		if(!Gate::allows('purchase_orders.delete')) {
+			return back()->with('error', _lang('You are not authorized to access this page'));
+		}
 		$purchases = PurchaseOrder::onlyTrashed()->whereIn('id', $request->ids)->get();
 
 		// audit log
@@ -788,6 +819,9 @@ class PurchaseOrderController extends Controller
 
 	public function bulk_restore(Request $request)
 	{
+		if(!Gate::allows('purchase_orders.restore')) {
+			return back()->with('error', _lang('You are not authorized to access this page'));
+		}
 		$purchases = PurchaseOrder::onlyTrashed()->whereIn('id', $request->ids)->get();
 
 		// audit log
@@ -851,6 +885,9 @@ class PurchaseOrderController extends Controller
 
 	public function import_purchase_orders(Request $request)
 	{
+		if(!Gate::allows('purchase_orders.import')) {
+			return back()->with('error', _lang('You are not authorized to access this page'));
+		}
 		$request->validate([
 			'orders_file' => 'required|mimes:xls,xlsx',
 		]);
@@ -873,6 +910,9 @@ class PurchaseOrderController extends Controller
 
 	public function purchases_filter(Request $request)
 	{
+		if(!Gate::allows('purchase_orders.view')) {
+			return back()->with('error', _lang('You are not authorized to access this page'));
+		}
 		$from =  explode('to', $request->date_range)[0] ?? '';
 		$to = explode('to', $request->date_range)[1] ?? '';
 
@@ -903,6 +943,9 @@ class PurchaseOrderController extends Controller
 
 	public function export_purchase_orders()
 	{
+		if(!Gate::allows('purchase_orders.export')) {
+			return back()->with('error', _lang('You are not authorized to access this page'));
+		}
 		// audit log
 		$audit = new AuditLog();
 		$audit->date_changed = date('Y-m-d H:i:s');
@@ -915,6 +958,9 @@ class PurchaseOrderController extends Controller
 
 	public function convert_to_bill($id, Request $request)
 	{
+		if(!Gate::allows('purchase_orders.convert_to_bill')) {
+			return back()->with('error', _lang('You are not authorized to access this page'));
+		}
 		$purchase_order = PurchaseOrder::find($id);
 		if ($purchase_order->status == 1) {
 			return redirect()->route('purchase_orders.index')->with('error', _lang('Purchase Order already converted'));

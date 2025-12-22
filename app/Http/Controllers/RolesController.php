@@ -16,10 +16,7 @@ class RolesController extends Controller
      */
     public function index()
     {
-        if (Gate::denies('roles.view')) {
-            return redirect()->back()->with('error', _lang('Permission denied!'));
-        }
-
+        Gate::authorize('roles.view');
         $roles = Role::where('guard_name', 'web')
             ->withCount('users', 'permissions')
             ->get()
@@ -62,9 +59,7 @@ class RolesController extends Controller
      */
     public function store(Request $request)
     {
-        if (Gate::denies('roles.create')) {
-            return redirect()->back()->with('error', _lang('Permission denied!'));
-        }
+        Gate::authorize('roles.create');
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', 'unique:roles,name'],
@@ -92,9 +87,7 @@ class RolesController extends Controller
      */
     public function update(Request $request, $id)
     {
-        if (Gate::denies('roles.edit')) {
-            return redirect()->back()->with('error', _lang('Permission denied!'));
-        }
+        Gate::authorize('roles.update');
 
         $role = Role::findOrFail($id);
 
@@ -133,9 +126,7 @@ class RolesController extends Controller
      */
     public function destroy($id)
     {
-        if (Gate::denies('roles.delete')) {
-            return redirect()->back()->with('error', _lang('Permission denied!'));
-        }
+        Gate::authorize('roles.delete');
 
         $role = Role::findOrFail($id);
 
@@ -162,9 +153,7 @@ class RolesController extends Controller
      */
     public function bulk_destroy(Request $request)
     {
-        if (Gate::denies('roles.delete')) {
-            return redirect()->back()->with('error', _lang('Permission denied!'));
-        }
+        Gate::authorize('roles.delete');
 
         $validated = $request->validate([
             'ids' => ['required', 'array'],

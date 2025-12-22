@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Validator;
+use Illuminate\Support\Facades\Gate;
 
 class PayrollController extends Controller
 {
@@ -58,6 +59,7 @@ class PayrollController extends Controller
      */
     public function index(Request $request)
     {
+        Gate::authorize('payrolls.view');
         $month = $request->month ?? date('m');
         $year = $request->year ?? date('Y');
         $search = $request->search;
@@ -159,6 +161,7 @@ class PayrollController extends Controller
 
     public function store(Request $request)
     {
+        Gate::authorize('payrolls.create');
         $validator = Validator::make($request->all(), [
             'month' => 'required',
             'year'  => 'required|integer',
@@ -1066,6 +1069,7 @@ class PayrollController extends Controller
 
     public function destroy($id)
     {
+        Gate::authorize('payrolls.delete');
         $payroll = Payroll::with('employee')->find($id);
 
         if (!$payroll) {
@@ -1129,6 +1133,7 @@ class PayrollController extends Controller
 
     public function bulk_approve(Request $request)
     {
+        Gate::authorize('payrolls.approve');
         $currentUserId = auth()->id();
         
         // Check if current user is a configured approver
@@ -1216,6 +1221,7 @@ class PayrollController extends Controller
 
     public function bulk_reject(Request $request)
     {
+        Gate::authorize('payrolls.reject');
         $currentUserId = auth()->id();
         
         // Check if current user is a configured approver
@@ -1306,6 +1312,7 @@ class PayrollController extends Controller
      */
     public function approve(Request $request, $id)
     {
+        Gate::authorize('payrolls.approve');
         $request->validate([
             'comment' => ['nullable', 'string', 'max:1000'],
         ]);
@@ -1372,6 +1379,7 @@ class PayrollController extends Controller
      */
     public function reject(Request $request, $id)
     {
+        Gate::authorize('payrolls.reject');
         $request->validate([
             'comment' => ['required', 'string', 'max:1000'],
         ], [

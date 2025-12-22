@@ -7,11 +7,14 @@ use App\Models\HoldPosInvoiceItem;
 use App\Models\HoldPosInvoiceItemTax;
 use App\Models\Tax;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class HoldPosInvoiceController extends Controller
 {
     public function store(Request $request)
     {
+        Gate::authorize('receipts.create');
+
         $request->validate([
             'customer_id'    => 'nullable',
             'product_id'     => 'required',

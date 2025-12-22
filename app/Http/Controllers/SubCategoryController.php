@@ -7,11 +7,15 @@ use App\Models\MainCategory;
 use App\Models\SubCategory;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Gate;
 
 class SubCategoryController extends Controller
 {
     public function index(Request $request)
     {
+        if(!Gate::allows('sub_categories.view')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
@@ -56,6 +60,9 @@ class SubCategoryController extends Controller
 
     public function trash(Request $request)
     {
+        if(!Gate::allows('sub_categories.view')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
@@ -100,6 +107,9 @@ class SubCategoryController extends Controller
 
     public function store()
     {
+        if(!Gate::allows('sub_categories.create')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $data = request()->validate([
             'name' => 'required',
             'main_category_id' => 'required',
@@ -131,6 +141,9 @@ class SubCategoryController extends Controller
 
     public function destroy($id)
     {
+        if(!Gate::allows('sub_categories.delete')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $category = SubCategory::find($id);
 
         $category->delete();
@@ -147,6 +160,9 @@ class SubCategoryController extends Controller
 
     public function permanent_destroy($id)
     {
+        if(!Gate::allows('sub_categories.delete')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $category = SubCategory::onlyTrashed()->find($id);
 
         // delete image
@@ -169,6 +185,9 @@ class SubCategoryController extends Controller
 
     public function restore($id)
     {
+        if(!Gate::allows('sub_categories.restore')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $category = SubCategory::onlyTrashed()->find($id);
 
         $category->restore();
@@ -185,6 +204,9 @@ class SubCategoryController extends Controller
 
     public function update(Request $request, $id)
     {
+        if(!Gate::allows('sub_categories.update')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $request->validate([
             'name' => 'required',
             'main_category_id' => 'required',
@@ -223,6 +245,9 @@ class SubCategoryController extends Controller
 
     public function bulk_destroy(Request $request)
     {
+        if(!Gate::allows('sub_categories.delete')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $ids = $request->ids;
 
         $deleted = [];
@@ -248,6 +273,9 @@ class SubCategoryController extends Controller
     }
     public function bulk_permanent_destroy(Request $request)
     {
+        if(!Gate::allows('sub_categories.delete')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $ids = $request->ids;
 
         $deleted = [];
@@ -278,6 +306,9 @@ class SubCategoryController extends Controller
     }
     public function bulk_restore(Request $request)
     {
+        if(!Gate::allows('sub_categories.restore')) {
+            return back()->with('error', _lang('You are not authorized to access this page'));
+        }
         $ids = $request->ids;
 
         $deleted = [];

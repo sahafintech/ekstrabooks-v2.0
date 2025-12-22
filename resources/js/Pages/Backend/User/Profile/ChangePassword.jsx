@@ -59,7 +59,7 @@ export default function Create({ profile }) {
 
                 <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
                     <form onSubmit={submit}>
-                        {auth.user.password ? (
+                        {auth.has_password ? (
                             <div className="grid grid-cols-12 mt-2">
                                 <Label
                                     htmlFor="old_password"
@@ -78,11 +78,11 @@ export default function Create({ profile }) {
                                                 e.target.value
                                             )
                                         }
-                                        className="md:w-1/2 w-full"
+                                        className={`md:w-1/2 w-full ${errors.old_password ? "border-red-500" : ""}`}
                                     />
                                     <InputError
                                         message={errors.old_password}
-                                        className="text-sm"
+                                        className="mt-1"
                                     />
                                 </div>
                             </div>
@@ -102,12 +102,12 @@ export default function Create({ profile }) {
                                     onChange={(e) =>
                                         setData("password", e.target.value)
                                     }
-                                    className="md:w-1/2 w-full"
+                                    className={`md:w-1/2 w-full ${errors.password ? "border-red-500" : ""}`}
                                     required
                                 />
                                 <InputError
                                     message={errors.password}
-                                    className="text-sm"
+                                    className="mt-1"
                                 />
                             </div>
                         </div>
@@ -130,12 +130,12 @@ export default function Create({ profile }) {
                                             e.target.value
                                         )
                                     }
-                                    className="md:w-1/2 w-full"
+                                    className={`md:w-1/2 w-full ${errors.password_confirmation ? "border-red-500" : ""}`}
                                     required
                                 />
                                 <InputError
                                     message={errors.password_confirmation}
-                                    className="text-sm"
+                                    className="mt-1"
                                 />
                             </div>
                         </div>

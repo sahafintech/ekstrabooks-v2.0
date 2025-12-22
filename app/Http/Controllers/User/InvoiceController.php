@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Support\Facades\Gate;
 use function Spatie\LaravelPdf\Support\pdf;
 
 class InvoiceController extends Controller
@@ -61,6 +62,8 @@ class InvoiceController extends Controller
      */
     public function index(Request $request)
     {
+        Gate::authorize('invoices.view');
+
         $query = Invoice::with('customer', 'client')
             ->where('is_deffered', 0);
 
@@ -183,6 +186,8 @@ class InvoiceController extends Controller
 
     public function trash(Request $request)
     {
+        Gate::authorize('invoices.view');
+
         $query = Invoice::onlyTrashed()->with('customer', 'client')
             ->where('is_deffered', 0);
 
@@ -267,6 +272,8 @@ class InvoiceController extends Controller
      */
     public function create()
     {
+        Gate::authorize('invoices.create');
+
         $invoice_title = get_business_option('invoice_title', 'Invoice');
         $customers = Customer::all();
         $currencies = Currency::all();
@@ -294,6 +301,8 @@ class InvoiceController extends Controller
      */
     public function store(Request $request)
     {
+        Gate::authorize('invoices.create');
+
         $validator = Validator::make($request->all(), [
             'customer_id'    => 'required',
             'title'          => 'required',
@@ -598,6 +607,8 @@ class InvoiceController extends Controller
      */
     public function show($id)
     {
+        Gate::authorize('invoices.view');
+
         $invoice = Invoice::with([
             'business',
             'business.bank_accounts',
@@ -623,6 +634,8 @@ class InvoiceController extends Controller
 
     public function pdf($id)
     {
+        Gate::authorize('invoices.pdf');
+
         $invoice = Invoice::with(['business', 'business.bank_accounts', 'items', 'taxes', 'customer', 'project'])->find($id);
         return pdf()
         ->view('backend.user.pdf.invoice', compact('invoice'))
@@ -641,6 +654,8 @@ class InvoiceController extends Controller
 
     public function send_email(Request $request, $id)
     {
+        Gate::authorize('invoices.send_email');
+
         if ($request->isMethod('get')) {
             $email_templates = EmailTemplate::whereIn('slug', ['NEW_INVOICE_CREATED', 'INVOICE_PAYMENT_REMINDER'])
                 ->where('email_status', 1)->get();
@@ -714,6 +729,8 @@ class InvoiceController extends Controller
      */
     public function edit($id)
     {
+        Gate::authorize('invoices.update');
+
         $invoice = Invoice::with(['items', 'taxes', 'customer'])
             ->where('id', $id)
             ->where('status', '!=', 2)
@@ -759,6 +776,8 @@ class InvoiceController extends Controller
      */
     public function update(Request $request, $id)
     {
+        Gate::authorize('invoices.update');
+
         $validator = Validator::make($request->all(), [
             'customer_id'    => 'required',
             'title'          => 'required',
@@ -1136,6 +1155,8 @@ class InvoiceController extends Controller
     /** Duplicate Invoice */
     public function duplicate($id)
     {
+        Gate::authorize('invoices.duplicate');
+
         DB::beginTransaction();
         $invoice                    = Invoice::find($id);
         $newInvoice                 = $invoice->replicate();
@@ -1196,6 +1217,8 @@ class InvoiceController extends Controller
      */
     public function destroy($id)
     {
+        Gate::authorize('invoices.delete');
+
         $invoice = Invoice::find($id);
 
         // audit log
@@ -1244,6 +1267,8 @@ class InvoiceController extends Controller
 
     public function bulk_destroy(Request $request)
     {
+        Gate::authorize('invoices.delete');
+
         foreach ($request->ids as $id) {
             $invoice = Invoice::find($id);
 
@@ -1294,6 +1319,8 @@ class InvoiceController extends Controller
 
     public function permanent_destroy($id)
     {
+        Gate::authorize('invoices.delete');
+
         $invoice = Invoice::onlyTrashed()->find($id);
 
         // audit log
@@ -1360,6 +1387,8 @@ class InvoiceController extends Controller
 
     public function bulk_permanent_destroy(Request $request)
     {
+        Gate::authorize('invoices.delete');
+
         foreach ($request->ids as $id) {
             $invoice = Invoice::onlyTrashed()->find($id);
 
@@ -1428,6 +1457,8 @@ class InvoiceController extends Controller
 
     public function restore($id)
     {
+        Gate::authorize('invoices.restore');
+
         $invoice = Invoice::onlyTrashed()->find($id);
 
         // audit log
@@ -1476,6 +1507,8 @@ class InvoiceController extends Controller
 
     public function bulk_restore(Request $request)
     {
+        Gate::authorize('invoices.restore');
+
         foreach ($request->ids as $id) {
             $invoice = Invoice::onlyTrashed()->find($id);
 
@@ -1571,6 +1604,8 @@ class InvoiceController extends Controller
 
     public function import_invoices(Request $request)
     {
+        Gate::authorize('invoices.csv.import');
+
         $request->validate([
             'invoices_file' => 'required|mimes:xls,xlsx',
         ]);
@@ -1689,6 +1724,8 @@ class InvoiceController extends Controller
 
     public function export_invoices()
     {
+        Gate::authorize('invoices.csv.export');
+
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');

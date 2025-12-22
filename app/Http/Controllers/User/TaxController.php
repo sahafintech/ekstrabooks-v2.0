@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 
 class TaxController extends Controller
 {
@@ -28,6 +29,7 @@ class TaxController extends Controller
      */
     public function index(Request $request)
     {
+        Gate::authorize('taxes.view');
         $query = Tax::with('account');
 
         if ($request->has('search') && $request->search != '') {
@@ -78,6 +80,7 @@ class TaxController extends Controller
      */
     public function store(Request $request)
     {
+        Gate::authorize('taxes.create');
         $validator = Validator::make($request->all(), [
             'name' => 'required|max:50',
             'rate' => 'required|numeric',
@@ -118,6 +121,7 @@ class TaxController extends Controller
      */
     public function update(Request $request, $id)
     {
+        Gate::authorize('taxes.update');
         $validator = Validator::make($request->all(), [
             'name' => 'required|max:50',
             'rate' => 'required|numeric',
@@ -157,6 +161,7 @@ class TaxController extends Controller
      */
     public function destroy($id)
     {
+        Gate::authorize('taxes.delete');
         $tax = Tax::find($id);
 
         // audit log
@@ -172,6 +177,7 @@ class TaxController extends Controller
 
     public function bulk_destroy(Request $request)
     {
+        Gate::authorize('taxes.delete');
         foreach ($request->ids as $id) {
             $tax = Tax::find($id);
 
@@ -193,6 +199,7 @@ class TaxController extends Controller
      * @return \Illuminate\Http\Response
      */
     public function trash(Request $request) {
+        Gate::authorize('taxes.view');
         $per_page = $request->get('per_page', 10);
         $search = $request->get('search', '');
         $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
@@ -246,6 +253,7 @@ class TaxController extends Controller
      */
     public function restore(Request $request, $id)
     {
+        Gate::authorize('taxes.restore');
         $tax = Tax::onlyTrashed()->findOrFail($id);
 
         // audit log
@@ -268,6 +276,7 @@ class TaxController extends Controller
      */
     public function bulk_restore(Request $request)
     {
+        Gate::authorize('taxes.restore');
         foreach ($request->ids as $id) {
             $tax = Tax::onlyTrashed()->findOrFail($id);
 
@@ -292,6 +301,7 @@ class TaxController extends Controller
      */
     public function permanent_destroy(Request $request, $id)
     {
+        Gate::authorize('taxes.delete');
         $tax = Tax::onlyTrashed()->findOrFail($id);
 
         // audit log
@@ -314,6 +324,7 @@ class TaxController extends Controller
      */
     public function bulk_permanent_destroy(Request $request)
     {
+        Gate::authorize('taxes.delete');
         foreach ($request->ids as $id) {
             $tax = Tax::onlyTrashed()->findOrFail($id);
 

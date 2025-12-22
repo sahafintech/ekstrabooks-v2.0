@@ -18,6 +18,7 @@ use App\Models\Vendor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
@@ -32,6 +33,8 @@ class PurchaseReturnController extends Controller
      */
     public function index(Request $request)
     {
+        Gate::authorize('purchase_returns.view');
+
         $search = $request->get('search', '');
         $perPage = $request->get('per_page', 50);
         $sorting = $request->get('sorting', []);
@@ -150,6 +153,8 @@ class PurchaseReturnController extends Controller
 
     public function trash(Request $request)
     {
+        Gate::authorize('purchase_returns.view');
+
         $search = $request->get('search', '');
         $perPage = $request->get('per_page', 50);
         $sorting = $request->get('sorting', []);
@@ -232,6 +237,8 @@ class PurchaseReturnController extends Controller
      */
     public function create()
     {
+        Gate::authorize('purchase_returns.create');
+
         $purchase_return_title = get_business_option('purchase_return_title', 'Return');
         $vendors = Vendor::all();
         $currencies = Currency::all();
@@ -254,6 +261,8 @@ class PurchaseReturnController extends Controller
 
     public function show($id)
     {
+        Gate::authorize('purchase_returns.view');
+
         $purchase_return  = PurchaseReturn::with(['business', 'items', 'taxes', 'vendor'])->find($id);
 
         return Inertia::render('Backend/User/PurchaseReturn/View', [
@@ -263,6 +272,8 @@ class PurchaseReturnController extends Controller
 
     public function pdf($id)
     {
+        Gate::authorize('purchase_returns.pdf');
+
         $purchase_return = PurchaseReturn::with(['business', 'items', 'taxes', 'vendor'])->find($id);
         return pdf()
         ->view('backend.user.pdf.purchase-return', compact('purchase_return'))
@@ -286,6 +297,8 @@ class PurchaseReturnController extends Controller
 
     public function store(Request $request)
     {
+        Gate::authorize('purchase_returns.create');
+
         $validator = Validator::make($request->all(), [
             'vendor_id' => 'nullable',
             'title' => 'required',
@@ -599,6 +612,8 @@ class PurchaseReturnController extends Controller
 
     public function edit($id)
     {
+        Gate::authorize('purchase_returns.update');
+
         $purchase_return = PurchaseReturn::with(['business', 'items', 'taxes', 'vendor'])->find($id);
 
         if (!has_permission('purchase_returns.bulk_approve') && !request()->isOwner && $purchase_return->approval_status == 1) {
@@ -632,6 +647,8 @@ class PurchaseReturnController extends Controller
 
     public function update(Request $request, $id)
     {
+        Gate::authorize('purchase_returns.update');
+
         $validator = Validator::make($request->all(), [
             'vendor_id' => 'nullable',
             'title' => 'required',
@@ -1010,6 +1027,8 @@ class PurchaseReturnController extends Controller
 
     public function destroy($id)
     {
+        Gate::authorize('purchase_returns.delete');
+
         $return = PurchaseReturn::find($id);
 
         // audit log
@@ -1053,6 +1072,8 @@ class PurchaseReturnController extends Controller
 
     public function bulk_destroy(Request $request)
     {
+        Gate::authorize('purchase_returns.delete');
+
         foreach ($request->ids as $id) {
             $return = PurchaseReturn::find($id);
 
@@ -1098,6 +1119,8 @@ class PurchaseReturnController extends Controller
 
     public function refund_store(Request $request, $id)
     {
+        Gate::authorize('purchase_returns.refund');
+
         $request->validate(
             [
                 'refund_date' => 'required',
@@ -1217,6 +1240,8 @@ class PurchaseReturnController extends Controller
 
     public function restore($id)
     {
+        Gate::authorize('purchase_returns.restore');
+
         $purchaseReturn = PurchaseReturn::onlyTrashed()->find($id);
 
         // audit log
@@ -1255,6 +1280,8 @@ class PurchaseReturnController extends Controller
 
     public function bulk_restore(Request $request)
     {
+        Gate::authorize('purchase_returns.restore');
+
         foreach ($request->ids as $id) {
             $purchaseReturn = PurchaseReturn::onlyTrashed()->find($id);
 
@@ -1296,6 +1323,8 @@ class PurchaseReturnController extends Controller
 
     public function permanent_destroy($id)
     {
+        Gate::authorize('purchase_returns.delete');
+
         $purchaseReturn = PurchaseReturn::onlyTrashed()->find($id);
 
         // audit log
@@ -1333,6 +1362,8 @@ class PurchaseReturnController extends Controller
 
     public function bulk_permanent_destroy(Request $request)
     {
+        Gate::authorize('purchase_returns.delete');
+
         foreach ($request->ids as $id) {
             $purchaseReturn = PurchaseReturn::onlyTrashed()->find($id);
 
@@ -1373,6 +1404,8 @@ class PurchaseReturnController extends Controller
 
     public function bulk_approve(Request $request)
     {
+        Gate::authorize('purchase_returns.bulk_approve');
+
         foreach ($request->ids as $id) {
             $purchaseReturn = PurchaseReturn::find($id);
             $purchaseReturn->approval_status = 1;
@@ -1405,6 +1438,8 @@ class PurchaseReturnController extends Controller
 
     public function bulk_reject(Request $request)
     {
+        Gate::authorize('purchase_returns.bulk_approve');
+
         foreach ($request->ids as $id) {
             $purchaseReturn = PurchaseReturn::find($id);
             if ($purchaseReturn->approval_status == 0) {
