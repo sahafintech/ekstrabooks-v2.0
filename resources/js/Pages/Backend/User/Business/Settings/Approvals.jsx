@@ -35,6 +35,10 @@ export default function Approvals({ business, id, users = [], activeTab }) {
         // Payroll Approval Settings
         payroll_approval_required_count: getSettingValue("payroll_approval_required_count", "1"),
         payroll_approval_users: getArraySettingValue("payroll_approval_users"),
+
+        // Journal Approval Settings
+        journal_approval_required_count: getSettingValue("journal_approval_required_count", "1"),
+        journal_approval_users: getArraySettingValue("journal_approval_users"),
     });
 
     const submitApprovalSettings = (e) => {
@@ -166,6 +170,55 @@ export default function Approvals({ business, id, users = [], activeTab }) {
                                                 Users who will be assigned to approve payroll
                                             </p>
                                             <InputError message={errors.payroll_approval_users} className="mt-1" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Journal Workflow */}
+                                <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                                        <span className="mr-2">📒</span>
+                                        Journal Workflow
+                                    </h3>
+                                    
+                                    <div className="grid grid-cols-12 mb-4">
+                                        <Label htmlFor="journal_approval_required_count" className="col-span-12 md:col-span-3 flex items-center mb-2 md:mb-0">
+                                            Number of Approvals Required
+                                        </Label>
+                                        <div className="col-span-12 md:col-span-9">
+                                            <Input
+                                                id="journal_approval_required_count"
+                                                type="number"
+                                                min="0"
+                                                max="10"
+                                                value={data.journal_approval_required_count}
+                                                onChange={(e) => setData("journal_approval_required_count", e.target.value)}
+                                                className="w-full"
+                                                disabled={processing}
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Minimum number of approvals needed before a journal entry is approved
+                                            </p>
+                                            <InputError message={errors.journal_approval_required_count} className="mt-1" />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-12 mb-4">
+                                        <Label htmlFor="journal_approval_users" className="col-span-12 md:col-span-3 flex items-center mb-2 md:mb-0">
+                                            Approver Users
+                                        </Label>
+                                        <div className="col-span-12 md:col-span-9">
+                                            <SearchableMultiSelectCombobox
+                                                options={userOptions}
+                                                value={data.journal_approval_users}
+                                                onChange={(values) => setData("journal_approval_users", values)}
+                                                placeholder="Select approver users"
+                                                emptyMessage="No users found"
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Users who are permitted to approve journal entries
+                                            </p>
+                                            <InputError message={errors.journal_approval_users} className="mt-1" />
                                         </div>
                                     </div>
                                 </div>

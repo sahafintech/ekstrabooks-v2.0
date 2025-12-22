@@ -453,6 +453,8 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('journal/bulk_destroy', [JournalController::class, 'bulk_destroy'])->name('journals.bulk_destroy');
 		Route::post('journal/bulk_approve', [JournalController::class, 'bulk_approve'])->name('journals.bulk_approve');
 		Route::post('journal/bulk_reject', [JournalController::class, 'bulk_reject'])->name('journals.bulk_reject');
+		Route::post('journals/{id}/approve', [JournalController::class, 'approve'])->name('journals.approve');
+		Route::post('journals/{id}/reject', [JournalController::class, 'reject'])->name('journals.reject');
 
 		// Sales Receipts
 		Route::get('receipts/trash', [ReceiptController::class, 'trash'])->name('receipts.trash');

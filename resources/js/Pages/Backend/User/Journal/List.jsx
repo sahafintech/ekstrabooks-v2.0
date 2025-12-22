@@ -40,6 +40,9 @@ import {
     DollarSign,
     CheckCircle,
     AlertCircle,
+    AlertTriangle,
+    CheckCheck,
+    XCircle,
 } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
@@ -242,7 +245,7 @@ const DeleteAllJournalsModal = ({
     </Modal>
 );
 
-const ApproveAllJournalssModal = ({
+const ApproveAllJournalsModal = ({
     show,
     onClose,
     onConfirm,
@@ -251,21 +254,33 @@ const ApproveAllJournalssModal = ({
 }) => (
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
-            <h2 className="text-lg font-medium">
+            <div className="flex items-center gap-3 mb-4">
+                <div className="p-3 bg-green-100 rounded-full">
+                    <CheckCheck className="h-6 w-6 text-green-600" />
+                </div>
+                <h2 className="text-lg font-medium">
+                    Confirm Bulk Approval
+                </h2>
+            </div>
+            <p className="text-gray-600 mb-6">
                 Are you sure you want to approve {count} selected journal
-                {count !== 1 ? "s" : ""}?
-            </h2>
-            <div className="mt-6 flex justify-end">
+                {count !== 1 ? "s" : ""}? 
+                This will update your approval status for these journals.
+            </p>
+            <div className="flex justify-end gap-3">
                 <Button
                     type="button"
                     variant="secondary"
                     onClick={onClose}
-                    className="mr-3"
                 >
                     Cancel
                 </Button>
-                <Button type="submit" variant="default" disabled={processing}>
-                    Approve Selected
+                <Button
+                    type="submit"
+                    className="bg-green-600 hover:bg-green-700"
+                    disabled={processing}
+                >
+                    {processing ? "Approving..." : "Approve Selected"}
                 </Button>
             </div>
         </form>
@@ -281,16 +296,24 @@ const RejectAllJournalsModal = ({
 }) => (
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm}>
-            <h2 className="text-lg font-medium">
+            <div className="flex items-center gap-3 mb-4">
+                <div className="p-3 bg-red-100 rounded-full">
+                    <XCircle className="h-6 w-6 text-red-600" />
+                </div>
+                <h2 className="text-lg font-medium">
+                    Confirm Bulk Rejection
+                </h2>
+            </div>
+            <p className="text-gray-600 mb-6">
                 Are you sure you want to reject {count} selected journal
-                {count !== 1 ? "s" : ""}?
-            </h2>
-            <div className="mt-6 flex justify-end">
+                {count !== 1 ? "s" : ""}? 
+                This will update your rejection status for these journals.
+            </p>
+            <div className="flex justify-end gap-3">
                 <Button
                     type="button"
                     variant="secondary"
                     onClick={onClose}
-                    className="mr-3"
                 >
                     Cancel
                 </Button>
@@ -299,7 +322,7 @@ const RejectAllJournalsModal = ({
                     variant="destructive"
                     disabled={processing}
                 >
-                    Reject Selected
+                    {processing ? "Rejecting..." : "Reject Selected"}
                 </Button>
             </div>
         </form>
@@ -379,6 +402,8 @@ export default function List({
     summary = {},
     currencies = [],
     trashed_journals = 0,
+    hasConfiguredApprovers = false,
+    currentUserId = null,
 }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
@@ -750,6 +775,17 @@ export default function List({
                             </div>
                         </div>
 
+                        {/* Warning banner if no approvers configured */}
+                        {!hasConfiguredApprovers && (
+                            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3">
+                                <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                                <div>
+                                    <p className="text-sm font-medium text-yellow-800">No Approvers Configured</p>
+                                    <p className="text-xs text-yellow-600">Configure journal approval users in business settings to enable the approval workflow.</p>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="mb-4 flex flex-col md:flex-row gap-4 justify-between">
                             <div className="flex items-center gap-2">
                                 <Select
@@ -763,12 +799,22 @@ export default function List({
                                         <SelectItem value="delete">
                                             Delete Selected
                                         </SelectItem>
-                                        <SelectItem value="approve">
-                                            Approve Selected
-                                        </SelectItem>
-                                        <SelectItem value="reject">
-                                            Reject Selected
-                                        </SelectItem>
+                                        {hasConfiguredApprovers && (
+                                            <>
+                                                <SelectItem value="approve">
+                                                    <span className="flex items-center gap-2">
+                                                        <CheckCheck className="h-4 w-4 text-green-600" />
+                                                        Approve Selected
+                                                    </span>
+                                                </SelectItem>
+                                                <SelectItem value="reject">
+                                                    <span className="flex items-center gap-2">
+                                                        <XCircle className="h-4 w-4 text-red-600" />
+                                                        Reject Selected
+                                                    </span>
+                                                </SelectItem>
+                                            </>
+                                        )}
                                     </SelectContent>
                                 </Select>
                                 <Button
@@ -1070,7 +1116,7 @@ export default function List({
                 count={selectedJournals.length}
             />
 
-            <ApproveAllJournalssModal
+            <ApproveAllJournalsModal
                 show={showApproveAllModal}
                 onClose={() => setShowApproveAllModal(false)}
                 onConfirm={handleApproveAll}

@@ -30,6 +30,14 @@ class Journal extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    /**
+     * Get the approvals for this journal
+     */
+    public function approvals()
+    {
+        return $this->hasMany(Approvals::class, 'ref_id')->where('ref_name', 'journal');
+    }
+
     protected function date(): Attribute {
         $date_format = get_date_format();
 

@@ -29,6 +29,16 @@ class PendingTransaction extends Model
         ]);
     }
 
+    public function vendor()
+    {
+        return $this->belongsTo(Vendor::class, 'vendor_id')->withDefault();
+    }
+
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class, 'customer_id')->withDefault();
+    }
+
     public function project()
     {
         return $this->belongsTo(Project::class, 'project_id')->withDefault();

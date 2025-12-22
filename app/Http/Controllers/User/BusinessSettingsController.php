@@ -626,6 +626,7 @@ class BusinessSettingsController extends Controller
         $validator = Validator::make($request->all(), [
             'purchase_approval_required_count' => 'required|integer|min:0|max:10',
             'payroll_approval_required_count' => 'required|integer|min:0|max:10',
+            'journal_approval_required_count' => 'required|integer|min:0|max:10',
         ]);
 
         if ($validator->fails()) {

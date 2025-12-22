@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exports\JournalExport;
 use App\Imports\JournalImport;
+use App\Models\Approvals;
 use App\Models\AuditLog;
 use App\Models\BusinessSetting;
 use App\Models\Currency;
@@ -79,6 +80,11 @@ class JournalController extends Controller
 
         $journals = $query->paginate($perPage);
 
+        // Check if there are configured approval users for this business
+        $journalApprovalUsersJson = get_business_option('journal_approval_users', '[]');
+        $approvalUsersArray = json_decode($journalApprovalUsersJson, true);
+        $hasConfiguredApprovers = is_array($approvalUsersArray) && count($approvalUsersArray) > 0;
+
         return Inertia::render('Backend/User/Journal/List', [
             'journals' => $journals->items(),
             'currencies' => Currency::all(),
@@ -97,6 +103,8 @@ class JournalController extends Controller
             ],
             'summary' => $summary,
             'trashed_journals' => Journal::onlyTrashed()->where('business_id', request()->activeBusiness->id)->count(),
+            'hasConfiguredApprovers' => $hasConfiguredApprovers,
+            'currentUserId' => auth()->id(),
         ]);
     }
 
@@ -180,12 +188,12 @@ class JournalController extends Controller
         $journal->user_id = auth()->user()->id;
         $journal->business_id = request()->activeBusiness->id;
         $journal->created_by = auth()->user()->id;
-        if (has_permission('journals.bulk_approve') || request()->isOwner == true) {
-            $journal->status = 1;
-        } else {
-            $journal->status = 0;
-        }
+        // All journals start as pending - must go through approval workflow
+        $journal->status = 0;
         $journal->save();
+
+        // Create approval records for configured approvers
+        $this->createJournalApprovalRecords($journal);
 
         //increment journal number
         BusinessSetting::where('name', 'journal_number')->increment('value');
@@ -210,68 +218,32 @@ class JournalController extends Controller
                 }
             }
 
-            if (has_permission('journals.bulk_approve') || request()->isOwner == true) {
-                $transaction                              = new Transaction();
-                $transaction->trans_date                  = Carbon::parse($request->journal_entries[$i]['date'])->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                $transaction->account_id  = $request->journal_entries[$i]['account_id'];
-                $transaction->transaction_method          = $request->method;
-                $transaction->transaction_currency        = $request->trans_currency;
-                $transaction->currency_rate               = Currency::where('name', $request->trans_currency)->first()->exchange_rate;
-                if ($request->journal_entries[$i]['debit'] > 0) {
-                    $transaction->dr_cr       = 'dr';
-                    $transaction->transaction_amount      = $request->journal_entries[$i]['debit'];
-                    $transaction->base_currency_amount    = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entries[$i]['debit']);
-
-                    if ($request->journal_entries[$i]['project_id'] && $request->journal_entries[$i]['project_task_id'] && $request->journal_entries[$i]['cost_code_id']) {
-                        $projectBudget = ProjectBudget::where('project_id', $request->journal_entries[$i]['project_id'])->where('project_task_id', $request->journal_entries[$i]['project_task_id'])->where('cost_code_id', $request->journal_entries[$i]['cost_code_id'])->first();
-                        if ($projectBudget) {
-                            $projectBudget->actual_budget_quantity += $request->journal_entries[$i]['quantity'];
-                            $projectBudget->actual_budget_amount += $request->journal_entries[$i]['debit'];
-                            $projectBudget->save();
-                        }
-                    }
-                } else {
-                    $transaction->dr_cr       = 'cr';
-                    $transaction->transaction_amount      = $request->journal_entries[$i]['credit'];
-                    $transaction->base_currency_amount = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entries[$i]['credit']);
-                }
-                $transaction->description = $request->journal_entries[$i]['description'];
-                $transaction->ref_id      = $journal->id;
-                $transaction->ref_type    = 'journal';
-                $transaction->customer_id = $request->journal_entries[$i]['customer_id'] ?? NULL;
-                $transaction->vendor_id = $request->journal_entries[$i]['vendor_id'] ?? NULL;
-                $transaction->project_id = $request->journal_entries[$i]['project_id'] ?? NULL;
-                $transaction->project_task_id = $request->journal_entries[$i]['project_task_id'] ?? NULL;
-                $transaction->cost_code_id = $request->journal_entries[$i]['cost_code_id'] ?? NULL;
-                $transaction->quantity = $request->journal_entries[$i]['quantity'] ?? 0;
-                $transaction->save();
+            // All new journals go to pending transactions (approval workflow)
+            $transaction                              = new PendingTransaction();
+            $transaction->trans_date                  = Carbon::parse($request->journal_entries[$i]['date'])->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+            $transaction->account_id  = $request->journal_entries[$i]['account_id'];
+            $transaction->transaction_method          = $request->method;
+            $transaction->transaction_currency        = $request->trans_currency;
+            $transaction->currency_rate               = Currency::where('name', $request->trans_currency)->first()->exchange_rate;
+            if ($request->journal_entries[$i]['debit'] > 0) {
+                $transaction->dr_cr       = 'dr';
+                $transaction->transaction_amount      = $request->journal_entries[$i]['debit'];
+                $transaction->base_currency_amount    = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entries[$i]['debit']);
             } else {
-                $transaction                              = new PendingTransaction();
-                $transaction->trans_date                  = Carbon::parse($request->journal_entries[$i]['date'])->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                $transaction->account_id  = $request->journal_entries[$i]['account_id'];
-                $transaction->transaction_method          = $request->method;
-                $transaction->transaction_currency        = $request->trans_currency;
-                $transaction->currency_rate               = Currency::where('name', $request->trans_currency)->first()->exchange_rate;
-                if ($request->journal_entries[$i]['debit'] > 0) {
-                    $transaction->dr_cr       = 'dr';
-                    $transaction->transaction_amount      = $request->journal_entries[$i]['debit'];
-                    $transaction->base_currency_amount    = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entries[$i]['debit']);
-                } else {
-                    $transaction->dr_cr       = 'cr';
-                    $transaction->transaction_amount      = $request->journal_entries[$i]['credit'];
-                    $transaction->base_currency_amount = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entries[$i]['credit']);
-                }
-                $transaction->description = $request->journal_entries[$i]['description'];
-                $transaction->ref_id      = $journal->id;
-                $transaction->ref_type    = 'journal';
-                $transaction->customer_id = $request->journal_entries[$i]['customer_id'] ?? NULL;
-                $transaction->vendor_id = $request->journal_entries[$i]['vendor_id'] ?? NULL;
-                $transaction->project_id = $request->journal_entries[$i]['project_id'] ?? NULL;
-                $transaction->project_task_id = $request->journal_entries[$i]['project_task_id'] ?? NULL;
-                $transaction->cost_code_id = $request->journal_entries[$i]['cost_code_id'] ?? NULL;
-                $transaction->quantity = $request->journal_entries[$i]['quantity'] ?? 0;
-                $transaction->save();
+                $transaction->dr_cr       = 'cr';
+                $transaction->transaction_amount      = $request->journal_entries[$i]['credit'];
+                $transaction->base_currency_amount = convert_currency($request->trans_currency, $request->activeBusiness->currency, $request->journal_entries[$i]['credit']);
             }
+            $transaction->description = $request->journal_entries[$i]['description'];
+            $transaction->ref_id      = $journal->id;
+            $transaction->ref_type    = 'journal';
+            $transaction->customer_id = $request->journal_entries[$i]['customer_id'] ?? NULL;
+            $transaction->vendor_id = $request->journal_entries[$i]['vendor_id'] ?? NULL;
+            $transaction->project_id = $request->journal_entries[$i]['project_id'] ?? NULL;
+            $transaction->project_task_id = $request->journal_entries[$i]['project_task_id'] ?? NULL;
+            $transaction->cost_code_id = $request->journal_entries[$i]['cost_code_id'] ?? NULL;
+            $transaction->quantity = $request->journal_entries[$i]['quantity'] ?? 0;
+            $transaction->save();
 
             DB::commit();
         }
@@ -578,7 +550,7 @@ class JournalController extends Controller
     {
         $journal = Journal::where('id', $id)
             ->where('business_id', request()->activeBusiness->id)
-            ->with('created_user', 'approved_user')
+            ->with('created_user', 'approved_user', 'approvals.actionUser')
             ->first();
 
         if (!$journal) {
@@ -588,10 +560,42 @@ class JournalController extends Controller
         $transactions = Transaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->with('account', 'customer', 'vendor', 'project', 'project_task', 'cost_code')->get();
         $pending_transactions = PendingTransaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->with('account', 'customer', 'vendor', 'project', 'project_task', 'cost_code')->get();
 
+        // Check if there are configured approval users for this business
+        $journalApprovalUsersJson = get_business_option('journal_approval_users', '[]');
+        $approvalUsersCount = 0;
+        $hasConfiguredApprovers = false;
+        $configuredUserIds = [];
+        
+        $usersArray = json_decode($journalApprovalUsersJson, true);
+        if (is_array($usersArray) && count($usersArray) > 0) {
+            $approvalUsersCount = count($usersArray);
+            $hasConfiguredApprovers = true;
+            $configuredUserIds = $usersArray;
+        }
+
+        // Only create approval records if there are configured approvers
+        // AND the journal doesn't have any approvals yet
+        // AND the journal is not already approved
+        if ($journal->approvals->isEmpty() && $hasConfiguredApprovers && $journal->status != 1) {
+            // Create approval records for each configured approver
+            foreach ($configuredUserIds as $userId) {
+                $journal->approvals()->create([
+                    'ref_name' => 'journal',
+                    'action_user' => $userId,
+                    'status' => 0, // pending
+                ]);
+            }
+            
+            // Reload approvals with actionUser relationship
+            $journal->load('approvals.actionUser');
+        }
+
         return Inertia::render('Backend/User/Journal/View', [
             'journal' => $journal,
             'transactions' => $transactions,
-            'pending_transactions' => $pending_transactions
+            'pending_transactions' => $pending_transactions,
+            'approvalUsersCount' => $journal->approvals->count(),
+            'hasConfiguredApprovers' => $hasConfiguredApprovers,
         ]);
     }
 
@@ -602,90 +606,429 @@ class JournalController extends Controller
 
     public function bulk_approve(Request $request)
     {
+        $currentUserId = auth()->id();
+
+        // Check if there are any configured approval users for this business
+        $approvalUsersJson = get_business_option('journal_approval_users', '[]');
+        $configuredUserIds = json_decode($approvalUsersJson, true);
+        $hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
+
+        if (!$hasConfiguredApprovers) {
+            return redirect()->route('journals.index')->with('error', _lang('No approvers are configured. Please configure approvers in business settings first.'));
+        }
+
+        // Check if current user is in the configured approvers list
+        if (!in_array($currentUserId, $configuredUserIds)) {
+            return redirect()->route('journals.index')->with('error', _lang('You are not assigned as an approver for journals'));
+        }
+
         foreach ($request->ids as $id) {
-            $journal = Journal::find($id);
-            $journal->status = 1;
-            $journal->approved_by = auth()->user()->id;
-            $journal->save();
-
-            // transactions from pending to transaction
-            $pending_transactions = PendingTransaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->get();
-
-            if ($pending_transactions->count() > 0) {
-                foreach ($pending_transactions as $transaction) {
-                    // Create a new Transaction instance and replicate data from pending
-                    $new_transaction = $transaction->replicate();
-                    $new_transaction->setTable('transactions'); // Change the table to 'transactions'
-                    $new_transaction->save();
-
-                    if ($new_transaction->project_id && $new_transaction->project_task_id && $new_transaction->cost_code_id && $new_transaction->dr_cr == 'dr') {
-                        $projectBudget = ProjectBudget::where('project_id', $new_transaction->project_id)->where('project_task_id', $new_transaction->project_task_id)->where('cost_code_id', $new_transaction->cost_code_id)->first();
-                        if ($projectBudget) {
-                            $projectBudget->actual_budget_quantity += $new_transaction->quantity;
-                            $projectBudget->actual_budget_amount += $new_transaction->transaction_amount;
-                            $projectBudget->save();
-                        }
-                    }
-
-                    // Delete the pending transaction
-                    $transaction->delete();
-                }
+            $journal = Journal::with('approvals')->find($id);
+            
+            if (!$journal) {
+                continue;
             }
+
+            // Skip if already approved
+            if ($journal->status == 1) {
+                continue;
+            }
+
+            // Ensure approval records exist for this journal
+            if ($journal->approvals->isEmpty()) {
+                $this->createJournalApprovalRecords($journal);
+                $journal->load('approvals');
+            }
+
+            // Find the current user's approval record
+            $approval = $journal->approvals()
+                ->where('action_user', $currentUserId)
+                ->first();
+
+            if (!$approval) {
+                continue; // User is not an approver for this journal
+            }
+
+            // Update the approval record
+            $approval->update([
+                'status' => 1, // Approved
+                'action_date' => now(),
+            ]);
+
+            // Check if journal should be marked as approved based on required approvals
+            $this->checkAndUpdateJournalStatus($journal);
 
             // audit log
             $audit = new AuditLog();
             $audit->date_changed = date('Y-m-d H:i:s');
-            $audit->changed_by = auth()->user()->id;
-            $audit->event = 'Journal Entry Approved ' . $journal->journal_number;
+            $audit->changed_by = $currentUserId;
+            $audit->event = 'Bulk Approved Journal Entry ' . $journal->journal_number;
             $audit->save();
         }
 
-        return redirect()->route('journals.index')->with('success', _lang('Journal Entry Approved'));
+        return redirect()->route('journals.index')->with('success', _lang('Approved Successfully'));
     }
 
     public function bulk_reject(Request $request)
     {
+        $currentUserId = auth()->id();
+
+        // Check if there are any configured approval users for this business
+        $approvalUsersJson = get_business_option('journal_approval_users', '[]');
+        $configuredUserIds = json_decode($approvalUsersJson, true);
+        $hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
+
+        if (!$hasConfiguredApprovers) {
+            return redirect()->route('journals.index')->with('error', _lang('No approvers are configured. Please configure approvers in business settings first.'));
+        }
+
+        // Check if current user is in the configured approvers list
+        if (!in_array($currentUserId, $configuredUserIds)) {
+            return redirect()->route('journals.index')->with('error', _lang('You are not assigned as an approver for journals'));
+        }
+
         foreach ($request->ids as $id) {
-            $journal = Journal::find($id);
-
-            if ($journal->status == 1) {
-                // transactions from transactions to pending
-                $transactions = Transaction::where('ref_id', $journal->id)->where('ref_type', 'journal')->get();
-
-                if ($transactions->count() > 0) {
-                    foreach ($transactions as $transaction) {
-                        // Create a new PendingTransaction instance and replicate data from transaction
-                        $new_transaction = $transaction->replicate();
-                        $new_transaction->setTable('pending_transactions'); // Change the table to 'pending_transactions'
-                        $new_transaction->save();
-
-                        if ($transaction->project_id && $transaction->project_task_id && $transaction->cost_code_id && $transaction->dr_cr == 'dr') {
-                            $projectBudget = ProjectBudget::where('project_id', $transaction->project_id)->where('project_task_id', $transaction->project_task_id)->where('cost_code_id', $transaction->cost_code_id)->first();
-                            if ($projectBudget) {
-                                $projectBudget->actual_budget_quantity -= $transaction->quantity;
-                                $projectBudget->actual_budget_amount -= $transaction->transaction_amount;
-                                $projectBudget->save();
-                            }
-                        }
-
-                        // Delete the transaction
-                        $transaction->delete();
-                    }
-                }
+            $journal = Journal::with('approvals')->find($id);
+            
+            if (!$journal) {
+                continue;
             }
 
-            $journal->status = 2;
-            $journal->save();
+            // Ensure approval records exist for this journal
+            if ($journal->approvals->isEmpty()) {
+                $this->createJournalApprovalRecords($journal);
+                $journal->load('approvals');
+            }
+
+            // Find the current user's approval record
+            $approval = $journal->approvals()
+                ->where('action_user', $currentUserId)
+                ->first();
+
+            if (!$approval) {
+                continue; // User is not an approver for this journal
+            }
+
+            // Update the approval record
+            $approval->update([
+                'status' => 2, // Rejected
+                'action_date' => now(),
+            ]);
+
+            // Check if journal status should change based on approval records
+            $this->checkAndUpdateJournalStatus($journal);
 
             // audit log
             $audit = new AuditLog();
             $audit->date_changed = date('Y-m-d H:i:s');
-            $audit->changed_by = auth()->user()->id;
-            $audit->event = 'Journal Entry Rejected ' . $journal->journal_number;
+            $audit->changed_by = $currentUserId;
+            $audit->event = 'Bulk Rejected Journal Entry ' . $journal->journal_number;
             $audit->save();
         }
 
-        return redirect()->route('journals.index')->with('success', _lang('Journal Entry Rejected'));
+        return redirect()->route('journals.index')->with('success', _lang('Rejected Successfully'));
+    }
+
+    /**
+     * Approve a journal (single user approval)
+     */
+    public function approve(Request $request, $id)
+    {
+        $request->validate([
+            'comment' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $journal = Journal::with('approvals')->find($id);
+
+        if (!$journal) {
+            return back()->with('error', _lang('Journal not found'));
+        }
+
+        $currentUserId = auth()->id();
+
+        // Check if there are any configured approval users for this business
+        $approvalUsersJson = get_business_option('journal_approval_users', '[]');
+        $configuredUserIds = json_decode($approvalUsersJson, true);
+        $hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
+
+        // If no approvers configured, tell user to configure them first
+        if (!$hasConfiguredApprovers) {
+            return back()->with('error', _lang('No approvers are configured. Please configure approvers in business settings first.'));
+        }
+
+        // Check if current user is in the configured approvers list
+        if (!in_array($currentUserId, $configuredUserIds)) {
+            return back()->with('error', _lang('You are not assigned as an approver for this journal'));
+        }
+
+        // Find the approval record by action_user (who is assigned as approver)
+        $approval = $journal->approvals()
+            ->where('action_user', $currentUserId)
+            ->first();
+
+        if (!$approval) {
+            return back()->with('error', _lang('You are not assigned as an approver for this journal'));
+        }
+
+        // Update the approval record
+        $approval->update([
+            'status' => 1, // Approved
+            'comment' => $request->input('comment'),
+            'action_date' => now(),
+        ]);
+
+        // Check if journal should be marked as approved based on required approvals
+        $this->checkAndUpdateJournalStatus($journal);
+
+        // Audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = $currentUserId;
+        $audit->event = 'Approved Journal Entry ' . $journal->journal_number . ' by ' . auth()->user()->name;
+        $audit->save();
+
+        return back()->with('success', _lang('Journal approved successfully'));
+    }
+
+    /**
+     * Reject a journal (single user approval)
+     */
+    public function reject(Request $request, $id)
+    {
+        $request->validate([
+            'comment' => ['required', 'string', 'max:1000'],
+        ], [
+            'comment.required' => _lang('Comment is required when rejecting'),
+        ]);
+
+        $journal = Journal::with('approvals')->find($id);
+
+        if (!$journal) {
+            return back()->with('error', _lang('Journal not found'));
+        }
+
+        $currentUserId = auth()->id();
+
+        // Check if there are any configured approval users for this business
+        $approvalUsersJson = get_business_option('journal_approval_users', '[]');
+        $configuredUserIds = json_decode($approvalUsersJson, true);
+        $hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
+
+        // If no approvers configured, tell user to configure them first
+        if (!$hasConfiguredApprovers) {
+            return back()->with('error', _lang('No approvers are configured. Please configure approvers in business settings first.'));
+        }
+
+        // Check if current user is in the configured approvers list
+        if (!in_array($currentUserId, $configuredUserIds)) {
+            return back()->with('error', _lang('You are not assigned as an approver for this journal'));
+        }
+
+        // Find the approval record by action_user (who is assigned as approver)
+        $approval = $journal->approvals()
+            ->where('action_user', $currentUserId)
+            ->first();
+
+        if (!$approval) {
+            return back()->with('error', _lang('You are not assigned as an approver for this journal'));
+        }
+
+        // Update the approval record
+        $approval->update([
+            'status' => 2, // Rejected
+            'comment' => $request->input('comment'),
+            'action_date' => now(),
+        ]);
+
+        // Check if journal should be marked as rejected
+        $this->checkAndUpdateJournalStatus($journal);
+
+        // Audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = $currentUserId;
+        $audit->event = 'Rejected Journal Entry ' . $journal->journal_number . ' by ' . auth()->user()->name;
+        $audit->save();
+
+        return back()->with('success', _lang('Journal rejection recorded'));
+    }
+
+    /**
+     * Check and update journal status based on all approval records
+     */
+    private function checkAndUpdateJournalStatus(Journal $journal): void
+    {
+        // Reload approvals to get the most current state
+        $journal->load('approvals');
+        $approvals = $journal->approvals;
+        
+        // If no approvals configured, nothing to check
+        if ($approvals->isEmpty()) {
+            return;
+        }
+
+        // Get the required approval count from settings for the current business
+        $requiredApprovalCount = (int) get_business_option('journal_approval_required_count', 1);
+
+        $totalApprovers = $approvals->count();
+        $approvedCount = $approvals->where('status', 1)->count();
+        $rejectedCount = $approvals->where('status', 2)->count();
+        
+        // Ensure required count doesn't exceed total approvers
+        $requiredApprovalCount = min($requiredApprovalCount, $totalApprovers);
+        
+        // Store previous status to detect changes
+        $previousStatus = $journal->status;
+
+        // First check: If journal was previously approved but now doesn't have enough approvals
+        if ($previousStatus == 1 && $approvedCount < $requiredApprovalCount) {
+            $journal->update([
+                'status' => 0, // Back to Pending
+                'approved_by' => null,
+            ]);
+            
+            // Move transactions back to pending_transactions
+            $this->moveJournalTransactionsToPending($journal);
+            return;
+        }
+
+        // Second check: If ALL assigned users have rejected (unanimous rejection)
+        if ($rejectedCount === $totalApprovers) {
+            if ($previousStatus == 1) {
+                // Was approved, now all rejected - move transactions back
+                $journal->update([
+                    'status' => 2, // Rejected
+                    'approved_by' => null,
+                ]);
+                $this->moveJournalTransactionsToPending($journal);
+            } else {
+                $journal->update([
+                    'status' => 2, // Rejected
+                ]);
+            }
+            return;
+        }
+
+        // Third check: If we have enough approvals
+        if ($approvedCount >= $requiredApprovalCount && $rejectedCount < $totalApprovers) {
+            // Only process if not already approved
+            if ($previousStatus != 1) {
+                $journal->update([
+                    'status' => 1, // Approved
+                    'approved_by' => auth()->id(),
+                ]);
+                
+                // Move pending transactions to transactions table
+                $this->moveJournalPendingTransactionsToTransactions($journal);
+            }
+            return;
+        }
+
+        // Default: Not enough approvals yet - ensure it stays pending
+        if ($previousStatus == 1) {
+            // Was approved but no longer meets criteria
+            $journal->update([
+                'status' => 0,
+                'approved_by' => null,
+            ]);
+            $this->moveJournalTransactionsToPending($journal);
+        }
+    }
+
+    /**
+     * Move pending transactions to the transactions table when journal is approved
+     */
+    private function moveJournalPendingTransactionsToTransactions(Journal $journal): void
+    {
+        $transactions = PendingTransaction::where('ref_id', $journal->id)
+            ->where('ref_type', 'journal')
+            ->get();
+
+        foreach ($transactions as $transaction) {
+            // Create a new Transaction instance and replicate data from pending
+            $new_transaction = $transaction->replicate();
+            $new_transaction->setTable('transactions');
+            $new_transaction->save();
+
+            // Update project budget if applicable
+            if ($new_transaction->project_id && $new_transaction->project_task_id && $new_transaction->cost_code_id && $new_transaction->dr_cr == 'dr') {
+                $projectBudget = ProjectBudget::where('project_id', $new_transaction->project_id)
+                    ->where('project_task_id', $new_transaction->project_task_id)
+                    ->where('cost_code_id', $new_transaction->cost_code_id)
+                    ->first();
+                if ($projectBudget) {
+                    $projectBudget->actual_budget_quantity += $new_transaction->quantity;
+                    $projectBudget->actual_budget_amount += $new_transaction->transaction_amount;
+                    $projectBudget->save();
+                }
+            }
+
+            // Delete the pending transaction
+            $transaction->forceDelete();
+        }
+    }
+
+    /**
+     * Move transactions back to pending_transactions when journal approval is revoked
+     */
+    private function moveJournalTransactionsToPending(Journal $journal): void
+    {
+        $transactions = Transaction::where('ref_id', $journal->id)
+            ->where('ref_type', 'journal')
+            ->get();
+
+        foreach ($transactions as $transaction) {
+            // Create a new PendingTransaction instance and replicate data
+            $new_pending = $transaction->replicate();
+            $new_pending->setTable('pending_transactions');
+            $new_pending->save();
+
+            // Update project budget if applicable
+            if ($transaction->project_id && $transaction->project_task_id && $transaction->cost_code_id && $transaction->dr_cr == 'dr') {
+                $projectBudget = ProjectBudget::where('project_id', $transaction->project_id)
+                    ->where('project_task_id', $transaction->project_task_id)
+                    ->where('cost_code_id', $transaction->cost_code_id)
+                    ->first();
+                if ($projectBudget) {
+                    $projectBudget->actual_budget_quantity -= $transaction->quantity;
+                    $projectBudget->actual_budget_amount -= $transaction->transaction_amount;
+                    $projectBudget->save();
+                }
+            }
+
+            // Delete the transaction
+            $transaction->forceDelete();
+        }
+    }
+
+    /**
+     * Create approval records for all configured approvers for a given journal
+     */
+    private function createJournalApprovalRecords(Journal $journal): void
+    {
+        $journalApprovalUsersJson = get_business_option('journal_approval_users', '[]');
+        $configuredUserIds = json_decode($journalApprovalUsersJson, true);
+
+        if (!is_array($configuredUserIds) || empty($configuredUserIds)) {
+            return;
+        }
+
+        foreach ($configuredUserIds as $userId) {
+            // Check if approval record already exists for this user
+            $existingApproval = Approvals::where('ref_id', $journal->id)
+                ->where('ref_name', 'journal')
+                ->where('action_user', $userId)
+                ->first();
+
+            if (!$existingApproval) {
+                Approvals::create([
+                    'ref_id' => $journal->id,
+                    'ref_name' => 'journal',
+                    'action_user' => $userId,
+                    'status' => 0, // pending
+                ]);
+            }
+        }
     }
 
     public function trash(Request $request)
