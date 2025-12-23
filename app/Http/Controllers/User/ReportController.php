@@ -531,7 +531,7 @@ class ReportController extends Controller
 				'paid_amount' => $invoice->paid,
 				'due_amount' => $due_amount,
 				'status' => $invoice->status,
-				'payment_status' => $invoice->payment_status,
+				// 'payment_status' => $invoice->payment_status,
 			];
 		}
 

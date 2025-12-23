@@ -38,9 +38,7 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        if(!Gate::allows('products.view')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('products.view');
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
         $sorting = $request->get('sorting', []);
@@ -108,9 +106,7 @@ class ProductController extends Controller
 
     public function trash(Request $request)
     {
-        if(!Gate::allows('products.view')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('products.view');
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
         $sorting = $request->get('sorting', []);
@@ -182,9 +178,7 @@ class ProductController extends Controller
      */
     public function create(Request $request)
     {
-        if(!Gate::allows('products.create')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('products.create');
         $productUnits = ProductUnit::select('id', 'unit')->get();
         $categories = SubCategory::select('id', 'name')->get();
         $brands = Brands::select('id', 'name')->get();
@@ -201,9 +195,7 @@ class ProductController extends Controller
      */
     public function store(Request $request)
     {
-        if(!Gate::allows('products.create')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('products.create');
         $validator = Validator::make($request->all(), [
             'name'                 => 'required',
             'type'                 => 'required',
@@ -330,9 +322,7 @@ class ProductController extends Controller
      */
     public function show($id)
     {
-        if(!Gate::allows('products.view')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('products.view');
         $activeTab = request()->get('tab', 'details');
         $product = Product::withTrashed()->with(['income_account', 'expense_account', 'product_unit', 'brand', 'category'])
             ->withSum('invoice_items', 'quantity')
@@ -383,9 +373,7 @@ class ProductController extends Controller
      */
     public function edit($id)
     {
-        if(!Gate::allows('products.update')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('products.update');
         $product = Product::with(['income_account', 'expense_account', 'product_unit'])
             ->findOrFail($id);
 
@@ -412,9 +400,7 @@ class ProductController extends Controller
      */
     public function update(Request $request, $id)
     {
-        if(!Gate::allows('products.update')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('products.update');
         $validator = Validator::make($request->all(), [
             'name'                 => 'required',
             'type'                 => 'required',
@@ -610,9 +596,7 @@ class ProductController extends Controller
      */
     public function destroy($id)
     {
-        if(!Gate::allows('products.delete')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('products.delete');
         $product = Product::find($id);
 
         // audit log
@@ -634,9 +618,7 @@ class ProductController extends Controller
 
     public function permanent_destroy($id)
     {
-        if(!Gate::allows('products.delete')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('products.delete');
         $product = Product::onlyTrashed()->find($id);
 
         // audit log
@@ -663,9 +645,7 @@ class ProductController extends Controller
 
     public function restore($id)
     {
-        if(!Gate::allows('products.restore')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('products.restore');
         $product = Product::onlyTrashed()->find($id);
 
         // audit log
@@ -692,9 +672,7 @@ class ProductController extends Controller
 
     public function import_products(Request $request)
     {
-        if(!Gate::allows('products.import')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('products.import');
         $request->validate([
             'products_file' => 'required|mimes:xls,xlsx,csv,tsv',
         ]);
@@ -720,9 +698,7 @@ class ProductController extends Controller
 
     public function import_map_fields(Request $request)
     {
-        if(!Gate::allows('products.import')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('products.import');
         $request->validate([
             'file' => 'required|mimes:xls,xlsx,csv,tsv',
         ]);
@@ -819,9 +795,7 @@ class ProductController extends Controller
 
     public function import_preview(Request $request)
     {
-        if(!Gate::allows('products.import')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('products.import');
         $request->validate([
             'file' => 'required|mimes:xls,xlsx,csv,tsv',
             'field_mappings' => 'required|json',

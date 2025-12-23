@@ -132,9 +132,7 @@ class VendorController extends Controller
      */
     public function create(Request $request)
     {
-        if(!Gate::allows('vendors.create')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('vendors.create');
         return Inertia::render('Backend/User/Vendor/Create');
     }
 
@@ -264,9 +262,7 @@ class VendorController extends Controller
      */
     public function edit(Request $request, $id)
     {
-        if(!Gate::allows('vendors.update')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('vendors.update');
         $vendor = Vendor::find($id);
         return Inertia::render('Backend/User/Vendor/Edit', [
             'vendor' => $vendor
@@ -441,9 +437,7 @@ class VendorController extends Controller
 
     public function bulk_destroy(Request $request)
     {
-        if(!Gate::allows('vendors.delete')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('vendors.delete');
         $vendors = Vendor::whereIn('id', $request->ids)->get();
 
         // audit log

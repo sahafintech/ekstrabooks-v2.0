@@ -13,9 +13,7 @@ class MainCategoryController extends Controller
 {
     public function index(Request $request)
     {
-        if(!Gate::allows('main_categories.view')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('main_categories.view');
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
@@ -59,9 +57,7 @@ class MainCategoryController extends Controller
 
     public function trash(Request $request)
     {
-        if(!Gate::allows('main_categories.view')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('main_categories.view');
         $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
 
@@ -104,9 +100,7 @@ class MainCategoryController extends Controller
 
     public function store(Request $request)
     {
-        if(!Gate::allows('main_categories.create')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('main_categories.create');
         $data = $request->validate([
             'name' => 'required',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
@@ -136,9 +130,7 @@ class MainCategoryController extends Controller
 
     public function destroy($id)
     {
-        if(!Gate::allows('main_categories.delete')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('main_categories.delete');
         $category = MainCategory::find($id);
 
         $category->delete();
@@ -155,9 +147,7 @@ class MainCategoryController extends Controller
 
     public function permanent_destroy($id)
     {
-        if(!Gate::allows('main_categories.delete')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('main_categories.delete');
         $category = MainCategory::onlyTrashed()->find($id);
 
         // delete image if exists and not default
@@ -180,9 +170,7 @@ class MainCategoryController extends Controller
 
     public function restore($id)
     {
-        if(!Gate::allows('main_categories.restore')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('main_categories.restore');
         $category = MainCategory::onlyTrashed()->find($id);
 
         $category->restore();
@@ -199,9 +187,7 @@ class MainCategoryController extends Controller
 
     public function update(Request $request, $id)
     {
-        if(!Gate::allows('main_categories.update')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('main_categories.update');
         $request->validate([
             'name' => 'required',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
@@ -239,9 +225,7 @@ class MainCategoryController extends Controller
 
     public function bulk_destroy(Request $request)
     {
-        if(!Gate::allows('main_categories.delete')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('main_categories.delete');
         $ids = $request->ids;
 
         $deleted = [];
@@ -268,9 +252,7 @@ class MainCategoryController extends Controller
     
     public function bulk_permanent_destroy(Request $request)
     {
-        if(!Gate::allows('main_categories.delete')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('main_categories.delete');
         $ids = $request->ids;
 
         $deleted = [];
@@ -302,9 +284,7 @@ class MainCategoryController extends Controller
 
     public function bulk_restore(Request $request)
     {
-        if(!Gate::allows('main_categories.restore')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('main_categories.restore');
         $ids = $request->ids;
 
         $deleted = [];

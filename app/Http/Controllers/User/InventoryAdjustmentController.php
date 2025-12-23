@@ -23,9 +23,7 @@ class InventoryAdjustmentController extends Controller
 {
     public function index(Request $request)
     {
-        if(!Gate::allows('inventory_adjustments.view')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('inventory_adjustments.view');
         $sorting = $request->get('sorting', []);
         $sortColumn = $sorting['column'] ?? 'id';
         $sortDirection = $sorting['direction'] ?? 'desc';
@@ -80,9 +78,7 @@ class InventoryAdjustmentController extends Controller
 
     public function trash(Request $request)
     {
-        if(!Gate::allows('inventory_adjustments.view')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('inventory_adjustments.view');
         $sorting = $request->get('sorting', []);
         $sortColumn = $sorting['column'] ?? 'id';
         $sortDirection = $sorting['direction'] ?? 'desc';
@@ -141,9 +137,7 @@ class InventoryAdjustmentController extends Controller
      */
     public function create()
     {
-        if(!Gate::allows('inventory_adjustments.create')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('inventory_adjustments.create');
         // Get accounts for dropdown
         $accounts = Account::all(['id', 'account_name']);
 
@@ -162,9 +156,7 @@ class InventoryAdjustmentController extends Controller
 
     public function store(Request $request)
     {
-        if(!Gate::allows('inventory_adjustments.create')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('inventory_adjustments.create');
         $request->validate([
             'adjustment_date' => 'required|date',
             'account_id' => 'required|exists:accounts,id',
@@ -280,9 +272,7 @@ class InventoryAdjustmentController extends Controller
      */
     public function edit($id)
     {
-        if(!Gate::allows('inventory_adjustments.update')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('inventory_adjustments.update');
         $adjustment = InventoryAdjustment::with('product')->findOrFail($id);
 
         // Get accounts for dropdown
@@ -303,9 +293,7 @@ class InventoryAdjustmentController extends Controller
 
     public function update(Request $request, $id)
     {
-        if(!Gate::allows('inventory_adjustments.update')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('inventory_adjustments.update');
         $request->validate([
             'adjustment_date' => 'required|date',
             'account_id' => 'required|exists:accounts,id',
@@ -420,9 +408,7 @@ class InventoryAdjustmentController extends Controller
 
     public function destroy($id)
     {
-        if(!Gate::allows('inventory_adjustments.delete')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('inventory_adjustments.delete');
         DB::beginTransaction();
 
         try {
@@ -465,9 +451,7 @@ class InventoryAdjustmentController extends Controller
      */
     public function bulk_destroy(Request $request)
     {
-        if(!Gate::allows('inventory_adjustments.delete')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('inventory_adjustments.delete');
         $ids = $request->ids;
         $adjustments = InventoryAdjustment::whereIn('id', $ids)->get();
 
@@ -499,9 +483,7 @@ class InventoryAdjustmentController extends Controller
 
     public function permanent_destroy($id)
     {
-        if(!Gate::allows('inventory_adjustments.delete')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('inventory_adjustments.delete');
         DB::beginTransaction();
 
         try {
@@ -540,9 +522,7 @@ class InventoryAdjustmentController extends Controller
      */
     public function bulk_permanent_destroy(Request $request)
     {
-        if(!Gate::allows('inventory_adjustments.delete')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('inventory_adjustments.delete');
         $ids = $request->ids;
         $adjustments = InventoryAdjustment::onlyTrashed()->whereIn('id', $ids)->get();
 
@@ -570,9 +550,7 @@ class InventoryAdjustmentController extends Controller
 
     public function restore($id)
     {
-        if(!Gate::allows('inventory_adjustments.restore')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('inventory_adjustments.restore');
         DB::beginTransaction();
 
         try {
@@ -615,9 +593,7 @@ class InventoryAdjustmentController extends Controller
      */
     public function bulk_restore(Request $request)
     {
-        if(!Gate::allows('inventory_adjustments.restore')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('inventory_adjustments.restore');
         $ids = $request->ids;
         $adjustments = InventoryAdjustment::onlyTrashed()->whereIn('id', $ids)->get();
 
@@ -649,9 +625,7 @@ class InventoryAdjustmentController extends Controller
 
     public function import_adjustments(Request $request)
     {
-        if(!Gate::allows('inventory_adjustments.import')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('inventory_adjustments.import');
         $request->validate([
             'adjustments_file' => 'required|mimes:xls,xlsx,csv',
         ]);
@@ -680,9 +654,7 @@ class InventoryAdjustmentController extends Controller
      */
     public function export_adjustments()
     {
-        if(!Gate::allows('inventory_adjustments.export')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('inventory_adjustments.export');
         return Excel::download(new InventoryAdjustmentExport, 'inventory adjustments export ' . now()->format('d m Y') . '.xlsx');
 
         // audit log
@@ -695,9 +667,7 @@ class InventoryAdjustmentController extends Controller
 
     public function show($id)
     {
-        if(!Gate::allows('inventory_adjustments.view')) {
-            return back()->with('error', _lang('You are not authorized to access this page'));
-        }
+        Gate::authorize('inventory_adjustments.view');
         $adjustment = InventoryAdjustment::with('product', 'account')->findOrFail($id);
 
         return Inertia::render('Backend/User/InventoryAdjustment/View', [

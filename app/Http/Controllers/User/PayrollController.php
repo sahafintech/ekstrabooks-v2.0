@@ -59,7 +59,7 @@ class PayrollController extends Controller
      */
     public function index(Request $request)
     {
-        Gate::authorize('payrolls.view');
+        Gate::authorize('payslips.view');
         $month = $request->month ?? date('m');
         $year = $request->year ?? date('Y');
         $search = $request->search;
@@ -161,7 +161,7 @@ class PayrollController extends Controller
 
     public function store(Request $request)
     {
-        Gate::authorize('payrolls.create');
+        Gate::authorize('payslips.create');
         $validator = Validator::make($request->all(), [
             'month' => 'required',
             'year'  => 'required|integer',
@@ -232,7 +232,7 @@ class PayrollController extends Controller
 
         return [
             'business' => $business,
-            'weekendOption' => (function_exists('package') && package()->timesheet_module == 1)
+            'weekendOption' => (function_exists('package') && package()->time_sheet_module == 1)
                 ? (json_decode(get_business_option('weekends'), true) ?: [])
                 : null,
             'overtimeMultiplier' => floatval(get_business_option('overtime_rate_multiplier') ?: 1),
@@ -246,12 +246,12 @@ class PayrollController extends Controller
      */
     private function validateEmployeeRequirements($employee)
     {
-        if ($employee->timesheet_based == 1) {
+        if ($employee->time_sheet_based == 1) {
             if (empty($employee->working_hours) || $employee->working_hours == 0) {
                 throw new \Exception("Working hours is not set for {$employee->name}");
             }
         }
-        // If timesheet_based == 0, working_hours and max_overtime are not required
+        // If time_sheet_based == 0, working_hours and max_overtime are not required
     }
 
     /**
@@ -300,7 +300,7 @@ class PayrollController extends Controller
         $actual_working_hours = $required_working_hours;
         $overtime_hours = 0;
 
-        if ($employee->timesheet_based == 1 && package()->timesheet_module == 1) {
+        if ($employee->time_sheet_based == 1 && package()->time_sheet_module == 1) {
             return $this->calculateTimesheetBasedData($employee, $month, $year, $businessSettings);
         }
 
@@ -1069,7 +1069,7 @@ class PayrollController extends Controller
 
     public function destroy($id)
     {
-        Gate::authorize('payrolls.delete');
+        Gate::authorize('payslips.delete');
         $payroll = Payroll::with('employee')->find($id);
 
         if (!$payroll) {
@@ -1133,7 +1133,7 @@ class PayrollController extends Controller
 
     public function bulk_approve(Request $request)
     {
-        Gate::authorize('payrolls.approve');
+        Gate::authorize('payslips.approve');
         $currentUserId = auth()->id();
         
         // Check if current user is a configured approver
@@ -1221,7 +1221,7 @@ class PayrollController extends Controller
 
     public function bulk_reject(Request $request)
     {
-        Gate::authorize('payrolls.reject');
+        Gate::authorize('payslips.reject');
         $currentUserId = auth()->id();
         
         // Check if current user is a configured approver
@@ -1312,7 +1312,7 @@ class PayrollController extends Controller
      */
     public function approve(Request $request, $id)
     {
-        Gate::authorize('payrolls.approve');
+        Gate::authorize('payslips.approve');
         $request->validate([
             'comment' => ['nullable', 'string', 'max:1000'],
         ]);
@@ -1379,7 +1379,7 @@ class PayrollController extends Controller
      */
     public function reject(Request $request, $id)
     {
-        Gate::authorize('payrolls.reject');
+        Gate::authorize('payslips.reject');
         $request->validate([
             'comment' => ['required', 'string', 'max:1000'],
         ], [

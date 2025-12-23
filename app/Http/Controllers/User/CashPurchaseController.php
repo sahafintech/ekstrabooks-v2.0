@@ -38,9 +38,7 @@ class CashPurchaseController extends Controller
 {
 	public function index(Request $request)
 	{
-		if(!Gate::allows('cash_purchases.index')) {
-			return back()->with('error', _lang('You are not authorized to access this page'));
-		}
+		Gate::authorize('cash_purchases.view');
 		$search = $request->get('search', '');
 		$perPage = $request->get('per_page', 50);
 		$sorting = $request->get('sorting', []);
@@ -167,9 +165,7 @@ class CashPurchaseController extends Controller
 
 	public function trash(Request $request)
 	{
-		if(!Gate::allows('cash_purchases.trash')) {
-			return back()->with('error', _lang('You are not authorized to access this page'));
-		}
+		Gate::authorize('cash_purchases.view');
 		$search = $request->get('search', '');
 		$perPage = $request->get('per_page', 50);
 		$sorting = $request->get('sorting', []);
@@ -285,9 +281,7 @@ class CashPurchaseController extends Controller
 	 */
 	public function create(Request $request)
 	{
-		if(!Gate::allows('cash_purchases.create')) {
-			return back()->with('error', _lang('You are not authorized to access this page'));
-		}
+		Gate::authorize('cash_purchases.create');
 		$default_accounts = ['Purchase Tax Payable', 'Purchase Discount Allowed', 'Inventory'];
 
 		// if these accounts are not exists then create it
@@ -368,9 +362,7 @@ class CashPurchaseController extends Controller
 	 */
 	public function store(Request $request)
 	{
-		if(!Gate::allows('cash_purchases.create')) {
-			return back()->with('error', _lang('You are not authorized to access this page'));
-		}
+		Gate::authorize('cash_purchases.create');
 		$validator = Validator::make($request->all(), [
 			'vendor_id' => 'nullable',
 			'title' => 'required',
@@ -878,9 +870,7 @@ class CashPurchaseController extends Controller
 
 	public function show($id)
 	{
-		if(!Gate::allows('cash_purchases.view')) {
-			return back()->with('error', _lang('You are not authorized to access this page'));
-		}
+		Gate::authorize('cash_purchases.view');
 		$bill = Purchase::with(['business', 'items', 'taxes', 'vendor', 'approvals.actionUser'])->find($id);
 		$attachments = Attachment::where('ref_type', 'cash purchase')->where('ref_id', $id)->get();
 		$email_templates = EmailTemplate::whereIn('slug', ['NEW_CASH_PURCHASE_CREATED'])
@@ -931,9 +921,7 @@ class CashPurchaseController extends Controller
 
 	public function pdf($id)
 	{
-		if(!Gate::allows('cash_purchases.pdf')) {
-			return back()->with('error', _lang('You are not authorized to access this page'));
-		}
+		Gate::authorize('cash_purchases.pdf');
 		$bill = Purchase::with(['business', 'items', 'taxes', 'vendor'])->find($id);
 		return pdf()
 		->view('backend.user.pdf.cash-purchase', compact('bill'))
@@ -943,9 +931,7 @@ class CashPurchaseController extends Controller
 
 	public function show_public_cash_purchase($short_code)
 	{
-		if(!Gate::allows('cash_purchases.show_public')) {
-			return back()->with('error', _lang('You are not authorized to access this page'));
-		}
+		Gate::authorize('cash_purchases.show_public');
 		$purchase   = Purchase::withoutGlobalScopes()->with(['vendor', 'business', 'items', 'taxes'])
 			->where('short_code', $short_code)
 			->first();
@@ -967,9 +953,7 @@ class CashPurchaseController extends Controller
 	 */
 	public function edit(Request $request, $id)
 	{
-		if(!Gate::allows('cash_purchases.edit')) {
-			return back()->with('error', _lang('You are not authorized to access this page'));
-		}
+		Gate::authorize('cash_purchases.edit');
 		$default_accounts = ['Purchase Tax Payable', 'Purchase Discount Allowed', 'Inventory'];
 
 		// if these accounts are not exists then create it
@@ -1080,9 +1064,7 @@ class CashPurchaseController extends Controller
 	 */
 	public function update(Request $request, $id)
 	{
-		if(!Gate::allows('cash_purchases.update')) {
-			return back()->with('error', _lang('You are not authorized to access this page'));
-		}
+		Gate::authorize('cash_purchases.update');
 		$validator = Validator::make($request->all(), [
 			'vendor_id' => 'nullable',
 			'title' => 'required',
@@ -2215,9 +2197,7 @@ class CashPurchaseController extends Controller
 
 	public function bulk_reject(Request $request)
 	{
-		if(!Gate::allows('cash_purchases.bulk_reject')) {
-			return back()->with('error', _lang('You are not authorized to access this page'));
-		}
+		Gate::authorize('cash_purchases.bulk_reject');
 		$currentUserId = auth()->id();
 
 		// Check if there are any configured approval users for this business
