@@ -289,6 +289,35 @@ class PayrollController extends Controller
     }
 
     /**
+     * Sync approval records for a payroll with the configured approvers
+     * Adds missing approvers and removes approvers no longer in the list (if they haven't acted)
+     */
+    private function syncApprovalRecordsForPayroll(Payroll $payroll, array $configuredUserIds): void
+    {
+        // Get existing approval user IDs for this payroll
+        $existingApproverIds = $payroll->approvals->pluck('action_user')->toArray();
+
+        // Add missing approvers
+        foreach ($configuredUserIds as $userId) {
+            if (!in_array($userId, $existingApproverIds)) {
+                $payroll->approvals()->create([
+                    'ref_name' => 'payroll',
+                    'action_user' => $userId,
+                    'status' => 0, // pending
+                ]);
+            }
+        }
+
+        // Remove approvers who are no longer in the configured list
+        // Only remove if they haven't taken action yet (status = 0)
+        \App\Models\Approvals::where('ref_id', $payroll->id)
+            ->where('ref_name', 'payroll')
+            ->where('status', 0) // Only remove pending approvals
+            ->whereNotIn('action_user', $configuredUserIds)
+            ->delete();
+    }
+
+    /**
      * Calculate working data for employee
      */
     private function calculateWorkingData($employee, $month, $year, $businessSettings)
@@ -518,20 +547,10 @@ class PayrollController extends Controller
             $configuredUserIds = $usersArray;
         }
 
-        // Only create approval records if there are configured approvers
-        // AND the payroll doesn't have any approvals yet
-        // AND the payroll is still in draft status (status = 0)
-        if ($payroll->approvals->isEmpty() && $hasConfiguredApprovers && $payroll->status == 0) {
-            
-            // Create approval records for each configured approver
-            foreach ($configuredUserIds as $userId) {
-                $payroll->approvals()->create([
-                    'ref_name' => 'payroll',
-                    'action_user' => $userId,
-                    'status' => 0, // pending
-                ]);
-            }
-            
+        // Sync approval records for draft payrolls
+        // This ensures new approvers are added to existing payrolls
+        if ($hasConfiguredApprovers && $payroll->status == 0) {
+            $this->syncApprovalRecordsForPayroll($payroll, $configuredUserIds);
             // Reload approvals with actionUser relationship
             $payroll->load('approvals.actionUser');
         }

@@ -576,19 +576,10 @@ class JournalController extends Controller
             $configuredUserIds = $usersArray;
         }
 
-        // Only create approval records if there are configured approvers
-        // AND the journal doesn't have any approvals yet
-        // AND the journal is not already approved
-        if ($journal->approvals->isEmpty() && $hasConfiguredApprovers && $journal->status != 1) {
-            // Create approval records for each configured approver
-            foreach ($configuredUserIds as $userId) {
-                $journal->approvals()->create([
-                    'ref_name' => 'journal',
-                    'action_user' => $userId,
-                    'status' => 0, // pending
-                ]);
-            }
-            
+        // Sync approval records for pending journals
+        // This ensures new approvers are added to existing journals
+        if ($hasConfiguredApprovers && $journal->status != 1) {
+            $this->syncApprovalRecordsForJournal($journal, $configuredUserIds);
             // Reload approvals with actionUser relationship
             $journal->load('approvals.actionUser');
         }
@@ -600,6 +591,35 @@ class JournalController extends Controller
             'approvalUsersCount' => $journal->approvals->count(),
             'hasConfiguredApprovers' => $hasConfiguredApprovers,
         ]);
+    }
+
+    /**
+     * Sync approval records for a journal with the configured approvers
+     * Adds missing approvers and removes approvers no longer in the list (if they haven't acted)
+     */
+    private function syncApprovalRecordsForJournal(Journal $journal, array $configuredUserIds): void
+    {
+        // Get existing approval user IDs for this journal
+        $existingApproverIds = $journal->approvals->pluck('action_user')->toArray();
+
+        // Add missing approvers
+        foreach ($configuredUserIds as $userId) {
+            if (!in_array($userId, $existingApproverIds)) {
+                $journal->approvals()->create([
+                    'ref_name' => 'journal',
+                    'action_user' => $userId,
+                    'status' => 0, // pending
+                ]);
+            }
+        }
+
+        // Remove approvers who are no longer in the configured list
+        // Only remove if they haven't taken action yet (status = 0)
+        Approvals::where('ref_id', $journal->id)
+            ->where('ref_name', 'journal')
+            ->where('status', 0) // Only remove pending approvals
+            ->whereNotIn('action_user', $configuredUserIds)
+            ->delete();
     }
 
     public function export_journal($id)

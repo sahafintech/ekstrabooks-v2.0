@@ -890,21 +890,10 @@ class CashPurchaseController extends Controller
 			$configuredUserIds = $usersArray;
 		}
 
-		// Only create approval records if there are configured approvers
-		// AND the purchase doesn't have any approvals yet
-		// AND the purchase is not already approved
-		// This preserves existing approval decisions (approved/rejected/pending)
-		if ($bill->approvals->isEmpty() && $hasConfiguredApprovers && $bill->approval_status != 1) {
-			
-			// Create approval records for each configured approver
-			foreach ($configuredUserIds as $userId) {
-				$bill->approvals()->create([
-					'ref_name' => 'purchase',
-					'action_user' => $userId,
-					'status' => 0, // pending
-				]);
-			}
-			
+		// Sync approval records for pending purchases
+		// This ensures new approvers are added to existing purchases
+		if ($hasConfiguredApprovers && $bill->approval_status != 1) {
+			$this->syncApprovalRecordsForPurchase($bill, $configuredUserIds);
 			// Reload approvals with actionUser relationship
 			$bill->load('approvals.actionUser');
 		}
@@ -917,6 +906,35 @@ class CashPurchaseController extends Controller
 			'approvalUsersCount' => $bill->approvals->count(), // Actual approval records for this purchase
 			'hasConfiguredApprovers' => $hasConfiguredApprovers,
 		]);
+	}
+
+	/**
+	 * Sync approval records for a purchase with the configured approvers
+	 * Adds missing approvers and removes approvers no longer in the list (if they haven't acted)
+	 */
+	private function syncApprovalRecordsForPurchase(Purchase $purchase, array $configuredUserIds): void
+	{
+		// Get existing approval user IDs for this purchase
+		$existingApproverIds = $purchase->approvals->pluck('action_user')->toArray();
+
+		// Add missing approvers
+		foreach ($configuredUserIds as $userId) {
+			if (!in_array($userId, $existingApproverIds)) {
+				$purchase->approvals()->create([
+					'ref_name' => 'purchase',
+					'action_user' => $userId,
+					'status' => 0, // pending
+				]);
+			}
+		}
+
+		// Remove approvers who are no longer in the configured list
+		// Only remove if they haven't taken action yet (status = 0)
+		Approvals::where('ref_id', $purchase->id)
+			->where('ref_name', 'purchase')
+			->where('status', 0) // Only remove pending approvals
+			->whereNotIn('action_user', $configuredUserIds)
+			->delete();
 	}
 
 	public function pdf($id)

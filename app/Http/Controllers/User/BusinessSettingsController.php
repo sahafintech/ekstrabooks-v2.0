@@ -663,6 +663,11 @@ class BusinessSettingsController extends Controller
             update_business_option($key, $value, $businessId);
         }
 
+        // Sync approval records for pending items with new approvers
+        $this->syncPurchaseApprovalRecords($request->purchase_approval_users ?? [], $businessId);
+        $this->syncPayrollApprovalRecords($request->payroll_approval_users ?? [], $businessId);
+        $this->syncJournalApprovalRecords($request->journal_approval_users ?? [], $businessId);
+
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
@@ -671,5 +676,134 @@ class BusinessSettingsController extends Controller
         $audit->save();
 
         return back()->with('success', _lang('Saved Successfully'));
+    }
+
+    /**
+     * Sync approval records for all pending purchases (both cash and bill invoices) with the configured approvers
+     * This ensures new approvers get added to existing pending purchases
+     */
+    private function syncPurchaseApprovalRecords(array $approverUserIds, $businessId): void
+    {
+        if (empty($approverUserIds)) {
+            return;
+        }
+
+        // Get all pending purchases (approval_status = 0) for this business - both cash and bill invoices
+        $pendingPurchases = \App\Models\Purchase::where('business_id', $businessId)
+            ->where('approval_status', 0)
+            ->get();
+
+        foreach ($pendingPurchases as $purchase) {
+            foreach ($approverUserIds as $userId) {
+                // Check if approval record already exists for this user
+                $existingApproval = \App\Models\Approvals::where('ref_id', $purchase->id)
+                    ->where('ref_name', 'purchase')
+                    ->where('action_user', $userId)
+                    ->first();
+
+                if (!$existingApproval) {
+                    \App\Models\Approvals::create([
+                        'ref_id' => $purchase->id,
+                        'ref_name' => 'purchase',
+                        'action_user' => $userId,
+                        'status' => 0, // pending
+                    ]);
+                }
+            }
+
+            // Remove approval records for users no longer in the approvers list
+            // Only remove if they haven't taken action yet (status = 0)
+            \App\Models\Approvals::where('ref_id', $purchase->id)
+                ->where('ref_name', 'purchase')
+                ->where('status', 0) // Only remove pending approvals
+                ->whereNotIn('action_user', $approverUserIds)
+                ->delete();
+        }
+    }
+
+    /**
+     * Sync approval records for all draft payrolls with the configured approvers
+     * This ensures new approvers get added to existing draft payrolls
+     */
+    private function syncPayrollApprovalRecords(array $approverUserIds, $businessId): void
+    {
+        if (empty($approverUserIds)) {
+            return;
+        }
+
+        // Get all draft payrolls (status = 0) for this business
+        $draftPayrolls = \App\Models\Payroll::where('business_id', $businessId)
+            ->where('status', 0)
+            ->get();
+
+        foreach ($draftPayrolls as $payroll) {
+            foreach ($approverUserIds as $userId) {
+                // Check if approval record already exists for this user
+                $existingApproval = \App\Models\Approvals::where('ref_id', $payroll->id)
+                    ->where('ref_name', 'payroll')
+                    ->where('action_user', $userId)
+                    ->first();
+
+                if (!$existingApproval) {
+                    \App\Models\Approvals::create([
+                        'ref_id' => $payroll->id,
+                        'ref_name' => 'payroll',
+                        'action_user' => $userId,
+                        'status' => 0, // pending
+                    ]);
+                }
+            }
+
+            // Remove approval records for users no longer in the approvers list
+            // Only remove if they haven't taken action yet (status = 0)
+            \App\Models\Approvals::where('ref_id', $payroll->id)
+                ->where('ref_name', 'payroll')
+                ->where('status', 0) // Only remove pending approvals
+                ->whereNotIn('action_user', $approverUserIds)
+                ->delete();
+        }
+    }
+
+    /**
+     * Sync approval records for all pending journals with the configured approvers
+     * This ensures new approvers get added to existing pending journals
+     */
+    private function syncJournalApprovalRecords(array $approverUserIds, $businessId): void
+    {
+        if (empty($approverUserIds)) {
+            return;
+        }
+
+        // Get all pending journals (status = 0) for this business
+        $pendingJournals = \App\Models\Journal::where('business_id', $businessId)
+            ->where('status', 0)
+            ->get();
+
+        foreach ($pendingJournals as $journal) {
+            foreach ($approverUserIds as $userId) {
+                // Check if approval record already exists for this user
+                $existingApproval = \App\Models\Approvals::where('ref_id', $journal->id)
+                    ->where('ref_name', 'journal')
+                    ->where('action_user', $userId)
+                    ->first();
+
+                if (!$existingApproval) {
+                    \App\Models\Approvals::create([
+                        'ref_id' => $journal->id,
+                        'ref_name' => 'journal',
+                        'action_user' => $userId,
+                        'status' => 0, // pending
+                    ]);
+                }
+            }
+
+            // Remove approval records for users no longer in the approvers list
+            // Only remove if they haven't taken action yet (status = 0)
+            \App\Models\Approvals::where('ref_id', $journal->id)
+                ->where('ref_name', 'journal')
+                ->where('status', 0) // Only remove pending approvals
+                ->whereNotIn('action_user', $approverUserIds)
+                ->delete();
+        }
     }
 }
