@@ -277,14 +277,23 @@ class PayrollController extends Controller
         $approvalUsersJson = get_business_option('payroll_approval_users', '[]');
         $configuredUserIds = json_decode($approvalUsersJson, true);
         
-        if (is_array($configuredUserIds) && count($configuredUserIds) > 0) {
-            foreach ($configuredUserIds as $userId) {
-                $payroll->approvals()->create([
-                    'ref_name' => 'payroll',
-                    'action_user' => $userId,
-                    'status' => 0, // pending
-                ]);
-            }
+        if (!is_array($configuredUserIds) || empty($configuredUserIds)) {
+            return;
+        }
+
+        // Filter to only include user IDs that actually exist in the database
+        $validUserIds = \App\Models\User::whereIn('id', $configuredUserIds)->pluck('id')->toArray();
+        
+        if (empty($validUserIds)) {
+            return;
+        }
+
+        foreach ($validUserIds as $userId) {
+            $payroll->approvals()->create([
+                'ref_name' => 'payroll',
+                'action_user' => $userId,
+                'status' => 0, // pending
+            ]);
         }
     }
 
@@ -294,11 +303,18 @@ class PayrollController extends Controller
      */
     private function syncApprovalRecordsForPayroll(Payroll $payroll, array $configuredUserIds): void
     {
+        // Filter to only include user IDs that actually exist in the database
+        $validUserIds = \App\Models\User::whereIn('id', $configuredUserIds)->pluck('id')->toArray();
+        
+        if (empty($validUserIds)) {
+            return;
+        }
+
         // Get existing approval user IDs for this payroll
         $existingApproverIds = $payroll->approvals->pluck('action_user')->toArray();
 
         // Add missing approvers
-        foreach ($configuredUserIds as $userId) {
+        foreach ($validUserIds as $userId) {
             if (!in_array($userId, $existingApproverIds)) {
                 $payroll->approvals()->create([
                     'ref_name' => 'payroll',
@@ -313,7 +329,7 @@ class PayrollController extends Controller
         \App\Models\Approvals::where('ref_id', $payroll->id)
             ->where('ref_name', 'payroll')
             ->where('status', 0) // Only remove pending approvals
-            ->whereNotIn('action_user', $configuredUserIds)
+            ->whereNotIn('action_user', $validUserIds)
             ->delete();
     }
 

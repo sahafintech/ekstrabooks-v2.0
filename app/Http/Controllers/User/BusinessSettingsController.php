@@ -688,13 +688,20 @@ class BusinessSettingsController extends Controller
             return;
         }
 
+        // Filter to only include user IDs that actually exist in the database
+        $validUserIds = \App\Models\User::whereIn('id', $approverUserIds)->pluck('id')->toArray();
+        
+        if (empty($validUserIds)) {
+            return;
+        }
+
         // Get all pending purchases (approval_status = 0) for this business - both cash and bill invoices
         $pendingPurchases = \App\Models\Purchase::where('business_id', $businessId)
             ->where('approval_status', 0)
             ->get();
 
         foreach ($pendingPurchases as $purchase) {
-            foreach ($approverUserIds as $userId) {
+            foreach ($validUserIds as $userId) {
                 // Check if approval record already exists for this user
                 $existingApproval = \App\Models\Approvals::where('ref_id', $purchase->id)
                     ->where('ref_name', 'purchase')
@@ -716,7 +723,7 @@ class BusinessSettingsController extends Controller
             \App\Models\Approvals::where('ref_id', $purchase->id)
                 ->where('ref_name', 'purchase')
                 ->where('status', 0) // Only remove pending approvals
-                ->whereNotIn('action_user', $approverUserIds)
+                ->whereNotIn('action_user', $validUserIds)
                 ->delete();
         }
     }
@@ -731,13 +738,20 @@ class BusinessSettingsController extends Controller
             return;
         }
 
+        // Filter to only include user IDs that actually exist in the database
+        $validUserIds = \App\Models\User::whereIn('id', $approverUserIds)->pluck('id')->toArray();
+        
+        if (empty($validUserIds)) {
+            return;
+        }
+
         // Get all draft payrolls (status = 0) for this business
         $draftPayrolls = \App\Models\Payroll::where('business_id', $businessId)
             ->where('status', 0)
             ->get();
 
         foreach ($draftPayrolls as $payroll) {
-            foreach ($approverUserIds as $userId) {
+            foreach ($validUserIds as $userId) {
                 // Check if approval record already exists for this user
                 $existingApproval = \App\Models\Approvals::where('ref_id', $payroll->id)
                     ->where('ref_name', 'payroll')
@@ -759,7 +773,7 @@ class BusinessSettingsController extends Controller
             \App\Models\Approvals::where('ref_id', $payroll->id)
                 ->where('ref_name', 'payroll')
                 ->where('status', 0) // Only remove pending approvals
-                ->whereNotIn('action_user', $approverUserIds)
+                ->whereNotIn('action_user', $validUserIds)
                 ->delete();
         }
     }
@@ -774,13 +788,20 @@ class BusinessSettingsController extends Controller
             return;
         }
 
+        // Filter to only include user IDs that actually exist in the database
+        $validUserIds = \App\Models\User::whereIn('id', $approverUserIds)->pluck('id')->toArray();
+        
+        if (empty($validUserIds)) {
+            return;
+        }
+
         // Get all pending journals (status = 0) for this business
         $pendingJournals = \App\Models\Journal::where('business_id', $businessId)
             ->where('status', 0)
             ->get();
 
         foreach ($pendingJournals as $journal) {
-            foreach ($approverUserIds as $userId) {
+            foreach ($validUserIds as $userId) {
                 // Check if approval record already exists for this user
                 $existingApproval = \App\Models\Approvals::where('ref_id', $journal->id)
                     ->where('ref_name', 'journal')
@@ -802,7 +823,7 @@ class BusinessSettingsController extends Controller
             \App\Models\Approvals::where('ref_id', $journal->id)
                 ->where('ref_name', 'journal')
                 ->where('status', 0) // Only remove pending approvals
-                ->whereNotIn('action_user', $approverUserIds)
+                ->whereNotIn('action_user', $validUserIds)
                 ->delete();
         }
     }

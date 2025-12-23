@@ -599,11 +599,18 @@ class JournalController extends Controller
      */
     private function syncApprovalRecordsForJournal(Journal $journal, array $configuredUserIds): void
     {
+        // Filter to only include user IDs that actually exist in the database
+        $validUserIds = \App\Models\User::whereIn('id', $configuredUserIds)->pluck('id')->toArray();
+        
+        if (empty($validUserIds)) {
+            return;
+        }
+
         // Get existing approval user IDs for this journal
         $existingApproverIds = $journal->approvals->pluck('action_user')->toArray();
 
         // Add missing approvers
-        foreach ($configuredUserIds as $userId) {
+        foreach ($validUserIds as $userId) {
             if (!in_array($userId, $existingApproverIds)) {
                 $journal->approvals()->create([
                     'ref_name' => 'journal',
@@ -618,7 +625,7 @@ class JournalController extends Controller
         Approvals::where('ref_id', $journal->id)
             ->where('ref_name', 'journal')
             ->where('status', 0) // Only remove pending approvals
-            ->whereNotIn('action_user', $configuredUserIds)
+            ->whereNotIn('action_user', $validUserIds)
             ->delete();
     }
 
@@ -1036,7 +1043,14 @@ class JournalController extends Controller
             return;
         }
 
-        foreach ($configuredUserIds as $userId) {
+        // Filter to only include user IDs that actually exist in the database
+        $validUserIds = \App\Models\User::whereIn('id', $configuredUserIds)->pluck('id')->toArray();
+        
+        if (empty($validUserIds)) {
+            return;
+        }
+
+        foreach ($validUserIds as $userId) {
             // Check if approval record already exists for this user
             $existingApproval = Approvals::where('ref_id', $journal->id)
                 ->where('ref_name', 'journal')
