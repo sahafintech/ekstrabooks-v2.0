@@ -54,7 +54,7 @@ export default function Approvals({ business, id, users = [], activeTab }) {
     // Transform users for the combobox
     const userOptions = users.map(user => ({
         id: user.id.toString(),
-        name: user.name,
+        name: `${user.name} (${user.email})`,
     }));
 
     return (

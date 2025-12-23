@@ -27,14 +27,22 @@ class UserManagementController extends Controller
         $currentUser = auth()->user();
         $perPage = $request->get('per_page', 50);
         
-        // Get users who belong to businesses owned by the current user
+        // Get all business IDs the current user is a member of
+        $userBusinessIds = \DB::table('business_users')
+            ->where('user_id', $currentUser->id)
+            ->pluck('business_id')
+            ->unique()
+            ->toArray();
+        
+        // Get users who belong to businesses the current user is a member of
         $query = User::with('roles', 'permissions')
             ->where('user_type', '!=', 'admin')
-            ->whereExists(function ($subQuery) use ($currentUser) {
+            ->where('id', '!=', $currentUser->id) // Exclude current user from list
+            ->whereExists(function ($subQuery) use ($userBusinessIds) {
                 $subQuery->select(\DB::raw(1))
                     ->from('business_users')
                     ->whereColumn('business_users.user_id', 'users.id')
-                    ->where('business_users.owner_id', $currentUser->id);
+                    ->whereIn('business_users.business_id', $userBusinessIds);
             });
 
         // Search
@@ -60,14 +68,15 @@ class UserManagementController extends Controller
         // Paginate
         $paginatedUsers = $query->paginate($perPage);
         
-        $users = $paginatedUsers->map(function ($user) use ($currentUser) {
-            // Get businesses this user has access to (owned by current user)
+        $users = $paginatedUsers->map(function ($user) use ($userBusinessIds) {
+            // Get businesses this user has access to (that are also accessible to current user)
             $userBusinesses = \DB::table('business_users')
                 ->join('business', 'business_users.business_id', '=', 'business.id')
                 ->where('business_users.user_id', $user->id)
-                ->where('business_users.owner_id', $currentUser->id)
+                ->whereIn('business_users.business_id', $userBusinessIds)
                 ->whereNull('business.deleted_at')
                 ->select('business.id', 'business.name')
+                ->distinct()
                 ->get();
             
             return [
@@ -113,26 +122,30 @@ class UserManagementController extends Controller
             ];
         }
 
-        // Get all businesses owned by the current user
-        $ownerBusinesses = \DB::table('business')
+        // Get all businesses the current user is a member of
+        $userBusinesses = \DB::table('business')
             ->join('business_users', 'business.id', '=', 'business_users.business_id')
-            ->where('business_users.owner_id', $currentUser->id)
+            ->where('business_users.user_id', $currentUser->id)
             ->whereNull('business.deleted_at')
             ->select('business.id', 'business.name')
             ->distinct()
             ->get()
             ->map(fn($b) => ['id' => $b->id, 'name' => $b->name]);
 
-        // Get pending invitations count
-        $pendingInvitationsCount = Invite::where('sender_id', $currentUser->id)
-            ->where('status', 1)
+        // Get pending invitations count for businesses the current user is in
+        $pendingInvitationsCount = Invite::where('status', 1)
+            ->where(function ($query) use ($userBusinessIds) {
+                foreach ($userBusinessIds as $businessId) {
+                    $query->orWhereJsonContains('business_id', $businessId);
+                }
+            })
             ->count();
 
         return Inertia::render('Backend/User/Business/user-management', [
             'users' => $users,
             'roles' => $roles,
             'permissions' => $permissions,
-            'ownerBusinesses' => $ownerBusinesses,
+            'ownerBusinesses' => $userBusinesses,
             'pendingInvitationsCount' => $pendingInvitationsCount,
             'meta' => [
                 'current_page' => $paginatedUsers->currentPage(),
@@ -221,6 +234,28 @@ class UserManagementController extends Controller
     public function updateRolesAndPermissions(Request $request, User $user)
     {
         Gate::authorize('business.user.update');
+        $currentUser = auth()->user();
+
+        // Get businesses the current user is a member of
+        $userBusinessIds = \DB::table('business_users')
+            ->where('user_id', $currentUser->id)
+            ->pluck('business_id')
+            ->unique()
+            ->toArray();
+
+        // Check if the user being updated is in a business the current user has access to
+        $targetUserBusinessIds = \DB::table('business_users')
+            ->where('user_id', $user->id)
+            ->pluck('business_id')
+            ->unique()
+            ->toArray();
+
+        $hasAccess = !empty(array_intersect($targetUserBusinessIds, $userBusinessIds));
+
+        if (!$hasAccess) {
+            return redirect()->back()->with('error', 'Unauthorized action.');
+        }
+
         $validated = $request->validate([
             'roles' => ['array'],
             'roles.*' => ['string', 'exists:roles,name'],
@@ -243,6 +278,28 @@ class UserManagementController extends Controller
     public function destroy(User $user)
     {
         Gate::authorize('business.user.delete');
+        $currentUser = auth()->user();
+
+        // Get businesses the current user is a member of
+        $userBusinessIds = \DB::table('business_users')
+            ->where('user_id', $currentUser->id)
+            ->pluck('business_id')
+            ->unique()
+            ->toArray();
+
+        // Check if the user being deleted is in a business the current user has access to
+        $targetUserBusinessIds = \DB::table('business_users')
+            ->where('user_id', $user->id)
+            ->pluck('business_id')
+            ->unique()
+            ->toArray();
+
+        $hasAccess = !empty(array_intersect($targetUserBusinessIds, $userBusinessIds));
+
+        if (!$hasAccess) {
+            return redirect()->back()->with('error', 'Unauthorized action.');
+        }
+
         // Prevent deleting the last Owner
         if ($user->hasRole('Owner')) {
             $ownerCount = User::role('Owner')->count();
@@ -262,10 +319,19 @@ class UserManagementController extends Controller
     public function bulkDestroy(Request $request)
     {
         Gate::authorize('business.user.delete');
+        $currentUser = auth()->user();
+        
         $validated = $request->validate([
             'ids' => ['required', 'array'],
             'ids.*' => ['integer', 'exists:users,id'],
         ]);
+
+        // Get businesses the current user is a member of
+        $userBusinessIds = \DB::table('business_users')
+            ->where('user_id', $currentUser->id)
+            ->pluck('business_id')
+            ->unique()
+            ->toArray();
 
         $deletedCount = 0;
         $skippedCount = 0;
@@ -273,6 +339,20 @@ class UserManagementController extends Controller
         foreach ($validated['ids'] as $id) {
             $user = User::find($id);
             if ($user) {
+                // Check if the user being deleted is in a business the current user has access to
+                $targetUserBusinessIds = \DB::table('business_users')
+                    ->where('user_id', $user->id)
+                    ->pluck('business_id')
+                    ->unique()
+                    ->toArray();
+
+                $hasAccess = !empty(array_intersect($targetUserBusinessIds, $userBusinessIds));
+
+                if (!$hasAccess) {
+                    $skippedCount++;
+                    continue;
+                }
+
                 // Prevent deleting the last Owner
                 if ($user->hasRole('Owner')) {
                     $ownerCount = User::role('Owner')->count();
@@ -288,7 +368,7 @@ class UserManagementController extends Controller
 
         $message = "Deleted {$deletedCount} user(s).";
         if ($skippedCount > 0) {
-            $message .= " Skipped {$skippedCount} user(s) (last Owner protection).";
+            $message .= " Skipped {$skippedCount} user(s) (unauthorized or last Owner protection).";
         }
 
         return redirect()->back()->with('success', $message);
@@ -308,28 +388,37 @@ class UserManagementController extends Controller
         $currentUser = auth()->user();
         $businessIds = $validated['business_ids'] ?? [];
 
-        // Get owner's businesses to validate
-        $ownerBusinessIds = \DB::table('business_users')
-            ->where('owner_id', $currentUser->id)
+        // Get businesses the current user is a member of
+        $userBusinessIds = \DB::table('business_users')
+            ->where('user_id', $currentUser->id)
             ->pluck('business_id')
             ->unique()
             ->toArray();
 
-        // Only process businesses that belong to the current owner
-        $validBusinessIds = array_intersect($businessIds, $ownerBusinessIds);
+        // Only process businesses that the current user is a member of
+        $validBusinessIds = array_intersect($businessIds, $userBusinessIds);
 
-        // Remove the user from all businesses owned by current user
+        // Get owners for each business the current user is in
+        $businessOwners = \DB::table('business_users')
+            ->whereIn('business_id', $userBusinessIds)
+            ->where('user_id', $currentUser->id)
+            ->pluck('owner_id', 'business_id')
+            ->toArray();
+
+        // Remove the user from businesses the current user has access to
         \DB::table('business_users')
             ->where('user_id', $user->id)
-            ->where('owner_id', $currentUser->id)
+            ->whereIn('business_id', $userBusinessIds)
             ->delete();
 
-        // Add user to selected businesses
+        // Add user to selected businesses with the appropriate owner
         foreach ($validBusinessIds as $businessId) {
+            $ownerId = $businessOwners[$businessId] ?? $currentUser->id;
+            
             \DB::table('business_users')->insert([
                 'user_id' => $user->id,
                 'business_id' => $businessId,
-                'owner_id' => $currentUser->id,
+                'owner_id' => $ownerId,
                 'is_active' => 1,
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -348,7 +437,19 @@ class UserManagementController extends Controller
         $currentUser = auth()->user();
         $perPage = $request->get('per_page', 50);
 
-        $query = Invite::where('sender_id', $currentUser->id);
+        // Get all business IDs the current user is a member of
+        $userBusinessIds = \DB::table('business_users')
+            ->where('user_id', $currentUser->id)
+            ->pluck('business_id')
+            ->unique()
+            ->toArray();
+
+        // Get invitations for businesses the current user is a member of
+        $query = Invite::where(function ($q) use ($userBusinessIds) {
+            foreach ($userBusinessIds as $businessId) {
+                $q->orWhereJsonContains('business_id', $businessId);
+            }
+        });
 
         // Search
         if ($request->has('search') && $request->search) {
@@ -370,11 +471,13 @@ class UserManagementController extends Controller
         // Paginate
         $paginatedInvitations = $query->paginate($perPage);
 
-        $invitations = $paginatedInvitations->map(function ($invite) {
-            // Get businesses for this invite
+        $invitations = $paginatedInvitations->map(function ($invite) use ($userBusinessIds) {
+            // Get businesses for this invite (only show businesses the current user has access to)
             $businessIds = is_array($invite->business_id) ? $invite->business_id : [$invite->business_id];
+            $visibleBusinessIds = array_intersect($businessIds, $userBusinessIds);
+            
             $businesses = \DB::table('business')
-                ->whereIn('id', $businessIds)
+                ->whereIn('id', $visibleBusinessIds)
                 ->whereNull('deleted_at')
                 ->select('id', 'name')
                 ->get()
@@ -393,6 +496,7 @@ class UserManagementController extends Controller
                 'role' => $role ? $role->name : 'Unknown',
                 'message' => $invite->message,
                 'created_at' => $invite->created_at->format('Y-m-d H:i'),
+                'is_own_invitation' => $invite->sender_id === auth()->id(),
             ];
         });
 
@@ -422,8 +526,18 @@ class UserManagementController extends Controller
         Gate::authorize('business.invitations.resend');
         $currentUser = auth()->user();
 
-        // Verify ownership
-        if ($invitation->sender_id !== $currentUser->id) {
+        // Get businesses the current user is a member of
+        $userBusinessIds = \DB::table('business_users')
+            ->where('user_id', $currentUser->id)
+            ->pluck('business_id')
+            ->unique()
+            ->toArray();
+
+        // Check if the invitation is for a business the current user has access to
+        $invitationBusinessIds = is_array($invitation->business_id) ? $invitation->business_id : [$invitation->business_id];
+        $hasAccess = !empty(array_intersect($invitationBusinessIds, $userBusinessIds));
+
+        if (!$hasAccess) {
             return redirect()->back()->with('error', 'Unauthorized action.');
         }
 
@@ -455,8 +569,18 @@ class UserManagementController extends Controller
         Gate::authorize('business.invitations.cancel');
         $currentUser = auth()->user();
 
-        // Verify ownership
-        if ($invitation->sender_id !== $currentUser->id) {
+        // Get businesses the current user is a member of
+        $userBusinessIds = \DB::table('business_users')
+            ->where('user_id', $currentUser->id)
+            ->pluck('business_id')
+            ->unique()
+            ->toArray();
+
+        // Check if the invitation is for a business the current user has access to
+        $invitationBusinessIds = is_array($invitation->business_id) ? $invitation->business_id : [$invitation->business_id];
+        $hasAccess = !empty(array_intersect($invitationBusinessIds, $userBusinessIds));
+
+        if (!$hasAccess) {
             return redirect()->back()->with('error', 'Unauthorized action.');
         }
 

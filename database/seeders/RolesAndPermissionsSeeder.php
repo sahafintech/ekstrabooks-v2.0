@@ -51,6 +51,9 @@ final class RolesAndPermissionsSeeder extends Seeder
             'business.roles.create',
             'business.roles.update',
             'business.roles.delete',
+            'business.invitations.view',
+            'business.invitations.resend',
+            'business.invitations.cancel',
 
             // =====================
             // CURRENCY
@@ -669,6 +672,9 @@ final class RolesAndPermissionsSeeder extends Seeder
             'business.roles.create',
             'business.roles.update',
             'business.roles.delete',
+            'business.invitations.view',
+            'business.invitations.resend',
+            'business.invitations.cancel',
 
             // Currency
             'currency.view',

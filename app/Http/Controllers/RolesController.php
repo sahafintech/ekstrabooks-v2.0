@@ -16,7 +16,7 @@ class RolesController extends Controller
      */
     public function index()
     {
-        Gate::authorize('roles.view');
+        Gate::authorize('business.roles.view');
         $roles = Role::where('guard_name', 'web')
             ->withCount('users', 'permissions')
             ->get()
@@ -59,7 +59,7 @@ class RolesController extends Controller
      */
     public function store(Request $request)
     {
-        Gate::authorize('roles.create');
+        Gate::authorize('business.roles.create');
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', 'unique:roles,name'],
@@ -87,7 +87,7 @@ class RolesController extends Controller
      */
     public function update(Request $request, $id)
     {
-        Gate::authorize('roles.update');
+        Gate::authorize('business.roles.update');
 
         $role = Role::findOrFail($id);
 
@@ -126,7 +126,7 @@ class RolesController extends Controller
      */
     public function destroy($id)
     {
-        Gate::authorize('roles.delete');
+        Gate::authorize('business.roles.delete');
 
         $role = Role::findOrFail($id);
 
@@ -153,7 +153,7 @@ class RolesController extends Controller
      */
     public function bulk_destroy(Request $request)
     {
-        Gate::authorize('roles.delete');
+        Gate::authorize('business.roles.delete');
 
         $validated = $request->validate([
             'ids' => ['required', 'array'],

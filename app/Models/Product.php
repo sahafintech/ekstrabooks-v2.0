@@ -91,7 +91,6 @@ class Product extends Model {
      */
     public function getAllTransactions() {
         $sales = $this->invoice_items()
-            ->with('invoice')
             ->select(
                 'invoice_date as date',
                 'invoice_items.quantity',
@@ -106,7 +105,6 @@ class Product extends Model {
             ->selectRaw("CONCAT('/user/invoices/', invoices.id) as reference_url");
 
         $receipts = $this->receipt_items()
-            ->with('receipt')
             ->select(
                 'receipt_date as date',
                 'receipt_items.quantity',
@@ -121,7 +119,6 @@ class Product extends Model {
             ->selectRaw("CONCAT('/user/receipts/', receipts.id) as reference_url");
 
         $purchases = $this->purchase_items()
-            ->with('purchase')
             ->select(
                 'purchase_date as date',
                 'purchase_items.quantity',
@@ -136,7 +133,6 @@ class Product extends Model {
             ->selectRaw("CASE WHEN purchases.cash = 1 THEN CONCAT('/user/cash_purchases/', purchases.id) ELSE CONCAT('/user/bill_invoices/', purchases.id) END as reference_url");
 
         $sale_returns = $this->sales_return_items()
-            ->with('sales_return')
             ->select(
                 'return_date as date',
                 'sales_return_items.quantity',
@@ -151,7 +147,6 @@ class Product extends Model {
             ->selectRaw("CONCAT('/user/sales_returns/', sales_returns.id) as reference_url");
 
         $purchase_returns = $this->purchase_return_items()
-            ->with('purchase_return')
             ->select(
                 'return_date as date',
                 'purchase_return_items.quantity',
