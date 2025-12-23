@@ -953,7 +953,7 @@ class CashPurchaseController extends Controller
 	 */
 	public function edit(Request $request, $id)
 	{
-		Gate::authorize('cash_purchases.edit');
+		Gate::authorize('cash_purchases.update');
 		$default_accounts = ['Purchase Tax Payable', 'Purchase Discount Allowed', 'Inventory'];
 
 		// if these accounts are not exists then create it
