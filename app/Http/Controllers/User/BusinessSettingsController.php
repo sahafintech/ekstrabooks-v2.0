@@ -16,6 +16,10 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
+use App\Models\Approvals;
+use App\Models\Purchase;
+use App\Models\Payroll;
+use App\Models\Journal;
 
 class BusinessSettingsController extends Controller
 {
@@ -689,27 +693,27 @@ class BusinessSettingsController extends Controller
         }
 
         // Filter to only include user IDs that actually exist in the database
-        $validUserIds = \App\Models\User::whereIn('id', $approverUserIds)->pluck('id')->toArray();
+        $validUserIds = User::whereIn('id', $approverUserIds)->pluck('id')->toArray();
         
         if (empty($validUserIds)) {
             return;
         }
 
         // Get all pending purchases (approval_status = 0) for this business - both cash and bill invoices
-        $pendingPurchases = \App\Models\Purchase::where('business_id', $businessId)
+        $pendingPurchases = Purchase::where('business_id', $businessId)
             ->where('approval_status', 0)
             ->get();
 
         foreach ($pendingPurchases as $purchase) {
             foreach ($validUserIds as $userId) {
                 // Check if approval record already exists for this user
-                $existingApproval = \App\Models\Approvals::where('ref_id', $purchase->id)
+                $existingApproval = Approvals::where('ref_id', $purchase->id)
                     ->where('ref_name', 'purchase')
                     ->where('action_user', $userId)
                     ->first();
 
                 if (!$existingApproval) {
-                    \App\Models\Approvals::create([
+                    Approvals::create([
                         'ref_id' => $purchase->id,
                         'ref_name' => 'purchase',
                         'action_user' => $userId,
@@ -720,7 +724,7 @@ class BusinessSettingsController extends Controller
 
             // Remove approval records for users no longer in the approvers list
             // Only remove if they haven't taken action yet (status = 0)
-            \App\Models\Approvals::where('ref_id', $purchase->id)
+            Approvals::where('ref_id', $purchase->id)
                 ->where('ref_name', 'purchase')
                 ->where('status', 0) // Only remove pending approvals
                 ->whereNotIn('action_user', $validUserIds)
@@ -739,27 +743,27 @@ class BusinessSettingsController extends Controller
         }
 
         // Filter to only include user IDs that actually exist in the database
-        $validUserIds = \App\Models\User::whereIn('id', $approverUserIds)->pluck('id')->toArray();
+        $validUserIds = User::whereIn('id', $approverUserIds)->pluck('id')->toArray();
         
         if (empty($validUserIds)) {
             return;
         }
 
         // Get all draft payrolls (status = 0) for this business
-        $draftPayrolls = \App\Models\Payroll::where('business_id', $businessId)
+        $draftPayrolls = Payroll::where('business_id', $businessId)
             ->where('status', 0)
             ->get();
 
         foreach ($draftPayrolls as $payroll) {
             foreach ($validUserIds as $userId) {
                 // Check if approval record already exists for this user
-                $existingApproval = \App\Models\Approvals::where('ref_id', $payroll->id)
+                $existingApproval = Approvals::where('ref_id', $payroll->id)
                     ->where('ref_name', 'payroll')
                     ->where('action_user', $userId)
                     ->first();
 
                 if (!$existingApproval) {
-                    \App\Models\Approvals::create([
+                    Approvals::create([
                         'ref_id' => $payroll->id,
                         'ref_name' => 'payroll',
                         'action_user' => $userId,
@@ -770,7 +774,7 @@ class BusinessSettingsController extends Controller
 
             // Remove approval records for users no longer in the approvers list
             // Only remove if they haven't taken action yet (status = 0)
-            \App\Models\Approvals::where('ref_id', $payroll->id)
+            Approvals::where('ref_id', $payroll->id)
                 ->where('ref_name', 'payroll')
                 ->where('status', 0) // Only remove pending approvals
                 ->whereNotIn('action_user', $validUserIds)
@@ -789,27 +793,27 @@ class BusinessSettingsController extends Controller
         }
 
         // Filter to only include user IDs that actually exist in the database
-        $validUserIds = \App\Models\User::whereIn('id', $approverUserIds)->pluck('id')->toArray();
+        $validUserIds = User::whereIn('id', $approverUserIds)->pluck('id')->toArray();
         
         if (empty($validUserIds)) {
             return;
         }
 
         // Get all pending journals (status = 0) for this business
-        $pendingJournals = \App\Models\Journal::where('business_id', $businessId)
+        $pendingJournals = Journal::where('business_id', $businessId)
             ->where('status', 0)
             ->get();
 
         foreach ($pendingJournals as $journal) {
             foreach ($validUserIds as $userId) {
                 // Check if approval record already exists for this user
-                $existingApproval = \App\Models\Approvals::where('ref_id', $journal->id)
+                $existingApproval = Approvals::where('ref_id', $journal->id)
                     ->where('ref_name', 'journal')
                     ->where('action_user', $userId)
                     ->first();
 
                 if (!$existingApproval) {
-                    \App\Models\Approvals::create([
+                    Approvals::create([
                         'ref_id' => $journal->id,
                         'ref_name' => 'journal',
                         'action_user' => $userId,
@@ -820,7 +824,7 @@ class BusinessSettingsController extends Controller
 
             // Remove approval records for users no longer in the approvers list
             // Only remove if they haven't taken action yet (status = 0)
-            \App\Models\Approvals::where('ref_id', $journal->id)
+            Approvals::where('ref_id', $journal->id)
                 ->where('ref_name', 'journal')
                 ->where('status', 0) // Only remove pending approvals
                 ->whereNotIn('action_user', $validUserIds)

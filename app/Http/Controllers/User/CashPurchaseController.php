@@ -1691,6 +1691,273 @@ class CashPurchaseController extends Controller
 		return Excel::download(new CashPurchaseExport($purchases), 'cash_purchases_' . now()->format('d m Y') . '.xlsx');
 	}
 
+	/**
+	 * Show the import page
+	 */
+	public function import()
+	{
+		Gate::authorize('cash_purchases.create');
+		
+		return Inertia::render('Backend/User/CashPurchase/Import');
+	}
+
+	/**
+	 * Handle file upload and return headers for mapping
+	 */
+	public function uploadImportFile(Request $request)
+	{
+		Gate::authorize('cash_purchases.create');
+		
+		// If this is a GET request (page refresh), redirect to step 1
+		if ($request->isMethod('get')) {
+			return redirect()->route('cash_purchases.import.page');
+		}
+		
+		$request->validate([
+			'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
+		]);
+
+		try {
+			// Create a unique temporary directory
+			$sessionId = session()->getId();
+			$tempDir = storage_path("app/imports/temp/{$sessionId}");
+
+			// Ensure directory exists with proper permissions
+			if (!is_dir($tempDir)) {
+				mkdir($tempDir, 0755, true);
+			}
+
+			// Generate unique filename
+			$fileName = uniqid() . '_' . $request->file('file')->getClientOriginalName();
+			$fullPath = $tempDir . '/' . $fileName;
+
+			// Move uploaded file
+			$request->file('file')->move($tempDir, $fileName);
+
+			// Verify file exists
+			if (!file_exists($fullPath)) {
+				throw new \Exception('Failed to store uploaded file');
+			}
+
+			// Store relative path for later use
+			$relativePath = "imports/temp/{$sessionId}/{$fileName}";
+
+			$spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+			$worksheet = $spreadsheet->getActiveSheet();
+			$headers = [];
+
+			foreach ($worksheet->getRowIterator(1, 1) as $row) {
+				$cellIterator = $row->getCellIterator();
+				$cellIterator->setIterateOnlyExistingCells(false);
+
+				foreach ($cellIterator as $cell) {
+					$value = $cell->getValue();
+					if ($value) {
+						$headers[] = (string) $value;
+					}
+				}
+			}
+
+			// Store in session with explicit save
+			session()->put('cash_purchase_import_file_path', $relativePath);
+			session()->put('cash_purchase_import_full_path', $fullPath);
+			session()->put('cash_purchase_import_file_name', $request->file('file')->getClientOriginalName());
+			session()->put('cash_purchase_import_headers', $headers);
+			session()->save();
+
+			return Inertia::render('Backend/User/CashPurchase/Import', [
+				'previewData' => [
+					'headers' => $headers,
+				],
+			]);
+		} catch (\Exception $e) {
+			return back()->with('error', 'Failed to process file: ' . $e->getMessage());
+		}
+	}
+
+	/**
+	 * Preview import data with validation
+	 */
+	public function previewImport(Request $request)
+	{
+		Gate::authorize('cash_purchases.create');
+		
+		// If this is a GET request (page refresh), redirect to step 1
+		if ($request->isMethod('get')) {
+			return redirect()->route('cash_purchases.import.page');
+		}
+		
+		$mappings = $request->input('mappings', []);
+		$fullPath = session('cash_purchase_import_full_path');
+		$headers = session('cash_purchase_import_headers', []);
+
+		if (!$fullPath || !file_exists($fullPath)) {
+			return back()->with('error', 'Import session expired or file not found. Please upload your file again.');
+		}
+
+		try {
+			$spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+			$worksheet = $spreadsheet->getActiveSheet();
+
+			$headers = session('cash_purchase_import_headers', []);
+			$previewRecords = [];
+			$validCount = 0;
+			$errorCount = 0;
+			$warningCount = 0;
+			$totalRows = 0;
+			$uniqueBillNos = [];
+
+			// Process rows (skip header row)
+			foreach ($worksheet->getRowIterator(2) as $row) {
+				$rowIndex = $row->getRowIndex();
+				$totalRows++;
+
+				$cellIterator = $row->getCellIterator();
+				$cellIterator->setIterateOnlyExistingCells(false);
+
+				$rowData = [];
+				$cellIndex = 0;
+
+				foreach ($cellIterator as $cell) {
+					if ($cellIndex < count($headers)) {
+						$header = $headers[$cellIndex];
+						$systemField = $mappings[$header] ?? null;
+
+						if ($systemField && $systemField !== 'skip') {
+							$rowData[$systemField] = $cell->getValue();
+						}
+					}
+					$cellIndex++;
+				}
+
+				// Skip completely empty rows
+				if (empty($rowData['bill_no']) && empty($rowData['product_name'])) {
+					$totalRows--;
+					continue;
+				}
+
+				// Track unique bill numbers
+				if (!empty($rowData['bill_no'])) {
+					$uniqueBillNos[trim((string) $rowData['bill_no'])] = true;
+				}
+
+				// Validate row
+				$errors = [];
+
+				// Product name is required
+				if (empty($rowData['product_name'])) {
+					$errors[] = 'Product name is required';
+				} else {
+					// Check if product exists
+					$product = Product::where('name', 'like', '%' . trim((string) $rowData['product_name']) . '%')->first();
+					if (!$product) {
+						$errors[] = 'Product "' . $rowData['product_name'] . '" not found';
+					}
+				}
+
+				// Quantity required and must be positive
+				if (empty($rowData['quantity']) || floatval($rowData['quantity']) <= 0) {
+					$errors[] = 'Quantity must be greater than 0';
+				}
+
+				// Unit cost required and must be non-negative
+				if (!isset($rowData['unit_cost']) || $rowData['unit_cost'] === '' || floatval($rowData['unit_cost']) < 0) {
+					$errors[] = 'Unit cost is required and must be non-negative';
+				}
+
+				// Vendor validation (optional but should exist if provided)
+				if (!empty($rowData['vendor_name'])) {
+					$vendor = Vendor::where('name', 'like', '%' . trim((string) $rowData['vendor_name']) . '%')->first();
+					if (!$vendor) {
+						$warningCount++;
+					}
+				}
+
+				$status = count($errors) > 0 ? 'error' : 'valid';
+				if ($status === 'error') {
+					$errorCount++;
+				} else {
+					$validCount++;
+				}
+
+				// Only add rows with errors to preview_records (limit to 50)
+				if ($status === 'error' && count($previewRecords) < 50) {
+					$previewRecords[] = [
+						'row' => $rowIndex,
+						'data' => $rowData,
+						'status' => $status,
+						'errors' => $errors,
+					];
+				}
+			}
+
+			session()->put('cash_purchase_import_mappings', $mappings);
+			session()->save();
+
+			return Inertia::render('Backend/User/CashPurchase/Import', [
+				'previewData' => [
+					'headers' => $headers,
+					'total_rows' => $totalRows,
+					'unique_purchases' => count($uniqueBillNos),
+					'preview_records' => $previewRecords,
+					'valid_count' => $validCount,
+					'error_count' => $errorCount,
+					'warning_count' => $warningCount,
+				],
+			]);
+		} catch (\Exception $e) {
+			return back()->with('error', 'Failed to preview import: ' . $e->getMessage());
+		}
+	}
+
+	/**
+	 * Execute the actual import
+	 */
+	public function executeImport(Request $request)
+	{
+		Gate::authorize('cash_purchases.create');
+		
+		// If this is a GET request (page refresh), redirect to step 1
+		if ($request->isMethod('get')) {
+			return redirect()->route('cash_purchases.import.page');
+		}
+		
+		$mappings = session('cash_purchase_import_mappings', []);
+		$fullPath = session('cash_purchase_import_full_path');
+		$headers = session('cash_purchase_import_headers', []);
+
+		if (!$fullPath || !file_exists($fullPath)) {
+			return redirect()
+				->route('cash_purchases.index')
+				->with('error', 'Import session expired or file not found. Please start over.');
+		}
+
+		try {
+			Excel::import(new \App\Imports\CashPurchaseImport($mappings), $fullPath);
+
+			// audit log
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = auth()->user()->id;
+			$audit->event = 'Cash Purchases Imported - ' . session('cash_purchase_import_file_name');
+			$audit->save();
+
+			// Clean up
+			if (file_exists($fullPath)) {
+				unlink($fullPath);
+			}
+			session()->forget(['cash_purchase_import_file_path', 'cash_purchase_import_full_path', 'cash_purchase_import_file_name', 'cash_purchase_import_headers', 'cash_purchase_import_mappings']);
+
+			return redirect()
+				->route('cash_purchases.index')
+				->with('success', 'Cash purchases imported successfully.');
+		} catch (\Exception $e) {
+			return redirect()
+				->route('cash_purchases.index')
+				->with('error', 'Import failed: ' . $e->getMessage());
+		}
+	}
+
 	public function voucher($id)
 	{
 		$bill = Purchase::find($id);
@@ -2157,6 +2424,7 @@ class CashPurchaseController extends Controller
 
 	public function bulk_approve(Request $request)
 	{
+		Gate::authorize('cash_purchases.approve');
 		$currentUserId = auth()->id();
 
 		// Check if there are any configured approval users for this business
@@ -2222,7 +2490,7 @@ class CashPurchaseController extends Controller
 
 	public function bulk_reject(Request $request)
 	{
-		Gate::authorize('cash_purchases.bulk_reject');
+		Gate::authorize('cash_purchases.reject');
 		$currentUserId = auth()->id();
 
 		// Check if there are any configured approval users for this business

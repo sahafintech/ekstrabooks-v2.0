@@ -2107,7 +2107,7 @@ class PurchaseController extends Controller
 
 	public function bulk_approve(Request $request)
 	{
-		Gate::authorize('bill_invoices.bulk_approve');
+		Gate::authorize('bill_invoices.approve');
 		$currentUserId = auth()->id();
 
 		// Check if there are any configured approval users for this business
