@@ -667,14 +667,14 @@ class ProductController extends Controller
 
     public function import()
     {
-        Gate::authorize('products.import');
+        Gate::authorize('products.csv.import');
         
         return Inertia::render('Backend/User/Product/Import');
     }
 
     public function uploadImportFile(Request $request)
     {
-        Gate::authorize('products.import');
+        Gate::authorize('products.csv.import');
         
         // If this is a GET request (page refresh), redirect to step 1
         if ($request->isMethod('get')) {
@@ -745,7 +745,7 @@ class ProductController extends Controller
 
     public function previewImport(Request $request)
     {
-        Gate::authorize('products.import');
+        Gate::authorize('products.csv.import');
         
         // If this is a GET request (page refresh), redirect to step 1
         if ($request->isMethod('get')) {
@@ -890,7 +890,7 @@ class ProductController extends Controller
 
     public function executeImport(Request $request)
     {
-        Gate::authorize('products.import');
+        Gate::authorize('products.csv.import');
         
         // If this is a GET request (page refresh), redirect to step 1
         if ($request->isMethod('get')) {
@@ -935,6 +935,7 @@ class ProductController extends Controller
 
     public function product_export()
     {
+        Gate::authorize('products.csv.export');
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
@@ -947,7 +948,7 @@ class ProductController extends Controller
 
     public function bulk_destroy(Request $request)
     {
-
+        Gate::authorize('products.delete');
         $products = Product::whereIn('id', $request->ids)->get();
 
         // audit log
@@ -973,7 +974,7 @@ class ProductController extends Controller
 
     public function bulk_restore(Request $request)
     {
-
+        Gate::authorize('products.restore');
         $products = Product::onlyTrashed()->whereIn('id', $request->ids)->get();
 
         // audit log
@@ -999,7 +1000,7 @@ class ProductController extends Controller
 
     public function bulk_permanent_destroy(Request $request)
     {
-
+        Gate::authorize('products.delete');
         $products = Product::whereIn('id', $request->ids)->get();
 
         // audit log
