@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Imports;
 
 use App\Models\Account;
@@ -8,115 +10,231 @@ use App\Models\InventoryAdjustment;
 use App\Models\Product;
 use App\Models\Transaction;
 use Carbon\Carbon;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
-use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\ToModel;
+use Maatwebsite\Excel\Concerns\SkipsFailures;
+use Maatwebsite\Excel\Concerns\SkipsOnFailure;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
-use Maatwebsite\Excel\Concerns\WithValidation;
+use Maatwebsite\Excel\Concerns\WithBatchInserts;
+use Maatwebsite\Excel\Concerns\WithChunkReading;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
 
-class InventoryAdjustmentImport implements ToCollection, WithHeadingRow, WithValidation, SkipsEmptyRows
+final class InventoryAdjustmentImport implements SkipsOnFailure, ToModel, WithBatchInserts, WithChunkReading, WithHeadingRow
 {
+    use SkipsFailures;
 
-    public function collection(Collection $rows)
+    /**
+     * Field mappings from Excel header to system field
+     * Format: ['Excel Header' => 'system_field']
+     */
+    private array $mappings;
+
+    public function __construct(array $mappings = [])
     {
+        $this->mappings = $mappings;
+    }
 
-        foreach ($rows as $row) {
-
-            $product = Product::where('id', $row['id'])->firstOrFail();
-            $account = Account::where('account_name', $row['account_name'])->firstOrFail();
-
-            $adjustment = new InventoryAdjustment();
-            $adjustment->adjustment_date = Date::excelToDateTimeObject($row['adjustment_date'])->format('Y-m-d');
-            $adjustment->account_id = $account->id;
-            $adjustment->product_id = $product->id;
-            $adjustment->quantity_on_hand = $row['quantity_on_hand'];
-            $adjustment->adjusted_quantity = $row['adjusted_quantity'];
-            if ($row['adjusted_quantity'] >= 0) {
-                $adjustment->new_quantity_on_hand = $row['quantity_on_hand'] + $row['adjusted_quantity'];
-            } else {
-                $adjustment->new_quantity_on_hand = $row['quantity_on_hand'] - abs($row['adjusted_quantity']);
+    /**
+     * Transform row data using field mappings
+     */
+    private function mapRowData(array $row): array
+    {
+        $mappedData = [];
+        
+        foreach ($row as $header => $value) {
+            $normalizedHeader = $this->normalizeHeader($header);
+            
+            foreach ($this->mappings as $excelHeader => $systemField) {
+                $normalizedExcelHeader = $this->normalizeHeader($excelHeader);
+                if ($normalizedHeader === $normalizedExcelHeader && $systemField !== 'skip') {
+                    $mappedData[$systemField] = $value;
+                    break;
+                }
             }
-            $adjustment->description = $row['description'] ?? null;
-            $adjustment->adjustment_type = $row['adjusted_quantity'] >= 0 ? 'adds' : 'deducts';
-            $adjustment->save();
+        }
+        
+        return $mappedData;
+    }
 
-            // Update product stock
-            $product->stock = $adjustment->new_quantity_on_hand;
-            $product->save();
+    /**
+     * Normalize header for comparison
+     */
+    private function normalizeHeader(string $header): string
+    {
+        return strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', trim($header)));
+    }
 
-            $currentTime = Carbon::now();
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    public function model(array $row): ?InventoryAdjustment
+    {
+        // Apply field mappings
+        $data = $this->mapRowData($row);
+        
+        // Skip empty rows
+        if (empty($data['product_id']) && empty($data['product_name'])) {
+            return null;
+        }
 
-            if ($adjustment->adjustment_type == 'adds') {
-                $transaction              = new Transaction();
-                $transaction->trans_date  = Carbon::parse(Date::excelToDateTimeObject($row['adjustment_date'])->format('Y-m-d'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-                $transaction->account_id  = $account->id;
-                $transaction->dr_cr       = 'cr';
-                $transaction->transaction_currency    = request()->activeBusiness->currency;
-                $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                $transaction->base_currency_amount    = abs($row['adjusted_quantity']) * $product->purchase_cost;
-                $transaction->transaction_amount      = abs($row['adjusted_quantity']) * $product->purchase_cost;
-                $transaction->description = $product->name . ' Inventory Adjustment #' . $row['adjusted_quantity'];
-                $transaction->ref_id      =  $product->id;
-                $transaction->ref_type    = 'product adjustment';
-                $transaction->save();
+        // Get product - by ID or name
+        $product = null;
+        if (!empty($data['product_id'])) {
+            $product = Product::find($data['product_id']);
+        } elseif (!empty($data['product_name'])) {
+            $product = Product::where('name', $data['product_name'])->first();
+        }
+        
+        if (!$product) {
+            return null;
+        }
 
-                // invetory account transaction
-                $transaction              = new Transaction();
-                $transaction->trans_date  = Carbon::parse(Date::excelToDateTimeObject($row['adjustment_date'])->format('Y-m-d'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-                $transaction->account_id  = get_account('Inventory')->id;
-                $transaction->dr_cr       = 'dr';
-                $transaction->transaction_currency    = request()->activeBusiness->currency;
-                $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                $transaction->base_currency_amount    = abs($row['adjusted_quantity']) * $product->purchase_cost;
-                $transaction->transaction_amount      = abs($row['adjusted_quantity']) * $product->purchase_cost;
-                $transaction->description = $product->name . ' Inventory Adjustment #' . $row['adjusted_quantity'];
-                $transaction->ref_id      =  $product->id;
-                $transaction->ref_type    = 'product adjustment';
-                $transaction->save();
-            } else {
-                $transaction              = new Transaction();
-                $transaction->trans_date  = Carbon::parse(Date::excelToDateTimeObject($row['adjustment_date'])->format('Y-m-d'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-                $transaction->account_id  = $account->id;
-                $transaction->dr_cr       = 'dr';
-                $transaction->transaction_currency    = request()->activeBusiness->currency;
-                $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                $transaction->base_currency_amount    = abs($row['adjusted_quantity']) * $product->purchase_cost;
-                $transaction->transaction_amount      = abs($row['adjusted_quantity']) * $product->purchase_cost;
-                $transaction->description = $product->name . ' Inventory Adjustment #' . $row['adjusted_quantity'];
-                $transaction->ref_id      =  $product->id;
-                $transaction->ref_type    = 'product adjustment';
-                $transaction->save();
+        // Get account - by ID or name
+        $account = null;
+        if (!empty($data['account_id'])) {
+            $account = Account::find($data['account_id']);
+        } elseif (!empty($data['account_name'])) {
+            $account = Account::where('account_name', $data['account_name'])->first();
+        }
+        
+        if (!$account) {
+            return null;
+        }
 
-                // invetory account transaction
-                $transaction              = new Transaction();
-                $transaction->trans_date  = Carbon::parse(Date::excelToDateTimeObject($row['adjustment_date'])->format('Y-m-d'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-                $transaction->account_id  = get_account('Inventory')->id;
-                $transaction->dr_cr       = 'cr';
-                $transaction->transaction_currency    = request()->activeBusiness->currency;
-                $transaction->currency_rate           = Currency::where('name', request()->activeBusiness->currency)->first()->exchange_rate;
-                $transaction->base_currency_amount    = abs($row['adjusted_quantity']) * $product->purchase_cost;
-                $transaction->transaction_amount      = abs($row['adjusted_quantity']) * $product->purchase_cost;
-                $transaction->description = $product->name . ' Inventory Adjustment #' . $row['adjusted_quantity'];
-                $transaction->ref_id      =  $product->id;
-                $transaction->ref_type    = 'product adjustment';
-                $transaction->save();
+        // Parse adjustment date
+        $adjustmentDate = now()->format('Y-m-d');
+        if (!empty($data['adjustment_date'])) {
+            try {
+                if (is_numeric($data['adjustment_date'])) {
+                    $adjustmentDate = Date::excelToDateTimeObject($data['adjustment_date'])->format('Y-m-d');
+                } else {
+                    $adjustmentDate = Carbon::parse($data['adjustment_date'])->format('Y-m-d');
+                }
+            } catch (\Exception $e) {
+                $adjustmentDate = now()->format('Y-m-d');
             }
         }
 
-        DB::commit();
+        // Get quantity values
+        $quantityOnHand = !empty($data['quantity_on_hand']) ? (float) $data['quantity_on_hand'] : $product->stock;
+        $adjustedQuantity = !empty($data['adjusted_quantity']) ? (float) $data['adjusted_quantity'] : 0;
+        
+        if ($adjustedQuantity == 0) {
+            return null;
+        }
+
+        // Calculate new quantity
+        if ($adjustedQuantity >= 0) {
+            $newQuantityOnHand = $quantityOnHand + $adjustedQuantity;
+        } else {
+            $newQuantityOnHand = $quantityOnHand - abs($adjustedQuantity);
+        }
+
+        // Create adjustment
+        $adjustment = new InventoryAdjustment();
+        $adjustment->adjustment_date = $adjustmentDate;
+        $adjustment->account_id = $account->id;
+        $adjustment->product_id = $product->id;
+        $adjustment->quantity_on_hand = $quantityOnHand;
+        $adjustment->adjusted_quantity = $adjustedQuantity;
+        $adjustment->new_quantity_on_hand = $newQuantityOnHand;
+        $adjustment->description = $data['description'] ?? null;
+        $adjustment->adjustment_type = $adjustedQuantity >= 0 ? 'adds' : 'deducts';
+        $adjustment->save();
+
+        // Update product stock
+        $product->stock = $newQuantityOnHand;
+        $product->save();
+
+        // Create transactions
+        $this->createTransactions($adjustment, $product, $account, $adjustedQuantity, $adjustmentDate);
+
+        return null; // Return null since we've already saved manually
     }
 
-    public function rules(): array
+    /**
+     * Create accounting transactions for the adjustment
+     */
+    protected function createTransactions(InventoryAdjustment $adjustment, Product $product, Account $account, float $adjustedQuantity, string $adjustmentDate): void
     {
-        return [
-            'adjustment_date' => 'required',
-            'id' => 'required|exists:products,id',
-            'account_name' => 'required|exists:accounts,account_name',
-            'quantity_on_hand' => 'required',
-            'adjusted_quantity' => 'required',
-            'description' => 'nullable',
-        ];
+        $currentTime = Carbon::now();
+        $currency = request()->activeBusiness->currency;
+        $exchangeRate = Currency::where('name', $currency)->first()->exchange_rate ?? 1;
+        $purchaseCost = $product->purchase_cost ?? 0;
+        $amount = abs($adjustedQuantity) * $purchaseCost;
+        
+        // Skip transaction creation if the amount is zero (product has no purchase cost)
+        if ($amount <= 0) {
+            return;
+        }
+        
+        $transDate = Carbon::parse($adjustmentDate)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+
+        if ($adjustment->adjustment_type == 'adds') {
+            // Credit the adjustment account
+            $transaction = new Transaction();
+            $transaction->trans_date = $transDate;
+            $transaction->account_id = $account->id;
+            $transaction->dr_cr = 'cr';
+            $transaction->transaction_currency = $currency;
+            $transaction->currency_rate = $exchangeRate;
+            $transaction->base_currency_amount = $amount;
+            $transaction->transaction_amount = $amount;
+            $transaction->description = $product->name . ' Inventory Adjustment #' . $adjustedQuantity;
+            $transaction->ref_id = $product->id;
+            $transaction->ref_type = 'product adjustment';
+            $transaction->save();
+
+            // Debit Inventory account
+            $transaction = new Transaction();
+            $transaction->trans_date = $transDate;
+            $transaction->account_id = get_account('Inventory')->id;
+            $transaction->dr_cr = 'dr';
+            $transaction->transaction_currency = $currency;
+            $transaction->currency_rate = $exchangeRate;
+            $transaction->base_currency_amount = $amount;
+            $transaction->transaction_amount = $amount;
+            $transaction->description = $product->name . ' Inventory Adjustment #' . $adjustedQuantity;
+            $transaction->ref_id = $product->id;
+            $transaction->ref_type = 'product adjustment';
+            $transaction->save();
+        } else {
+            // Debit the adjustment account
+            $transaction = new Transaction();
+            $transaction->trans_date = $transDate;
+            $transaction->account_id = $account->id;
+            $transaction->dr_cr = 'dr';
+            $transaction->transaction_currency = $currency;
+            $transaction->currency_rate = $exchangeRate;
+            $transaction->base_currency_amount = $amount;
+            $transaction->transaction_amount = $amount;
+            $transaction->description = $product->name . ' Inventory Adjustment #' . $adjustedQuantity;
+            $transaction->ref_id = $product->id;
+            $transaction->ref_type = 'product adjustment';
+            $transaction->save();
+
+            // Credit Inventory account
+            $transaction = new Transaction();
+            $transaction->trans_date = $transDate;
+            $transaction->account_id = get_account('Inventory')->id;
+            $transaction->dr_cr = 'cr';
+            $transaction->transaction_currency = $currency;
+            $transaction->currency_rate = $exchangeRate;
+            $transaction->base_currency_amount = $amount;
+            $transaction->transaction_amount = $amount;
+            $transaction->description = $product->name . ' Inventory Adjustment #' . $adjustedQuantity;
+            $transaction->ref_id = $product->id;
+            $transaction->ref_type = 'product adjustment';
+            $transaction->save();
+        }
+    }
+
+    public function batchSize(): int
+    {
+        return 100;
+    }
+
+    public function chunkSize(): int
+    {
+        return 100;
     }
 }

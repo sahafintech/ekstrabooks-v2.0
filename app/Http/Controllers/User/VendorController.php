@@ -389,28 +389,238 @@ class VendorController extends Controller
      * @return \Illuminate\Http\Response
      */
 
-    public function import_vendors(Request $request)
+    public function import()
     {
         Gate::authorize('vendors.import');
-        if ($request->hasFile('vendors_file')) {
-            try {
-                Excel::import(new SupplierImport, $request->file('vendors_file'));
+        
+        return Inertia::render('Backend/User/Vendor/Import');
+    }
 
-                // audit log
-                $audit = new AuditLog();
-                $audit->date_changed = date('Y-m-d H:i:s');
-                $audit->changed_by = Auth::id();
-                $audit->event = 'Suppliers Imported';
-                $audit->save();
+    public function uploadImportFile(Request $request)
+    {
+        Gate::authorize('vendors.import');
+        
+        // If this is a GET request (page refresh), redirect to step 1
+        if ($request->isMethod('get')) {
+            return redirect()->route('vendors.import.page');
+        }
+        
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
+        ]);
 
-                return back()->with('success', _lang('Imported Successfully'));
-            } catch (\Exception $e) {
-                return back()->with('error', _lang('Error: ' . $e->getMessage()));
-            } catch (\Exception $e) {
-                return back()->with('error', _lang('Error: ' . $e->getMessage()));
+        try {
+            // Create a unique temporary directory
+            $sessionId = session()->getId();
+            $tempDir = storage_path("app/imports/temp/{$sessionId}");
+
+            // Ensure directory exists with proper permissions
+            if (!is_dir($tempDir)) {
+                mkdir($tempDir, 0755, true);
             }
-        }else {
-            return redirect()->route('vendors.index')->with('error', _lang('Please choose a file'));
+
+            // Generate unique filename
+            $fileName = uniqid() . '_' . $request->file('file')->getClientOriginalName();
+            $fullPath = $tempDir . '/' . $fileName;
+
+            // Move uploaded file
+            $request->file('file')->move($tempDir, $fileName);
+
+            // Verify file exists
+            if (!file_exists($fullPath)) {
+                throw new \Exception('Failed to store uploaded file');
+            }
+
+            // Store relative path for later use
+            $relativePath = "imports/temp/{$sessionId}/{$fileName}";
+
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+            $worksheet = $spreadsheet->getActiveSheet();
+            $headers = [];
+
+            foreach ($worksheet->getRowIterator(1, 1) as $row) {
+                $cellIterator = $row->getCellIterator();
+                $cellIterator->setIterateOnlyExistingCells(false);
+
+                foreach ($cellIterator as $cell) {
+                    $value = $cell->getValue();
+                    if ($value) {
+                        $headers[] = (string) $value;
+                    }
+                }
+            }
+
+            // Store in session with explicit save
+            session()->put('vendor_import_file_path', $relativePath);
+            session()->put('vendor_import_full_path', $fullPath);
+            session()->put('vendor_import_file_name', $request->file('file')->getClientOriginalName());
+            session()->put('vendor_import_headers', $headers);
+            session()->save();
+
+            return Inertia::render('Backend/User/Vendor/Import', [
+                'previewData' => [
+                    'headers' => $headers,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to process file: ' . $e->getMessage());
+        }
+    }
+
+    public function previewImport(Request $request)
+    {
+        Gate::authorize('vendors.import');
+        
+        // If this is a GET request (page refresh), redirect to step 1
+        if ($request->isMethod('get')) {
+            return redirect()->route('vendors.import.page');
+        }
+        
+        $mappings = $request->input('mappings', []);
+        $fullPath = session('vendor_import_full_path');
+        $headers = session('vendor_import_headers', []);
+
+        if (!$fullPath || !file_exists($fullPath)) {
+            return back()->with('error', 'Import session expired or file not found. Please upload your file again.');
+        }
+
+        try {
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+            $worksheet = $spreadsheet->getActiveSheet();
+
+            $headers = session('vendor_import_headers', []);
+            $previewRecords = [];
+            $validCount = 0;
+            $errorCount = 0;
+            $warningCount = 0;
+            $totalRows = 0;
+
+            // Process rows (skip header row)
+            foreach ($worksheet->getRowIterator(2) as $row) {
+                $rowIndex = $row->getRowIndex();
+                $totalRows++;
+
+                $cellIterator = $row->getCellIterator();
+                $cellIterator->setIterateOnlyExistingCells(false);
+
+                $rowData = [];
+                $cellIndex = 0;
+
+                foreach ($cellIterator as $cell) {
+                    if ($cellIndex < count($headers)) {
+                        $header = $headers[$cellIndex];
+                        $systemField = $mappings[$header] ?? null;
+
+                        if ($systemField && $systemField !== 'skip') {
+                            $rowData[$systemField] = $cell->getValue();
+                        }
+                    }
+                    $cellIndex++;
+                }
+
+                // Validate row
+                $errors = [];
+
+                // Name is required
+                if (empty($rowData['name'])) {
+                    $errors[] = 'Name is required';
+                }
+
+                // Check for duplicate email if provided
+                if (!empty($rowData['email'])) {
+                    $existingVendor = Vendor::where('email', $rowData['email'])->first();
+                    if ($existingVendor && empty($rowData['id'])) {
+                        // This is not an error, just a warning that it will update existing
+                        $warningCount++;
+                    }
+                }
+
+                // Check for ID-based updates
+                if (!empty($rowData['id'])) {
+                    $vendor = Vendor::find($rowData['id']);
+                    if (!$vendor) {
+                        $errors[] = 'Supplier with ID "' . $rowData['id'] . '" not found';
+                    }
+                }
+
+                $status = count($errors) > 0 ? 'error' : 'valid';
+                if ($status === 'error') {
+                    $errorCount++;
+                } else {
+                    $validCount++;
+                }
+
+                // Only add rows with errors to preview_records
+                if ($status === 'error') {
+                    $previewRecords[] = [
+                        'row' => $rowIndex,
+                        'data' => $rowData,
+                        'status' => $status,
+                        'errors' => $errors,
+                    ];
+                }
+            }
+
+            session()->put('vendor_import_mappings', $mappings);
+            session()->save();
+
+            return Inertia::render('Backend/User/Vendor/Import', [
+                'previewData' => [
+                    'headers' => $headers,
+                    'total_rows' => $totalRows,
+                    'preview_records' => $previewRecords,
+                    'valid_count' => $validCount,
+                    'error_count' => $errorCount,
+                    'warning_count' => $warningCount,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to preview import: ' . $e->getMessage());
+        }
+    }
+
+    public function executeImport(Request $request)
+    {
+        Gate::authorize('vendors.import');
+        
+        // If this is a GET request (page refresh), redirect to step 1
+        if ($request->isMethod('get')) {
+            return redirect()->route('vendors.import.page');
+        }
+        
+        $mappings = session('vendor_import_mappings', []);
+        $fullPath = session('vendor_import_full_path');
+        $headers = session('vendor_import_headers', []);
+
+        if (!$fullPath || !file_exists($fullPath)) {
+            return redirect()
+                ->route('vendors.index')
+                ->with('error', 'Import session expired or file not found. Please start over.');
+        }
+
+        try {
+            Excel::import(new SupplierImport($mappings), $fullPath);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Suppliers Imported - ' . session('vendor_import_file_name');
+            $audit->save();
+
+            // Clean up
+            if (file_exists($fullPath)) {
+                unlink($fullPath);
+            }
+            session()->forget(['vendor_import_file_path', 'vendor_import_full_path', 'vendor_import_file_name', 'vendor_import_headers', 'vendor_import_mappings']);
+
+            return redirect()
+                ->route('vendors.index')
+                ->with('success', 'Suppliers imported successfully.');
+        } catch (\Exception $e) {
+            return redirect()
+                ->route('vendors.index')
+                ->with('error', 'Import failed: ' . $e->getMessage());
         }
     }
 

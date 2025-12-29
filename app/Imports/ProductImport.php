@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Imports;
 
 use App\Models\Account;
@@ -10,218 +12,282 @@ use App\Models\ProductUnit;
 use App\Models\SubCategory;
 use App\Models\Transaction;
 use Carbon\Carbon;
-use Illuminate\Support\Collection;
-use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
-use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\ToModel;
+use Maatwebsite\Excel\Concerns\SkipsFailures;
+use Maatwebsite\Excel\Concerns\SkipsOnFailure;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
-use Maatwebsite\Excel\Concerns\WithValidation;
-use PhpOffice\PhpSpreadsheet\Shared\Date;
+use Maatwebsite\Excel\Concerns\WithBatchInserts;
+use Maatwebsite\Excel\Concerns\WithChunkReading;
 
-class ProductImport implements ToCollection, WithHeadingRow, WithValidation, SkipsEmptyRows
+final class ProductImport implements SkipsOnFailure, ToModel, WithBatchInserts, WithChunkReading, WithHeadingRow
 {
-    protected $fieldMappings;
-    protected $duplicateHandling;
+    use SkipsFailures;
 
-    public function __construct($fieldMappings = [], $duplicateHandling = 'skip')
+    /**
+     * Field mappings from Excel header to system field
+     * Format: ['Excel Header' => 'system_field']
+     */
+    private array $mappings;
+
+    public function __construct(array $mappings = [])
     {
-        $this->fieldMappings = $fieldMappings;
-        $this->duplicateHandling = $duplicateHandling;
+        $this->mappings = $mappings;
     }
 
     /**
-     * @param array $row
-     *
-     * @return \Illuminate\Database\Eloquent\Model|null
+     * Transform row data using field mappings
      */
-    public function collection(Collection $rows)
+    private function mapRowData(array $row): array
     {
-        // Ensure required accounts exist (only check once)
-        if (!Account::where('account_name', 'Common Shares')->where('business_id', request()->activeBusiness->id)->exists()) {
-            $account                  = new Account();
-            $account->account_code    = '3000';
-            $account->account_name    = 'Common Shares';
-            $account->account_type    = 'Equity';
-            $account->opening_date    = Carbon::now()->format('Y-m-d');
-            $account->business_id     = request()->activeBusiness->id;
-            $account->user_id         = request()->activeBusiness->user->id;
-            $account->dr_cr           = 'cr';
-            $account->save();
-        }
-
-        if (!Account::where('account_name', 'Inventory')->where('business_id', request()->activeBusiness->id)->exists()) {
-            $account                  = new Account();
-            $account->account_code    = '1000';
-            $account->account_name    = 'Inventory';
-            $account->account_type    = 'Other Current Asset';
-            $account->opening_date    = Carbon::now()->format('Y-m-d');
-            $account->business_id     = request()->activeBusiness->id;
-            $account->user_id         = request()->activeBusiness->user->id;
-            $account->dr_cr           = 'dr';
-            $account->save();
-        }
-
-        foreach ($rows as $row) {
-            // Map fields if mappings are provided
-            $data = $this->mapRowData($row);
-
-            // Skip if required field is missing
-            if (empty($data['name'])) {
-                continue;
-            }
-
-            // Handle duplicate checking
-            $product = null;
-            if ($this->duplicateHandling === 'skip') {
-                $product = Product::where('name', $data['name'])->first();
-                if ($product) {
-                    continue; // Skip duplicates
-                }
-            } else {
-                // Overwrite mode - find existing product by name
-                $product = Product::where('name', $data['name'])->first();
-            }
-
-            // Parse expiry date
-            $expiry_date = null;
-            if (!empty($data['expiry_date'])) {
-                try {
-                    $expiry_date = Date::excelToDateTimeObject($data['expiry_date']);
-                } catch (\Exception $e) {
-                    $expiry_date = null;
-                }
-            }
-
-            if ($product == null) {
-                // Create new product
-                $productData = $this->prepareProductData($data, $expiry_date);
-                $product = Product::create($productData);
-
-                // Create transactions for initial stock
-                $initialStock = $data['initial_stock'] ?? 0;
-                if ($initialStock > 0) {
-                    $this->createStockTransactions($product, $initialStock, 'Opening Stock');
-                }
-            } else {
-                // Update existing product
-                $previous_initial_stock = $product->initial_stock ?? 0;
-                $new_initial_stock = $data['initial_stock'] ?? 0;
-                $stock_difference = $new_initial_stock - $previous_initial_stock;
-
-                $productData = $this->prepareProductData($data, $expiry_date);
-                $productData['initial_stock'] = $new_initial_stock;
-                $product->update($productData);
-
-                // Update current stock
-                if ($stock_difference != 0) {
-                    $product->stock = ($product->stock ?? 0) + $stock_difference;
-                    $product->save();
-                }
-
-                // Handle transactions for stock changes
-                if ($stock_difference != 0) {
-                    // Delete previous stock transactions
-                    Transaction::where('ref_id', $product->id)
-                        ->where('ref_type', 'product')
-                        ->where('description', 'like', '%Opening Stock%')
-                        ->delete();
-
-                    if ($stock_difference > 0) {
-                        // Increase stock
-                        $this->createStockTransactions($product, $stock_difference, 
-                            'Opening Stock Adjustment +' . $stock_difference, 'increase');
-                    } else {
-                        // Decrease stock
-                        $this->createStockTransactions($product, abs($stock_difference), 
-                            'Opening Stock Adjustment -' . abs($stock_difference), 'decrease');
-                    }
+        $mappedData = [];
+        
+        // Invert mappings: we have header => system_field, we need to find system_field values
+        $invertedMappings = array_flip($this->mappings);
+        
+        foreach ($row as $header => $value) {
+            // Normalize header (Excel/PhpSpreadsheet converts to lowercase with underscores)
+            $normalizedHeader = $this->normalizeHeader($header);
+            
+            // Check if this header is mapped to a system field
+            foreach ($this->mappings as $excelHeader => $systemField) {
+                $normalizedExcelHeader = $this->normalizeHeader($excelHeader);
+                if ($normalizedHeader === $normalizedExcelHeader && $systemField !== 'skip') {
+                    $mappedData[$systemField] = $value;
+                    break;
                 }
             }
         }
+        
+        return $mappedData;
     }
 
-    protected function mapRowData($row)
+    /**
+     * Normalize header for comparison
+     */
+    private function normalizeHeader(string $header): string
     {
-        // If field mappings are provided, map the data
-        if (!empty($this->fieldMappings)) {
-            $mappedData = [];
-            foreach ($this->fieldMappings as $systemField => $fileHeader) {
-                if (!empty($fileHeader) && isset($row[$fileHeader])) {
-                    $mappedData[$systemField] = $row[$fileHeader];
-                }
-            }
-            return $mappedData;
-        }
-
-        // Otherwise, return row as-is (for backward compatibility)
-        return $row;
+        return strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', trim($header)));
     }
 
-    protected function prepareProductData($data, $expiry_date)
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    public function model(array $row): ?Product
     {
-        // Map field names from import format to database fields
-        $productData = [
-            'name' => $data['name'] ?? '',
-            'type' => $data['type'] ?? $data['item_type'] ?? 'product',
-            'descriptions' => $data['description'] ?? $data['descriptions'] ?? null,
-            'selling_price' => $data['rate'] ?? $data['selling_price'] ?? 0,
-            'purchase_cost' => $data['purchase_rate'] ?? $data['purchase_cost'] ?? 0,
-            'image' => $data['image'] ?? 'default.png',
-            'stock_management' => $data['track_inventory'] ?? $data['stock_management'] ?? 0,
-            'initial_stock' => $data['initial_stock'] ?? 0,
-            'stock' => $data['initial_stock'] ?? 0,
-            'allow_for_selling' => $data['sellable'] ?? $data['allow_for_selling'] ?? 0,
-            'allow_for_purchasing' => $data['purchasable'] ?? $data['allow_for_purchasing'] ?? 0,
-            'status' => $data['status'] ?? 1,
-            'expiry_date' => $expiry_date,
-            'code' => $data['code'] ?? null,
-            'reorder_point' => $data['reorder_point'] ?? null,
-        ];
+        // Apply field mappings to transform row data
+        $data = $this->mapRowData($row);
+        
+        // Skip empty rows
+        if (empty($data['name']) && empty($data['code'])) {
+            return null;
+        }
+
+        // Ensure required accounts exist
+        $this->ensureAccountsExist();
+
+        $status = 1; // Default to active
+        if (isset($data['status'])) {
+            $statusValue = is_string($data['status']) ? strtolower(trim($data['status'])) : $data['status'];
+            if ($statusValue === 'inactive' || $statusValue === '0' || $statusValue === 0) {
+                $status = 0;
+            }
+        }
+
+        // Parse stock management
+        $stockManagement = 1; // Default to enabled
+        if (isset($data['stock_management'])) {
+            $smValue = is_string($data['stock_management']) ? strtolower(trim($data['stock_management'])) : $data['stock_management'];
+            if ($smValue === 'no' || $smValue === '0' || $smValue === 0 || $smValue === 'false') {
+                $stockManagement = 0;
+            }
+        }
+
+        // Parse allow_for_selling
+        $allowForSelling = 1; // Default to enabled
+        if (isset($data['allow_for_selling'])) {
+            $afsValue = is_string($data['allow_for_selling']) ? strtolower(trim($data['allow_for_selling'])) : $data['allow_for_selling'];
+            if ($afsValue === 'no' || $afsValue === '0' || $afsValue === 0 || $afsValue === 'false') {
+                $allowForSelling = 0;
+            }
+        }
+
+        // Parse allow_for_purchasing
+        $allowForPurchasing = 1; // Default to enabled
+        if (isset($data['allow_for_purchasing'])) {
+            $afpValue = is_string($data['allow_for_purchasing']) ? strtolower(trim($data['allow_for_purchasing'])) : $data['allow_for_purchasing'];
+            if ($afpValue === 'no' || $afpValue === '0' || $afpValue === 0 || $afpValue === 'false') {
+                $allowForPurchasing = 0;
+            }
+        }
 
         // Handle product unit
-        if (!empty($data['usage_unit'] ?? $data['unit'])) {
-            $unitName = $data['usage_unit'] ?? $data['unit'];
-            $unit = ProductUnit::where('unit', 'like', '%' . $unitName . '%')->first();
+        $productUnitId = null;
+        if (!empty($data['unit'])) {
+            $unit = ProductUnit::where('unit', 'like', '%' . $data['unit'] . '%')->first();
             if ($unit) {
-                $productData['product_unit_id'] = $unit->id;
+                $productUnitId = $unit->id;
             }
         }
 
         // Handle accounts
-        if (!empty($data['account'] ?? $data['income_account_name'])) {
-            $accountName = $data['account'] ?? $data['income_account_name'];
-            $account = get_account($accountName);
+        $incomeAccountId = null;
+        if (!empty($data['income_account_name'])) {
+            $account = Account::where('account_name', $data['income_account_name'])->first();
             if ($account) {
-                $productData['income_account_id'] = $account->id;
+                $incomeAccountId = $account->id;
             }
         }
 
+        $expenseAccountId = null;
         if (!empty($data['expense_account_name'])) {
-            $account = get_account($data['expense_account_name']);
+            $account = Account::where('account_name', $data['expense_account_name'])->first();
             if ($account) {
-                $productData['expense_account_id'] = $account->id;
+                $expenseAccountId = $account->id;
             }
         }
 
         // Handle brand
+        $brandId = null;
         if (!empty($data['brand'])) {
             $brand = Brands::where('name', $data['brand'])->first();
             if ($brand) {
-                $productData['brand_id'] = $brand->id;
+                $brandId = $brand->id;
             }
         }
 
         // Handle sub category
+        $subCategoryId = null;
         if (!empty($data['sub_category'])) {
             $category = SubCategory::where('name', $data['sub_category'])->first();
             if ($category) {
-                $productData['sub_category_id'] = $category->id;
+                $subCategoryId = $category->id;
             }
         }
 
-        return $productData;
+        // Parse expiry date
+        $expiryDate = null;
+        if (!empty($data['expiry_date'])) {
+            try {
+                if (is_numeric($data['expiry_date'])) {
+                    $expiryDate = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($data['expiry_date']);
+                } else {
+                    $expiryDate = Carbon::parse($data['expiry_date']);
+                }
+            } catch (\Exception $e) {
+                $expiryDate = null;
+            }
+        }
+
+        $initialStock = !empty($data['initial_stock']) ? (float) $data['initial_stock'] : 0;
+
+        $productData = [
+            'code' => !empty($data['code']) ? strtoupper($data['code']) : null,
+            'name' => !empty($data['name']) ? ucwords($data['name']) : '',
+            'type' => !empty($data['type']) ? strtolower($data['type']) : 'product',
+            'product_unit_id' => $productUnitId,
+            'purchase_cost' => !empty($data['purchase_cost']) ? (float) $data['purchase_cost'] : 0,
+            'selling_price' => !empty($data['selling_price']) ? (float) $data['selling_price'] : 0,
+            'descriptions' => $data['descriptions'] ?? null,
+            'stock_management' => $stockManagement,
+            'initial_stock' => $initialStock,
+            'stock' => $initialStock,
+            'allow_for_selling' => $allowForSelling,
+            'allow_for_purchasing' => $allowForPurchasing,
+            'income_account_id' => $incomeAccountId,
+            'expense_account_id' => $expenseAccountId,
+            'status' => $status,
+            'expiry_date' => $expiryDate,
+            'brand_id' => $brandId,
+            'sub_category_id' => $subCategoryId,
+            'image' => 'default.png',
+        ];
+
+        // Check if ID is provided for update
+        if (!empty($data['id'])) {
+            $product = Product::find($data['id']);
+            if ($product) {
+                // Handle stock difference for updates
+                $previousInitialStock = $product->initial_stock ?? 0;
+                $stockDifference = $initialStock - $previousInitialStock;
+                
+                $product->update($productData);
+                
+                // Update current stock
+                if ($stockDifference != 0) {
+                    $product->stock = ($product->stock ?? 0) + $stockDifference;
+                    $product->save();
+                    
+                    // Handle transactions for stock changes
+                    $this->handleStockTransactions($product, $stockDifference);
+                }
+                
+                return null; // Return null since we've already updated
+            }
+        }
+
+        // Create new product
+        $product = new Product($productData);
+        $product->save();
+        
+        if ($initialStock > 0) {
+            $this->createStockTransactions($product, $initialStock, 'Opening Stock');
+        }
+        
+        return null; // Return null since we've already saved manually
     }
 
-    protected function createStockTransactions($product, $quantity, $descriptionSuffix, $type = 'increase')
+    /**
+     * Ensure required accounts exist
+     */
+    protected function ensureAccountsExist(): void
+    {
+        if (!Account::where('account_name', 'Common Shares')->where('business_id', request()->activeBusiness->id)->exists()) {
+            $account = new Account();
+            $account->account_code = '3000';
+            $account->account_name = 'Common Shares';
+            $account->account_type = 'Equity';
+            $account->opening_date = Carbon::now()->format('Y-m-d');
+            $account->business_id = request()->activeBusiness->id;
+            $account->user_id = request()->activeBusiness->user->id;
+            $account->dr_cr = 'cr';
+            $account->save();
+        }
+
+        if (!Account::where('account_name', 'Inventory')->where('business_id', request()->activeBusiness->id)->exists()) {
+            $account = new Account();
+            $account->account_code = '1000';
+            $account->account_name = 'Inventory';
+            $account->account_type = 'Other Current Asset';
+            $account->opening_date = Carbon::now()->format('Y-m-d');
+            $account->business_id = request()->activeBusiness->id;
+            $account->user_id = request()->activeBusiness->user->id;
+            $account->dr_cr = 'dr';
+            $account->save();
+        }
+    }
+
+    /**
+     * Handle stock transactions for updates
+     */
+    protected function handleStockTransactions(Product $product, float $stockDifference): void
+    {
+        // Delete previous stock transactions
+        Transaction::where('ref_id', $product->id)
+            ->where('ref_type', 'product')
+            ->where('description', 'like', '%Opening Stock%')
+            ->delete();
+
+        if ($stockDifference > 0) {
+            $this->createStockTransactions($product, $stockDifference, 'Opening Stock Adjustment +' . $stockDifference, 'increase');
+        } else {
+            $this->createStockTransactions($product, abs($stockDifference), 'Opening Stock Adjustment -' . abs($stockDifference), 'decrease');
+        }
+    }
+
+    /**
+     * Create stock transactions
+     */
+    protected function createStockTransactions(Product $product, float $quantity, string $descriptionSuffix, string $type = 'increase'): void
     {
         $purchaseCost = $product->purchase_cost ?? 0;
         $amount = $purchaseCost * $quantity;
@@ -229,7 +295,6 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
         $exchangeRate = Currency::where('name', $currency)->first()->exchange_rate ?? 1;
 
         if ($type === 'increase') {
-            // Increase stock: Debit Inventory, Credit Common Shares
             // Debit Inventory
             $transaction = new Transaction();
             $transaction->trans_date = now()->format('Y-m-d H:i:s');
@@ -258,7 +323,6 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
             $transaction->ref_type = 'product';
             $transaction->save();
         } else {
-            // Decrease stock: Credit Inventory, Debit Common Shares
             // Credit Inventory
             $transaction = new Transaction();
             $transaction->trans_date = now()->format('Y-m-d H:i:s');
@@ -289,25 +353,13 @@ class ProductImport implements ToCollection, WithHeadingRow, WithValidation, Ski
         }
     }
 
-    public function rules(): array
+    public function batchSize(): int
     {
-        return [
-            'name' => 'required',
-            'type' => 'required',
-            'unit' => 'nullable',
-            'purchase_cost' => 'nullable',
-            'selling_price' => 'nullable',
-            'descriptions' => 'nullable',
-            'stock_management' => 'required|in:1,0',
-            'allow_for_selling' => 'required|in:1,0',
-            'income_account_name' => 'required_if:allow_for_selling,1|exists:accounts,account_name',
-            'allow_for_purchasing' => 'required|in:1,0',
-            'expense_account_name' => 'required_if:allow_for_purchasing,1|exists:accounts,account_name',
-            'status' => 'required|in:1,0',
-            'expiry_date' => 'nullable',
-            'code' => 'nullable',
-            'brand' => 'nullable|exists:product_brands,name',
-            'sub_category' => 'nullable|exists:sub_categories,name',
-        ];
+        return 100;
+    }
+
+    public function chunkSize(): int
+    {
+        return 100;
     }
 }

@@ -326,9 +326,9 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('product_units/bulk_destroy', [ProductUnitController::class, 'bulk_destroy'])->name('product_units.bulk_destroy');
 		Route::get('products/export', [ProductController::class, 'product_export'])->name('products.export');
 		Route::get('products/import', [ProductController::class, 'import'])->name('products.import.page');
-		Route::post('import_products', [ProductController::class, 'import_products'])->name('products.import');
-		Route::post('products/import/map_fields', [ProductController::class, 'import_map_fields'])->name('products.import.map_fields');
-		Route::post('products/import/preview', [ProductController::class, 'import_preview'])->name('products.import.preview');
+		Route::match(['get', 'post'], 'products/import/upload', [ProductController::class, 'uploadImportFile'])->name('products.import.upload');
+		Route::match(['get', 'post'], 'products/import/preview', [ProductController::class, 'previewImport'])->name('products.import.preview');
+		Route::match(['get', 'post'], 'products/import/execute', [ProductController::class, 'executeImport'])->name('products.import.execute');
 		Route::post('products/bulk_destroy', [ProductController::class, 'bulk_destroy'])->name('products.bulk_destroy');
 		Route::get('products/trash', [ProductController::class, 'trash'])->name('products.trash');
 		Route::post('products/{id}/restore', [ProductController::class, 'restore'])->name('products.restore');
@@ -363,7 +363,10 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('brands', BrandsController::class);
 
 		// Inventory Adjustment Import (MUST BE BEFORE RESOURCE ROUTE)
-		Route::post('import_adjustments', [InventoryAdjustmentController::class, 'import_adjustments'])->name('inventory_adjustments.import');
+		Route::get('inventory_adjustments/import', [InventoryAdjustmentController::class, 'import'])->name('inventory_adjustments.import.page');
+		Route::match(['get', 'post'], 'inventory_adjustments/import/upload', [InventoryAdjustmentController::class, 'uploadImportFile'])->name('inventory_adjustments.import.upload');
+		Route::match(['get', 'post'], 'inventory_adjustments/import/preview', [InventoryAdjustmentController::class, 'previewImport'])->name('inventory_adjustments.import.preview');
+		Route::match(['get', 'post'], 'inventory_adjustments/import/execute', [InventoryAdjustmentController::class, 'executeImport'])->name('inventory_adjustments.import.execute');
 		Route::get('export_adjustments', [InventoryAdjustmentController::class, 'export_adjustments'])->name('inventory_adjustments.export');
 
 		// inventory transfers resource route

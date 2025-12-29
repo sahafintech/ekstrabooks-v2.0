@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/Components/ui/tabs";
 import { Badge } from "@/Components/ui/badge";
 import { DataTable } from "@/Components/ui/data-table/data-table";
-import { Eye, FileText, Download, Edit, Clock, CreditCard, User, Mail, Phone, MapPin, Building, FileUp, FileDown, Briefcase, Calendar, DollarSign } from "lucide-react";
+import { Eye, FileText, Edit, Clock, CreditCard, User, Mail, Phone, MapPin, Building, FileDown, Briefcase, Calendar, DollarSign } from "lucide-react";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +17,6 @@ import {
 } from "@/Components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/Components/ui/avatar";
 import { Progress } from "@/Components/ui/progress";
-import { Head } from "@inertiajs/react";
 
 export default function View({ vendor, purchase, purchases, transactions, activeTab = "overview" }) {
   const [currentTab, setCurrentTab] = useState(activeTab);

@@ -667,267 +667,269 @@ class ProductController extends Controller
 
     public function import()
     {
+        Gate::authorize('products.import');
+        
         return Inertia::render('Backend/User/Product/Import');
     }
 
-    public function import_products(Request $request)
+    public function uploadImportFile(Request $request)
     {
         Gate::authorize('products.import');
+        
+        // If this is a GET request (page refresh), redirect to step 1
+        if ($request->isMethod('get')) {
+            return redirect()->route('products.import.page');
+        }
+        
         $request->validate([
-            'products_file' => 'required|mimes:xls,xlsx,csv,tsv',
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
         ]);
 
         try {
-            $fieldMappings = json_decode($request->input('field_mappings', '{}'), true);
-            $duplicateHandling = $request->input('duplicate_handling', 'skip');
+            // Create a unique temporary directory
+            $sessionId = session()->getId();
+            $tempDir = storage_path("app/imports/temp/{$sessionId}");
 
-            Excel::import(new ProductImport($fieldMappings, $duplicateHandling), $request->file('products_file'));
+            // Ensure directory exists with proper permissions
+            if (!is_dir($tempDir)) {
+                mkdir($tempDir, 0755, true);
+            }
+
+            // Generate unique filename
+            $fileName = uniqid() . '_' . $request->file('file')->getClientOriginalName();
+            $fullPath = $tempDir . '/' . $fileName;
+
+            // Move uploaded file
+            $request->file('file')->move($tempDir, $fileName);
+
+            // Verify file exists
+            if (!file_exists($fullPath)) {
+                throw new \Exception('Failed to store uploaded file');
+            }
+
+            // Store relative path for later use
+            $relativePath = "imports/temp/{$sessionId}/{$fileName}";
+
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+            $worksheet = $spreadsheet->getActiveSheet();
+            $headers = [];
+
+            foreach ($worksheet->getRowIterator(1, 1) as $row) {
+                $cellIterator = $row->getCellIterator();
+                $cellIterator->setIterateOnlyExistingCells(false);
+
+                foreach ($cellIterator as $cell) {
+                    $value = $cell->getValue();
+                    if ($value) {
+                        $headers[] = (string) $value;
+                    }
+                }
+            }
+
+            // Store in session with explicit save
+            session()->put('product_import_file_path', $relativePath);
+            session()->put('product_import_full_path', $fullPath);
+            session()->put('product_import_file_name', $request->file('file')->getClientOriginalName());
+            session()->put('product_import_headers', $headers);
+            session()->save();
+
+            return Inertia::render('Backend/User/Product/Import', [
+                'previewData' => [
+                    'headers' => $headers,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to process file: ' . $e->getMessage());
+        }
+    }
+
+    public function previewImport(Request $request)
+    {
+        Gate::authorize('products.import');
+        
+        // If this is a GET request (page refresh), redirect to step 1
+        if ($request->isMethod('get')) {
+            return redirect()->route('products.import.page');
+        }
+        
+        $mappings = $request->input('mappings', []);
+        $fullPath = session('product_import_full_path');
+        $headers = session('product_import_headers', []);
+
+        if (!$fullPath || !file_exists($fullPath)) {
+            return back()->with('error', 'Import session expired or file not found. Please upload your file again.');
+        }
+
+        try {
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+            $worksheet = $spreadsheet->getActiveSheet();
+
+            $headers = session('product_import_headers', []);
+            $previewRecords = [];
+            $validCount = 0;
+            $errorCount = 0;
+            $warningCount = 0;
+            $totalRows = 0;
+
+            // Process rows (skip header row)
+            foreach ($worksheet->getRowIterator(2) as $row) {
+                $rowIndex = $row->getRowIndex();
+                $totalRows++;
+
+                $cellIterator = $row->getCellIterator();
+                $cellIterator->setIterateOnlyExistingCells(false);
+
+                $rowData = [];
+                $cellIndex = 0;
+
+                foreach ($cellIterator as $cell) {
+                    if ($cellIndex < count($headers)) {
+                        $header = $headers[$cellIndex];
+                        $systemField = $mappings[$header] ?? null;
+
+                        if ($systemField && $systemField !== 'skip') {
+                            $rowData[$systemField] = $cell->getValue();
+                        }
+                    }
+                    $cellIndex++;
+                }
+
+                // Validate row
+                $errors = [];
+
+                // Required field validation
+                if (empty($rowData['name'])) {
+                    $errors[] = 'Name is required';
+                }
+
+                // Validate income account exists
+                if (!empty($rowData['income_account_name'])) {
+                    $incomeAccount = Account::where('account_name', $rowData['income_account_name'])->first();
+                    if (!$incomeAccount) {
+                        $errors[] = 'Income account "' . $rowData['income_account_name'] . '" not found';
+                    }
+                }
+
+                // Validate expense account exists
+                if (!empty($rowData['expense_account_name'])) {
+                    $expenseAccount = Account::where('account_name', $rowData['expense_account_name'])->first();
+                    if (!$expenseAccount) {
+                        $errors[] = 'Expense account "' . $rowData['expense_account_name'] . '" not found';
+                    }
+                }
+
+                // Validate brand exists
+                if (!empty($rowData['brand'])) {
+                    $brand = Brands::where('name', $rowData['brand'])->first();
+                    if (!$brand) {
+                        $errors[] = 'Brand "' . $rowData['brand'] . '" not found';
+                    }
+                }
+
+                // Validate sub category exists
+                if (!empty($rowData['sub_category'])) {
+                    $subCategory = SubCategory::where('name', $rowData['sub_category'])->first();
+                    if (!$subCategory) {
+                        $errors[] = 'Sub category "' . $rowData['sub_category'] . '" not found';
+                    }
+                }
+
+                // Validate unit exists
+                if (!empty($rowData['unit'])) {
+                    $unit = ProductUnit::where('unit', 'like', '%' . $rowData['unit'] . '%')->first();
+                    if (!$unit) {
+                        $errors[] = 'Unit "' . $rowData['unit'] . '" not found';
+                    }
+                }
+
+                // Validate ID exists if provided (for updates)
+                if (!empty($rowData['id'])) {
+                    $existingProduct = Product::find($rowData['id']);
+                    if (!$existingProduct) {
+                        $errors[] = 'Product with ID "' . $rowData['id'] . '" not found (will be created as new)';
+                        // This is a warning, not an error - product will be created
+                        $warningCount++;
+                    }
+                }
+
+                $status = count($errors) > 0 ? 'error' : 'valid';
+                if ($status === 'error') {
+                    $errorCount++;
+                } else {
+                    $validCount++;
+                }
+
+                // Only add rows with errors to preview_records
+                if ($status === 'error') {
+                    $previewRecords[] = [
+                        'row' => $rowIndex,
+                        'data' => $rowData,
+                        'status' => $status,
+                        'errors' => $errors,
+                    ];
+                }
+            }
+
+            session()->put('product_import_mappings', $mappings);
+            session()->save();
+
+            return Inertia::render('Backend/User/Product/Import', [
+                'previewData' => [
+                    'headers' => $headers,
+                    'total_rows' => $totalRows,
+                    'preview_records' => $previewRecords,
+                    'valid_count' => $validCount,
+                    'error_count' => $errorCount,
+                    'warning_count' => $warningCount,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to preview import: ' . $e->getMessage());
+        }
+    }
+
+    public function executeImport(Request $request)
+    {
+        Gate::authorize('products.import');
+        
+        // If this is a GET request (page refresh), redirect to step 1
+        if ($request->isMethod('get')) {
+            return redirect()->route('products.import.page');
+        }
+        
+        $mappings = session('product_import_mappings', []);
+        $fullPath = session('product_import_full_path');
+        $headers = session('product_import_headers', []);
+
+        if (!$fullPath || !file_exists($fullPath)) {
+            return redirect()
+                ->route('products.index')
+                ->with('error', 'Import session expired or file not found. Please start over.');
+        }
+
+        try {
+            Excel::import(new ProductImport($mappings), $fullPath);
 
             // audit log
             $audit = new AuditLog();
             $audit->date_changed = date('Y-m-d H:i:s');
             $audit->changed_by = Auth::user()->id;
-            $audit->event = 'Products Imported - ' . $request->file('products_file')->getClientOriginalName();
+            $audit->event = 'Products Imported - ' . session('product_import_file_name');
             $audit->save();
+
+            // Clean up
+            if (file_exists($fullPath)) {
+                unlink($fullPath);
+            }
+            session()->forget(['product_import_file_path', 'product_import_full_path', 'product_import_file_name', 'product_import_headers', 'product_import_mappings']);
+
+            return redirect()
+                ->route('products.index')
+                ->with('success', 'Products imported successfully.');
         } catch (\Exception $e) {
-            return redirect()->route('products.index')->with('error', $e->getMessage());
-        }
-
-        return redirect()->route('products.index')->with('success', _lang('Products Imported'));
-    }
-
-    public function import_map_fields(Request $request)
-    {
-        Gate::authorize('products.import');
-        $request->validate([
-            'file' => 'required|mimes:xls,xlsx,csv,tsv',
-        ]);
-
-        try {
-            $file = $request->file('file');
-            $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($file->getRealPath());
-            $reader->setReadDataOnly(true);
-            $spreadsheet = $reader->load($file->getRealPath());
-            $worksheet = $spreadsheet->getActiveSheet();
-            $headers = [];
-            
-            // Get first row as headers
-            $firstRow = $worksheet->getRowIterator(1, 1)->current();
-            foreach ($firstRow->getCellIterator() as $cell) {
-                $value = $cell->getValue();
-                if (!empty($value)) {
-                    $headers[] = trim($value);
-                }
-            }
-
-
-            // Define system fields for products
-            $systemFields = [
-                ['key' => 'id', 'label' => 'ID', 'required' => true],
-                ['key' => 'name', 'label' => 'Item Name', 'required' => true],
-                ['key' => 'type', 'label' => 'Type', 'required' => false],
-                ['key' => 'unit', 'label' => 'Unit', 'required' => false],
-                ['key' => 'purchase_cost', 'label' => 'Purchase Cost', 'required' => false],
-                ['key' => 'selling_price', 'label' => 'Selling Price', 'required' => false],
-                ['key' => 'descriptions', 'label' => 'Description', 'required' => false],
-                ['key' => 'initial_stock', 'label' => 'Initial Stock', 'required' => false],
-                ['key' => 'stock_management', 'label' => 'Stock Management', 'required' => false],
-                ['key' => 'allow_for_selling', 'label' => 'Allow for Selling', 'required' => false],
-                ['key' => 'income_account_name', 'label' => 'Income Account', 'required' => false],
-                ['key' => 'allow_for_purchasing', 'label' => 'Allow for Purchasing', 'required' => false],
-                ['key' => 'expense_account_name', 'label' => 'Expense Account', 'required' => false],
-                ['key' => 'status', 'label' => 'Status', 'required' => false],
-                ['key' => 'expiry_date', 'label' => 'Expiry Date', 'required' => false],
-                ['key' => 'code', 'label' => 'Code', 'required' => false],
-                ['key' => 'image', 'label' => 'Image', 'required' => false],
-                ['key' => 'sub_category', 'label' => 'Sub Category', 'required' => false],
-                ['key' => 'brand', 'label' => 'Brand', 'required' => false],
-            ];
-
-            // Auto-match headers to system fields (simple name matching)
-            $autoMappings = [];
-            foreach ($systemFields as $systemField) {
-                $systemKey = strtolower($systemField['key']);
-                $systemLabel = strtolower($systemField['label']);
-                
-                foreach ($headers as $header) {
-                    $headerLower = strtolower($header);
-                    // Try to match by key or label
-                    if (strpos($headerLower, $systemKey) !== false || 
-                        strpos($headerLower, $systemLabel) !== false ||
-                        strpos($systemLabel, $headerLower) !== false) {
-                        $autoMappings[$systemField['key']] = $header;
-                        break;
-                    }
-                }
-            }
-
-            // Store file temporarily for preview
-            $tempFileName = 'import_' . time() . '_' . $file->getClientOriginalName();
-            $file->storeAs('temp_imports', $tempFileName);
-
-            // Return JSON for API calls (check for JSON accept header or X-Requested-With header)
-            if ($request->wantsJson() || $request->ajax() || $request->expectsJson()) {
-                return response()->json([
-                    'headers' => $headers,
-                    'systemFields' => $systemFields,
-                    'autoMappings' => $autoMappings,
-                    'temp_file' => $tempFileName,
-                ]);
-            }
-
-            // Return Inertia response
-            return back()->with([
-                'headers' => $headers,
-                'systemFields' => $systemFields,
-                'autoMappings' => $autoMappings,
-                'temp_file' => $tempFileName,
-            ]);
-        } catch (\Exception $e) {
-            if ($request->wantsJson() || $request->ajax() || $request->expectsJson()) {
-                return response()->json([
-                    'error' => $e->getMessage(),
-                ], 422);
-            }
-            return back()->withErrors(['error' => $e->getMessage()]);
-        }
-    }
-
-    public function import_preview(Request $request)
-    {
-        Gate::authorize('products.import');
-        $request->validate([
-            'file' => 'required|mimes:xls,xlsx,csv,tsv',
-            'field_mappings' => 'required|json',
-        ]);
-
-        try {
-            $file = $request->file('file');
-            $fieldMappings = json_decode($request->input('field_mappings'), true);
-            $duplicateHandling = $request->input('duplicate_handling', 'skip');
-
-            // Read and validate the file
-            $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($file->getRealPath());
-            $reader->setReadDataOnly(true);
-            $spreadsheet = $reader->load($file->getRealPath());
-            $worksheet = $spreadsheet->getActiveSheet();
-
-            $readyItems = [];
-            $skippedItems = [];
-            $unmappedFields = [];
-            $rowNumber = 1;
-
-            // Get headers
-            $headers = [];
-            $firstRow = $worksheet->getRowIterator(1, 1)->current();
-            foreach ($firstRow->getCellIterator() as $cell) {
-                $value = $cell->getValue();
-                if (!empty($value)) {
-                    $headers[] = trim($value);
-                }
-            }
-
-            // Check for unmapped required fields
-            $requiredFields = ['name'];
-            foreach ($requiredFields as $requiredField) {
-                if (empty($fieldMappings[$requiredField])) {
-                    $unmappedFields[] = $requiredField;
-                }
-            }
-
-            // Process rows (skip header row)
-            foreach ($worksheet->getRowIterator(2) as $row) {
-                $rowNumber++;
-                $rowData = [];
-                $cellIterator = $row->getCellIterator();
-                $cellIterator->setIterateOnlyExistingCells(false);
-
-                $colIndex = 0;
-                foreach ($cellIterator as $cell) {
-                    if ($colIndex < count($headers)) {
-                        $rowData[$headers[$colIndex]] = $cell->getValue();
-                    }
-                    $colIndex++;
-                }
-
-                // Map fields
-                $mappedData = [];
-                foreach ($fieldMappings as $systemField => $fileHeader) {
-                    if (!empty($fileHeader) && isset($rowData[$fileHeader])) {
-                        $mappedData[$systemField] = $rowData[$fileHeader];
-                    }
-                }
-
-                // Validate required fields
-                $isValid = true;
-                $skipReason = '';
-
-                if (empty($mappedData['name'])) {
-                    $isValid = false;
-                    $skipReason = 'Missing required field: Item Name';
-                }
-
-                // Check for duplicates if skip mode
-                if ($isValid && $duplicateHandling === 'skip') {
-                    $existingProduct = Product::where('name', $mappedData['name'])->first();
-                    if ($existingProduct) {
-                        $isValid = false;
-                        $skipReason = 'Duplicate product name';
-                    }
-                }
-
-                if ($isValid) {
-                    $readyItems[] = [
-                        'row' => $rowNumber,
-                        'data' => $mappedData,
-                    ];
-                } else {
-                    $skippedItems[] = [
-                        'row' => $rowNumber,
-                        'reason' => $skipReason,
-                        'data' => $mappedData,
-                    ];
-                }
-            }
-
-            // Store file temporarily for final import
-            $tempFileName = 'import_' . time() . '_' . $file->getClientOriginalName();
-            $file->storeAs('temp_imports', $tempFileName);
-
-            $preview = [
-                'total_items' => count($readyItems) + count($skippedItems),
-                'ready_items' => count($readyItems),
-                'skipped_items' => count($skippedItems),
-                'unmapped_fields' => count($unmappedFields),
-                'ready_details' => array_slice($readyItems, 0, 50), // Limit to 50 for display
-                'skipped_details' => array_slice($skippedItems, 0, 50),
-                'unmapped_fields_list' => $unmappedFields,
-                'temp_file' => $tempFileName,
-            ];
-
-            // Return JSON for API calls (check for JSON accept header or X-Requested-With header)
-            if ($request->wantsJson() || $request->ajax() || $request->expectsJson() || 
-                $request->header('Accept') === 'application/json' ||
-                $request->header('X-Requested-With') === 'XMLHttpRequest') {
-                return response()->json([
-                    'preview' => $preview,
-                ]);
-            }
-
-            // Return Inertia response
-            return back()->with([
-                'preview' => $preview,
-            ]);
-        } catch (\Exception $e) {
-            // Return JSON for API calls
-            if ($request->wantsJson() || $request->ajax() || $request->expectsJson() || 
-                $request->header('Accept') === 'application/json' ||
-                $request->header('X-Requested-With') === 'XMLHttpRequest') {
-                return response()->json([
-                    'error' => $e->getMessage(),
-                ], 422);
-            }
-            return back()->withErrors(['error' => $e->getMessage()]);
+            return redirect()
+                ->route('products.index')
+                ->with('error', 'Import failed: ' . $e->getMessage());
         }
     }
 

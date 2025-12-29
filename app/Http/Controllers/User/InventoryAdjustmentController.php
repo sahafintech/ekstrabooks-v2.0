@@ -623,26 +623,261 @@ class InventoryAdjustmentController extends Controller
             ->with('success', _lang('Inventory adjustments restored successfully'));
     }
 
-    public function import_adjustments(Request $request)
+    public function import()
     {
         Gate::authorize('inventory_adjustments.import');
+        
+        return Inertia::render('Backend/User/InventoryAdjustment/Import');
+    }
+
+    public function uploadImportFile(Request $request)
+    {
+        Gate::authorize('inventory_adjustments.import');
+        
+        // If this is a GET request (page refresh), redirect to step 1
+        if ($request->isMethod('get')) {
+            return redirect()->route('inventory_adjustments.import.page');
+        }
+        
         $request->validate([
-            'adjustments_file' => 'required|mimes:xls,xlsx,csv',
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
         ]);
 
         try {
-            Excel::import(new InventoryAdjustmentImport, $request->file('adjustments_file'));
+            // Create a unique temporary directory
+            $sessionId = session()->getId();
+            $tempDir = storage_path("app/imports/temp/{$sessionId}");
 
-        // audit log
-        $audit = new AuditLog();
-        $audit->date_changed = date('Y-m-d H:i:s');
-        $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Imported Inventory Adjustments';
-        $audit->save();
+            // Ensure directory exists with proper permissions
+            if (!is_dir($tempDir)) {
+                mkdir($tempDir, 0755, true);
+            }
 
-            return redirect()->route('inventory_adjustments.index')->with('success', _lang('Inventory Adjustments Imported'));
+            // Generate unique filename
+            $fileName = uniqid() . '_' . $request->file('file')->getClientOriginalName();
+            $fullPath = $tempDir . '/' . $fileName;
+
+            // Move uploaded file
+            $request->file('file')->move($tempDir, $fileName);
+
+            // Verify file exists
+            if (!file_exists($fullPath)) {
+                throw new \Exception('Failed to store uploaded file');
+            }
+
+            // Store relative path for later use
+            $relativePath = "imports/temp/{$sessionId}/{$fileName}";
+
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+            $worksheet = $spreadsheet->getActiveSheet();
+            $headers = [];
+
+            foreach ($worksheet->getRowIterator(1, 1) as $row) {
+                $cellIterator = $row->getCellIterator();
+                $cellIterator->setIterateOnlyExistingCells(false);
+
+                foreach ($cellIterator as $cell) {
+                    $value = $cell->getValue();
+                    if ($value) {
+                        $headers[] = (string) $value;
+                    }
+                }
+            }
+
+            // Store in session with explicit save
+            session()->put('adjustment_import_file_path', $relativePath);
+            session()->put('adjustment_import_full_path', $fullPath);
+            session()->put('adjustment_import_file_name', $request->file('file')->getClientOriginalName());
+            session()->put('adjustment_import_headers', $headers);
+            session()->save();
+
+            return Inertia::render('Backend/User/InventoryAdjustment/Import', [
+                'previewData' => [
+                    'headers' => $headers,
+                ],
+            ]);
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', _lang('An error occurred: ') . $e->getMessage());
+            return back()->with('error', 'Failed to process file: ' . $e->getMessage());
+        }
+    }
+
+    public function previewImport(Request $request)
+    {
+        Gate::authorize('inventory_adjustments.import');
+        
+        // If this is a GET request (page refresh), redirect to step 1
+        if ($request->isMethod('get')) {
+            return redirect()->route('inventory_adjustments.import.page');
+        }
+        
+        $mappings = $request->input('mappings', []);
+        $fullPath = session('adjustment_import_full_path');
+        $headers = session('adjustment_import_headers', []);
+
+        if (!$fullPath || !file_exists($fullPath)) {
+            return back()->with('error', 'Import session expired or file not found. Please upload your file again.');
+        }
+
+        try {
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+            $worksheet = $spreadsheet->getActiveSheet();
+
+            $headers = session('adjustment_import_headers', []);
+            $previewRecords = [];
+            $validCount = 0;
+            $errorCount = 0;
+            $warningCount = 0;
+            $totalRows = 0;
+
+            // Process rows (skip header row)
+            foreach ($worksheet->getRowIterator(2) as $row) {
+                $rowIndex = $row->getRowIndex();
+                $totalRows++;
+
+                $cellIterator = $row->getCellIterator();
+                $cellIterator->setIterateOnlyExistingCells(false);
+
+                $rowData = [];
+                $cellIndex = 0;
+
+                foreach ($cellIterator as $cell) {
+                    if ($cellIndex < count($headers)) {
+                        $header = $headers[$cellIndex];
+                        $systemField = $mappings[$header] ?? null;
+
+                        if ($systemField && $systemField !== 'skip') {
+                            $rowData[$systemField] = $cell->getValue();
+                        }
+                    }
+                    $cellIndex++;
+                }
+
+                // Validate row
+                $errors = [];
+
+                // Validate product exists
+                $hasProduct = false;
+                if (!empty($rowData['product_id'])) {
+                    $product = Product::find($rowData['product_id']);
+                    if (!$product) {
+                        $errors[] = 'Product with ID "' . $rowData['product_id'] . '" not found';
+                    } else {
+                        $hasProduct = true;
+                    }
+                } elseif (!empty($rowData['product_name'])) {
+                    $product = Product::where('name', $rowData['product_name'])->first();
+                    if (!$product) {
+                        $errors[] = 'Product "' . $rowData['product_name'] . '" not found';
+                    } else {
+                        $hasProduct = true;
+                    }
+                } else {
+                    $errors[] = 'Product ID or Product Name is required';
+                }
+
+                // Validate account exists
+                $hasAccount = false;
+                if (!empty($rowData['account_id'])) {
+                    $account = Account::find($rowData['account_id']);
+                    if (!$account) {
+                        $errors[] = 'Account with ID "' . $rowData['account_id'] . '" not found';
+                    } else {
+                        $hasAccount = true;
+                    }
+                } elseif (!empty($rowData['account_name'])) {
+                    $account = Account::where('account_name', $rowData['account_name'])->first();
+                    if (!$account) {
+                        $errors[] = 'Account "' . $rowData['account_name'] . '" not found';
+                    } else {
+                        $hasAccount = true;
+                    }
+                } else {
+                    $errors[] = 'Account ID or Account Name is required';
+                }
+
+                // Validate adjusted quantity
+                if (empty($rowData['adjusted_quantity']) || $rowData['adjusted_quantity'] == 0) {
+                    $errors[] = 'Adjusted quantity is required and must not be zero';
+                }
+
+                $status = count($errors) > 0 ? 'error' : 'valid';
+                if ($status === 'error') {
+                    $errorCount++;
+                } else {
+                    $validCount++;
+                }
+
+                // Only add rows with errors to preview_records
+                if ($status === 'error') {
+                    $previewRecords[] = [
+                        'row' => $rowIndex,
+                        'data' => $rowData,
+                        'status' => $status,
+                        'errors' => $errors,
+                    ];
+                }
+            }
+
+            session()->put('adjustment_import_mappings', $mappings);
+            session()->save();
+
+            return Inertia::render('Backend/User/InventoryAdjustment/Import', [
+                'previewData' => [
+                    'headers' => $headers,
+                    'total_rows' => $totalRows,
+                    'preview_records' => $previewRecords,
+                    'valid_count' => $validCount,
+                    'error_count' => $errorCount,
+                    'warning_count' => $warningCount,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to preview import: ' . $e->getMessage());
+        }
+    }
+
+    public function executeImport(Request $request)
+    {
+        Gate::authorize('inventory_adjustments.import');
+        
+        // If this is a GET request (page refresh), redirect to step 1
+        if ($request->isMethod('get')) {
+            return redirect()->route('inventory_adjustments.import.page');
+        }
+        
+        $mappings = session('adjustment_import_mappings', []);
+        $fullPath = session('adjustment_import_full_path');
+        $headers = session('adjustment_import_headers', []);
+
+        if (!$fullPath || !file_exists($fullPath)) {
+            return redirect()
+                ->route('inventory_adjustments.index')
+                ->with('error', 'Import session expired or file not found. Please start over.');
+        }
+
+        try {
+            Excel::import(new InventoryAdjustmentImport($mappings), $fullPath);
+
+            // audit log
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Imported Inventory Adjustments - ' . session('adjustment_import_file_name');
+            $audit->save();
+
+            // Clean up
+            if (file_exists($fullPath)) {
+                unlink($fullPath);
+            }
+            session()->forget(['adjustment_import_file_path', 'adjustment_import_full_path', 'adjustment_import_file_name', 'adjustment_import_headers', 'adjustment_import_mappings']);
+
+            return redirect()
+                ->route('inventory_adjustments.index')
+                ->with('success', 'Inventory adjustments imported successfully.');
+        } catch (\Exception $e) {
+            return redirect()
+                ->route('inventory_adjustments.index')
+                ->with('error', 'Import failed: ' . $e->getMessage());
         }
     }
 
