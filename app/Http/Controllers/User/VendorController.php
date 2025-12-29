@@ -391,14 +391,14 @@ class VendorController extends Controller
 
     public function import()
     {
-        Gate::authorize('vendors.import');
+        Gate::authorize('vendors.csv.import');
         
         return Inertia::render('Backend/User/Vendor/Import');
     }
 
     public function uploadImportFile(Request $request)
     {
-        Gate::authorize('vendors.import');
+        Gate::authorize('vendors.csv.import');
         
         // If this is a GET request (page refresh), redirect to step 1
         if ($request->isMethod('get')) {
@@ -469,7 +469,7 @@ class VendorController extends Controller
 
     public function previewImport(Request $request)
     {
-        Gate::authorize('vendors.import');
+        Gate::authorize('vendors.csv.import');
         
         // If this is a GET request (page refresh), redirect to step 1
         if ($request->isMethod('get')) {
@@ -581,7 +581,7 @@ class VendorController extends Controller
 
     public function executeImport(Request $request)
     {
-        Gate::authorize('vendors.import');
+        Gate::authorize('vendors.csv.import');
         
         // If this is a GET request (page refresh), redirect to step 1
         if ($request->isMethod('get')) {
@@ -632,7 +632,7 @@ class VendorController extends Controller
      */
     public function export_vendors($type)
     {
-        Gate::authorize('vendors.export');
+        Gate::authorize('vendors.csv.export');
         $filename = date('Y-m-d') . '_vendors.' . $type;
 
         // audit log
