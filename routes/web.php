@@ -548,8 +548,11 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('cash_purchases/bulk_restore', [CashPurchaseController::class, 'bulk_restore'])->name('cash_purchases.bulk_restore');
 		Route::post('cash_purchases/bulk_permanent_destroy', [CashPurchaseController::class, 'bulk_permanent_destroy'])->name('cash_purchases.bulk_permanent_destroy');
 		Route::delete('cash_purchases/{id}/permanent_destroy', [CashPurchaseController::class, 'permanent_destroy'])->name('cash_purchases.permanent_destroy');
+		Route::get('cash_purchases/import', [CashPurchaseController::class, 'import'])->name('cash_purchases.import.page');
+		Route::match(['get', 'post'], 'cash_purchases/import/upload', [CashPurchaseController::class, 'uploadImportFile'])->name('cash_purchases.import.upload');
+		Route::match(['get', 'post'], 'cash_purchases/import/preview', [CashPurchaseController::class, 'previewImport'])->name('cash_purchases.import.preview');
+		Route::match(['get', 'post'], 'cash_purchases/import/execute', [CashPurchaseController::class, 'executeImport'])->name('cash_purchases.import.execute');
 		Route::resource('cash_purchases', CashPurchaseController::class);
-		Route::post('import_cash_purchases', [CashPurchaseController::class, 'import_cash_purchases'])->name('cash_purchases.import');
 		Route::post('all_bills', [CashPurchaseController::class, 'bills_all'])->name('cash_purchases.all');
 		Route::get('export_cash_purchases', [CashPurchaseController::class, 'export_cash_purchases'])->name('cash_purchases.export');
 		Route::get('cash_purchases/voucher/{id}', [CashPurchaseController::class, 'voucher'])->name('cash_purchases.voucher');
