@@ -63,68 +63,7 @@ const DeleteCashPurchaseModal = ({ show, onClose, onConfirm, processing }) => (
   </Modal>
 );
 
-const ImportCashPurchasesModal = ({ show, onClose, onSubmit, processing }) => (
-  <Modal show={show} onClose={onClose}>
-    <form onSubmit={onSubmit} className="p-6">
-      <div className="ti-modal-header">
-        <h3 className="text-lg font-bold">Import Cash Purchases</h3>
-      </div>
-      <div className="ti-modal-body grid grid-cols-12">
-        <div className="col-span-12">
-          <div className="flex items-center justify-between">
-            <label className="block font-medium text-sm text-gray-700">
-              Cash Purchases File
-            </label>
-            <Link href="/uploads/media/default/sample_cash_purchases.xlsx">
-              <Button variant="secondary" size="sm">
-                Use This Sample File
-              </Button>
-            </Link>
-          </div>
-          <input type="file" className="w-full dropify" name="cash_purchases_file" required />
-        </div>
-        <div className="col-span-12 mt-4">
-          <ul className="space-y-3 text-sm">
-            <li className="flex space-x-3">
-              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
-              <span className="text-gray-800 dark:text-white/70">
-                Maximum File Size: 1 MB
-              </span>
-            </li>
-            <li className="flex space-x-3">
-              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
-              <span className="text-gray-800 dark:text-white/70">
-                File format Supported: CSV, TSV, XLS
-              </span>
-            </li>
-            <li className="flex space-x-3">
-              <span className="text-primary bg-primary/20 rounded-full px-1">✓</span>
-              <span className="text-gray-800 dark:text-white/70">
-                Make sure the format of the import file matches our sample file by comparing them.
-              </span>
-            </li>
-          </ul>
-        </div>
-      </div>
-      <div className="ti-modal-footer flex justify-end mt-4">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={onClose}
-          className="mr-3"
-        >
-          Close
-        </Button>
-        <Button
-          type="submit"
-          disabled={processing}
-        >
-          Import Cash Purchases
-        </Button>
-      </div>
-    </form>
-  </Modal>
-);
+
 
 const DeleteAllCashPurchasesModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
@@ -305,7 +244,6 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [showBulkApproveModal, setShowBulkApproveModal] = useState(false);
   const [showBulkRejectModal, setShowBulkRejectModal] = useState(false);
@@ -387,25 +325,6 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
           setProcessing(false);
         }
       });
-  };
-
-
-
-  const handleImport = (e) => {
-    e.preventDefault();
-    setProcessing(true);
-
-    const formData = new FormData(e.target);
-
-    router.post(route("cash_purchases.import"), formData, {
-      onSuccess: () => {
-        setShowImportModal(false);
-        setProcessing(false);
-      },
-      onError: (errors) => {
-        setProcessing(false);
-      }
-    });
   };
 
   const handleSearch = (e) => {
@@ -614,9 +533,11 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setShowImportModal(true)}>
-                      <FileUp className="mr-2 h-4 w-4" /> Import
-                    </DropdownMenuItem>
+                    <Link href={route('cash_purchases.import.page')}>
+                      <DropdownMenuItem>
+                        <FileUp className="mr-2 h-4 w-4" /> Import
+                      </DropdownMenuItem>
+                    </Link>
                     <DropdownMenuItem onClick={exportCashPurchases}>
                       <FileDown className="mr-2 h-4 w-4" /> Export
                     </DropdownMenuItem>
@@ -877,13 +798,6 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
         onConfirm={handleDeleteAll}
         processing={processing}
         count={selectedPurchases.length}
-      />
-
-      <ImportCashPurchasesModal
-        show={showImportModal}
-        onClose={() => setShowImportModal(false)}
-        onSubmit={handleImport}
-        processing={processing}
       />
 
       <BulkApproveModal

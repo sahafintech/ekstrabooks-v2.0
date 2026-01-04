@@ -791,8 +791,8 @@ class ReportController extends Controller
 
 			$debit_amount = $account->dr_amount ?? 0;
 			$credit_amount = $account->cr_amount ?? 0;
-			$balance = $account->dr_cr == 'dr' 
-				? $debit_amount - $credit_amount 
+			$balance = $account->dr_cr == 'dr'
+				? $debit_amount - $credit_amount
 				: $credit_amount - $debit_amount;
 
 			$grand_total_debit += $debit_amount;
@@ -2168,7 +2168,7 @@ class ReportController extends Controller
 			return Inertia::render('Backend/User/Reports/BalanceSheet', [
 				'report_data' => $report_data,
 				'date2' => $date2,
-				'base_currency' => $request->activeBusiness->base_currency,
+				'base_currency' => $request->activeBusiness->currency,
 				'business_name' => $request->activeBusiness->name,
 			]);
 		}
@@ -3223,36 +3223,36 @@ class ReportController extends Controller
 				$query->where('sub_categories.id', $sub_category);
 			}
 
-				$products = $query->addSelect([
-					'total_sold_invoices' => InvoiceItem::selectRaw('IFNULL(SUM(quantity), 0)')
-						->whereColumn('product_id', 'products.id')
-						->whereHas('invoice', function ($query) use ($date1, $date2) {
-							$query->whereDate('invoice_date', '>=', $date1)
-								->whereDate('invoice_date', '<=', $date2);
-						}),
-					'total_sold_receipts' => ReceiptItem::selectRaw('IFNULL(SUM(quantity), 0)')
-						->whereColumn('product_id', 'products.id')
-						->whereHas('receipt', function ($query) use ($date1, $date2) {
-							$query->whereDate('receipt_date', '>=', $date1)
-								->whereDate('receipt_date', '<=', $date2);
-						}),
-					'total_stock_in' => PurchaseItem::selectRaw('IFNULL(SUM(quantity), 0)')
-						->whereColumn('product_id', 'products.id')
-						->whereHas('purchase', function ($query) use ($date1, $date2) {
-							$query->whereDate('purchase_date', '>=', $date1)
-								->whereDate('purchase_date', '<=', $date2);
-						}),
-					'total_stock_adjustment_added' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
-						->whereColumn('product_id', 'products.id')
-						->where('adjustment_type', 'adds')
-						->whereDate('adjustment_date', '>=', $date1)
-						->whereDate('adjustment_date', '<=', $date2),
-					'total_stock_adjustment_deducted' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
-						->whereColumn('product_id', 'products.id')
-						->where('adjustment_type', 'deducts')
-						->whereDate('adjustment_date', '>=', $date1)
-						->whereDate('adjustment_date', '<=', $date2),
-				])
+			$products = $query->addSelect([
+				'total_sold_invoices' => InvoiceItem::selectRaw('IFNULL(SUM(quantity), 0)')
+					->whereColumn('product_id', 'products.id')
+					->whereHas('invoice', function ($query) use ($date1, $date2) {
+						$query->whereDate('invoice_date', '>=', $date1)
+							->whereDate('invoice_date', '<=', $date2);
+					}),
+				'total_sold_receipts' => ReceiptItem::selectRaw('IFNULL(SUM(quantity), 0)')
+					->whereColumn('product_id', 'products.id')
+					->whereHas('receipt', function ($query) use ($date1, $date2) {
+						$query->whereDate('receipt_date', '>=', $date1)
+							->whereDate('receipt_date', '<=', $date2);
+					}),
+				'total_stock_in' => PurchaseItem::selectRaw('IFNULL(SUM(quantity), 0)')
+					->whereColumn('product_id', 'products.id')
+					->whereHas('purchase', function ($query) use ($date1, $date2) {
+						$query->whereDate('purchase_date', '>=', $date1)
+							->whereDate('purchase_date', '<=', $date2);
+					}),
+				'total_stock_adjustment_added' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
+					->whereColumn('product_id', 'products.id')
+					->where('adjustment_type', 'adds')
+					->whereDate('adjustment_date', '>=', $date1)
+					->whereDate('adjustment_date', '<=', $date2),
+				'total_stock_adjustment_deducted' => InventoryAdjustment::selectRaw('IFNULL(SUM(adjusted_quantity), 0)')
+					->whereColumn('product_id', 'products.id')
+					->where('adjustment_type', 'deducts')
+					->whereDate('adjustment_date', '>=', $date1)
+					->whereDate('adjustment_date', '<=', $date2),
+			])
 				->get()
 				->map(function ($product) {
 					// Calculate the total sold by summing invoices and receipts
