@@ -181,7 +181,7 @@ final class ProductImport implements SkipsOnFailure, ToModel, WithBatchInserts, 
         $initialStock = !empty($data['initial_stock']) ? (float) $data['initial_stock'] : 0;
 
         $productData = [
-            'code' => !empty($data['code']) ? strtoupper($data['code']) : null,
+            'code' => !empty($data['code']) ? strtoupper((string) $data['code']) : null,
             'name' => !empty($data['name']) ? ucwords($data['name']) : '',
             'type' => !empty($data['type']) ? strtolower($data['type']) : 'product',
             'product_unit_id' => $productUnitId,
