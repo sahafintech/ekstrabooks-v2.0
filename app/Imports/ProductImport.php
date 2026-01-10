@@ -40,14 +40,14 @@ final class ProductImport implements SkipsOnFailure, ToModel, WithBatchInserts, 
     private function mapRowData(array $row): array
     {
         $mappedData = [];
-        
+
         // Invert mappings: we have header => system_field, we need to find system_field values
         $invertedMappings = array_flip($this->mappings);
-        
+
         foreach ($row as $header => $value) {
             // Normalize header (Excel/PhpSpreadsheet converts to lowercase with underscores)
             $normalizedHeader = $this->normalizeHeader($header);
-            
+
             // Check if this header is mapped to a system field
             foreach ($this->mappings as $excelHeader => $systemField) {
                 $normalizedExcelHeader = $this->normalizeHeader($excelHeader);
@@ -57,15 +57,16 @@ final class ProductImport implements SkipsOnFailure, ToModel, WithBatchInserts, 
                 }
             }
         }
-        
+
         return $mappedData;
     }
 
     /**
      * Normalize header for comparison
      */
-    private function normalizeHeader(string $header): string
+    private function normalizeHeader(string|int $header): string
     {
+        $header = (string) $header;
         return strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', trim($header)));
     }
 
@@ -76,7 +77,7 @@ final class ProductImport implements SkipsOnFailure, ToModel, WithBatchInserts, 
     {
         // Apply field mappings to transform row data
         $data = $this->mapRowData($row);
-        
+
         // Skip empty rows
         if (empty($data['name']) && empty($data['code'])) {
             return null;
@@ -209,18 +210,18 @@ final class ProductImport implements SkipsOnFailure, ToModel, WithBatchInserts, 
                 // Handle stock difference for updates
                 $previousInitialStock = $product->initial_stock ?? 0;
                 $stockDifference = $initialStock - $previousInitialStock;
-                
+
                 $product->update($productData);
-                
+
                 // Update current stock
                 if ($stockDifference != 0) {
                     $product->stock = ($product->stock ?? 0) + $stockDifference;
                     $product->save();
-                    
+
                     // Handle transactions for stock changes
                     $this->handleStockTransactions($product, $stockDifference);
                 }
-                
+
                 return null; // Return null since we've already updated
             }
         }
@@ -228,11 +229,11 @@ final class ProductImport implements SkipsOnFailure, ToModel, WithBatchInserts, 
         // Create new product
         $product = new Product($productData);
         $product->save();
-        
+
         if ($initialStock > 0) {
             $this->createStockTransactions($product, $initialStock, 'Opening Stock');
         }
-        
+
         return null; // Return null since we've already saved manually
     }
 
