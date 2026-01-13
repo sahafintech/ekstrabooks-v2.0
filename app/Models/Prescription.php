@@ -19,12 +19,8 @@ class Prescription extends Model
         return $this->belongsTo(Customer::class, 'customer_id');
     }
 
-    public function medical_record()
+    public function items()
     {
-        return $this->belongsTo(MedicalRecord::class, 'medical_records_id');
-    }
-
-    public function items() {
         return $this->hasManyThrough(PrescriptionProductItem::class, PrescriptionProduct::class, 'prescription_id', 'prescription_products_id');
     }
 
@@ -33,7 +29,7 @@ class Prescription extends Model
         $date_format = get_date_format();
 
         return Attribute::make(
-            get: fn ($value) => $value != null ? \Carbon\Carbon::parse($value)->format("$date_format") : null,
+            get: fn($value) => $value != null ? \Carbon\Carbon::parse($value)->format("$date_format") : null,
         );
     }
 
@@ -42,7 +38,7 @@ class Prescription extends Model
         $date_format = get_date_format();
 
         return Attribute::make(
-            get: fn ($value) => $value != null ? \Carbon\Carbon::parse($value)->format("$date_format") : null,
+            get: fn($value) => $value != null ? \Carbon\Carbon::parse($value)->format("$date_format") : null,
         );
     }
 }

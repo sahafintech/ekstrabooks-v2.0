@@ -19,7 +19,7 @@ class PrescriptionController extends Controller
     public function index(Request $request)
     {
         Gate::authorize('prescriptions.view');
-        $query = Prescription::with('customer', 'medical_record');
+        $query = Prescription::with('customer');
 
         // handle search
         if ($request->has('search') && !empty($request->get('search'))) {
@@ -42,8 +42,8 @@ class PrescriptionController extends Controller
         if (in_array($sortColumn, ['customer.name', 'customer.age', 'customer.mobile'])) {
             $customerField = explode('.', $sortColumn)[1];
             $query->join('customers', 'prescriptions.customer_id', '=', 'customers.id')
-                  ->orderBy('customers.' . $customerField, $sortDirection)
-                  ->select('prescriptions.*');
+                ->orderBy('customers.' . $customerField, $sortDirection)
+                ->select('prescriptions.*');
         } else {
             $query->orderBy('prescriptions.' . $sortColumn, $sortDirection);
         }
@@ -72,7 +72,7 @@ class PrescriptionController extends Controller
     public function trash(Request $request)
     {
         Gate::authorize('prescriptions.view');
-        $query = Prescription::onlyTrashed()->with('customer', 'medical_record');
+        $query = Prescription::onlyTrashed()->with('customer');
 
         // handle search
         if ($request->has('search') && !empty($request->get('search'))) {
@@ -95,8 +95,8 @@ class PrescriptionController extends Controller
         if (in_array($sortColumn, ['customer.name', 'customer.age', 'customer.mobile'])) {
             $customerField = explode('.', $sortColumn)[1];
             $query->join('customers', 'prescriptions.customer_id', '=', 'customers.id')
-                  ->orderBy('customers.' . $customerField, $sortDirection)
-                  ->select('prescriptions.*');
+                ->orderBy('customers.' . $customerField, $sortDirection)
+                ->select('prescriptions.*');
         } else {
             $query->orderBy('prescriptions.' . $sortColumn, $sortDirection);
         }
