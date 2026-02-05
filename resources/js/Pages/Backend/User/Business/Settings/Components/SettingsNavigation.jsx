@@ -13,6 +13,7 @@ const tabs = [
     { id: "pos_settings", label: "POS Settings", icon: "🖥️" },
     { id: "payroll", label: "Payroll", icon: "💳" },
     { id: "approvals", label: "Approvals", icon: "✅" },
+    { id: "checkers", label: "Checkers", icon: "🕵️" },
 ];
 
 export default function SettingsNavigation({ activeTab, businessId }) {

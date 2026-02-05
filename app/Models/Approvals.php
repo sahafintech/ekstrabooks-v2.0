@@ -11,6 +11,7 @@ class Approvals extends Model
     protected $fillable = [
         'ref_id',
         'ref_name',
+        'checker_type',
         'status',
         'comment',
         'action_date',

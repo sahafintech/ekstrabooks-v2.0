@@ -26,7 +26,8 @@ import {
     CheckCircle,
     XCircle,
     Clock,
-    Users
+    Users,
+    ShieldCheck
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Table, TableBody, TableHeader, TableRow, TableHead, TableCell } from "@/Components/ui/table";
@@ -79,7 +80,7 @@ const printStyles = `
     }
 `;
 
-export default function View({ bill, attachments, decimalPlace, email_templates, approvalUsersCount, hasConfiguredApprovers }) {
+export default function View({ bill, attachments, decimalPlace, email_templates, approvalUsersCount, hasConfiguredApprovers, checkerUsersCount, hasConfiguredCheckers }) {
     const { flash = {} } = usePage().props;
     const { toast: toastHook } = useToast();
     const [isLoading, setIsLoading] = useState({
@@ -91,10 +92,14 @@ export default function View({ bill, attachments, decimalPlace, email_templates,
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isAttachmentsModalOpen, setIsAttachmentsModalOpen] = useState(false);
     const [isApprovalsDrawerOpen, setIsApprovalsDrawerOpen] = useState(false);
+    const [isCheckersDrawerOpen, setIsCheckersDrawerOpen] = useState(false);
     const [isApproveRejectModalOpen, setIsApproveRejectModalOpen] = useState(false);
+    const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
     const [approvalAction, setApprovalAction] = useState(null); // 'approve' or 'reject'
     const [approvalComment, setApprovalComment] = useState('');
+    const [verifyComment, setVerifyComment] = useState('');
     const [isSubmittingApproval, setIsSubmittingApproval] = useState(false);
+    const [isSubmittingVerify, setIsSubmittingVerify] = useState(false);
     const [shareLink, setShareLink] = useState('');
 
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -108,6 +113,11 @@ export default function View({ bill, attachments, decimalPlace, email_templates,
         setApprovalAction(action);
         setApprovalComment('');
         setIsApproveRejectModalOpen(true);
+    };
+
+    const handleVerifyAction = () => {
+        setVerifyComment('');
+        setIsVerifyModalOpen(true);
     };
 
     const submitApprovalAction = () => {
@@ -139,6 +149,30 @@ export default function View({ bill, attachments, decimalPlace, email_templates,
         });
     };
 
+    const submitVerifyAction = () => {
+        setIsSubmittingVerify(true);
+
+        router.post(route('bill_invoices.verify', bill.id), {
+            comment: verifyComment
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setIsVerifyModalOpen(false);
+                setVerifyComment('');
+                setIsSubmittingVerify(false);
+                toast.success('Bill verified successfully');
+            },
+            onError: (errors) => {
+                setIsSubmittingVerify(false);
+                if (errors.comment) {
+                    toast.error(errors.comment);
+                } else {
+                    toast.error('Failed to verify bill');
+                }
+            }
+        });
+    };
+
     // Get current user's approval status
     const userApproval = bill.approvals?.find(approval => approval.action_user?.id === usePage().props.auth.user.id);
     // User can only take approval actions if:
@@ -153,6 +187,19 @@ export default function View({ bill, attachments, decimalPlace, email_templates,
     const hasAlreadyApproved = currentStatus === 1;
     const hasAlreadyRejected = currentStatus === 2;
 
+    // Get current user's checker status
+    const userChecker = bill.checkers?.find(checker => checker.action_user?.id === usePage().props.auth.user.id);
+    // User can only take verify actions if:
+    // 1. There are configured checkers in the system
+    // 2. AND the user is one of the assigned checkers
+    const canVerify = hasConfiguredCheckers && userChecker !== undefined;
+    const currentVerifyStatus = userChecker?.status || null;
+    // Check individual user's checker status:
+    // - status 0 (pending): Show Verify button
+    // - status 1 (verified): Already verified
+    // - status 2 (rejected): Show Verify button (to change vote)
+    const hasAlreadyVerified = currentVerifyStatus === 1;
+
     const handlePrint = () => {
         setIsLoading(prev => ({ ...prev, print: true }));
         setTimeout(() => {
@@ -163,22 +210,22 @@ export default function View({ bill, attachments, decimalPlace, email_templates,
 
     useEffect(() => {
         if (flash && flash.success) {
-          toastHook({
-            title: "Success",
-            description: flash.success,
-          });
+            toastHook({
+                title: "Success",
+                description: flash.success,
+            });
         }
-    
-        if (flash && flash.error) {
-          toastHook({
-            variant: "destructive",
-            title: "Error",
-            description: flash.error,
-          });
-        }
-      }, [flash, toastHook]);
 
-      const BillStatusBadge = ({ status }) => {
+        if (flash && flash.error) {
+            toastHook({
+                variant: "destructive",
+                title: "Error",
+                description: flash.error,
+            });
+        }
+    }, [flash, toastHook]);
+
+    const BillStatusBadge = ({ status }) => {
         const statusMap = {
             0: {
                 label: "Active",
@@ -193,10 +240,10 @@ export default function View({ bill, attachments, decimalPlace, email_templates,
                 className: "text-green-600",
             },
         };
-    
+
         return (
-            <Badge variant="outline" className={statusMap[status].className}>
-                {statusMap[status].label}: (Paid {formatCurrency({ amount: bill.paid, currency: bill.currency })})
+            <Badge variant="outline" className="gap-1 text-green-600 border-green-600 mt-2">
+                {statusMap[status].label}: (Paid {formatCurrency({ amount: bill.paid })})
             </Badge>
         );
     };
@@ -266,14 +313,17 @@ export default function View({ bill, attachments, decimalPlace, email_templates,
                     />
 
                     <div className="flex items-center justify-end space-x-2 mb-4">
-                        {attachments && attachments.length > 0 && (
+                        {checkerUsersCount > 0 && (
                             <Button
                                 variant="outline"
-                                onClick={() => setIsAttachmentsModalOpen(true)}
+                                onClick={() => setIsCheckersDrawerOpen(true)}
                                 className="flex items-center"
                             >
-                                <PaperclipIcon className="mr-2 h-4 w-4" />
-                                Attachments ({attachments.length})
+                                <ShieldCheck className="mr-2 h-4 w-4" />
+                                Checkers
+                                <Badge variant="secondary" className="ml-2">
+                                    {checkerUsersCount}
+                                </Badge>
                             </Button>
                         )}
                         {approvalUsersCount > 0 && (
@@ -287,6 +337,16 @@ export default function View({ bill, attachments, decimalPlace, email_templates,
                                 <Badge variant="secondary" className="ml-2">
                                     {approvalUsersCount}
                                 </Badge>
+                            </Button>
+                        )}
+                        {attachments && attachments.length > 0 && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setIsAttachmentsModalOpen(true)}
+                                className="flex items-center"
+                            >
+                                <PaperclipIcon className="mr-2 h-4 w-4" />
+                                Attachments ({attachments.length})
                             </Button>
                         )}
                         <Button
@@ -329,12 +389,12 @@ export default function View({ bill, attachments, decimalPlace, email_templates,
                                     <ShareIcon className="mr-2 h-4 w-4" />
                                     <span>Share Link</span>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem asChild>
-                                    <Link href={route("bill_invoices.edit", bill.id)} className="flex items-center">
-                                        <Edit className="mr-2 h-4 w-4" />
-                                        <span>Edit Credit Purchase</span>
-                                    </Link>
-                                </DropdownMenuItem>
+                                {canVerify && !hasAlreadyVerified && (
+                                    <DropdownMenuItem onClick={() => handleVerifyAction()}>
+                                        <ShieldCheck className="mr-2 h-4 w-4 text-blue-600" />
+                                        <span>Verify</span>
+                                    </DropdownMenuItem>
+                                )}
                                 {canApprove && (
                                     <>
                                         {!hasAlreadyApproved && (
@@ -351,6 +411,12 @@ export default function View({ bill, attachments, decimalPlace, email_templates,
                                         )}
                                     </>
                                 )}
+                                <DropdownMenuItem asChild>
+                                    <Link href={route("bill_invoices.edit", bill.id)} className="flex items-center">
+                                        <Edit className="mr-2 h-4 w-4" />
+                                        <span>Edit Credit Purchase</span>
+                                    </Link>
+                                </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
@@ -369,6 +435,24 @@ export default function View({ bill, attachments, decimalPlace, email_templates,
                                     <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
                                         This bill cannot be approved or rejected until approvers are configured.
                                         Go to <span className="font-medium">Settings → Business Settings → Approval Workflows</span> to assign approvers.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Warning banner when no checkers are configured */}
+                    {!hasConfiguredCheckers && bill.approval_status === 0 && (
+                        <div className="p-4 rounded-lg border border-orange-400 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-600 print:hidden">
+                            <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0 mt-0.5">
+                                    <ShieldCheck className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-medium text-orange-800 dark:text-orange-200">No Checkers Assigned</h3>
+                                    <p className="text-sm text-orange-700 dark:text-orange-300 mt-1">
+                                        This bill cannot be verified until checkers are configured.
+                                        Go to <span className="font-medium">Settings → Business Settings → Checker Workflows</span> to assign checkers.
                                     </p>
                                 </div>
                             </div>
@@ -630,7 +714,7 @@ export default function View({ bill, attachments, decimalPlace, email_templates,
                                         <BillStatusBadge status={bill.status} />
                                     </div>
                                     <div className="mt-4 sm:flex sm:justify-end">
-                                        <QRCodeSVG 
+                                        <QRCodeSVG
                                             value={route('bill_invoices.show_public_bill_invoice', bill.short_code)}
                                             size={100}
                                             level="H"
@@ -660,6 +744,7 @@ export default function View({ bill, attachments, decimalPlace, email_templates,
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
+                                            <TableHead className="print:hidden">Account</TableHead>
                                             <TableHead>Item</TableHead>
                                             <TableHead>Description</TableHead>
                                             <TableHead className="text-right">Quantity</TableHead>
@@ -670,6 +755,11 @@ export default function View({ bill, attachments, decimalPlace, email_templates,
                                     <TableBody>
                                         {bill.items.map((item, index) => (
                                             <TableRow key={index}>
+                                                <TableCell className="print:hidden">
+                                                    {item.account?.account_name ? (
+                                                        <Badge variant="outline" className="gap-1 text-green-600 border-green-600">{item.account.account_name}</Badge>
+                                                    ) : '-'}
+                                                </TableCell>
                                                 <TableCell className="font-medium">{item.product_name}</TableCell>
                                                 <TableCell>{item.description}</TableCell>
                                                 <TableCell className="text-right">{item.quantity}</TableCell>
@@ -905,10 +995,143 @@ export default function View({ bill, attachments, decimalPlace, email_templates,
                         disabled={isSubmittingApproval}
                         className={approvalAction === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
                     >
-                        {isSubmittingApproval 
-                            ? (approvalAction === 'approve' ? 'Approving...' : 'Rejecting...') 
+                        {isSubmittingApproval
+                            ? (approvalAction === 'approve' ? 'Approving...' : 'Rejecting...')
                             : (approvalAction === 'approve' ? 'Approve' : 'Reject')
                         }
+                    </Button>
+                </div>
+            </Modal>
+
+            {/* Checkers Drawer */}
+            <DrawerComponent
+                open={isCheckersDrawerOpen}
+                onOpenChange={setIsCheckersDrawerOpen}
+                title="Bill Verification"
+                position="right"
+                width="w-4xl"
+            >
+                <div className="p-4">
+                    <div className="mb-4">
+                        <p className="text-sm text-gray-600">
+                            View verification status from all assigned checkers
+                        </p>
+                    </div>
+
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Comment</TableHead>
+                                <TableHead>Date</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {bill.checkers && bill.checkers.length > 0 ? (
+                                bill.checkers.map((checker, index) => (
+                                    <TableRow key={index}>
+                                        <TableCell className="font-medium">
+                                            {checker.action_user?.name || 'N/A'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {checker.action_user?.email || 'N/A'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {checker.status === 0 && (
+                                                <Badge variant="outline" className="flex items-center w-fit">
+                                                    <Clock className="h-3 w-3 mr-1" />
+                                                    Pending
+                                                </Badge>
+                                            )}
+                                            {checker.status === 1 && (
+                                                <Badge variant="outline" className="flex items-center w-fit text-blue-600 border-blue-600">
+                                                    <ShieldCheck className="h-3 w-3 mr-1" />
+                                                    Verified
+                                                </Badge>
+                                            )}
+                                            {checker.status === 2 && (
+                                                <Badge variant="outline" className="flex items-center w-fit text-red-600 border-red-600">
+                                                    <XCircle className="h-3 w-3 mr-1" />
+                                                    Rejected
+                                                </Badge>
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            {checker.comment || '-'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {checker.action_date ? new Date(checker.action_date).toLocaleDateString() : '-'}
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center py-8">
+                                        <div className="flex flex-col items-center">
+                                            <ShieldCheck className="h-10 w-10 text-orange-500 mb-3" />
+                                            <p className="font-medium text-orange-700 dark:text-orange-400 mb-2">No Checkers Assigned</p>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                                This bill cannot be verified until checkers are configured.
+                                            </p>
+                                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                                Go to <span className="font-medium">Settings → Business Settings → Checker Workflows</span> to assign checkers.
+                                            </p>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+            </DrawerComponent>
+
+            {/* Verify Modal */}
+            <Modal
+                show={isVerifyModalOpen}
+                onClose={() => setIsVerifyModalOpen(false)}
+                maxWidth="md"
+            >
+                <div className="mb-6">
+                    <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center">
+                        <ShieldCheck className="h-5 w-5 mr-2 text-blue-600" />
+                        Verify Bill
+                    </h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        Add an optional comment for this verification
+                    </p>
+                </div>
+
+                <div className="mb-6">
+                    <label className="block text-sm font-medium mb-2">
+                        Comment
+                    </label>
+                    <Textarea
+                        value={verifyComment}
+                        onChange={(e) => setVerifyComment(e.target.value)}
+                        placeholder="Add a comment (optional)"
+                        rows={4}
+                        className="w-full"
+                    />
+                </div>
+
+                <div className="flex justify-end space-x-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsVerifyModalOpen(false)}
+                        disabled={isSubmittingVerify}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="button"
+                        onClick={submitVerifyAction}
+                        disabled={isSubmittingVerify}
+                        className="bg-blue-600 hover:bg-blue-700"
+                    >
+                        {isSubmittingVerify ? 'Verifying...' : 'Verify'}
                     </Button>
                 </div>
             </Modal>

@@ -41,8 +41,10 @@ return new class extends Migration {
             $table->datetime('email_send_at')->nullable();
             $table->tinyInteger('withholding_tax')->default(0);
             $table->tinyInteger('approval_status')->default(0);
+            $table->tinyInteger('checker_status')->default(0);
             $table->bigInteger('created_by')->nullable()->unsigned();
             $table->bigInteger('approved_by')->nullable()->unsigned();
+            $table->bigInteger('checked_by')->nullable()->unsigned();
             $table->string('benificiary')->nullable();
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
@@ -54,6 +56,7 @@ return new class extends Migration {
 
             $table->foreign('created_by')->references('id')->on('users')->onDelete('cascade');
             $table->foreign('approved_by')->references('id')->on('users')->onDelete('cascade');
+            $table->foreign('checked_by')->references('id')->on('users')->onDelete('cascade');
             $table->foreign('vendor_id')->references('id')->on('vendors')->onDelete('cascade');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->foreign('business_id')->references('id')->on('business')->onDelete('cascade');

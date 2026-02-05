@@ -23,7 +23,9 @@ import {
     CheckCircle,
     XCircle,
     Clock,
-    Users
+    Users,
+    ShieldCheck,
+    ShieldX
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -72,7 +74,7 @@ const printStyles = `
     }
 `;
 
-export default function View({ bill, attachments, decimalPlace, approvalUsersCount, hasConfiguredApprovers }) {
+export default function View({ bill, attachments, decimalPlace, approvalUsersCount, hasConfiguredApprovers, checkerUsersCount, hasConfiguredCheckers }) {
     const [isLoading, setIsLoading] = useState({
         print: false,
         pdf: false
@@ -80,10 +82,15 @@ export default function View({ bill, attachments, decimalPlace, approvalUsersCou
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [isAttachmentsModalOpen, setIsAttachmentsModalOpen] = useState(false);
     const [isApprovalsDrawerOpen, setIsApprovalsDrawerOpen] = useState(false);
+    const [isCheckersDrawerOpen, setIsCheckersDrawerOpen] = useState(false);
     const [isApproveRejectModalOpen, setIsApproveRejectModalOpen] = useState(false);
+    const [isVerifyUnverifyModalOpen, setIsVerifyUnverifyModalOpen] = useState(false);
     const [approvalAction, setApprovalAction] = useState(null); // 'approve' or 'reject'
+    const [verifyAction, setVerifyAction] = useState(null); // 'verify' or 'unverify'
     const [approvalComment, setApprovalComment] = useState('');
+    const [verifyComment, setVerifyComment] = useState('');
     const [isSubmittingApproval, setIsSubmittingApproval] = useState(false);
+    const [isSubmittingVerify, setIsSubmittingVerify] = useState(false);
     const [shareLink, setShareLink] = useState('');
 
     const handleApprovalAction = (action) => {
@@ -121,12 +128,48 @@ export default function View({ bill, attachments, decimalPlace, approvalUsersCou
         });
     };
 
+    const handleVerifyAction = (action) => {
+        setVerifyAction(action);
+        setVerifyComment('');
+        setIsVerifyUnverifyModalOpen(true);
+    };
+
+    const submitVerifyAction = () => {
+        if (verifyAction === 'unverify' && !verifyComment.trim()) {
+            toast.error("Comment is required when rejecting verification");
+            return;
+        }
+
+        setIsSubmittingVerify(true);
+
+        router.post(route(`cash_purchases.${verifyAction}`, bill.id), {
+            comment: verifyComment
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setIsVerifyUnverifyModalOpen(false);
+                setVerifyComment('');
+                setIsSubmittingVerify(false);
+                toast.success(`Purchase ${verifyAction === 'verify' ? 'verified' : 'verification rejected'} successfully`);
+            },
+            onError: (errors) => {
+                setIsSubmittingVerify(false);
+                if (errors.comment) {
+                    toast.error(errors.comment);
+                } else {
+                    toast.error(`Failed to ${verifyAction} purchase`);
+                }
+            }
+        });
+    };
+
     // Get current user's approval status
     const userApproval = bill.approvals?.find(approval => approval.action_user?.id === usePage().props.auth.user.id);
     // User can only take approval actions if:
     // 1. There are configured approvers in the system
     // 2. AND the user is one of the assigned approvers
-    const canApprove = hasConfiguredApprovers && userApproval !== undefined;
+    // 3. AND the purchase is verified (approval_status === 4)
+    const canApprove = hasConfiguredApprovers && userApproval !== undefined && bill.approval_status === 4;
     const currentStatus = userApproval?.status || null;
     // Check individual user's approval status:
     // - status 0 (pending): Show both Approve and Reject buttons
@@ -134,6 +177,17 @@ export default function View({ bill, attachments, decimalPlace, approvalUsersCou
     // - status 2 (rejected): Show only Approve button (to change vote)
     const hasAlreadyApproved = currentStatus === 1;
     const hasAlreadyRejected = currentStatus === 2;
+
+    // Get current user's checker status
+    const userChecker = bill.checkers?.find(checker => checker.action_user?.id === usePage().props.auth.user.id);
+    // User can only take checker actions if:
+    // 1. There are configured checkers in the system
+    // 2. AND the user is one of the assigned checkers
+    // 3. AND the purchase is pending (approval_status === 0)
+    const canVerify = hasConfiguredCheckers && userChecker !== undefined && bill.approval_status === 0;
+    const currentCheckerStatus = userChecker?.status || null;
+    const hasAlreadyVerified = currentCheckerStatus === 1;
+    const hasAlreadyRejectedVerification = currentCheckerStatus === 2;
 
     const handlePrint = () => {
         setIsLoading(prev => ({ ...prev, print: true }));
@@ -144,7 +198,7 @@ export default function View({ bill, attachments, decimalPlace, approvalUsersCou
     };
 
     const handleDownloadPDF = async () => {
-            window.open(route('cash_purchases.pdf', bill.id), '_blank');
+        window.open(route('cash_purchases.pdf', bill.id), '_blank');
     };
 
     const handleShareLink = () => {
@@ -198,7 +252,38 @@ export default function View({ bill, attachments, decimalPlace, approvalUsersCou
                         </div>
                     )}
 
+                    {/* Warning banner when no checkers are configured */}
+                    {!hasConfiguredCheckers && bill.approval_status === 0 && (
+                        <div className="p-4 rounded-lg border border-orange-400 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-600 print:hidden">
+                            <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0 mt-0.5">
+                                    <ShieldCheck className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-medium text-orange-800 dark:text-orange-200">No Checkers Assigned</h3>
+                                    <p className="text-sm text-orange-700 dark:text-orange-300 mt-1">
+                                        This cash purchase cannot be verified until checkers are configured.
+                                        Go to <span className="font-medium">Settings → Business Settings → Checker Workflows</span> to assign checkers.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="flex items-center justify-end space-x-2 mb-4">
+                        {checkerUsersCount > 0 && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setIsCheckersDrawerOpen(true)}
+                                className="flex items-center"
+                            >
+                                <ShieldCheck className="mr-2 h-4 w-4" />
+                                Checkers
+                                <Badge variant="secondary" className="ml-2">
+                                    {checkerUsersCount}
+                                </Badge>
+                            </Button>
+                        )}
                         {approvalUsersCount > 0 && (
                             <Button
                                 variant="outline"
@@ -253,6 +338,12 @@ export default function View({ bill, attachments, decimalPlace, approvalUsersCou
                                     <ShareIcon className="mr-2 h-4 w-4" />
                                     <span>Share Link</span>
                                 </DropdownMenuItem>
+                                {canVerify && !hasAlreadyVerified && (
+                                    <DropdownMenuItem onClick={() => handleVerifyAction('verify')}>
+                                        <ShieldCheck className="mr-2 h-4 w-4 text-blue-600" />
+                                        <span>Verify</span>
+                                    </DropdownMenuItem>
+                                )}
                                 {canApprove && (
                                     <>
                                         {!hasAlreadyApproved && (
@@ -312,13 +403,13 @@ export default function View({ bill, attachments, decimalPlace, approvalUsersCou
                                             <p><span className="font-medium">Order Number:</span> {bill.order_number}</p>
                                         )}
                                         {bill.paid > 0 && (
-                                            <Badge variant="outline" className="mt-2 text-green-600">
-                                                Paid: {formatCurrency({ amount: bill.paid, currency: bill.currency })}
+                                            <Badge variant="outline" className="gap-1 text-green-600 border-green-600 mt-2">
+                                                Paid: {formatCurrency({ amount: bill.paid })}
                                             </Badge>
                                         )}
                                     </div>
                                     <div className="mt-4 sm:flex sm:justify-end">
-                                        <QRCodeSVG 
+                                        <QRCodeSVG
                                             value={route('cash_purchases.show_public_cash_purchase', bill.short_code)}
                                             size={100}
                                             level="H"
@@ -348,6 +439,7 @@ export default function View({ bill, attachments, decimalPlace, approvalUsersCou
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
+                                            <TableHead className="print:hidden">Account</TableHead>
                                             <TableHead>Item</TableHead>
                                             <TableHead>Description</TableHead>
                                             <TableHead className="text-right">Quantity</TableHead>
@@ -358,6 +450,11 @@ export default function View({ bill, attachments, decimalPlace, approvalUsersCou
                                     <TableBody>
                                         {bill.items.map((item, index) => (
                                             <TableRow key={index}>
+                                                <TableCell className="print:hidden">
+                                                    {item.account?.account_name ? (
+                                                        <Badge variant="outline" className="gap-1 text-green-600 border-green-600">{item.account.account_name}</Badge>
+                                                    ) : '-'}
+                                                </TableCell>
                                                 <TableCell className="font-medium">{item.product_name}</TableCell>
                                                 <TableCell>{item.description}</TableCell>
                                                 <TableCell className="text-right">{item.quantity}</TableCell>
@@ -655,6 +752,91 @@ export default function View({ bill, attachments, decimalPlace, approvalUsersCou
                 </div>
             </DrawerComponent>
 
+            {/* Checkers Drawer */}
+            <DrawerComponent
+                open={isCheckersDrawerOpen}
+                onOpenChange={setIsCheckersDrawerOpen}
+                title="Purchase Verification"
+                position="right"
+                width="w-4xl"
+            >
+                <div className="p-4">
+                    <div className="mb-4">
+                        <p className="text-sm text-gray-600">
+                            View verification status from all assigned checkers
+                        </p>
+                    </div>
+
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Comment</TableHead>
+                                <TableHead>Date</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {bill.checkers && bill.checkers.length > 0 ? (
+                                bill.checkers.map((checker, index) => (
+                                    <TableRow key={index}>
+                                        <TableCell className="font-medium">
+                                            {checker.action_user?.name || 'N/A'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {checker.action_user?.email || 'N/A'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {checker.status === 0 && (
+                                                <Badge variant="outline" className="flex items-center w-fit">
+                                                    <Clock className="h-3 w-3 mr-1" />
+                                                    Pending
+                                                </Badge>
+                                            )}
+                                            {checker.status === 1 && (
+                                                <Badge variant="outline" className="flex items-center w-fit text-blue-600 border-blue-600">
+                                                    <ShieldCheck className="h-3 w-3 mr-1" />
+                                                    Verified
+                                                </Badge>
+                                            )}
+                                            {checker.status === 2 && (
+                                                <Badge variant="outline" className="flex items-center w-fit text-orange-600 border-orange-600">
+                                                    <ShieldX className="h-3 w-3 mr-1" />
+                                                    Rejected
+                                                </Badge>
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            {checker.comment || '-'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {checker.action_date ? new Date(checker.action_date).toLocaleDateString() : '-'}
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center py-8">
+                                        <div className="flex flex-col items-center">
+                                            <ShieldCheck className="h-10 w-10 text-orange-500 mb-3" />
+                                            <p className="font-medium text-orange-700 dark:text-orange-400 mb-2">No Checkers Assigned</p>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                                This cash purchase cannot be verified until checkers are configured.
+                                            </p>
+                                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                                Go to <span className="font-medium">Settings → Business Settings → Checker Workflows</span> to assign checkers.
+                                            </p>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+            </DrawerComponent>
+
+
             {/* Approve/Reject Modal */}
             <Modal
                 show={isApproveRejectModalOpen}
@@ -710,9 +892,72 @@ export default function View({ bill, attachments, decimalPlace, approvalUsersCou
                         disabled={isSubmittingApproval}
                         className={approvalAction === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
                     >
-                        {isSubmittingApproval 
-                            ? (approvalAction === 'approve' ? 'Approving...' : 'Rejecting...') 
+                        {isSubmittingApproval
+                            ? (approvalAction === 'approve' ? 'Approving...' : 'Rejecting...')
                             : (approvalAction === 'approve' ? 'Approve' : 'Reject')
+                        }
+                    </Button>
+                </div>
+            </Modal>
+
+            {/* Verify/Unverify Modal */}
+            <Modal
+                show={isVerifyUnverifyModalOpen}
+                onClose={() => setIsVerifyUnverifyModalOpen(false)}
+                maxWidth="md"
+            >
+                <div className="mb-6">
+                    <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center">
+                        {verifyAction === 'verify' ? (
+                            <>
+                                <ShieldCheck className="h-5 w-5 mr-2 text-blue-600" />
+                                Verify Purchase
+                            </>
+                        ) : (
+                            <>
+                                <ShieldX className="h-5 w-5 mr-2 text-orange-600" />
+                                Reject Verification
+                            </>
+                        )}
+                    </h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {verifyAction === 'verify'
+                            ? 'Add an optional comment for this verification'
+                            : 'Please provide a reason for rejecting verification'}
+                    </p>
+                </div>
+
+                <div className="mb-6">
+                    <label className="block text-sm font-medium mb-2">
+                        Comment {verifyAction === 'unverify' && <span className="text-red-600">*</span>}
+                    </label>
+                    <Textarea
+                        value={verifyComment}
+                        onChange={(e) => setVerifyComment(e.target.value)}
+                        placeholder={verifyAction === 'verify' ? "Add a comment (optional)" : "Explain why you're rejecting this verification"}
+                        rows={4}
+                        className="w-full"
+                    />
+                </div>
+
+                <div className="flex justify-end space-x-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsVerifyUnverifyModalOpen(false)}
+                        disabled={isSubmittingVerify}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="button"
+                        onClick={submitVerifyAction}
+                        disabled={isSubmittingVerify}
+                        className={verifyAction === 'verify' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700'}
+                    >
+                        {isSubmittingVerify
+                            ? (verifyAction === 'verify' ? 'Verifying...' : 'Rejecting...')
+                            : (verifyAction === 'verify' ? 'Verify' : 'Reject Verification')
                         }
                     </Button>
                 </div>

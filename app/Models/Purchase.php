@@ -40,7 +40,28 @@ class Purchase extends Model {
     }
 
     public function approvals() {
+        return $this->hasMany(Approvals::class, 'ref_id')->where('ref_name', 'purchase')->where('checker_type', 'approval')->withoutGlobalScopes();
+    }
+
+    /**
+     * Get checker validation records for this purchase
+     */
+    public function checkers() {
+        return $this->hasMany(Approvals::class, 'ref_id')->where('ref_name', 'purchase')->where('checker_type', 'checker')->withoutGlobalScopes();
+    }
+
+    /**
+     * Get all approval and checker records for this purchase
+     */
+    public function allApprovalRecords() {
         return $this->hasMany(Approvals::class, 'ref_id')->where('ref_name', 'purchase')->withoutGlobalScopes();
+    }
+
+    /**
+     * Get the user who checked this purchase
+     */
+    public function checkedByUser() {
+        return $this->belongsTo(User::class, 'checked_by')->withDefault()->withoutGlobalScopes();
     }
 
     protected function subTotal(): Attribute {

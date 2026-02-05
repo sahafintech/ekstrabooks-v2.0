@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Head, Link, router, usePage } from "@inertiajs/react";
+import { Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -35,6 +35,7 @@ import Modal from "@/Components/Modal";
 import { formatCurrency } from "@/lib/utils";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import DateTimePicker from "@/Components/DateTimePicker";
+import { Badge } from "@/Components/ui/badge";
 
 const DeleteInvoiceModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
@@ -155,17 +156,17 @@ const DeleteAllInvoicesModal = ({ show, onClose, onConfirm, processing, count })
 
 const InvoiceStatusBadge = ({ status }) => {
   const statusMap = {
-    0: { label: "Draft", className: "text-gray-600 bg-gray-200 px-3 py-1 rounded text-sm" },
-    1: { label: "Active", className: "text-blue-600 bg-blue-200 px-3 py-1 rounded text-sm" },
-    2: { label: "Paid", className: "text-green-600 bg-green-200 px-3 py-1 rounded text-sm" },
-    3: { label: "Partially Paid", className: "text-yellow-600 bg-yellow-200 px-3 py-1 rounded text-sm" },
-    4: { label: "Canceled", className: "text-red-600 bg-red-200 px-3 py-1 rounded text-sm" }
+    0: { label: "Draft", className: "gap-1 text-gray-600 border-gray-400" },
+    1: { label: "Active", className: "gap-1 text-blue-600 border-blue-600" },
+    2: { label: "Paid", className: "gap-1 text-green-600 border-green-600" },
+    3: { label: "Partially Paid", className: "gap-1 text-yellow-600 border-yellow-600" },
+    4: { label: "Canceled", className: "gap-1 text-red-600 border-red-600" }
   };
 
   return (
-    <span className={statusMap[status].className}>
+    <Badge variant="outline" className={statusMap[status].className}>
       {statusMap[status].label}
-    </span>
+    </Badge>
   );
 };
 
@@ -314,10 +315,10 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
     setSearch(value);
     router.get(
       route("invoices.index"),
-      { 
-        search: value, 
-        page: 1, 
-        per_page: perPage, 
+      {
+        search: value,
+        page: 1,
+        per_page: perPage,
         sorting,
         customer_id: selectedCustomer,
         date_range: dateRange,
@@ -331,10 +332,10 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
     setPerPage(value);
     router.get(
       route("invoices.index"),
-      { 
-        search, 
-        page: 1, 
-        per_page: value, 
+      {
+        search,
+        page: 1,
+        per_page: value,
         sorting,
         customer_id: selectedCustomer,
         date_range: dateRange,
@@ -348,10 +349,10 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
     setCurrentPage(page);
     router.get(
       route("invoices.index"),
-      { 
-        search, 
-        page, 
-        per_page: perPage, 
+      {
+        search,
+        page,
+        per_page: perPage,
         sorting,
         customer_id: selectedCustomer,
         date_range: dateRange,
@@ -365,10 +366,10 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
     setSelectedCustomer(value);
     router.get(
       route("invoices.index"),
-      { 
-        search, 
-        page: 1, 
-        per_page: perPage, 
+      {
+        search,
+        page: 1,
+        per_page: perPage,
         sorting,
         customer_id: value,
         date_range: dateRange,
@@ -382,10 +383,10 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
     setDateRange(dates);
     router.get(
       route("invoices.index"),
-      { 
-        search, 
-        page: 1, 
-        per_page: perPage, 
+      {
+        search,
+        page: 1,
+        per_page: perPage,
         sorting,
         customer_id: selectedCustomer,
         date_range: dates,
@@ -399,10 +400,10 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
     setSelectedStatus(value);
     router.get(
       route("invoices.index"),
-      { 
-        search, 
-        page: 1, 
-        per_page: perPage, 
+      {
+        search,
+        page: 1,
+        per_page: perPage,
         sorting,
         customer_id: selectedCustomer,
         date_range: dateRange,

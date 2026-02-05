@@ -19,6 +19,7 @@ return new class extends Migration
             $table->tinyInteger('status')->default(0); // 0: pending, 1: approved, 2: rejected
             $table->text('comment')->nullable();
             $table->timestamp('action_date')->nullable();
+            $table->string('checker_type', 20)->default('approval');
             $table->timestamps();
 
             $table->foreign('action_user')->references('id')->on('users')->onDelete('cascade');

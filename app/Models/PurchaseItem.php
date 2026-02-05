@@ -38,6 +38,10 @@ class PurchaseItem extends Model {
         return $this->belongsTo(Purchase::class, 'purchase_id');
     }
 
+    public function account() {
+        return $this->belongsTo(Account::class, 'account_id')->withDefault();
+    }
+
     protected function unitCost(): Attribute {
         $decimal_place = get_business_option('decimal_places', 2);
 

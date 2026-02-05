@@ -135,6 +135,11 @@ class CashPurchaseController extends Controller
 		$approvalUsersArray = json_decode($purchaseApprovalUsersJson, true);
 		$hasConfiguredApprovers = is_array($approvalUsersArray) && count($approvalUsersArray) > 0;
 
+		// Check if there are configured checker users for this business
+		$purchaseCheckerUsersJson = get_business_option('purchase_checker_users', '[]');
+		$checkerUsersArray = json_decode($purchaseCheckerUsersJson, true);
+		$hasConfiguredCheckers = is_array($checkerUsersArray) && count($checkerUsersArray) > 0;
+
 		return Inertia::render('Backend/User/CashPurchase/List', [
 			'purchases' => $purchases->items(),
 			'meta' => [
@@ -159,6 +164,7 @@ class CashPurchaseController extends Controller
 			'summary' => $summary,
 			'trashed_cash_purchases' => Purchase::onlyTrashed()->where('cash', 1)->count(),
 			'hasConfiguredApprovers' => $hasConfiguredApprovers,
+			'hasConfiguredCheckers' => $hasConfiguredCheckers,
 			'currentUserId' => auth()->id(),
 		]);
 	}
@@ -505,8 +511,10 @@ class CashPurchaseController extends Controller
 		$purchase->footer = $request->input('footer');
 		// All purchases start as pending - must go through approval workflow
 		$purchase->approval_status = 0;
+		$purchase->checker_status = 0; // Must go through checker verification first
 		$purchase->created_by = auth()->user()->id;
 		$purchase->approved_by = null;
+		$purchase->checked_by = null;
 		$purchase->benificiary = $request->input('benificiary');
 		$purchase->short_code = rand(100000, 9999999) . uniqid();
 		$purchase->paid = $summary['grandTotal'];
@@ -516,6 +524,9 @@ class CashPurchaseController extends Controller
 
 		// Create approval records for configured approvers
 		$this->createPurchaseApprovalRecords($purchase);
+
+		// Create checker records for configured checkers
+		$this->createPurchaseCheckerRecords($purchase);
 
 		// if attachments then upload
 		if (isset($request->attachments)) {
@@ -871,7 +882,7 @@ class CashPurchaseController extends Controller
 	public function show($id)
 	{
 		Gate::authorize('cash_purchases.view');
-		$bill = Purchase::with(['business', 'items', 'taxes', 'vendor', 'approvals.actionUser'])->find($id);
+		$bill = Purchase::with(['business', 'items.account', 'taxes', 'vendor', 'approvals.actionUser', 'checkers.actionUser'])->find($id);
 		$attachments = Attachment::where('ref_type', 'cash purchase')->where('ref_id', $id)->get();
 		$email_templates = EmailTemplate::whereIn('slug', ['NEW_CASH_PURCHASE_CREATED'])
 			->where('email_status', 1)
@@ -881,21 +892,42 @@ class CashPurchaseController extends Controller
 		$purchaseApprovalUsersJson = get_business_option('purchase_approval_users', '[]');
 		$approvalUsersCount = 0;
 		$hasConfiguredApprovers = false;
-		$configuredUserIds = [];
+		$configuredApproverUserIds = [];
 		
-		$usersArray = json_decode($purchaseApprovalUsersJson, true);
-		if (is_array($usersArray) && count($usersArray) > 0) {
-			$approvalUsersCount = count($usersArray);
+		$approvalUsersArray = json_decode($purchaseApprovalUsersJson, true);
+		if (is_array($approvalUsersArray) && count($approvalUsersArray) > 0) {
+			$approvalUsersCount = count($approvalUsersArray);
 			$hasConfiguredApprovers = true;
-			$configuredUserIds = $usersArray;
+			$configuredApproverUserIds = $approvalUsersArray;
+		}
+
+		// Check if there are configured checker users for this business
+		$purchaseCheckerUsersJson = get_business_option('purchase_checker_users', '[]');
+		$checkerUsersCount = 0;
+		$hasConfiguredCheckers = false;
+		$configuredCheckerUserIds = [];
+		
+		$checkerUsersArray = json_decode($purchaseCheckerUsersJson, true);
+		if (is_array($checkerUsersArray) && count($checkerUsersArray) > 0) {
+			$checkerUsersCount = count($checkerUsersArray);
+			$hasConfiguredCheckers = true;
+			$configuredCheckerUserIds = $checkerUsersArray;
 		}
 
 		// Sync approval records for pending purchases
 		// This ensures new approvers are added to existing purchases
 		if ($hasConfiguredApprovers && $bill->approval_status != 1) {
-			$this->syncApprovalRecordsForPurchase($bill, $configuredUserIds);
+			$this->syncApprovalRecordsForPurchase($bill, $configuredApproverUserIds);
 			// Reload approvals with actionUser relationship
 			$bill->load('approvals.actionUser');
+		}
+
+		// Sync checker records for pending purchases
+		// This ensures new checkers are added to existing purchases
+		if ($hasConfiguredCheckers && $bill->checker_status != 1) {
+			$this->syncCheckerRecordsForPurchase($bill, $configuredCheckerUserIds);
+			// Reload checkers with actionUser relationship
+			$bill->load('checkers.actionUser');
 		}
 
 		return Inertia::render('Backend/User/CashPurchase/View', [
@@ -905,6 +937,8 @@ class CashPurchaseController extends Controller
 			'decimalPlace' => get_business_option('decimal_places', 2),
 			'approvalUsersCount' => $bill->approvals->count(), // Actual approval records for this purchase
 			'hasConfiguredApprovers' => $hasConfiguredApprovers,
+			'checkerUsersCount' => $bill->checkers->count(), // Actual checker records for this purchase
+			'hasConfiguredCheckers' => $hasConfiguredCheckers,
 		]);
 	}
 
@@ -927,8 +961,10 @@ class CashPurchaseController extends Controller
 		// Add missing approvers
 		foreach ($validUserIds as $userId) {
 			if (!in_array($userId, $existingApproverIds)) {
-				$purchase->approvals()->create([
+				Approvals::create([
+					'ref_id' => $purchase->id,
 					'ref_name' => 'purchase',
+					'checker_type' => 'approval',
 					'action_user' => $userId,
 					'status' => 0, // pending
 				]);
@@ -939,6 +975,7 @@ class CashPurchaseController extends Controller
 		// Only remove if they haven't taken action yet (status = 0)
 		Approvals::where('ref_id', $purchase->id)
 			->where('ref_name', 'purchase')
+			->where('checker_type', 'approval')
 			->where('status', 0) // Only remove pending approvals
 			->whereNotIn('action_user', $validUserIds)
 			->delete();
@@ -2493,60 +2530,115 @@ class CashPurchaseController extends Controller
 		Gate::authorize('cash_purchases.reject');
 		$currentUserId = auth()->id();
 
-		// Check if there are any configured approval users for this business
+		// Get configured approvers and checkers
 		$approvalUsersJson = get_business_option('purchase_approval_users', '[]');
-		$configuredUserIds = json_decode($approvalUsersJson, true);
-		$hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
+		$approverUserIds = json_decode($approvalUsersJson, true);
+		$isApprover = is_array($approverUserIds) && in_array($currentUserId, $approverUserIds);
 
-		if (!$hasConfiguredApprovers) {
-			return redirect()->route('cash_purchases.index')->with('error', _lang('No approvers are configured. Please configure approvers in business settings first.'));
+		$checkerUsersJson = get_business_option('purchase_checker_users', '[]');
+		$checkerUserIds = json_decode($checkerUsersJson, true);
+		$isChecker = is_array($checkerUserIds) && in_array($currentUserId, $checkerUserIds);
+
+		if (!$isApprover && !$isChecker) {
+			return redirect()->route('cash_purchases.index')->with('error', _lang('You are not assigned as an approver or checker for purchases'));
 		}
 
-		// Check if current user is in the configured approvers list
-		if (!in_array($currentUserId, $configuredUserIds)) {
-			return redirect()->route('cash_purchases.index')->with('error', _lang('You are not assigned as an approver for purchases'));
-		}
+		$rejectedCount = 0;
 
 		foreach ($request->ids as $id) {
-			$purchase = Purchase::with('approvals')->find($id);
+			$purchase = Purchase::with(['approvals', 'checkers'])->find($id);
 			
 			if (!$purchase) {
 				continue;
 			}
 
-			// Ensure approval records exist for this purchase
-			if ($purchase->approvals->isEmpty()) {
-				$this->createPurchaseApprovalRecords($purchase);
-				$purchase->load('approvals');
+			// Determine rejection type based on purchase status
+			if ($purchase->approval_status == 1 && $isApprover) {
+				// Purchase is in Approved state - reject as approver
+				// Ensure approval records exist
+				if ($purchase->approvals->isEmpty()) {
+					$this->createPurchaseApprovalRecords($purchase);
+					$purchase->load('approvals');
+				}
+
+				$approval = $purchase->approvals()
+					->where('action_user', $currentUserId)
+					->first();
+
+				if (!$approval) {
+					continue;
+				}
+
+				// Update the approver record as Rejected
+				$approval->update([
+					'status' => 2, // Rejected
+					'action_date' => now(),
+				]);
+
+				// Reset purchase approval_status to Pending (back to Verified state)
+				$purchase->update([
+					'approval_status' => 0,
+					'approved_by' => null,
+				]);
+
+				// Move transactions back to pending
+				$this->moveTransactionsToPending($purchase);
+
+				// Audit log
+				$audit = new AuditLog();
+				$audit->date_changed = date('Y-m-d H:i:s');
+				$audit->changed_by = $currentUserId;
+				$audit->event = 'Bulk Rejected Approved Cash Purchase ' . $purchase->bill_no . ' (Approver)';
+				$audit->save();
+
+				$rejectedCount++;
+
+			} elseif ($purchase->checker_status == 1 && $purchase->approval_status == 0 && $isChecker) {
+				// Purchase is in Verified state - reject as checker
+				// Ensure checker records exist
+				if ($purchase->checkers->isEmpty()) {
+					$this->createPurchaseCheckerRecords($purchase);
+					$purchase->load('checkers');
+				}
+
+				$checker = $purchase->checkers()
+					->where('action_user', $currentUserId)
+					->first();
+
+				if (!$checker) {
+					continue;
+				}
+
+				// Update the checker record as Rejected
+				$checker->update([
+					'status' => 2, // Rejected
+					'action_date' => now(),
+				]);
+
+				// Reset purchase checker_status to Pending AND approval_status to Pending
+				$purchase->update([
+					'checker_status' => 0,
+					'approval_status' => 0, // Reset to Pending
+					'checked_by' => null,
+				]);
+
+				// Audit log
+				$audit = new AuditLog();
+				$audit->date_changed = date('Y-m-d H:i:s');
+				$audit->changed_by = $currentUserId;
+				$audit->event = 'Bulk Rejected Verified Cash Purchase ' . $purchase->bill_no . ' (Checker)';
+				$audit->save();
+
+				$rejectedCount++;
 			}
-
-			// Find the current user's approval record
-			$approval = $purchase->approvals()
-				->where('action_user', $currentUserId)
-				->first();
-
-			if (!$approval) {
-				continue; // User is not an approver for this purchase
-			}
-
-			// Update the approval record
-			$approval->update([
-				'status' => 2, // Rejected
-				'action_date' => now(),
-			]);
-
-			// Check if purchase status should change based on approval records
-			$this->checkAndUpdatePurchaseStatus($purchase);
-
-			// audit log
-			$audit = new AuditLog();
-			$audit->date_changed = date('Y-m-d H:i:s');
-			$audit->changed_by = $currentUserId;
-			$audit->event = 'Bulk Rejected Cash Purchase ' . $purchase->bill_no;
-			$audit->save();
+			// Skip purchases in Pending state
 		}
 
-		return redirect()->route('cash_purchases.index')->with('success', _lang('Rejected Successfully'));
+		if ($rejectedCount > 0) {
+			return redirect()->route('cash_purchases.index')->with('success', _lang('Rejected Successfully') . ' (' . $rejectedCount . ')');
+		} else {
+			return redirect()->route('cash_purchases.index')->with('error', _lang('No purchases were rejected. They may already be in Pending status or you do not have the appropriate role.'));
+		}
 	}
 
 	/**
@@ -2611,7 +2703,9 @@ class CashPurchaseController extends Controller
 	}
 
 	/**
-	 * Reject a cash purchase (single user approval)
+	 * Reject a cash purchase (conditional based on purchase status)
+	 * - If Verified: Reset checker_status to Pending and mark checker record as Rejected
+	 * - If Approved: Reset approval_status to Pending and mark approver record as Rejected
 	 */
 	public function reject(Request $request, $id)
 	{
@@ -2621,7 +2715,7 @@ class CashPurchaseController extends Controller
 			'comment.required' => _lang('Comment is required when rejecting'),
 		]);
 
-		$purchase = Purchase::with('approvals')->find($id);
+		$purchase = Purchase::with(['approvals', 'checkers'])->find($id);
 
 		if (!$purchase) {
 			return back()->with('error', _lang('Purchase not found'));
@@ -2629,48 +2723,108 @@ class CashPurchaseController extends Controller
 
 		$currentUserId = auth()->id();
 
-		// Check if there are any configured approval users for this business
-		$approvalUsersJson = get_business_option('purchase_approval_users', '[]');
-		$configuredUserIds = json_decode($approvalUsersJson, true);
-		$hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
+		// Determine rejection type based on purchase status
+		// If purchase is Approved (approval_status = 1), reject as approver
+		// If purchase is Verified (checker_status = 1, approval_status = 0), reject as checker
+		
+		if ($purchase->approval_status == 1) {
+			// Purchase is in Approved state - reject as approver
+			$approvalUsersJson = get_business_option('purchase_approval_users', '[]');
+			$configuredUserIds = json_decode($approvalUsersJson, true);
+			$hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
 
-		// If no approvers configured, tell user to configure them first
-		if (!$hasConfiguredApprovers) {
-			return back()->with('error', _lang('No approvers are configured. Please configure approvers in business settings first.'));
+			if (!$hasConfiguredApprovers) {
+				return back()->with('error', _lang('No approvers are configured. Please configure approvers in business settings first.'));
+			}
+
+			if (!in_array($currentUserId, $configuredUserIds)) {
+				return back()->with('error', _lang('You are not assigned as an approver for this purchase'));
+			}
+
+			// Find the approval record for the current user
+			$approval = $purchase->approvals()
+				->where('action_user', $currentUserId)
+				->first();
+
+			if (!$approval) {
+				return back()->with('error', _lang('You are not assigned as an approver for this purchase'));
+			}
+
+			// Update the approver record as Rejected
+			$approval->update([
+				'status' => 2, // Rejected
+				'comment' => $request->input('comment'),
+				'action_date' => now(),
+			]);
+
+			// Reset purchase approval_status to Pending (back to Verified state)
+			$purchase->update([
+				'approval_status' => 0,
+				'approved_by' => null,
+			]);
+
+			// Move transactions back to pending
+			$this->moveTransactionsToPending($purchase);
+
+			// Audit log
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = $currentUserId;
+			$audit->event = 'Rejected Approved Cash Purchase ' . $purchase->bill_no . ' by ' . auth()->user()->name . ' (Approver)';
+			$audit->save();
+
+			return back()->with('success', _lang('Purchase approval rejected. Status reset to Verified.'));
+
+		} elseif ($purchase->checker_status == 1) {
+			// Purchase is in Verified state - reject as checker
+			$checkerUsersJson = get_business_option('purchase_checker_users', '[]');
+			$configuredUserIds = json_decode($checkerUsersJson, true);
+			$hasConfiguredCheckers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
+
+			if (!$hasConfiguredCheckers) {
+				return back()->with('error', _lang('No checkers are configured. Please configure checkers in business settings first.'));
+			}
+
+			if (!in_array($currentUserId, $configuredUserIds)) {
+				return back()->with('error', _lang('You are not assigned as a checker for this purchase'));
+			}
+
+			// Find the checker record for the current user
+			$checker = $purchase->checkers()
+				->where('action_user', $currentUserId)
+				->first();
+
+			if (!$checker) {
+				return back()->with('error', _lang('You are not assigned as a checker for this purchase'));
+			}
+
+			// Update the checker record as Rejected
+			$checker->update([
+				'status' => 2, // Rejected
+				'comment' => $request->input('comment'),
+				'action_date' => now(),
+			]);
+
+			// Reset purchase checker_status to Pending AND approval_status to Pending
+			$purchase->update([
+				'checker_status' => 0,
+				'approval_status' => 0, // Reset to Pending
+				'checked_by' => null,
+			]);
+
+			// Audit log
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = $currentUserId;
+			$audit->event = 'Rejected Verified Cash Purchase ' . $purchase->bill_no . ' by ' . auth()->user()->name . ' (Checker)';
+			$audit->save();
+
+			return back()->with('success', _lang('Purchase verification rejected. Status reset to Pending.'));
+
+		} else {
+			// Purchase is in Pending state - cannot reject
+			return back()->with('error', _lang('This purchase is already in Pending status and cannot be rejected.'));
 		}
-
-		// Check if current user is in the configured approvers list
-		if (!in_array($currentUserId, $configuredUserIds)) {
-			return back()->with('error', _lang('You are not assigned as an approver for this purchase'));
-		}
-
-		// Find the approval record by action_user (who is assigned as approver)
-		$approval = $purchase->approvals()
-			->where('action_user', $currentUserId)
-			->first();
-
-		if (!$approval) {
-			return back()->with('error', _lang('You are not assigned as an approver for this purchase'));
-		}
-
-		// Update the approval record (action_user remains the same - it's already the approver)
-		$approval->update([
-			'status' => 2, // Rejected
-			'comment' => $request->input('comment'),
-			'action_date' => now(),
-		]);
-
-		// Check if purchase should be marked as rejected (or reset to pending if votes changed)
-		$this->checkAndUpdatePurchaseStatus($purchase);
-
-		// Audit log
-		$audit = new AuditLog();
-		$audit->date_changed = date('Y-m-d H:i:s');
-		$audit->changed_by = $currentUserId;
-		$audit->event = 'Rejected Cash Purchase ' . $purchase->bill_no . ' by ' . auth()->user()->name;
-		$audit->save();
-
-		return back()->with('success', _lang('Purchase rejection recorded'));
 	}
 
 	/**
@@ -2834,6 +2988,7 @@ class CashPurchaseController extends Controller
 			// Check if approval record already exists for this user
 			$existingApproval = Approvals::where('ref_id', $purchase->id)
 				->where('ref_name', 'purchase')
+				->where('checker_type', 'approval')
 				->where('action_user', $userId)
 				->first();
 
@@ -2841,10 +2996,302 @@ class CashPurchaseController extends Controller
 				Approvals::create([
 					'ref_id' => $purchase->id,
 					'ref_name' => 'purchase',
+					'checker_type' => 'approval',
 					'action_user' => $userId,
 					'status' => 0, // pending
 				]);
 			}
 		}
 	}
+
+	/**
+	 * Create checker records for all configured checkers for a given purchase
+	 */
+	private function createPurchaseCheckerRecords(Purchase $purchase): void
+	{
+		$purchaseCheckerUsersJson = get_business_option('purchase_checker_users', '[]');
+		$configuredUserIds = json_decode($purchaseCheckerUsersJson, true);
+
+		if (!is_array($configuredUserIds) || empty($configuredUserIds)) {
+			return;
+		}
+
+		// Filter to only include user IDs that actually exist in the database
+		$validUserIds = \App\Models\User::whereIn('id', $configuredUserIds)->pluck('id')->toArray();
+		
+		if (empty($validUserIds)) {
+			return;
+		}
+
+		foreach ($validUserIds as $userId) {
+			// Check if checker record already exists for this user
+			$existingChecker = Approvals::where('ref_id', $purchase->id)
+				->where('ref_name', 'purchase')
+				->where('checker_type', 'checker')
+				->where('action_user', $userId)
+				->first();
+
+			if (!$existingChecker) {
+				Approvals::create([
+					'ref_id' => $purchase->id,
+					'ref_name' => 'purchase',
+					'checker_type' => 'checker',
+					'action_user' => $userId,
+					'status' => 0, // pending
+				]);
+			}
+		}
+	}
+
+	/**
+	 * Verify a cash purchase (single user verification - checker step)
+	 */
+	public function verify(Request $request, $id)
+	{
+		$request->validate([
+			'comment' => ['nullable', 'string', 'max:1000'],
+		]);
+
+		$purchase = Purchase::with('checkers')->find($id);
+
+		if (!$purchase) {
+			return back()->with('error', _lang('Purchase not found'));
+		}
+
+		$currentUserId = auth()->id();
+
+		// Check if there are any configured checker users for this business
+		$checkerUsersJson = get_business_option('purchase_checker_users', '[]');
+		$configuredUserIds = json_decode($checkerUsersJson, true);
+		$hasConfiguredCheckers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
+
+		// If no checkers configured, tell user to configure them first
+		if (!$hasConfiguredCheckers) {
+			return back()->with('error', _lang('No checkers are configured. Please configure checkers in business settings first.'));
+		}
+
+		// Check if current user is in the configured checkers list
+		if (!in_array($currentUserId, $configuredUserIds)) {
+			return back()->with('error', _lang('You are not assigned as a checker for this purchase'));
+		}
+
+		// Find the checker record by action_user (who is assigned as checker)
+		$checker = $purchase->checkers()
+			->where('action_user', $currentUserId)
+			->first();
+
+		if (!$checker) {
+			return back()->with('error', _lang('You are not assigned as a checker for this purchase'));
+		}
+
+		// Update the checker record
+		$checker->update([
+			'status' => 1, // Verified
+			'comment' => $request->input('comment'),
+			'action_date' => now(),
+		]);
+
+		// Check if purchase should be marked as verified based on required verifications
+		$this->checkAndUpdatePurchaseCheckerStatus($purchase);
+
+		// Audit log
+		$audit = new AuditLog();
+		$audit->date_changed = date('Y-m-d H:i:s');
+		$audit->changed_by = $currentUserId;
+		$audit->event = 'Verified Cash Purchase ' . $purchase->bill_no . ' by ' . auth()->user()->name;
+		$audit->save();
+
+		return back()->with('success', _lang('Purchase verified successfully'));
+	}
+
+	/**
+	 * Bulk verify cash purchases
+	 */
+	public function bulk_verify(Request $request)
+	{
+		Gate::authorize('cash_purchases.verify');
+		$currentUserId = auth()->id();
+
+		// Check if there are any configured checker users for this business
+		$checkerUsersJson = get_business_option('purchase_checker_users', '[]');
+		$configuredUserIds = json_decode($checkerUsersJson, true);
+		$hasConfiguredCheckers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
+
+		if (!$hasConfiguredCheckers) {
+			return redirect()->route('cash_purchases.index')->with('error', _lang('No checkers are configured. Please configure checkers in business settings first.'));
+		}
+
+		// Check if current user is in the configured checkers list
+		if (!in_array($currentUserId, $configuredUserIds)) {
+			return redirect()->route('cash_purchases.index')->with('error', _lang('You are not assigned as a checker for purchases'));
+		}
+
+		foreach ($request->ids as $id) {
+			$purchase = Purchase::with('checkers')->find($id);
+			
+			if (!$purchase) {
+				continue;
+			}
+
+			// Skip if already verified
+			if ($purchase->checker_status == 1) {
+				continue;
+			}
+
+			// Ensure checker records exist for this purchase
+			if ($purchase->checkers->isEmpty()) {
+				$this->createPurchaseCheckerRecords($purchase);
+				$purchase->load('checkers');
+			}
+
+			// Find the current user's checker record
+			$checker = $purchase->checkers()
+				->where('action_user', $currentUserId)
+				->first();
+
+			if (!$checker) {
+				continue; // User is not a checker for this purchase
+			}
+
+			// Update the checker record
+			$checker->update([
+				'status' => 1, // Verified
+				'action_date' => now(),
+			]);
+
+			// Check if purchase should be marked as verified based on required verifications
+			$this->checkAndUpdatePurchaseCheckerStatus($purchase);
+
+			// audit log
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = $currentUserId;
+			$audit->event = 'Bulk Verified Cash Purchase ' . $purchase->bill_no;
+			$audit->save();
+		}
+
+		return redirect()->route('cash_purchases.index')->with('success', _lang('Verified Successfully'));
+	}
+
+	/**
+	 * Check and update purchase checker status based on all checker records
+	 * - Verified: Required count of checker verifications reached (from settings)
+	 * - Pending: Not enough verifications yet
+	 */
+	private function checkAndUpdatePurchaseCheckerStatus(Purchase $purchase): void
+	{
+		// Reload checkers to get the most current state
+		$purchase->load('checkers');
+		$checkers = $purchase->checkers;
+		
+		// If no checkers configured, nothing to check
+		if ($checkers->isEmpty()) {
+			return;
+		}
+
+		// Get the required checker count from settings for the current business
+		// Default to 1 if not set (any single checker can verify the purchase)
+		$requiredCheckerCount = (int) get_business_option('purchase_checker_required_count', 1);
+
+		$totalCheckers = $checkers->count();
+		$verifiedCount = $checkers->where('status', 1)->count();
+		$rejectedCount = $checkers->where('status', 2)->count();
+		
+		// Ensure required count doesn't exceed total checkers
+		$requiredCheckerCount = min($requiredCheckerCount, $totalCheckers);
+		
+		// Store previous status to detect changes
+		$previousStatus = $purchase->checker_status;
+
+		// First check: If purchase was previously verified but now doesn't have enough verifications
+		// (e.g., someone changed their vote from verify to reject), reset to pending immediately
+		if ($previousStatus == 1 && $verifiedCount < $requiredCheckerCount) {
+			$purchase->update([
+				'checker_status' => 0, // Back to Pending
+				'approval_status' => 0, // Back to Pending
+				'checked_by' => null,
+			]);
+			return; // Exit early
+		}
+
+		// Second check: If ALL assigned checkers have rejected (unanimous rejection)
+		if ($rejectedCount === $totalCheckers) {
+			if ($previousStatus == 1) {
+				$purchase->update([
+					'checker_status' => 0, // Reset to pending
+					'approval_status' => 0, // Reset to pending
+					'checked_by' => null,
+				]);
+			}
+			return;
+		}
+
+		// Third check: If we have enough verifications AND not everyone rejected
+		if ($verifiedCount >= $requiredCheckerCount && $rejectedCount < $totalCheckers) {
+			// Only process if not already verified
+			if ($previousStatus != 1) {
+				$purchase->update([
+					'checker_status' => 1, // Verified
+					'approval_status' => 4, // Verified
+					'checked_by' => auth()->id(),
+				]);
+			}
+			return;
+		}
+
+		// Default: Not enough verifications yet - ensure it stays pending
+		if ($previousStatus == 1) {
+			$purchase->update([
+				'checker_status' => 0,
+				'approval_status' => 0,
+				'checked_by' => null,
+			]);
+		}
+	}
+
+	/**
+	 * Sync checker records for a purchase with configured checkers
+	 */
+	private function syncCheckerRecordsForPurchase(Purchase $purchase, array $configuredCheckerUserIds): void
+	{
+		if (empty($configuredCheckerUserIds)) {
+			return;
+		}
+
+		// Filter to only include user IDs that actually exist in the database
+		$validUserIds = \App\Models\User::whereIn('id', $configuredCheckerUserIds)->pluck('id')->toArray();
+		
+		if (empty($validUserIds)) {
+			return;
+		}
+
+		foreach ($validUserIds as $userId) {
+			// Check if checker record already exists for this user
+			$existingChecker = Approvals::where('ref_id', $purchase->id)
+				->where('ref_name', 'purchase')
+				->where('checker_type', 'checker')
+				->where('action_user', $userId)
+				->first();
+
+			if (!$existingChecker) {
+				Approvals::create([
+					'ref_id' => $purchase->id,
+					'ref_name' => 'purchase',
+					'checker_type' => 'checker',
+					'action_user' => $userId,
+					'status' => 0, // pending
+				]);
+			}
+		}
+
+		// Remove checker records for users no longer in the checkers list
+		// Only remove if they haven't taken action yet (status = 0)
+		Approvals::where('ref_id', $purchase->id)
+			->where('ref_name', 'purchase')
+			->where('checker_type', 'checker')
+			->where('status', 0)
+			->whereNotIn('action_user', $validUserIds)
+			->delete();
+	}
 }
+

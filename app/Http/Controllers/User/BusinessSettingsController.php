@@ -137,6 +137,13 @@ class BusinessSettingsController extends Controller
                 })->select('id', 'name', 'email')->get();
                 $data['users'] = $users;
                 return Inertia::render('Backend/User/Business/Settings/Approvals', $data);
+            case 'checkers':
+                // Get users that belong to this business for checker settings
+                $users = User::whereHas('business', function ($query) use ($id) {
+                    $query->where('business_id', $id);
+                })->select('id', 'name', 'email')->get();
+                $data['users'] = $users;
+                return Inertia::render('Backend/User/Business/Settings/Checkers', $data);
             default:
                 return Inertia::render('Backend/User/Business/Settings/General', $data);
         }
@@ -682,6 +689,90 @@ class BusinessSettingsController extends Controller
         return back()->with('success', _lang('Saved Successfully'));
     }
 
+    public function store_checker_settings(Request $request, $businessId)
+    {
+        Gate::authorize('business.settings');
+        $validator = Validator::make($request->all(), [
+            'purchase_checker_required_count' => 'required|integer|min:0|max:10',
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+
+        $settingsData = $request->except($this->ignoreRequests);
+
+        foreach ($settingsData as $key => $value) {
+            $value = is_array($value) ? json_encode($value) : $value;
+            update_business_option($key, $value, $businessId);
+        }
+
+        // Sync checker records for pending items with new checkers
+        $this->syncPurchaseCheckerRecords($request->purchase_checker_users ?? [], $businessId);
+
+        // audit log
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Updated Checker Settings for ' . $request->activeBusiness->name;
+        $audit->save();
+
+        return back()->with('success', _lang('Saved Successfully'));
+    }
+
+    /**
+     * Sync checker records for all pending purchases with the configured checkers
+     * This ensures new checkers are added to existing pending purchases
+     */
+    private function syncPurchaseCheckerRecords(array $checkerUserIds, $businessId): void
+    {
+        if (empty($checkerUserIds)) {
+            return;
+        }
+
+        // Filter to only include user IDs that actually exist in the database
+        $validUserIds = User::whereIn('id', $checkerUserIds)->pluck('id')->toArray();
+        
+        if (empty($validUserIds)) {
+            return;
+        }
+
+        // Get all pending purchases (checker_status = 0 and approval_status = 0) for this business - both cash and bill invoices
+        $pendingPurchases = Purchase::where('business_id', $businessId)
+            ->where('checker_status', 0)
+            ->get();
+
+        foreach ($pendingPurchases as $purchase) {
+            foreach ($validUserIds as $userId) {
+                // Check if checker record already exists for this user
+                $existingChecker = Approvals::where('ref_id', $purchase->id)
+                    ->where('ref_name', 'purchase')
+                    ->where('checker_type', 'checker')
+                    ->where('action_user', $userId)
+                    ->first();
+
+                if (!$existingChecker) {
+                    Approvals::create([
+                        'ref_id' => $purchase->id,
+                        'ref_name' => 'purchase',
+                        'checker_type' => 'checker',
+                        'action_user' => $userId,
+                        'status' => 0, // pending
+                    ]);
+                }
+            }
+
+            // Remove checker records for users no longer in the checkers list
+            // Only remove if they haven't taken action yet (status = 0)
+            Approvals::where('ref_id', $purchase->id)
+                ->where('ref_name', 'purchase')
+                ->where('checker_type', 'checker')
+                ->where('status', 0) // Only remove pending checks
+                ->whereNotIn('action_user', $validUserIds)
+                ->delete();
+        }
+    }
+
     /**
      * Sync approval records for all pending purchases (both cash and bill invoices) with the configured approvers
      * This ensures new approvers get added to existing pending purchases
@@ -709,6 +800,7 @@ class BusinessSettingsController extends Controller
                 // Check if approval record already exists for this user
                 $existingApproval = Approvals::where('ref_id', $purchase->id)
                     ->where('ref_name', 'purchase')
+                    ->where('checker_type', 'approval')
                     ->where('action_user', $userId)
                     ->first();
 
@@ -716,6 +808,7 @@ class BusinessSettingsController extends Controller
                     Approvals::create([
                         'ref_id' => $purchase->id,
                         'ref_name' => 'purchase',
+                        'checker_type' => 'approval',
                         'action_user' => $userId,
                         'status' => 0, // pending
                     ]);
@@ -726,6 +819,7 @@ class BusinessSettingsController extends Controller
             // Only remove if they haven't taken action yet (status = 0)
             Approvals::where('ref_id', $purchase->id)
                 ->where('ref_name', 'purchase')
+                ->where('checker_type', 'approval')
                 ->where('status', 0) // Only remove pending approvals
                 ->whereNotIn('action_user', $validUserIds)
                 ->delete();

@@ -50,6 +50,7 @@ import { formatCurrency } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Label } from "@/Components/ui/label";
+import { Badge } from "@/Components/ui/badge";
 
 const DeletePurchaseOrderModal = ({ show, onClose, onConfirm, processing }) => (
     <Modal show={show} onClose={onClose}>
@@ -260,14 +261,14 @@ const DeleteAllPurchaseOrdersModal = ({
 
 const PurchaseOrderStatusBadge = ({ status }) => {
     const statusMap = {
-        0: { label: "Active", className: "text-blue-500" },
-        1: { label: "Converted", className: "text-green-500" },
+        0: { label: "Active", className: "gap-1 text-blue-600 border-blue-600" },
+        1: { label: "Converted", className: "gap-1 text-green-600 border-green-600" },
     };
 
     return (
-        <span className={statusMap[status].className}>
+        <Badge variant="outline" className={statusMap[status].className}>
             {statusMap[status].label}
-        </span>
+        </Badge>
     );
 };
 
@@ -592,7 +593,7 @@ export default function List({
         setCurrentPage(page);
         router.get(
             route("purchase_orders.index"),
-            { 
+            {
                 search,
                 page,
                 per_page: perPage,
@@ -628,18 +629,16 @@ export default function List({
         return (
             <span className="inline-flex flex-col ml-1">
                 <ChevronUp
-                    className={`w-3 h-3 ${
-                        isActive && sorting.direction === "asc"
+                    className={`w-3 h-3 ${isActive && sorting.direction === "asc"
                             ? "text-gray-800"
                             : "text-gray-300"
-                    }`}
+                        }`}
                 />
                 <ChevronDown
-                    className={`w-3 h-3 -mt-1 ${
-                        isActive && sorting.direction === "desc"
+                    className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc"
                             ? "text-gray-800"
                             : "text-gray-300"
-                    }`}
+                        }`}
                 />
             </span>
         );
@@ -733,9 +732,9 @@ export default function List({
                                         </DropdownMenuItem>
                                         <DropdownMenuItem
                                             onClick={() =>
-                                                (window.location.href = route(
-                                                    "purchase_orders.export"
-                                                ))
+                                            (window.location.href = route(
+                                                "purchase_orders.export"
+                                            ))
                                             }
                                         >
                                             <FileDown className="mr-2 h-4 w-4" />{" "}
@@ -747,9 +746,9 @@ export default function List({
                                     <Button variant="outline" className="relative">
                                         <Trash2 className="h-8 w-8" />
                                         {trashed_purchase_orders > 0 && (
-                                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                                            {trashed_purchase_orders}
-                                        </span>
+                                            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
+                                                {trashed_purchase_orders}
+                                            </span>
                                         )}
                                     </Button>
                                 </Link>
@@ -921,11 +920,11 @@ export default function List({
                                                 <TableCell className="text-right">
                                                     {order.grand_total !== order.converted_total ? (
                                                         <span>
-                                                        {formatCurrency({ amount: order.grand_total, currency: order.business.currency })} ({formatCurrency({ amount: order.converted_total, currency: order.currency })})
+                                                            {formatCurrency({ amount: order.grand_total, currency: order.business.currency })} ({formatCurrency({ amount: order.converted_total, currency: order.currency })})
                                                         </span>
                                                     ) : (
                                                         <span>
-                                                        {formatCurrency({ amount: order.grand_total, currency: order.business.currency })}
+                                                            {formatCurrency({ amount: order.grand_total, currency: order.business.currency })}
                                                         </span>
                                                     )}
                                                 </TableCell>

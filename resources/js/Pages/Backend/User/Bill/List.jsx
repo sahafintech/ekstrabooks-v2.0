@@ -43,6 +43,7 @@ import {
     AlertTriangle,
     CheckCheck,
     XCircle,
+    ShieldCheck,
 } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
@@ -52,6 +53,7 @@ import Modal from "@/Components/Modal";
 import { formatCurrency } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import { Badge } from "@/Components/ui/badge";
 
 const DeleteBillModal = ({ show, onClose, onConfirm, processing }) => (
     <Modal show={show} onClose={onClose}>
@@ -201,7 +203,7 @@ const BulkApproveModal = ({ show, onClose, onConfirm, processing, count }) => (
                 </h2>
             </div>
             <p className="text-gray-600 mb-6">
-                Are you sure you want to approve {count} selected bill{count !== 1 ? "s" : ""}? 
+                Are you sure you want to approve {count} selected bill{count !== 1 ? "s" : ""}?
                 This will update your approval status for these bills.
             </p>
             <div className="flex justify-end gap-3">
@@ -236,7 +238,7 @@ const BulkRejectModal = ({ show, onClose, onConfirm, processing, count }) => (
                 </h2>
             </div>
             <p className="text-gray-600 mb-6">
-                Are you sure you want to reject {count} selected bill{count !== 1 ? "s" : ""}? 
+                Are you sure you want to reject {count} selected bill{count !== 1 ? "s" : ""}?
                 This will update your rejection status for these bills.
             </p>
             <div className="flex justify-end gap-3">
@@ -259,22 +261,61 @@ const BulkRejectModal = ({ show, onClose, onConfirm, processing, count }) => (
     </Modal>
 );
 
+const BulkVerifyModal = ({ show, onClose, onConfirm, processing, count }) => (
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
+            <div className="flex items-center gap-3 mb-4">
+                <div className="p-3 bg-blue-100 rounded-full">
+                    <ShieldCheck className="h-6 w-6 text-blue-600" />
+                </div>
+                <h2 className="text-lg font-medium">
+                    Confirm Bulk Verification
+                </h2>
+            </div>
+            <p className="text-gray-600 mb-6">
+                Are you sure you want to verify {count} selected bill{count !== 1 ? "s" : ""}?
+                This will update your verification status for these bills.
+            </p>
+            <div className="flex justify-end gap-3">
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={onClose}
+                >
+                    Cancel
+                </Button>
+                <Button
+                    type="submit"
+                    className="bg-blue-600 hover:bg-blue-700"
+                    disabled={processing}
+                >
+                    {processing ? "Verifying..." : "Verify Selected"}
+                </Button>
+            </div>
+        </form>
+    </Modal>
+);
+
 const BillApprovalStatusBadge = ({ status }) => {
     const statusMap = {
         0: {
             label: "Pending",
-            className: "text-gray-600 bg-gray-200 px-3 py-1 rounded text-xs",
+            className: "gap-1 text-gray-600 border-gray-400",
         },
         1: {
             label: "Approved",
-            className: "text-green-400 bg-green-200 px-3 py-1 rounded text-xs",
+            className: "gap-1 text-green-600 border-green-600",
         },
+        4: {
+            label: "Verified",
+            className: "gap-1 text-blue-600 border-blue-600",
+        }
     };
 
     return (
-        <span className={statusMap[status].className}>
+        <Badge variant="outline" className={statusMap[status].className}>
             {statusMap[status].label}
-        </span>
+        </Badge>
     );
 };
 
@@ -282,23 +323,22 @@ const BillStatusBadge = ({ status }) => {
     const statusMap = {
         0: {
             label: "Active",
-            className: "text-blue-600 bg-blue-200 px-3 py-1 rounded text-xs",
+            className: "gap-1 text-blue-600 border-blue-600",
         },
         1: {
             label: "Partial Paid",
-            className:
-                "text-yellow-600 bg-yellow-200 px-3 py-1 rounded text-xs",
+            className: "gap-1 text-yellow-600 border-yellow-600",
         },
         2: {
             label: "Paid",
-            className: "text-green-600 bg-green-200 px-3 py-1 rounded text-xs",
+            className: "gap-1 text-green-600 border-green-600",
         },
     };
 
     return (
-        <span className={statusMap[status].className}>
+        <Badge variant="outline" className={statusMap[status].className}>
             {statusMap[status].label}
-        </span>
+        </Badge>
     );
 };
 
@@ -361,6 +401,7 @@ export default function List({
     summary = {},
     trashed_bills = 0,
     hasConfiguredApprovers = false,
+    hasConfiguredCheckers = false,
     currentUserId = null,
 }) {
     const { flash = {} } = usePage().props;
@@ -391,6 +432,7 @@ export default function List({
     const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
     const [showBulkApproveModal, setShowBulkApproveModal] = useState(false);
     const [showBulkRejectModal, setShowBulkRejectModal] = useState(false);
+    const [showBulkVerifyModal, setShowBulkVerifyModal] = useState(false);
     const [billToDelete, setBillToDelete] = useState(null);
     const [processing, setProcessing] = useState(false);
 
@@ -602,9 +644,9 @@ export default function List({
         setSelectedBillStatus(value);
         router.get(
             route("bill_invoices.index"),
-            { 
-                search, 
-                page: 1, 
+            {
+                search,
+                page: 1,
                 per_page: perPage,
                 vendor_id: selectedVendor,
                 date_range: dateRange,
@@ -619,9 +661,9 @@ export default function List({
         setSelectedApprovalStatus(value);
         router.get(
             route("bill_invoices.index"),
-            { 
-                search, 
-                page: 1, 
+            {
+                search,
+                page: 1,
                 per_page: perPage,
                 vendor_id: selectedVendor,
                 date_range: dateRange,
@@ -639,6 +681,8 @@ export default function List({
             setShowBulkApproveModal(true);
         } else if (bulkAction === "reject" && selectedBills.length > 0) {
             setShowBulkRejectModal(true);
+        } else if (bulkAction === "verify" && selectedBills.length > 0) {
+            setShowBulkVerifyModal(true);
         }
     };
 
@@ -684,6 +728,27 @@ export default function List({
         );
     };
 
+    const handleBulkVerify = (e) => {
+        e.preventDefault();
+        setProcessing(true);
+        router.post(
+            route("bill_invoices.bulk_verify"),
+            { ids: selectedBills },
+            {
+                onSuccess: () => {
+                    setProcessing(false);
+                    setSelectedBills([]);
+                    setIsAllSelected(false);
+                    setBulkAction("");
+                    setShowBulkVerifyModal(false);
+                },
+                onError: () => {
+                    setProcessing(false);
+                }
+            }
+        );
+    };
+
     const handleExport = () => {
         window.location.href = route("bill_invoices.export");
     };
@@ -706,18 +771,16 @@ export default function List({
         return (
             <span className="inline-flex flex-col ml-1">
                 <ChevronUp
-                    className={`w-3 h-3 ${
-                        isActive && sorting.direction === "asc"
-                            ? "text-gray-800"
-                            : "text-gray-300"
-                    }`}
+                    className={`w-3 h-3 ${isActive && sorting.direction === "asc"
+                        ? "text-gray-800"
+                        : "text-gray-300"
+                        }`}
                 />
                 <ChevronDown
-                    className={`w-3 h-3 -mt-1 ${
-                        isActive && sorting.direction === "desc"
-                            ? "text-gray-800"
-                            : "text-gray-300"
-                    }`}
+                    className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc"
+                        ? "text-gray-800"
+                        : "text-gray-300"
+                        }`}
                 />
             </span>
         );
@@ -803,9 +866,9 @@ export default function List({
                                     <Button variant="outline" className="relative">
                                         <Trash2 className="h-8 w-8" />
                                         {trashed_bills > 0 && (
-                                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                                            {trashed_bills}
-                                        </span>
+                                            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
+                                                {trashed_bills}
+                                            </span>
                                         )}
                                     </Button>
                                 </Link>
@@ -844,6 +907,14 @@ export default function List({
                                         <SelectItem value="delete">
                                             Delete Selected
                                         </SelectItem>
+                                        {hasConfiguredCheckers && (
+                                            <SelectItem value="verify">
+                                                <span className="flex items-center gap-2">
+                                                    <ShieldCheck className="h-4 w-4 text-blue-600" />
+                                                    Verify Selected
+                                                </span>
+                                            </SelectItem>
+                                        )}
                                         {hasConfiguredApprovers && (
                                             <>
                                                 <SelectItem value="approve">
@@ -1006,7 +1077,7 @@ export default function List({
                                             Due
                                         </TableHead>
                                         <TableHead
-                                            className="cursor-pointer"
+                                            className="cursor-pointer text-right"
                                             onClick={() =>
                                                 handleSort("approval_status")
                                             }
@@ -1065,15 +1136,15 @@ export default function List({
                                                     {bill.due_date}
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                {bill.grand_total !== bill.converted_total ? (
-                                                    <span>
-                                                    {formatCurrency({ amount: bill.grand_total, currency: bill.business.currency })} ({formatCurrency({ amount: bill.converted_total, currency: bill.currency })})
-                                                    </span>
-                                                ) : (
-                                                    <span>
-                                                    {formatCurrency({ amount: bill.grand_total, currency: bill.business.currency })}
-                                                    </span>
-                                                )}
+                                                    {bill.grand_total !== bill.converted_total ? (
+                                                        <span>
+                                                            {formatCurrency({ amount: bill.grand_total, currency: bill.business.currency })} ({formatCurrency({ amount: bill.converted_total, currency: bill.currency })})
+                                                        </span>
+                                                    ) : (
+                                                        <span>
+                                                            {formatCurrency({ amount: bill.grand_total, currency: bill.business.currency })}
+                                                        </span>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     {formatCurrency({
@@ -1081,17 +1152,17 @@ export default function List({
                                                     })}
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                {bill.grand_total !== bill.converted_total ? (
-                                                    <span>
-                                                    {formatCurrency({ amount: bill.grand_total - bill.paid, currency: bill.business.currency })} ({formatCurrency({ amount: bill.converted_total - bill.paid, currency: bill.currency })})
-                                                    </span>
-                                                ) : (
-                                                    <span>
-                                                    {formatCurrency({ amount: bill.grand_total - bill.paid, currency: bill.business.currency })}
-                                                    </span>
-                                                )}
+                                                    {bill.grand_total !== bill.converted_total ? (
+                                                        <span>
+                                                            {formatCurrency({ amount: bill.grand_total - bill.paid, currency: bill.business.currency })} ({formatCurrency({ amount: bill.converted_total - bill.paid, currency: bill.currency })})
+                                                        </span>
+                                                    ) : (
+                                                        <span>
+                                                            {formatCurrency({ amount: bill.grand_total - bill.paid, currency: bill.business.currency })}
+                                                        </span>
+                                                    )}
                                                 </TableCell>
-                                                <TableCell>
+                                                <TableCell className="text-right">
                                                     <BillApprovalStatusBadge
                                                         status={
                                                             bill.approval_status
@@ -1252,6 +1323,14 @@ export default function List({
                 show={showBulkRejectModal}
                 onClose={() => setShowBulkRejectModal(false)}
                 onConfirm={handleBulkReject}
+                processing={processing}
+                count={selectedBills.length}
+            />
+
+            <BulkVerifyModal
+                show={showBulkVerifyModal}
+                onClose={() => setShowBulkVerifyModal(false)}
+                onConfirm={handleBulkVerify}
                 processing={processing}
                 count={selectedBills.length}
             />

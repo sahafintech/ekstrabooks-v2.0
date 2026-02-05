@@ -31,7 +31,8 @@ export default function Approvals({ business, id, users = [], activeTab }) {
         // Purchases Approval Settings
         purchase_approval_required_count: getSettingValue("purchase_approval_required_count", "1"),
         purchase_approval_users: getArraySettingValue("purchase_approval_users"),
-        
+
+
         // Payroll Approval Settings
         payroll_approval_required_count: getSettingValue("payroll_approval_required_count", "1"),
         payroll_approval_users: getArraySettingValue("payroll_approval_users"),
@@ -80,9 +81,9 @@ export default function Approvals({ business, id, users = [], activeTab }) {
                                 <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
                                     <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                                         <span className="mr-2">🛒</span>
-                                        Purchases Workflow
+                                        Purchases Approval Workflow
                                     </h3>
-                                    
+
                                     <div className="grid grid-cols-12 mb-4">
                                         <Label htmlFor="purchase_approval_required_count" className="col-span-12 md:col-span-3 flex items-center mb-2 md:mb-0">
                                             Number of Approvals Required
@@ -125,13 +126,15 @@ export default function Approvals({ business, id, users = [], activeTab }) {
                                     </div>
                                 </div>
 
+
+
                                 {/* Payroll Workflow */}
                                 <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
                                     <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                                         <span className="mr-2">💵</span>
                                         Payroll Workflow
                                     </h3>
-                                    
+
                                     <div className="grid grid-cols-12 mb-4">
                                         <Label htmlFor="payroll_approval_required_count" className="col-span-12 md:col-span-3 flex items-center mb-2 md:mb-0">
                                             Number of Approvals Required
@@ -180,7 +183,7 @@ export default function Approvals({ business, id, users = [], activeTab }) {
                                         <span className="mr-2">📒</span>
                                         Journal Workflow
                                     </h3>
-                                    
+
                                     <div className="grid grid-cols-12 mb-4">
                                         <Label htmlFor="journal_approval_required_count" className="col-span-12 md:col-span-3 flex items-center mb-2 md:mb-0">
                                             Number of Approvals Required

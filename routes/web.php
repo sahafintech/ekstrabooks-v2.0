@@ -258,6 +258,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('business/{id}/store_general_settings', [BusinessSettingsController::class, 'store_general_settings'])->name('business.store_general_settings');
 		Route::post('business/{id}/store_payroll_settings', [BusinessSettingsController::class, 'store_payroll_settings'])->name('business.store_payroll_settings');
 		Route::post('business/{id}/store_approval_settings', [BusinessSettingsController::class, 'store_approval_settings'])->name('business.store_approval_settings');
+		Route::post('business/{id}/store_checker_settings', [BusinessSettingsController::class, 'store_checker_settings'])->name('business.store_checker_settings');
 		// Business Settings Route (with tab parameter)
 		Route::get('business/{id}/settings/{tab?}', [BusinessSettingsController::class, 'settings'])->name('business.settings');
 
@@ -541,6 +542,8 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('bill_invoices/{id}/pdf', [PurchaseController::class, 'pdf'])->name('bill_invoices.pdf');
 		Route::post('bill_invoices/{id}/approve', [PurchaseController::class, 'approve'])->name('bill_invoices.approve');
 		Route::post('bill_invoices/{id}/reject', [PurchaseController::class, 'reject'])->name('bill_invoices.reject');
+		Route::post('bill_invoices/{id}/verify', [PurchaseController::class, 'verify'])->name('bill_invoices.verify');
+		Route::post('bill_invoices/bulk_verify', [PurchaseController::class, 'bulk_verify'])->name('bill_invoices.bulk_verify');
 
 		//Cash Purchases
 		Route::get('cash_purchases/trash', [CashPurchaseController::class, 'trash'])->name('cash_purchases.trash');
@@ -563,6 +566,8 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('cash_purchases/{id}/pdf', [CashPurchaseController::class, 'pdf'])->name('cash_purchases.pdf');
 		Route::post('cash_purchases/{id}/approve', [CashPurchaseController::class, 'approve'])->name('cash_purchases.approve');
 		Route::post('cash_purchases/{id}/reject', [CashPurchaseController::class, 'reject'])->name('cash_purchases.reject');
+		Route::post('cash_purchases/{id}/verify', [CashPurchaseController::class, 'verify'])->name('cash_purchases.verify');
+		Route::post('cash_purchases/bulk_verify', [CashPurchaseController::class, 'bulk_verify'])->name('cash_purchases.bulk_verify');
 
 		// purchase orders
 		Route::get('purchase_orders/{id}/pdf', [PurchaseOrderController::class, 'pdf'])->name('purchase_orders.pdf');

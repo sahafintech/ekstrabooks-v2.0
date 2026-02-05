@@ -48,6 +48,7 @@ import DateTimePicker from "@/Components/DateTimePicker";
 import { DrawerComponent } from "@/Components/DrawerComponent";
 import { Textarea } from "@/Components/ui/textarea";
 import InputError from "@/Components/InputError";
+import { Badge } from "@/Components/ui/badge";
 
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
@@ -479,7 +480,7 @@ export default function List({
         filters.sorting || { column: "id", direction: "desc" }
     );
     const [paymentAmounts, setPaymentAmounts] = useState({});
-    
+
     // Edit drawer states
     const [editDrawerOpen, setEditDrawerOpen] = useState(false);
     const [editingPayroll, setEditingPayroll] = useState(null);
@@ -508,27 +509,27 @@ export default function List({
 
     useEffect(() => {
         if (flash && flash.success) {
-          toast("Success Message", {
-            description: flash.success,
-            action: {
-              label: "Close",
-              onClick: () => {
-                toast.dismiss();
-              }
-            }
-          });
+            toast("Success Message", {
+                description: flash.success,
+                action: {
+                    label: "Close",
+                    onClick: () => {
+                        toast.dismiss();
+                    }
+                }
+            });
         }
-    
+
         if (flash && flash.error) {
-          toast("Error Message", {
-            description: flash.error,
-            action: {
-              label: "Close",
-              onClick: () => {
-                toast.dismiss();
-              }
-            }
-          });
+            toast("Error Message", {
+                description: flash.error,
+                action: {
+                    label: "Close",
+                    onClick: () => {
+                        toast.dismiss();
+                    }
+                }
+            });
         }
     }, [flash, toast]);
 
@@ -899,18 +900,16 @@ export default function List({
         return (
             <span className="inline-flex flex-col ml-1">
                 <ChevronUp
-                    className={`w-3 h-3 ${
-                        isActive && sorting.direction === "asc"
+                    className={`w-3 h-3 ${isActive && sorting.direction === "asc"
                             ? "text-gray-800"
                             : "text-gray-300"
-                    }`}
+                        }`}
                 />
                 <ChevronDown
-                    className={`w-3 h-3 -mt-1 ${
-                        isActive && sorting.direction === "desc"
+                    className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc"
                             ? "text-gray-800"
                             : "text-gray-300"
-                    }`}
+                        }`}
                 />
             </span>
         );
@@ -951,17 +950,17 @@ export default function List({
 
     const PayrollStatusBadge = ({ status }) => {
         const statusMap = {
-            0: { label: "Draft", className: "text-gray-600" },
-            1: { label: "Approved", className: "text-blue-600" },
-            2: { label: "Accrued", className: "text-green-600" },
-            3: { label: "Partially Paid", className: "text-yellow-600" },
-            4: { label: "Paid", className: "text-green-600" },
+            0: { label: "Draft", className: "gap-1 text-gray-600 border-gray-400" },
+            1: { label: "Approved", className: "gap-1 text-blue-600 border-blue-600" },
+            2: { label: "Accrued", className: "gap-1 text-green-600 border-green-600" },
+            3: { label: "Partially Paid", className: "gap-1 text-yellow-600 border-yellow-600" },
+            4: { label: "Paid", className: "gap-1 text-green-600 border-green-600" },
         };
 
         return (
-            <span className={statusMap[status].className}>
+            <Badge variant="outline" className={statusMap[status].className}>
                 {statusMap[status].label}
-            </span>
+            </Badge>
         );
     };
 
@@ -980,7 +979,7 @@ export default function List({
     // Edit drawer functions
     const handleEditPayroll = (payroll) => {
         setEditingPayroll(payroll);
-        
+
         // Initialize form data
         setEditData({
             advance: payroll.advance || "",
@@ -1016,7 +1015,7 @@ export default function List({
             onError: () => {
                 toast({
                     variant: "destructive",
-                    title: "Error", 
+                    title: "Error",
                     description: "Failed to update payroll",
                 });
             },
@@ -1078,15 +1077,15 @@ export default function List({
         const currentSalary = parseFloat(editingPayroll.current_salary) || 0;
         const totalAllowances = Array.isArray(editData.allowances)
             ? editData.allowances.reduce(
-                  (sum, item) => sum + (parseFloat(item.amount) || 0),
-                  0
-              )
+                (sum, item) => sum + (parseFloat(item.amount) || 0),
+                0
+            )
             : 0;
         const totalDeductions = Array.isArray(editData.deductions)
             ? editData.deductions.reduce(
-                  (sum, item) => sum + (parseFloat(item.amount) || 0),
-                  0
-              )
+                (sum, item) => sum + (parseFloat(item.amount) || 0),
+                0
+            )
             : 0;
         const advance = parseFloat(editData.advance) || 0;
         const calculatedNetSalary = currentSalary + totalAllowances - totalDeductions - advance;
@@ -1316,162 +1315,162 @@ export default function List({
                                         </TableHead>
                                         {userPackage.time_sheet_module ===
                                             1 && (
-                                            <>
-                                                <TableHead
-                                                    className="cursor-pointer whitespace-nowrap"
-                                                    onClick={() =>
-                                                        handleSort(
+                                                <>
+                                                    <TableHead
+                                                        className="cursor-pointer whitespace-nowrap"
+                                                        onClick={() =>
+                                                            handleSort(
+                                                                "required_working_days"
+                                                            )
+                                                        }
+                                                    >
+                                                        Required Working Days{" "}
+                                                        {renderSortIcon(
                                                             "required_working_days"
-                                                        )
-                                                    }
-                                                >
-                                                    Required Working Days{" "}
-                                                    {renderSortIcon(
-                                                        "required_working_days"
-                                                    )}
-                                                </TableHead>
-                                                <TableHead
-                                                    className="cursor-pointer whitespace-nowrap"
-                                                    onClick={() =>
-                                                        handleSort(
+                                                        )}
+                                                    </TableHead>
+                                                    <TableHead
+                                                        className="cursor-pointer whitespace-nowrap"
+                                                        onClick={() =>
+                                                            handleSort(
+                                                                "public_holiday"
+                                                            )
+                                                        }
+                                                    >
+                                                        Public Holiday{" "}
+                                                        {renderSortIcon(
                                                             "public_holiday"
-                                                        )
-                                                    }
-                                                >
-                                                    Public Holiday{" "}
-                                                    {renderSortIcon(
-                                                        "public_holiday"
-                                                    )}
-                                                </TableHead>
-                                                <TableHead
-                                                    className="cursor-pointer whitespace-nowrap"
-                                                    onClick={() =>
-                                                        handleSort("weekend")
-                                                    }
-                                                >
-                                                    Weekend{" "}
-                                                    {renderSortIcon("weekend")}
-                                                </TableHead>
-                                                <TableHead
-                                                    className="cursor-pointer whitespace-nowrap"
-                                                    onClick={() =>
-                                                        handleSort(
+                                                        )}
+                                                    </TableHead>
+                                                    <TableHead
+                                                        className="cursor-pointer whitespace-nowrap"
+                                                        onClick={() =>
+                                                            handleSort("weekend")
+                                                        }
+                                                    >
+                                                        Weekend{" "}
+                                                        {renderSortIcon("weekend")}
+                                                    </TableHead>
+                                                    <TableHead
+                                                        className="cursor-pointer whitespace-nowrap"
+                                                        onClick={() =>
+                                                            handleSort(
+                                                                "required_working_hours"
+                                                            )
+                                                        }
+                                                    >
+                                                        Required Working Hours{" "}
+                                                        {renderSortIcon(
                                                             "required_working_hours"
-                                                        )
-                                                    }
-                                                >
-                                                    Required Working Hours{" "}
-                                                    {renderSortIcon(
-                                                        "required_working_hours"
-                                                    )}
-                                                </TableHead>
-                                                <TableHead
-                                                    className="cursor-pointer whitespace-nowrap"
-                                                    onClick={() =>
-                                                        handleSort(
+                                                        )}
+                                                    </TableHead>
+                                                    <TableHead
+                                                        className="cursor-pointer whitespace-nowrap"
+                                                        onClick={() =>
+                                                            handleSort(
+                                                                "overtime_hours"
+                                                            )
+                                                        }
+                                                    >
+                                                        Overtime Hours{" "}
+                                                        {renderSortIcon(
                                                             "overtime_hours"
-                                                        )
-                                                    }
-                                                >
-                                                    Overtime Hours{" "}
-                                                    {renderSortIcon(
-                                                        "overtime_hours"
-                                                    )}
-                                                </TableHead>
-                                                <TableHead
-                                                    className="cursor-pointer whitespace-nowrap"
-                                                    onClick={() =>
-                                                        handleSort(
+                                                        )}
+                                                    </TableHead>
+                                                    <TableHead
+                                                        className="cursor-pointer whitespace-nowrap"
+                                                        onClick={() =>
+                                                            handleSort(
+                                                                "cost_overtime_hours"
+                                                            )
+                                                        }
+                                                    >
+                                                        Cost of Overtime Hours{" "}
+                                                        {renderSortIcon(
                                                             "cost_overtime_hours"
-                                                        )
-                                                    }
-                                                >
-                                                    Cost of Overtime Hours{" "}
-                                                    {renderSortIcon(
-                                                        "cost_overtime_hours"
-                                                    )}
-                                                </TableHead>
-                                                <TableHead
-                                                    className="cursor-pointer whitespace-nowrap"
-                                                    onClick={() =>
-                                                        handleSort(
+                                                        )}
+                                                    </TableHead>
+                                                    <TableHead
+                                                        className="cursor-pointer whitespace-nowrap"
+                                                        onClick={() =>
+                                                            handleSort(
+                                                                "cost_public_holiday"
+                                                            )
+                                                        }
+                                                    >
+                                                        Cost of Public Holiday{" "}
+                                                        {renderSortIcon(
                                                             "cost_public_holiday"
-                                                        )
-                                                    }
-                                                >
-                                                    Cost of Public Holiday{" "}
-                                                    {renderSortIcon(
-                                                        "cost_public_holiday"
-                                                    )}
-                                                </TableHead>
-                                                <TableHead
-                                                    className="cursor-pointer whitespace-nowrap"
-                                                    onClick={() =>
-                                                        handleSort(
+                                                        )}
+                                                    </TableHead>
+                                                    <TableHead
+                                                        className="cursor-pointer whitespace-nowrap"
+                                                        onClick={() =>
+                                                            handleSort(
+                                                                "cost_weekend"
+                                                            )
+                                                        }
+                                                    >
+                                                        Cost of Weekend{" "}
+                                                        {renderSortIcon(
                                                             "cost_weekend"
-                                                        )
-                                                    }
-                                                >
-                                                    Cost of Weekend{" "}
-                                                    {renderSortIcon(
-                                                        "cost_weekend"
-                                                    )}
-                                                </TableHead>
-                                                <TableHead
-                                                    className="cursor-pointer whitespace-nowrap"
-                                                    onClick={() =>
-                                                        handleSort(
+                                                        )}
+                                                    </TableHead>
+                                                    <TableHead
+                                                        className="cursor-pointer whitespace-nowrap"
+                                                        onClick={() =>
+                                                            handleSort(
+                                                                "total_cost_normal_hours"
+                                                            )
+                                                        }
+                                                    >
+                                                        Total Cost of Normal Hours{" "}
+                                                        {renderSortIcon(
                                                             "total_cost_normal_hours"
-                                                        )
-                                                    }
-                                                >
-                                                    Total Cost of Normal Hours{" "}
-                                                    {renderSortIcon(
-                                                        "total_cost_normal_hours"
-                                                    )}
-                                                </TableHead>
-                                                <TableHead
-                                                    className="cursor-pointer whitespace-nowrap"
-                                                    onClick={() =>
-                                                        handleSort(
+                                                        )}
+                                                    </TableHead>
+                                                    <TableHead
+                                                        className="cursor-pointer whitespace-nowrap"
+                                                        onClick={() =>
+                                                            handleSort(
+                                                                "total_cost_overtime_hours"
+                                                            )
+                                                        }
+                                                    >
+                                                        Total Cost of Overtime Hours{" "}
+                                                        {renderSortIcon(
                                                             "total_cost_overtime_hours"
-                                                        )
-                                                    }
-                                                >
-                                                    Total Cost of Overtime Hours{" "}
-                                                    {renderSortIcon(
-                                                        "total_cost_overtime_hours"
-                                                    )}
-                                                </TableHead>
-                                                <TableHead
-                                                    className="cursor-pointer whitespace-nowrap"
-                                                    onClick={() =>
-                                                        handleSort(
+                                                        )}
+                                                    </TableHead>
+                                                    <TableHead
+                                                        className="cursor-pointer whitespace-nowrap"
+                                                        onClick={() =>
+                                                            handleSort(
+                                                                "total_cost_public_holiday"
+                                                            )
+                                                        }
+                                                    >
+                                                        Total Cost of Public
+                                                        Holidays{" "}
+                                                        {renderSortIcon(
                                                             "total_cost_public_holiday"
-                                                        )
-                                                    }
-                                                >
-                                                    Total Cost of Public
-                                                    Holidays{" "}
-                                                    {renderSortIcon(
-                                                        "total_cost_public_holiday"
-                                                    )}
-                                                </TableHead>
-                                                <TableHead
-                                                    className="cursor-pointer whitespace-nowrap"
-                                                    onClick={() =>
-                                                        handleSort(
+                                                        )}
+                                                    </TableHead>
+                                                    <TableHead
+                                                        className="cursor-pointer whitespace-nowrap"
+                                                        onClick={() =>
+                                                            handleSort(
+                                                                "total_cost_weekend"
+                                                            )
+                                                        }
+                                                    >
+                                                        Total Cost of Weekends{" "}
+                                                        {renderSortIcon(
                                                             "total_cost_weekend"
-                                                        )
-                                                    }
-                                                >
-                                                    Total Cost of Weekends{" "}
-                                                    {renderSortIcon(
-                                                        "total_cost_weekend"
-                                                    )}
-                                                </TableHead>
-                                            </>
-                                        )}
+                                                        )}
+                                                    </TableHead>
+                                                </>
+                                            )}
                                         <TableHead
                                             className="cursor-pointer whitespace-nowrap"
                                             onClick={() =>
@@ -1550,225 +1549,225 @@ export default function List({
                                         <TableCell colSpan={4}></TableCell>
                                         {userPackage.time_sheet_module ===
                                             1 && (
-                                            <>
-                                                <TableCell>
-                                                    <span className="text-blue-600">
-                                                        {formatAmount(
-                                                            payrolls.reduce(
-                                                                (
-                                                                    acc,
-                                                                    payroll
-                                                                ) =>
-                                                                    acc +
-                                                                    Number(
-                                                                        payroll.required_working_days ||
+                                                <>
+                                                    <TableCell>
+                                                        <span className="text-blue-600">
+                                                            {formatAmount(
+                                                                payrolls.reduce(
+                                                                    (
+                                                                        acc,
+                                                                        payroll
+                                                                    ) =>
+                                                                        acc +
+                                                                        Number(
+                                                                            payroll.required_working_days ||
                                                                             0
-                                                                    ),
-                                                                0
-                                                            )
-                                                        )}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="text-blue-600">
-                                                        {formatAmount(
-                                                            payrolls.reduce(
-                                                                (
-                                                                    acc,
-                                                                    payroll
-                                                                ) =>
-                                                                    acc +
-                                                                    Number(
-                                                                        payroll.public_holiday ||
+                                                                        ),
+                                                                    0
+                                                                )
+                                                            )}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="text-blue-600">
+                                                            {formatAmount(
+                                                                payrolls.reduce(
+                                                                    (
+                                                                        acc,
+                                                                        payroll
+                                                                    ) =>
+                                                                        acc +
+                                                                        Number(
+                                                                            payroll.public_holiday ||
                                                                             0
-                                                                    ),
-                                                                0
-                                                            )
-                                                        )}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="text-blue-600">
-                                                        {formatAmount(
-                                                            payrolls.reduce(
-                                                                (
-                                                                    acc,
-                                                                    payroll
-                                                                ) =>
-                                                                    acc +
-                                                                    Number(
-                                                                        payroll.weekend ||
+                                                                        ),
+                                                                    0
+                                                                )
+                                                            )}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="text-blue-600">
+                                                            {formatAmount(
+                                                                payrolls.reduce(
+                                                                    (
+                                                                        acc,
+                                                                        payroll
+                                                                    ) =>
+                                                                        acc +
+                                                                        Number(
+                                                                            payroll.weekend ||
                                                                             0
-                                                                    ),
-                                                                0
-                                                            )
-                                                        )}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="text-blue-600">
-                                                        {formatAmount(
-                                                            payrolls.reduce(
-                                                                (
-                                                                    acc,
-                                                                    payroll
-                                                                ) =>
-                                                                    acc +
-                                                                    Number(
-                                                                        payroll.required_working_hours ||
+                                                                        ),
+                                                                    0
+                                                                )
+                                                            )}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="text-blue-600">
+                                                            {formatAmount(
+                                                                payrolls.reduce(
+                                                                    (
+                                                                        acc,
+                                                                        payroll
+                                                                    ) =>
+                                                                        acc +
+                                                                        Number(
+                                                                            payroll.required_working_hours ||
                                                                             0
-                                                                    ),
-                                                                0
-                                                            )
-                                                        )}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="text-blue-600">
-                                                        {formatAmount(
-                                                            payrolls.reduce(
-                                                                (
-                                                                    acc,
-                                                                    payroll
-                                                                ) =>
-                                                                    acc +
-                                                                    Number(
-                                                                        payroll.overtime_hours ||
+                                                                        ),
+                                                                    0
+                                                                )
+                                                            )}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="text-blue-600">
+                                                            {formatAmount(
+                                                                payrolls.reduce(
+                                                                    (
+                                                                        acc,
+                                                                        payroll
+                                                                    ) =>
+                                                                        acc +
+                                                                        Number(
+                                                                            payroll.overtime_hours ||
                                                                             0
-                                                                    ),
-                                                                0
-                                                            )
-                                                        )}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="text-blue-600">
-                                                        {formatCurrency({
-                                                            amount: payrolls.reduce(
-                                                                (
-                                                                    acc,
-                                                                    payroll
-                                                                ) =>
-                                                                    acc +
-                                                                    Number(
-                                                                        payroll.cost_overtime_hours ||
+                                                                        ),
+                                                                    0
+                                                                )
+                                                            )}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="text-blue-600">
+                                                            {formatCurrency({
+                                                                amount: payrolls.reduce(
+                                                                    (
+                                                                        acc,
+                                                                        payroll
+                                                                    ) =>
+                                                                        acc +
+                                                                        Number(
+                                                                            payroll.cost_overtime_hours ||
                                                                             0
-                                                                    ),
-                                                                0
-                                                            ),
-                                                        })}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="text-blue-600">
-                                                        {formatCurrency({
-                                                            amount: payrolls.reduce(
-                                                                (
-                                                                    acc,
-                                                                    payroll
-                                                                ) =>
-                                                                    acc +
-                                                                    Number(
-                                                                        payroll.cost_public_holiday ||
+                                                                        ),
+                                                                    0
+                                                                ),
+                                                            })}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="text-blue-600">
+                                                            {formatCurrency({
+                                                                amount: payrolls.reduce(
+                                                                    (
+                                                                        acc,
+                                                                        payroll
+                                                                    ) =>
+                                                                        acc +
+                                                                        Number(
+                                                                            payroll.cost_public_holiday ||
                                                                             0
-                                                                    ),
-                                                                0
-                                                            ),
-                                                        })}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="text-blue-600">
-                                                        {formatCurrency({
-                                                            amount: payrolls.reduce(
-                                                                (
-                                                                    acc,
-                                                                    payroll
-                                                                ) =>
-                                                                    acc +
-                                                                    Number(
-                                                                        payroll.cost_weekend ||
+                                                                        ),
+                                                                    0
+                                                                ),
+                                                            })}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="text-blue-600">
+                                                            {formatCurrency({
+                                                                amount: payrolls.reduce(
+                                                                    (
+                                                                        acc,
+                                                                        payroll
+                                                                    ) =>
+                                                                        acc +
+                                                                        Number(
+                                                                            payroll.cost_weekend ||
                                                                             0
-                                                                    ),
-                                                                0
-                                                            ),
-                                                        })}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="text-blue-600">
-                                                        {formatCurrency({
-                                                            amount: payrolls.reduce(
-                                                                (
-                                                                    acc,
-                                                                    payroll
-                                                                ) =>
-                                                                    acc +
-                                                                    Number(
-                                                                        payroll.total_cost_normal_hours ||
+                                                                        ),
+                                                                    0
+                                                                ),
+                                                            })}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="text-blue-600">
+                                                            {formatCurrency({
+                                                                amount: payrolls.reduce(
+                                                                    (
+                                                                        acc,
+                                                                        payroll
+                                                                    ) =>
+                                                                        acc +
+                                                                        Number(
+                                                                            payroll.total_cost_normal_hours ||
                                                                             0
-                                                                    ),
-                                                                0
-                                                            ),
-                                                        })}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="text-blue-600">
-                                                        {formatCurrency({
-                                                            amount: payrolls.reduce(
-                                                                (
-                                                                    acc,
-                                                                    payroll
-                                                                ) =>
-                                                                    acc +
-                                                                    Number(
-                                                                        payroll.total_cost_overtime_hours ||
+                                                                        ),
+                                                                    0
+                                                                ),
+                                                            })}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="text-blue-600">
+                                                            {formatCurrency({
+                                                                amount: payrolls.reduce(
+                                                                    (
+                                                                        acc,
+                                                                        payroll
+                                                                    ) =>
+                                                                        acc +
+                                                                        Number(
+                                                                            payroll.total_cost_overtime_hours ||
                                                                             0
-                                                                    ),
-                                                                0
-                                                            ),
-                                                        })}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="text-blue-600">
-                                                        {formatCurrency({
-                                                            amount: payrolls.reduce(
-                                                                (
-                                                                    acc,
-                                                                    payroll
-                                                                ) =>
-                                                                    acc +
-                                                                    Number(
-                                                                        payroll.total_cost_public_holiday ||
+                                                                        ),
+                                                                    0
+                                                                ),
+                                                            })}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="text-blue-600">
+                                                            {formatCurrency({
+                                                                amount: payrolls.reduce(
+                                                                    (
+                                                                        acc,
+                                                                        payroll
+                                                                    ) =>
+                                                                        acc +
+                                                                        Number(
+                                                                            payroll.total_cost_public_holiday ||
                                                                             0
-                                                                    ),
-                                                                0
-                                                            ),
-                                                        })}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="text-blue-600">
-                                                        {formatCurrency({
-                                                            amount: payrolls.reduce(
-                                                                (
-                                                                    acc,
-                                                                    payroll
-                                                                ) =>
-                                                                    acc +
-                                                                    Number(
-                                                                        payroll.total_cost_weekend ||
+                                                                        ),
+                                                                    0
+                                                                ),
+                                                            })}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="text-blue-600">
+                                                            {formatCurrency({
+                                                                amount: payrolls.reduce(
+                                                                    (
+                                                                        acc,
+                                                                        payroll
+                                                                    ) =>
+                                                                        acc +
+                                                                        Number(
+                                                                            payroll.total_cost_weekend ||
                                                                             0
-                                                                    ),
-                                                                0
-                                                            ),
-                                                        })}
-                                                    </span>
-                                                </TableCell>
-                                            </>
-                                        )}
+                                                                        ),
+                                                                    0
+                                                                ),
+                                                            })}
+                                                        </span>
+                                                    </TableCell>
+                                                </>
+                                            )}
                                         <TableCell>
                                             <span className="text-blue-600">
                                                 {formatCurrency({
@@ -1777,7 +1776,7 @@ export default function List({
                                                             acc +
                                                             Number(
                                                                 payroll.current_salary ||
-                                                                    0
+                                                                0
                                                             ),
                                                         0
                                                     ),
@@ -1792,7 +1791,7 @@ export default function List({
                                                             acc +
                                                             Number(
                                                                 payroll.total_allowance ||
-                                                                    0
+                                                                0
                                                             ),
                                                         0
                                                     ),
@@ -1807,7 +1806,7 @@ export default function List({
                                                             acc +
                                                             Number(
                                                                 payroll.total_tax ||
-                                                                    0
+                                                                0
                                                             ),
                                                         0
                                                     ),
@@ -1822,7 +1821,7 @@ export default function List({
                                                             acc +
                                                             Number(
                                                                 payroll.total_deduction ||
-                                                                    0
+                                                                0
                                                             ),
                                                         0
                                                     ),
@@ -1837,7 +1836,7 @@ export default function List({
                                                             acc +
                                                             Number(
                                                                 payroll.advance ||
-                                                                    0
+                                                                0
                                                             ),
                                                         0
                                                     ),
@@ -1852,7 +1851,7 @@ export default function List({
                                                             acc +
                                                             Number(
                                                                 payroll.net_salary ||
-                                                                    0
+                                                                0
                                                             ),
                                                         0
                                                     ),
@@ -1867,7 +1866,7 @@ export default function List({
                                                             acc +
                                                             Number(
                                                                 payroll.paid ||
-                                                                    0
+                                                                0
                                                             ),
                                                         0
                                                     ),
@@ -1882,11 +1881,11 @@ export default function List({
                                                             acc +
                                                             (Number(
                                                                 payroll.net_salary ||
-                                                                    0
+                                                                0
                                                             ) -
                                                                 Number(
                                                                     payroll.paid ||
-                                                                        0
+                                                                    0
                                                                 )),
                                                         0
                                                     ),
@@ -1934,69 +1933,69 @@ export default function List({
                                                 </TableCell>
                                                 {userPackage.time_sheet_module ===
                                                     1 && (
-                                                    <>
-                                                        <TableCell className="whitespace-nowrap">
-                                                            {formatAmount(
-                                                                payroll.required_working_days
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell className="whitespace-nowrap">
-                                                            {formatAmount(
-                                                                payroll.public_holiday
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell className="whitespace-nowrap">
-                                                            {formatAmount(
-                                                                payroll.weekend
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell className="whitespace-nowrap">
-                                                            {formatAmount(
-                                                                payroll.required_working_hours
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell className="whitespace-nowrap">
-                                                            {formatAmount(
-                                                                payroll.overtime_hours
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell className="whitespace-nowrap">
-                                                            {formatCurrency({
-                                                                amount: payroll.cost_overtime_hours,
-                                                            })}
-                                                        </TableCell>
-                                                        <TableCell className="whitespace-nowrap">
-                                                            {formatCurrency({
-                                                                amount: payroll.cost_public_holiday,
-                                                            })}
-                                                        </TableCell>
-                                                        <TableCell className="whitespace-nowrap">
-                                                            {formatCurrency({
-                                                                amount: payroll.cost_weekend,
-                                                            })}
-                                                        </TableCell>
-                                                        <TableCell className="whitespace-nowrap">
-                                                            {formatCurrency({
-                                                                amount: payroll.total_cost_normal_hours,
-                                                            })}
-                                                        </TableCell>
-                                                        <TableCell className="whitespace-nowrap">
-                                                            {formatCurrency({
-                                                                amount: payroll.total_cost_overtime_hours,
-                                                            })}
-                                                        </TableCell>
-                                                        <TableCell className="whitespace-nowrap">
-                                                            {formatCurrency({
-                                                                amount: payroll.total_cost_public_holiday,
-                                                            })}
-                                                        </TableCell>
-                                                        <TableCell className="whitespace-nowrap">
-                                                            {formatCurrency({
-                                                                amount: payroll.total_cost_weekend,
-                                                            })}
-                                                        </TableCell>
-                                                    </>
-                                                )}
+                                                        <>
+                                                            <TableCell className="whitespace-nowrap">
+                                                                {formatAmount(
+                                                                    payroll.required_working_days
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell className="whitespace-nowrap">
+                                                                {formatAmount(
+                                                                    payroll.public_holiday
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell className="whitespace-nowrap">
+                                                                {formatAmount(
+                                                                    payroll.weekend
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell className="whitespace-nowrap">
+                                                                {formatAmount(
+                                                                    payroll.required_working_hours
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell className="whitespace-nowrap">
+                                                                {formatAmount(
+                                                                    payroll.overtime_hours
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell className="whitespace-nowrap">
+                                                                {formatCurrency({
+                                                                    amount: payroll.cost_overtime_hours,
+                                                                })}
+                                                            </TableCell>
+                                                            <TableCell className="whitespace-nowrap">
+                                                                {formatCurrency({
+                                                                    amount: payroll.cost_public_holiday,
+                                                                })}
+                                                            </TableCell>
+                                                            <TableCell className="whitespace-nowrap">
+                                                                {formatCurrency({
+                                                                    amount: payroll.cost_weekend,
+                                                                })}
+                                                            </TableCell>
+                                                            <TableCell className="whitespace-nowrap">
+                                                                {formatCurrency({
+                                                                    amount: payroll.total_cost_normal_hours,
+                                                                })}
+                                                            </TableCell>
+                                                            <TableCell className="whitespace-nowrap">
+                                                                {formatCurrency({
+                                                                    amount: payroll.total_cost_overtime_hours,
+                                                                })}
+                                                            </TableCell>
+                                                            <TableCell className="whitespace-nowrap">
+                                                                {formatCurrency({
+                                                                    amount: payroll.total_cost_public_holiday,
+                                                                })}
+                                                            </TableCell>
+                                                            <TableCell className="whitespace-nowrap">
+                                                                {formatCurrency({
+                                                                    amount: payroll.total_cost_weekend,
+                                                                })}
+                                                            </TableCell>
+                                                        </>
+                                                    )}
                                                 <TableCell className="whitespace-nowrap">
                                                     {formatCurrency({
                                                         amount: payroll.current_salary,
@@ -2044,10 +2043,10 @@ export default function List({
                                                         type="number"
                                                         value={
                                                             paymentAmounts[
-                                                                payroll.id
+                                                            payroll.id
                                                             ] ||
                                                             payroll.net_salary -
-                                                                payroll.paid
+                                                            payroll.paid
                                                         }
                                                         onChange={(e) =>
                                                             handlePaymentAmountChange(
