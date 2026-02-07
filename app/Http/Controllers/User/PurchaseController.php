@@ -2270,7 +2270,7 @@ class PurchaseController extends Controller
 
 				$rejectedCount++;
 
-			} elseif ($purchase->checker_status == 1 && $purchase->approval_status == 0 && $isChecker) {
+			} elseif ($purchase->checker_status == 1 && $isChecker) {
 				// Bill is in Verified state - reject as checker
 				// Ensure checker records exist
 				if ($purchase->checkers->isEmpty()) {
@@ -2811,9 +2811,9 @@ public function bulk_verify(Request $request)
 		}
 
 		// Skip if already verified
-		if ($purchase->checker_status == 1) {
+		/*if ($purchase->checker_status == 1) {
 			continue;
-		}
+		}*/
 
 		// Ensure checker records exist for this purchase
 		if ($purchase->checkers->isEmpty()) {

@@ -699,7 +699,8 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
                     options={[
                       { id: "", name: "All Status" },
                       { id: "0", name: "Pending" },
-                      { id: "1", name: "Approved" }
+                      { id: "1", name: "Approved" },
+                      { id: "4", name: "Verified" }
                     ]}
                     value={selectedStatus}
                     onChange={(value) => handleFilter('status', value)}

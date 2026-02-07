@@ -87,7 +87,7 @@ class CashPurchaseController extends Controller
 		}
 
 		// Filter by status
-		if ($status) {
+		if ($status !== null && $status !== '') {
 			$query->where('approval_status', $status);
 		}
 
@@ -115,7 +115,7 @@ class CashPurchaseController extends Controller
 			$allPurchases->whereBetween('purchase_date', $dateRange);
 		}
 
-		if ($status) {
+		if ($status !== null && $status !== '') {
 			$allPurchases->where('approval_status', $status);
 		}
 
@@ -2593,7 +2593,7 @@ class CashPurchaseController extends Controller
 
 				$rejectedCount++;
 
-			} elseif ($purchase->checker_status == 1 && $purchase->approval_status == 0 && $isChecker) {
+			} elseif ($purchase->checker_status == 1 && $isChecker) {
 				// Purchase is in Verified state - reject as checker
 				// Ensure checker records exist
 				if ($purchase->checkers->isEmpty()) {
@@ -3134,9 +3134,9 @@ class CashPurchaseController extends Controller
 			}
 
 			// Skip if already verified
-			if ($purchase->checker_status == 1) {
+			/*if ($purchase->checker_status == 1) {
 				continue;
-			}
+			}*/
 
 			// Ensure checker records exist for this purchase
 			if ($purchase->checkers->isEmpty()) {
