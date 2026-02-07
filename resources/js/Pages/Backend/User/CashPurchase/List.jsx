@@ -26,6 +26,9 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
+import { Label } from "@/Components/ui/label";
+import InputError from "@/Components/InputError";
+import RichTextEditor from "@/Components/RichTextEditor";
 import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown, ShoppingCart, DollarSign, CheckCircle, Clock, AlertTriangle, CheckCheck, XCircle, ShieldCheck } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
@@ -198,6 +201,71 @@ const BulkVerifyModal = ({ show, onClose, onConfirm, processing, count }) => (
   </Modal>
 );
 
+const ShareSelectedModal = ({
+  show,
+  onClose,
+  onSubmit,
+  processing,
+  approvers,
+  emailData,
+  onRecipientChange,
+  onSubjectChange,
+  onMessageChange,
+  errors,
+  selectionCount,
+}) => (
+  <Modal show={show} onClose={onClose} maxWidth="4xl">
+    <form onSubmit={onSubmit} className="space-y-4">
+      <h2 className="text-lg font-medium">Share Selected Purchases via Email</h2>
+      <p className="text-sm text-gray-600">
+        {selectionCount} purchase{selectionCount !== 1 ? "s" : ""} will be inserted into the email body.
+      </p>
+
+      <div className="grid gap-3">
+        <div className="grid gap-2">
+          <Label>Recipient</Label>
+          <Select value={emailData.recipient_id} onValueChange={onRecipientChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select recipient" />
+            </SelectTrigger>
+            <SelectContent>
+              {approvers.map((user) => (
+                <SelectItem key={user.id} value={user.id.toString()}>
+                  {user.name} ({user.email})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <InputError message={errors?.recipient_id} className="text-sm" />
+        </div>
+
+        <div className="grid gap-2">
+          <Label>Subject</Label>
+          <Input value={emailData.subject} onChange={(e) => onSubjectChange(e.target.value)} />
+          <InputError message={errors?.subject} className="text-sm" />
+        </div>
+
+        <div className="grid gap-2">
+          <Label>Message</Label>
+          <RichTextEditor value={emailData.message} onChange={onMessageChange} height={260} />
+          <InputError message={errors?.message} className="text-sm" />
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-3 pt-2">
+        <Button type="button" variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={processing}>
+          {processing ? "Sending..." : "Send"}
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
+const DEFAULT_PURCHASE_TEMPLATE = `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #333333;"><h2 style="color: #333333;">Purchase Approval Required</h2><p>Dear {{approverName}},</p><p>We hope this email finds you well. The following purchase requests have been submitted and are awaiting your review and approval.</p><p>Please review the details below and take the necessary action at your earliest convenience.</p><table style="border-collapse: collapse; width: 100%; margin-top: 15px;"><thead><tr style="background-color: #f2f2f2;"><th style="border: 1px solid #dddddd; padding: 8px; text-align: left;">Purchase No</th><th style="border: 1px solid #dddddd; padding: 8px; text-align: left;">Supplier</th><th style="border: 1px solid #dddddd; padding: 8px; text-align: left;">Purchase Date</th><th style="border: 1px solid #dddddd; padding: 8px; text-align: right;">Total Amount</th><th style="border: 1px solid #dddddd; padding: 8px; text-align: left;">Status</th></tr></thead><tbody>{{#each purchases}}<tr><td style="border: 1px solid #dddddd; padding: 8px;"><a href=\"{{purchaseUrl}}\" style=\"color:#1a73e8; text-decoration:none;\">{{purchaseNumber}}</a></td><td style=\"border: 1px solid #dddddd; padding: 8px;\">{{supplier}}</td><td style=\"border: 1px solid #dddddd; padding: 8px;\">{{purchaseDate}}</td><td style=\"border: 1px solid #dddddd; padding: 8px; text-align: right;\">{{totalAmount}}</td><td style=\"border: 1px solid #dddddd; padding: 8px;\">{{status}}</td></tr>{{/each}}</tbody></table><p style=\"margin-top: 15px;\">Status values may include <strong>Pending</strong>, <strong>Approved</strong>, or <strong>Verified</strong>.</p><p>If you have already reviewed these purchases, please disregard this email. Otherwise, we kindly request you to complete the approval process to avoid any delays.</p><p>If you have any questions or require further information, please do not hesitate to contact us.</p><p>Thank you for your time and cooperation.</p><p>Best regards,<br />{{companyName}}</p></div>`;
+
 const PurchaseApprovalStatusBadge = ({ status }) => {
   const statusMap = {
     0: { label: "Pending", className: "gap-1 text-gray-600 border-gray-400" },
@@ -267,7 +335,7 @@ const SummaryCards = ({ summary = {} }) => {
   );
 };
 
-export default function List({ purchases = [], meta = {}, filters = {}, vendors = [], summary = {}, trashed_cash_purchases = 0, hasConfiguredApprovers = false, hasConfiguredCheckers = false, currentUserId = null }) {
+export default function List({ purchases = [], meta = {}, filters = {}, vendors = [], summary = {}, trashed_cash_purchases = 0, hasConfiguredApprovers = false, hasConfiguredCheckers = false, currentUserId = null, approvers = [], emailTemplate = null, appUrl = "" }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [selectedPurchases, setSelectedPurchases] = useState([]);
@@ -286,9 +354,64 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
   const [showBulkApproveModal, setShowBulkApproveModal] = useState(false);
   const [showBulkRejectModal, setShowBulkRejectModal] = useState(false);
   const [showBulkVerifyModal, setShowBulkVerifyModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const [purchaseToDelete, setPurchaseToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
+  const [shareErrors, setShareErrors] = useState({});
+  const [emailData, setEmailData] = useState({
+    recipient_id: approvers[0]?.id?.toString() || "",
+    subject: emailTemplate?.subject || "Purchase Approval Required",
+    message: "",
+  });
+
+  const statusLabel = (status) => {
+    if (status === 1) return "Approved";
+    if (status === 4) return "Verified";
+    return "Pending";
+  };
+
+  const buildEmailBody = (recipientId) => {
+    const baseUrl = appUrl || (typeof window !== "undefined" ? window.location.origin : "");
+    const recipient = approvers.find((u) => u.id.toString() === (recipientId || "").toString());
+    const companyName = purchases[0]?.business?.business_name || purchases[0]?.business?.name || "";
+    const selected = purchases.filter((p) => selectedPurchases.includes(p.id));
+
+    const templateRaw = emailTemplate?.email_body || DEFAULT_PURCHASE_TEMPLATE;
+    const hasLoop = templateRaw.includes("{{#each purchases}}");
+    const baseTemplate = hasLoop ? templateRaw : DEFAULT_PURCHASE_TEMPLATE;
+
+    const rowPattern = /{{#each purchases}}([\s\S]*?){{\/each}}/;
+    const rowMatch = baseTemplate.match(rowPattern);
+    const fallbackRowTemplate = '<tr><td style="border: 1px solid #dddddd; padding: 8px;"><a href="{{purchaseUrl}}" style="color:#1a73e8; text-decoration:none;">{{purchaseNumber}}</a></td><td style="border: 1px solid #dddddd; padding: 8px;">{{supplier}}</td><td style="border: 1px solid #dddddd; padding: 8px;">{{purchaseDate}}</td><td style="border: 1px solid #dddddd; padding: 8px; text-align: right;">{{totalAmount}}</td><td style="border: 1px solid #dddddd; padding: 8px;">{{status}}</td></tr>';
+    const rowTemplate = rowMatch ? rowMatch[1] : fallbackRowTemplate;
+
+    const rows = selected
+      .map((p) => {
+        let row = rowTemplate;
+        row = row.replace(/{{purchaseUrl}}/g, `${baseUrl}/user/cash_purchases/${p.bill_no}`);
+        row = row.replace(/{{purchaseNumber}}/g, p.bill_no);
+        row = row.replace(/{{supplier}}/g, p.vendor?.name || "-");
+        row = row.replace(/{{purchaseDate}}/g, p.purchase_date);
+        row = row.replace(/{{totalAmount}}/g, formatCurrency({ amount: p.grand_total, currency: p.business?.currency }));
+        row = row.replace(/{{status}}/g, statusLabel(p.approval_status));
+        return row;
+      })
+      .join("");
+
+    let body = baseTemplate;
+    if (rowMatch) {
+      body = body.replace(rowPattern, rows);
+    } else if (body.includes("<tbody>")) {
+      body = body.replace("<tbody>", "<tbody>" + rows);
+    } else {
+      body += rows;
+    }
+
+    body = body.replace(/{{approverName}}/g, recipient?.name || "");
+    body = body.replace(/{{companyName}}/g, companyName);
+    return body;
+  };
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -413,6 +536,16 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
       setShowBulkRejectModal(true);
     } else if (bulkAction === "verify" && selectedPurchases.length > 0) {
       setShowBulkVerifyModal(true);
+    } else if (bulkAction === "share_email" && selectedPurchases.length > 0) {
+      const recipientId = emailData.recipient_id || approvers[0]?.id?.toString() || "";
+      setEmailData((prev) => ({
+        ...prev,
+        recipient_id: recipientId,
+        subject: emailTemplate?.subject || "Purchase Approval Required",
+        message: buildEmailBody(recipientId),
+      }));
+      setShareErrors({});
+      setShowShareModal(true);
     }
   };
 
@@ -568,6 +701,51 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
   const exportCashPurchases = () => {
     window.location.href = route("cash_purchases.export");
   };
+
+  const handleRecipientChange = (value) => {
+    setEmailData((prev) => ({
+      ...prev,
+      recipient_id: value,
+      message: buildEmailBody(value),
+    }));
+  };
+
+  const handleSubjectChange = (value) => {
+    setEmailData((prev) => ({ ...prev, subject: value }));
+  };
+
+  const handleMessageChange = (value) => {
+    setEmailData((prev) => ({ ...prev, message: value }));
+  };
+
+  const handleShareSubmit = (e) => {
+    e.preventDefault();
+    setProcessing(true);
+    setShareErrors({});
+    router.post(
+      route("cash_purchases.bulk_email"),
+      {
+        ids: selectedPurchases,
+        recipient_id: emailData.recipient_id,
+        subject: emailData.subject,
+        message: emailData.message,
+      },
+      {
+        preserveScroll: true,
+        onSuccess: () => {
+          setProcessing(false);
+          setShowShareModal(false);
+          setSelectedPurchases([]);
+          setIsAllSelected(false);
+          setBulkAction("");
+        },
+        onError: (errors) => {
+          setProcessing(false);
+          setShareErrors(errors);
+        },
+      }
+    );
+  };
   return (
     <AuthenticatedLayout>
       <Toaster />
@@ -644,6 +822,9 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
                     <SelectValue placeholder="Bulk actions" />
                   </SelectTrigger>
                   <SelectContent>
+                    {approvers.length > 0 && (
+                      <SelectItem value="share_email">Share Selected via Email</SelectItem>
+                    )}
                     <SelectItem value="delete">Delete Selected</SelectItem>
                     {hasConfiguredCheckers && (
                       <SelectItem value="verify">
@@ -893,6 +1074,20 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
         onConfirm={handleBulkVerify}
         processing={processing}
         count={selectedPurchases.length}
+      />
+
+      <ShareSelectedModal
+        show={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        onSubmit={handleShareSubmit}
+        processing={processing}
+        approvers={approvers}
+        emailData={emailData}
+        onRecipientChange={handleRecipientChange}
+        onSubjectChange={handleSubjectChange}
+        onMessageChange={handleMessageChange}
+        errors={shareErrors}
+        selectionCount={selectedPurchases.length}
       />
     </AuthenticatedLayout>
   );

@@ -25,7 +25,9 @@ use App\Models\PurchasePayment;
 use App\Models\Tax;
 use App\Models\Transaction;
 use App\Models\Vendor;
+use App\Models\User;
 use App\Notifications\SendBillInvoice;
+use App\Notifications\SendPurchaseApprovalRequest;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -127,6 +129,18 @@ class PurchaseController extends Controller
 		$approvalUsersArray = json_decode($purchaseApprovalUsersJson, true);
 		$hasConfiguredApprovers = is_array($approvalUsersArray) && count($approvalUsersArray) > 0;
 
+		$approvers = [];
+		if ($hasConfiguredApprovers) {
+			$approvers = User::whereIn('id', $approvalUsersArray)
+				->select('id', 'name', 'email')
+				->orderBy('name')
+				->get();
+		}
+
+		$approvalEmailTemplate = EmailTemplate::where('slug', 'PURCHASE_APPROVAL_REQUEST')
+			->where('email_status', 1)
+			->first();
+
 		// Check if there are configured checker users for this business
 		$purchaseCheckerUsersJson = get_business_option('purchase_checker_users', '[]');
 		$checkerUsersArray = json_decode($purchaseCheckerUsersJson, true);
@@ -154,6 +168,9 @@ class PurchaseController extends Controller
 			'hasConfiguredApprovers' => $hasConfiguredApprovers,
 			'hasConfiguredCheckers' => $hasConfiguredCheckers,
 			'currentUserId' => auth()->id(),
+			'approvers' => $approvers,
+			'emailTemplate' => $approvalEmailTemplate,
+			'appUrl' => config('app.url') ?? url('/'),
 		]);
 	}
 
@@ -2069,6 +2086,62 @@ class PurchaseController extends Controller
 		}
 	}
 
+	/**
+	 * Bulk email selected bills using PURCHASE_APPROVAL_REQUEST template.
+	 */
+	public function bulk_email(Request $request)
+	{
+		Gate::authorize('bill_invoices.send_email');
+
+		$request->validate([
+			'ids' => ['required', 'array', 'min:1'],
+			'ids.*' => ['integer', 'exists:purchases,id'],
+			'recipient_id' => ['required', 'exists:users,id'],
+			'subject' => ['required', 'string', 'max:255'],
+			'message' => ['required', 'string'],
+		]);
+
+		$bills = Purchase::with(['vendor', 'business'])
+			->whereIn('id', $request->ids)
+			->where('cash', 0)
+			->get();
+
+		if ($bills->isEmpty()) {
+			return back()->with('error', _lang('No bills found for this request'));
+		}
+
+		$recipient = User::find($request->recipient_id);
+
+		$customMessage = [
+			'subject' => $request->subject,
+			'message' => $request->message,
+		];
+
+		try {
+			Notification::send($recipient, new SendPurchaseApprovalRequest($bills, $recipient, $customMessage));
+		} catch (\Exception $e) {
+			$errorMessage = $e->getMessage();
+			if (empty($errorMessage)) {
+				$errorMessage = 'Failed to send email. Please check mail configuration and try again.';
+			}
+			return back()->with('error', $errorMessage);
+		}
+
+		foreach ($bills as $bill) {
+			$bill->email_send = 1;
+			$bill->email_send_at = now();
+			$bill->save();
+
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = auth()->user()->id;
+			$audit->event = 'Sent Purchase Approval Request for Bill ' . $bill->bill_no . ' to ' . $recipient->email;
+			$audit->save();
+		}
+
+		return back()->with('success', _lang('Email has been sent'));
+	}
+
 	public function import_bills(Request $request)
 	{
 		Gate::authorize('bill_invoices.csv.import');
@@ -2971,4 +3044,3 @@ private function syncCheckerRecordsForBill(Purchase $purchase, array $configured
 		->delete();
 }
 }
-

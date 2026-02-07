@@ -544,6 +544,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('bill_invoices/{id}/reject', [PurchaseController::class, 'reject'])->name('bill_invoices.reject');
 		Route::post('bill_invoices/{id}/verify', [PurchaseController::class, 'verify'])->name('bill_invoices.verify');
 		Route::post('bill_invoices/bulk_verify', [PurchaseController::class, 'bulk_verify'])->name('bill_invoices.bulk_verify');
+		Route::post('bill_invoices/bulk_email', [PurchaseController::class, 'bulk_email'])->name('bill_invoices.bulk_email');
 
 		//Cash Purchases
 		Route::get('cash_purchases/trash', [CashPurchaseController::class, 'trash'])->name('cash_purchases.trash');
@@ -568,6 +569,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('cash_purchases/{id}/reject', [CashPurchaseController::class, 'reject'])->name('cash_purchases.reject');
 		Route::post('cash_purchases/{id}/verify', [CashPurchaseController::class, 'verify'])->name('cash_purchases.verify');
 		Route::post('cash_purchases/bulk_verify', [CashPurchaseController::class, 'bulk_verify'])->name('cash_purchases.bulk_verify');
+		Route::post('cash_purchases/bulk_email', [CashPurchaseController::class, 'bulk_email'])->name('cash_purchases.bulk_email');
 
 		// purchase orders
 		Route::get('purchase_orders/{id}/pdf', [PurchaseOrderController::class, 'pdf'])->name('purchase_orders.pdf');

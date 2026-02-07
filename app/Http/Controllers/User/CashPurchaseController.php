@@ -23,7 +23,9 @@ use App\Models\Tax;
 use App\Models\Transaction;
 use App\Models\TransactionMethod;
 use App\Models\Vendor;
+use App\Models\User;
 use App\Notifications\SendCashPurchase;
+use App\Notifications\SendPurchaseApprovalRequest;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -140,6 +142,18 @@ class CashPurchaseController extends Controller
 		$checkerUsersArray = json_decode($purchaseCheckerUsersJson, true);
 		$hasConfiguredCheckers = is_array($checkerUsersArray) && count($checkerUsersArray) > 0;
 
+		$approvers = [];
+		if ($hasConfiguredApprovers) {
+			$approvers = User::whereIn('id', $approvalUsersArray)
+				->select('id', 'name', 'email')
+				->orderBy('name')
+				->get();
+		}
+
+		$approvalEmailTemplate = EmailTemplate::where('slug', 'PURCHASE_APPROVAL_REQUEST')
+			->where('email_status', 1)
+			->first();
+
 		return Inertia::render('Backend/User/CashPurchase/List', [
 			'purchases' => $purchases->items(),
 			'meta' => [
@@ -166,6 +180,9 @@ class CashPurchaseController extends Controller
 			'hasConfiguredApprovers' => $hasConfiguredApprovers,
 			'hasConfiguredCheckers' => $hasConfiguredCheckers,
 			'currentUserId' => auth()->id(),
+			'approvers' => $approvers,
+			'emailTemplate' => $approvalEmailTemplate,
+			'appUrl' => config('app.url') ?? url('/'),
 		]);
 	}
 
@@ -2459,6 +2476,62 @@ class CashPurchaseController extends Controller
 		}
 	}
 
+	/**
+	 * Bulk email selected cash purchases using PURCHASE_APPROVAL_REQUEST template
+	 */
+	public function bulk_email(Request $request)
+	{
+		Gate::authorize('cash_purchases.send_email');
+
+		$request->validate([
+			'ids' => ['required', 'array', 'min:1'],
+			'ids.*' => ['integer', 'exists:purchases,id'],
+			'recipient_id' => ['required', 'exists:users,id'],
+			'subject' => ['required', 'string', 'max:255'],
+			'message' => ['required', 'string'],
+		]);
+
+		$purchases = Purchase::with(['vendor', 'business'])
+			->whereIn('id', $request->ids)
+			->where('cash', 1)
+			->get();
+
+		if ($purchases->isEmpty()) {
+			return back()->with('error', _lang('No purchases found for this request'));
+		}
+
+		$recipient = User::find($request->recipient_id);
+
+		$customMessage = [
+			'subject' => $request->subject,
+			'message' => $request->message,
+		];
+
+		try {
+			Notification::send($recipient, new SendPurchaseApprovalRequest($purchases, $recipient, $customMessage));
+		} catch (\Exception $e) {
+			$errorMessage = $e->getMessage();
+			if (empty($errorMessage)) {
+				$errorMessage = 'Failed to send email. Please check mail configuration and try again.';
+			}
+			return back()->with('error', $errorMessage);
+		}
+
+		foreach ($purchases as $purchase) {
+			$purchase->email_send = 1;
+			$purchase->email_send_at = now();
+			$purchase->save();
+
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = auth()->user()->id;
+			$audit->event = 'Sent Purchase Approval Request for Cash Purchase ' . $purchase->bill_no . ' to ' . $recipient->email;
+			$audit->save();
+		}
+
+		return back()->with('success', _lang('Email has been sent'));
+	}
+
 	public function bulk_approve(Request $request)
 	{
 		Gate::authorize('cash_purchases.approve');
@@ -3294,4 +3367,3 @@ class CashPurchaseController extends Controller
 			->delete();
 	}
 }
-
