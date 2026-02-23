@@ -15,7 +15,7 @@ import { useState, useEffect } from "react";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 import DateTimePicker from "@/Components/DateTimePicker";
 
-export default function Edit({ customers = [], products = [], currencies = [], taxes = [], sales_return, taxIds = [], accounts = [], paymentTransaction }) {
+export default function Edit({ customers = [], products = [], currencies = [], taxes = [], sales_return, taxIds = [], paymentTransaction }) {
     const [salesReturnItems, setSalesReturnItems] = useState([{
         product_id: "",
         product_name: "",
@@ -37,7 +37,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
         converted_total: sales_return.converted_total || 0,
         discount_type: sales_return.discount_type || "0",
         discount_value: sales_return.discount_value || 0,
-        type: sales_return.type || "",
+        type: "credit",
         template: sales_return.template || "",
         note: sales_return.note || "",
         footer: sales_return.footer || "",
@@ -72,6 +72,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
 
         setData({
             ...data,
+            type: "credit",
             product_id: sales_return.items.map(item => item.product_id),
             product_name: sales_return.items.map(item => item.product_name),
             description: sales_return.items.map(item => item.description),
@@ -273,6 +274,7 @@ export default function Edit({ customers = [], products = [], currencies = [], t
         // Create a new data object with all the required fields
         const formData = {
             ...data,
+            type: "credit",
             currency: selectedCurrency.name,
             exchange_rate: exchangeRate,
             product_id: salesReturnItems.map(item => item.product_id),
@@ -304,27 +306,8 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                 <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
                     <form onSubmit={submit}>
                         <div className="grid grid-cols-12 mt-2">
-                            <Label htmlFor="type" className="md:col-span-2 col-span-12">
-                                Type *
-                            </Label>
-                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                                <SearchableCombobox
-                                    options={[
-                                        { id: "credit", name: "Credit" },
-                                        { id: "cash", name: "Cash" }
-                                    ]}
-                                    value={data.type}
-                                    onChange={(value) => setData("type", value)}
-                                    placeholder="Select type"
-                                    required
-                                    className="md:w-1/2 w-full"
-                                />
-                                <InputError message={errors.type} className="text-sm" />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-12 mt-2">
                             <Label htmlFor="customer_id" className="md:col-span-2 col-span-12">
-                                {data.type == 'credit' ? 'Customer *' : 'Customer'}
+                                Customer *
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                 <div className="md:w-1/2 w-full">
@@ -373,28 +356,6 @@ export default function Edit({ customers = [], products = [], currencies = [], t
                                 <InputError message={errors.return_date} className="text-sm" />
                             </div>
                         </div>
-
-                        {data.type === "cash" && (
-                            <div className="grid grid-cols-12 mt-2">
-                                <Label htmlFor="payment_account" className="md:col-span-2 col-span-12">
-                                    Payment Account *
-                                </Label>
-                                <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                                    <SearchableCombobox
-                                        options={accounts.map(account => ({
-                                            id: account.id,
-                                            name: account.account_name
-                                        }))}
-                                        value={data.account_id}
-                                        onChange={(value) => setData("account_id", value)}
-                                        placeholder="Select payment account"
-                                        required
-                                        className="md:w-1/2 w-full"
-                                    />
-                                    <InputError message={errors.account_id} className="text-sm" />
-                                </div>
-                            </div>
-                        )}
 
                         <div className="grid grid-cols-12 mt-2">
                             <Label htmlFor="currency" className="md:col-span-2 col-span-12">

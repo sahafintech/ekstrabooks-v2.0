@@ -429,6 +429,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::delete('sales_returns/{id}/permanent_destroy', [SalesReturnController::class, 'permanent_destroy'])->name('sales_returns.permanent_destroy');
 		Route::resource('sales_returns', SalesReturnController::class);
 		Route::post('sales_returns/refund/store/{id}', [SalesReturnController::class, 'refund_store'])->name('sales_returns.refund.store');
+		Route::post('sales_returns/unrefund/{id}', [SalesReturnController::class, 'unrefund'])->name('sales_returns.unrefund');
 		Route::post('sales_returns/bulk_destroy', [SalesReturnController::class, 'bulk_destroy'])->name('sales_returns.bulk_destroy');
 		Route::match(['get', 'post'], 'sales_returns/{id}/send_email', [SalesReturnController::class, 'send_email'])->name('sales_returns.send_email');
 		Route::get('sales_returns/{id}/pdf', [SalesReturnController::class, 'pdf'])->name('sales_returns.pdf');

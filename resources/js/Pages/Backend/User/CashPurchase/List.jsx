@@ -29,7 +29,7 @@ import { Input } from "@/Components/ui/input";
 import { Label } from "@/Components/ui/label";
 import InputError from "@/Components/InputError";
 import RichTextEditor from "@/Components/RichTextEditor";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown, ShoppingCart, DollarSign, CheckCircle, Clock, AlertTriangle, CheckCheck, XCircle, ShieldCheck } from "lucide-react";
+import { MoreVertical, FileUp, FileDown, Plus, Mail, Eye, Trash2, Edit, ChevronUp, ChevronDown, ShoppingCart, DollarSign, CheckCircle, Clock, AlertTriangle, CheckCheck, XCircle, ShieldCheck } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -269,6 +269,7 @@ const DEFAULT_PURCHASE_TEMPLATE = `<div style="font-family: Arial, sans-serif; f
 const PurchaseApprovalStatusBadge = ({ status }) => {
   const statusMap = {
     0: { label: "Pending", className: "gap-1 text-gray-600 border-gray-400" },
+    2: { label: "Rejected", className: "gap-1 text-red-600 border-red-600" },
     1: { label: "Approved", className: "gap-1 text-green-600 border-green-600" },
     4: { label: "Verified", className: "gap-1 text-blue-600 border-blue-600" },
   };
@@ -821,11 +822,21 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Bulk actions" />
                   </SelectTrigger>
-                  <SelectContent>
+                    <SelectContent>
                     {approvers.length > 0 && (
-                      <SelectItem value="share_email">Share Selected via Email</SelectItem>
+                      <SelectItem value="share_email">
+                        <span className="flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-sky-600" />
+                          Share Selected via Email
+                        </span>
+                      </SelectItem>
                     )}
-                    <SelectItem value="delete">Delete Selected</SelectItem>
+                    <SelectItem value="delete">
+                      <span className="flex items-center gap-2">
+                        <Trash2 className="h-4 w-4 text-red-600" />
+                        Delete Selected
+                      </span>
+                    </SelectItem>
                     {hasConfiguredCheckers && (
                       <SelectItem value="verify">
                         <span className="flex items-center gap-2">

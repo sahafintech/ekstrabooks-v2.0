@@ -253,6 +253,10 @@ class SalesReturnController extends Controller
     {
         Gate::authorize('sales_returns.create');
 
+        if (!$request->filled('type')) {
+            $request->merge(['type' => 'credit']);
+        }
+
         $validator = Validator::make($request->all(), [
             'customer_id'    => $request->type == 'credit' ? 'required' : 'nullable',
             'title'          => 'required',
@@ -626,7 +630,7 @@ class SalesReturnController extends Controller
         $currentTime = Carbon::now();
 
         $transaction              = new Transaction();
-        $transaction->trans_date  = Carbon::parse($request->trans_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+        $transaction->trans_date  = Carbon::parse($request->refund_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
         $transaction->account_id  = $request->account_id;
         $transaction->transaction_method      = $request->method;
         $transaction->dr_cr       = 'cr';
@@ -643,7 +647,7 @@ class SalesReturnController extends Controller
         $transaction->save();
 
         $transaction              = new Transaction();
-        $transaction->trans_date  = Carbon::parse($request->input('trans_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+        $transaction->trans_date  = Carbon::parse($request->input('refund_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
         $transaction->account_id  = get_account('Accounts Receivable')->id;
         $transaction->dr_cr       = 'dr';
         $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $salesReturn->currency, $request->amount);
@@ -670,6 +674,43 @@ class SalesReturnController extends Controller
         $audit->save();
 
         return redirect()->route('sales_returns.index')->with('success', _lang('Saved Successfully'));
+    }
+
+    public function unrefund($id)
+    {
+        Gate::authorize('sales_returns.refund');
+
+        $salesReturn = SalesReturn::findOrFail($id);
+
+        DB::beginTransaction();
+
+        try {
+            $transactions = Transaction::where('ref_id', $salesReturn->id)
+                ->where('ref_type', 's refund')
+                ->get();
+
+            foreach ($transactions as $transaction) {
+                $transaction->delete();
+            }
+
+            $salesReturn->paid = 0;
+            $salesReturn->status = 0; // Active
+            $salesReturn->save();
+
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Sales Return Unrefund' . ' ' . $salesReturn->return_number;
+            $audit->save();
+
+            DB::commit();
+
+            return redirect()->route('sales_returns.index')->with('success', _lang('Unrefund completed successfully'));
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            return back()->with('error', _lang('Something going wrong, Please try again'));
+        }
     }
 
     public function send_email(Request $request, $id)
@@ -778,6 +819,10 @@ class SalesReturnController extends Controller
     public function update(Request $request, $id)
     {
         Gate::authorize('sales_returns.update');
+
+        if (!$request->filled('type')) {
+            $request->merge(['type' => 'credit']);
+        }
 
         $validator = Validator::make($request->all(), [
             'customer_id'    => $request->type == 'credit' ? 'required' : 'nullable',

@@ -2380,14 +2380,67 @@ class PurchaseController extends Controller
 				$audit->save();
 
 				$rejectedCount++;
+			} elseif ($purchase->approval_status == 0) {
+				// Bill is in Pending state - mark it as Rejected
+				if ($isApprover) {
+					if ($purchase->approvals->isEmpty()) {
+						$this->createBillApprovalRecords($purchase);
+						$purchase->load('approvals');
+					}
+
+					$approval = $purchase->approvals()
+						->where('action_user', $currentUserId)
+						->first();
+
+					if (!$approval) {
+						continue;
+					}
+
+					$approval->update([
+						'status' => 2, // Rejected
+						'action_date' => now(),
+					]);
+				} elseif ($isChecker) {
+					if ($purchase->checkers->isEmpty()) {
+						$this->createBillCheckerRecords($purchase);
+						$purchase->load('checkers');
+					}
+
+					$checker = $purchase->checkers()
+						->where('action_user', $currentUserId)
+						->first();
+
+					if (!$checker) {
+						continue;
+					}
+
+					$checker->update([
+						'status' => 2, // Rejected
+						'action_date' => now(),
+					]);
+				} else {
+					continue;
+				}
+
+				$purchase->update([
+					'approval_status' => 2, // Rejected
+					'approved_by' => null,
+				]);
+
+				$audit = new AuditLog();
+				$audit->date_changed = date('Y-m-d H:i:s');
+				$audit->changed_by = $currentUserId;
+				$audit->event = 'Bulk Rejected Pending Bill Invoice ' . $purchase->bill_no;
+				$audit->save();
+
+				$rejectedCount++;
 			}
-			// Skip bills in Pending state
 		}
 
 		if ($rejectedCount > 0) {
 			return redirect()->route('bill_invoices.index')->with('success', _lang('Rejected Successfully') . ' (' . $rejectedCount . ')');
 		} else {
-			return redirect()->route('bill_invoices.index')->with('error', _lang('No bills were rejected. They may already be in Pending status or you do not have the appropriate role.'));
+			return redirect()->route('bill_invoices.index')->with('error', _lang('No bills were rejected. They may already be rejected or you do not have the appropriate role.'));
 		}
 	}
 
@@ -2573,9 +2626,72 @@ public function reject(Request $request, $id)
 
 		return back()->with('success', _lang('Bill verification rejected. Status reset to Pending.'));
 
+	} elseif ($purchase->approval_status == 0) {
+		// Bill is in Pending state - mark it as Rejected
+		$approvalUsersJson = get_business_option('purchase_approval_users', '[]');
+		$approverUserIds = json_decode($approvalUsersJson, true);
+		$isApprover = is_array($approverUserIds) && in_array($currentUserId, $approverUserIds);
+
+		$checkerUsersJson = get_business_option('purchase_checker_users', '[]');
+		$checkerUserIds = json_decode($checkerUsersJson, true);
+		$isChecker = is_array($checkerUserIds) && in_array($currentUserId, $checkerUserIds);
+
+		if ($isApprover) {
+			if ($purchase->approvals->isEmpty()) {
+				$this->createBillApprovalRecords($purchase);
+				$purchase->load('approvals');
+			}
+
+			$approval = $purchase->approvals()
+				->where('action_user', $currentUserId)
+				->first();
+
+			if (!$approval) {
+				return back()->with('error', _lang('You are not assigned as an approver for this bill'));
+			}
+
+			$approval->update([
+				'status' => 2, // Rejected
+				'comment' => $request->input('comment'),
+				'action_date' => now(),
+			]);
+		} elseif ($isChecker) {
+			if ($purchase->checkers->isEmpty()) {
+				$this->createBillCheckerRecords($purchase);
+				$purchase->load('checkers');
+			}
+
+			$checker = $purchase->checkers()
+				->where('action_user', $currentUserId)
+				->first();
+
+			if (!$checker) {
+				return back()->with('error', _lang('You are not assigned as a checker for this bill'));
+			}
+
+			$checker->update([
+				'status' => 2, // Rejected
+				'comment' => $request->input('comment'),
+				'action_date' => now(),
+			]);
+		} else {
+			return back()->with('error', _lang('You are not assigned as an approver or checker for this bill'));
+		}
+
+		$purchase->update([
+			'approval_status' => 2, // Rejected
+			'approved_by' => null,
+		]);
+
+		$audit = new AuditLog();
+		$audit->date_changed = date('Y-m-d H:i:s');
+		$audit->changed_by = $currentUserId;
+		$audit->event = 'Rejected Pending Bill Invoice ' . $purchase->bill_no . ' by ' . auth()->user()->name;
+		$audit->save();
+
+		return back()->with('success', _lang('Bill rejected successfully. Status updated to Rejected.'));
 	} else {
-		// Bill is in Pending state - cannot reject
-		return back()->with('error', _lang('This bill is already in Pending status and cannot be rejected.'));
+		return back()->with('error', _lang('This bill cannot be rejected in its current status.'));
 	}
 }
 

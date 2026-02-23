@@ -2703,14 +2703,67 @@ class CashPurchaseController extends Controller
 				$audit->save();
 
 				$rejectedCount++;
+			} elseif ($purchase->approval_status == 0) {
+				// Purchase is in Pending state - mark it as Rejected
+				if ($isApprover) {
+					if ($purchase->approvals->isEmpty()) {
+						$this->createPurchaseApprovalRecords($purchase);
+						$purchase->load('approvals');
+					}
+
+					$approval = $purchase->approvals()
+						->where('action_user', $currentUserId)
+						->first();
+
+					if (!$approval) {
+						continue;
+					}
+
+					$approval->update([
+						'status' => 2, // Rejected
+						'action_date' => now(),
+					]);
+				} elseif ($isChecker) {
+					if ($purchase->checkers->isEmpty()) {
+						$this->createPurchaseCheckerRecords($purchase);
+						$purchase->load('checkers');
+					}
+
+					$checker = $purchase->checkers()
+						->where('action_user', $currentUserId)
+						->first();
+
+					if (!$checker) {
+						continue;
+					}
+
+					$checker->update([
+						'status' => 2, // Rejected
+						'action_date' => now(),
+					]);
+				} else {
+					continue;
+				}
+
+				$purchase->update([
+					'approval_status' => 2, // Rejected
+					'approved_by' => null,
+				]);
+
+				$audit = new AuditLog();
+				$audit->date_changed = date('Y-m-d H:i:s');
+				$audit->changed_by = $currentUserId;
+				$audit->event = 'Bulk Rejected Pending Cash Purchase ' . $purchase->bill_no;
+				$audit->save();
+
+				$rejectedCount++;
 			}
-			// Skip purchases in Pending state
 		}
 
 		if ($rejectedCount > 0) {
 			return redirect()->route('cash_purchases.index')->with('success', _lang('Rejected Successfully') . ' (' . $rejectedCount . ')');
 		} else {
-			return redirect()->route('cash_purchases.index')->with('error', _lang('No purchases were rejected. They may already be in Pending status or you do not have the appropriate role.'));
+			return redirect()->route('cash_purchases.index')->with('error', _lang('No purchases were rejected. They may already be rejected or you do not have the appropriate role.'));
 		}
 	}
 
@@ -2894,9 +2947,72 @@ class CashPurchaseController extends Controller
 
 			return back()->with('success', _lang('Purchase verification rejected. Status reset to Pending.'));
 
+		} elseif ($purchase->approval_status == 0) {
+			// Purchase is in Pending state - mark it as Rejected
+			$approvalUsersJson = get_business_option('purchase_approval_users', '[]');
+			$approverUserIds = json_decode($approvalUsersJson, true);
+			$isApprover = is_array($approverUserIds) && in_array($currentUserId, $approverUserIds);
+
+			$checkerUsersJson = get_business_option('purchase_checker_users', '[]');
+			$checkerUserIds = json_decode($checkerUsersJson, true);
+			$isChecker = is_array($checkerUserIds) && in_array($currentUserId, $checkerUserIds);
+
+			if ($isApprover) {
+				if ($purchase->approvals->isEmpty()) {
+					$this->createPurchaseApprovalRecords($purchase);
+					$purchase->load('approvals');
+				}
+
+				$approval = $purchase->approvals()
+					->where('action_user', $currentUserId)
+					->first();
+
+				if (!$approval) {
+					return back()->with('error', _lang('You are not assigned as an approver for this purchase'));
+				}
+
+				$approval->update([
+					'status' => 2, // Rejected
+					'comment' => $request->input('comment'),
+					'action_date' => now(),
+				]);
+			} elseif ($isChecker) {
+				if ($purchase->checkers->isEmpty()) {
+					$this->createPurchaseCheckerRecords($purchase);
+					$purchase->load('checkers');
+				}
+
+				$checker = $purchase->checkers()
+					->where('action_user', $currentUserId)
+					->first();
+
+				if (!$checker) {
+					return back()->with('error', _lang('You are not assigned as a checker for this purchase'));
+				}
+
+				$checker->update([
+					'status' => 2, // Rejected
+					'comment' => $request->input('comment'),
+					'action_date' => now(),
+				]);
+			} else {
+				return back()->with('error', _lang('You are not assigned as an approver or checker for this purchase'));
+			}
+
+			$purchase->update([
+				'approval_status' => 2, // Rejected
+				'approved_by' => null,
+			]);
+
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = $currentUserId;
+			$audit->event = 'Rejected Pending Cash Purchase ' . $purchase->bill_no . ' by ' . auth()->user()->name;
+			$audit->save();
+
+			return back()->with('success', _lang('Purchase rejected successfully. Status updated to Rejected.'));
 		} else {
-			// Purchase is in Pending state - cannot reject
-			return back()->with('error', _lang('This purchase is already in Pending status and cannot be rejected.'));
+			return back()->with('error', _lang('This purchase cannot be rejected in its current status.'));
 		}
 	}
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Head, Link, router, usePage } from "@inertiajs/react";
+import { Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
@@ -34,13 +34,7 @@ import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 import { Label } from "@/Components/ui/label";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/Components/ui/popover";
-import { cn, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import InputError from "@/Components/InputError";
 import { format } from "date-fns";
 import DateTimePicker from "@/Components/DateTimePicker";
@@ -82,34 +76,11 @@ const RefundSalesReturnModal = ({ show, onClose, onConfirm, processing, accounts
                             Refund Date *
                         </Label>
                         <div className="md:col-span-9 col-span-12 md:mt-0 mt-2">
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        variant={"outline"}
-                                        className={cn(
-                                            "w-full justify-start text-left font-normal",
-                                            !refundDate && "text-muted-foreground"
-                                        )}
-                                    >
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {refundDate ? (
-                                            format(new Date(refundDate), "PPP")
-                                        ) : (
-                                            <span>Pick a date</span>
-                                        )}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                        mode="single"
-                                        selected={refundDate ? new Date(refundDate) : undefined}
-                                        onSelect={(date) =>
-                                            setRefundDate(date ? format(date, "yyyy-MM-dd") : "")
-                                        }
-                                        initialFocus
-                                    />
-                                </PopoverContent>
-                            </Popover>
+                            <DateTimePicker
+                                value={refundDate}
+                                onChange={(date) => setRefundDate(date)}
+                                required
+                            />
                             <InputError message={errors.refund_date} className="text-sm" />
                         </div>
                     </div>
@@ -165,6 +136,36 @@ const RefundSalesReturnModal = ({ show, onClose, onConfirm, processing, accounts
                     disabled={processing}
                 >
                     Refund Sales Return
+                </Button>
+            </div>
+        </form>
+    </Modal>
+);
+
+const UnrefundSalesReturnModal = ({ show, onClose, onConfirm, processing }) => (
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
+            <h2 className="text-lg font-medium">
+                Unrefund this sales return?
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+                This will delete the related refund payment transactions and set the sales return status to Active.
+            </p>
+            <div className="mt-6 flex justify-end">
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={onClose}
+                    className="mr-3"
+                >
+                    Cancel
+                </Button>
+                <Button
+                    type="submit"
+                    variant="destructive"
+                    disabled={processing}
+                >
+                    Unrefund Sales Return
                 </Button>
             </div>
         </form>
@@ -352,8 +353,10 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
     // Refund confirmation modal states
     const [showRefundModal, setShowRefundModal] = useState(false);
     const [salesReturnToRefund, setSalesReturnToRefund] = useState(null);
+    const [showUnrefundModal, setShowUnrefundModal] = useState(false);
+    const [salesReturnToUnrefund, setSalesReturnToUnrefund] = useState(null);
 
-    const [refundDate, setRefundDate] = useState(format(new Date(), "yyyy-MM-dd"));
+    const [refundDate, setRefundDate] = useState(new Date());
     const [refundAmount, setRefundAmount] = useState("");
     const [paymentAccount, setPaymentAccount] = useState("");
 
@@ -460,6 +463,11 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
         setShowRefundModal(true);
     };
 
+    const handleUnrefundConfirm = (id) => {
+        setSalesReturnToUnrefund(id);
+        setShowUnrefundModal(true);
+    };
+
     const handleDelete = (e) => {
         e.preventDefault();
         setProcessing(true);
@@ -480,18 +488,38 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
         e.preventDefault();
         setProcessing(true);
 
-        router.post(route('sales_returns.refund.store', salesReturnToRefund), {
-            refund_date: refundDate,
-            amount: refundAmount,
-            account_id: paymentAccount,
+        router.post(
+            route('sales_returns.refund.store', salesReturnToRefund),
+            {
+                refund_date: refundDate ? format(new Date(refundDate), "yyyy-MM-dd") : "",
+                amount: refundAmount,
+                account_id: paymentAccount,
+            },
+            {
+                onSuccess: () => {
+                    setShowRefundModal(false);
+                    setSalesReturnToRefund(null);
+                    setProcessing(false);
+                    setRefundDate(new Date());
+                    setRefundAmount('');
+                    setPaymentAccount('');
+                },
+                onError: () => {
+                    setProcessing(false);
+                }
+            }
+        );
+    };
+
+    const handleUnrefund = (e) => {
+        e.preventDefault();
+        setProcessing(true);
+
+        router.post(route('sales_returns.unrefund', salesReturnToUnrefund), {}, {
             onSuccess: () => {
-                setShowRefundModal(false);
-                setSalesReturnToRefund(null);
+                setShowUnrefundModal(false);
+                setSalesReturnToUnrefund(null);
                 setProcessing(false);
-                toast.success('Refund created successfully');
-                setRefundDate('');
-                setRefundAmount('');
-                setPaymentAccount('');
             },
             onError: () => {
                 setProcessing(false);
@@ -836,6 +864,11 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                                                                 icon: <RefreshCcw className="h-4 w-4" />,
                                                                 onClick: () => handleRefundConfirm(sales_return.id),
                                                             },
+                                                            ...(Number(sales_return.paid) > 0 || Number(sales_return.status) !== 0 ? [{
+                                                                label: "Unrefund",
+                                                                icon: <RefreshCcw className="h-4 w-4" />,
+                                                                onClick: () => handleUnrefundConfirm(sales_return.id),
+                                                            }] : []),
                                                             {
                                                                 label: "Delete",
                                                                 icon: <Trash2 className="h-4 w-4" />,
@@ -924,6 +957,13 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                 paymentAccount={paymentAccount}
                 setPaymentAccount={setPaymentAccount}
                 errors={errors}
+            />
+
+            <UnrefundSalesReturnModal
+                show={showUnrefundModal}
+                onClose={() => setShowUnrefundModal(false)}
+                onConfirm={handleUnrefund}
+                processing={processing}
             />
 
             <DeleteAllSalesReturnModal

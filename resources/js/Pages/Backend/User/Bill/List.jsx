@@ -34,6 +34,7 @@ import {
     FileUp,
     FileDown,
     Plus,
+    Mail,
     Eye,
     Trash2,
     Edit,
@@ -369,6 +370,10 @@ const BillApprovalStatusBadge = ({ status }) => {
             label: "Pending",
             className: "gap-1 text-gray-600 border-gray-400",
         },
+        2: {
+            label: "Rejected",
+            className: "gap-1 text-red-600 border-red-600",
+        },
         1: {
             label: "Approved",
             className: "gap-1 text-green-600 border-green-600",
@@ -378,10 +383,11 @@ const BillApprovalStatusBadge = ({ status }) => {
             className: "gap-1 text-blue-600 border-blue-600",
         }
     };
+    const statusConfig = statusMap[status] || statusMap[0];
 
     return (
-        <Badge variant="outline" className={statusMap[status].className}>
-            {statusMap[status].label}
+        <Badge variant="outline" className={statusConfig.className}>
+            {statusConfig.label}
         </Badge>
     );
 };
@@ -1092,11 +1098,17 @@ export default function List({
                                     <SelectContent>
                                         {approvers.length > 0 && (
                                             <SelectItem value="share_email">
-                                                Share Selected via Email
+                                                <span className="flex items-center gap-2">
+                                                    <Mail className="h-4 w-4 text-sky-600" />
+                                                    Share Selected via Email
+                                                </span>
                                             </SelectItem>
                                         )}
                                         <SelectItem value="delete">
-                                            Delete Selected
+                                            <span className="flex items-center gap-2">
+                                                <Trash2 className="h-4 w-4 text-red-600" />
+                                                Delete Selected
+                                            </span>
                                         </SelectItem>
                                         {hasConfiguredCheckers && (
                                             <SelectItem value="verify">
