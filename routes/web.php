@@ -443,6 +443,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('purchase_returns', PurchaseReturnController::class);
 		Route::get('purchase_returns/refund/{id}', [PurchaseReturnController::class, 'refund'])->name('purchase_returns.refund');
 		Route::post('purchase_returns/refund/store/{id}', [PurchaseReturnController::class, 'refund_store'])->name('purchase_returns.refund.store');
+		Route::post('purchase_returns/unrefund/{id}', [PurchaseReturnController::class, 'unrefund'])->name('purchase_returns.unrefund');
 		Route::post('purchase_returns/bulk_destroy', [PurchaseReturnController::class, 'bulk_destroy'])->name('purchase_returns.bulk_destroy');
 		Route::match(['get', 'post'], 'purchase_returns/{id}/send_email', [PurchaseReturnController::class, 'send_email'])->name('purchase_returns.send_email');
 		Route::post('purchase_returns/bulk_approve', [PurchaseReturnController::class, 'bulk_approve'])->name('purchase_returns.bulk_approve');

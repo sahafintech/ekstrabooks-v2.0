@@ -26,7 +26,7 @@ import {
     DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, RefreshCcw, CalendarIcon, ChevronUp, ChevronDown, Receipt, DollarSign, CreditCard, Wallet } from "lucide-react";
+import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, RefreshCcw, ChevronUp, ChevronDown, Receipt, DollarSign, CreditCard, Wallet } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -38,6 +38,7 @@ import { formatCurrency } from "@/lib/utils";
 import InputError from "@/Components/InputError";
 import { format } from "date-fns";
 import DateTimePicker from "@/Components/DateTimePicker";
+import { Badge } from "@/Components/ui/badge";
 
 const DeleteSalesReturnModal = ({ show, onClose, onConfirm, processing }) => (
     <Modal show={show} onClose={onClose}>
@@ -264,15 +265,15 @@ const DeleteAllSalesReturnModal = ({ show, onClose, onConfirm, processing, count
 
 const SalesReturnStatusBadge = ({ status }) => {
     const statusMap = {
-        0: { label: "Active", className: "text-blue-600" },
-        1: { label: "Refunded", className: "text-green-600" },
-        2: { label: "Partially Refunded", className: "text-yellow-600" },
+        0: { label: "Active", className: "gap-1 text-blue-600 border-blue-600" },
+        1: { label: "Refunded", className: "gap-1 text-green-600 border-green-600" },
+        2: { label: "Partially Refunded", className: "gap-1 text-yellow-600 border-yellow-600" },
     };
 
     return (
-        <span className={statusMap[status].className}>
+        <Badge variant="outline" className={statusMap[status].className}>
             {statusMap[status].label}
-        </span>
+        </Badge>
     );
 };
 
@@ -423,9 +424,9 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
         setCurrentPage(page);
         router.get(
             route("sales_returns.index"),
-            { 
-                search, 
-                page, 
+            {
+                search,
+                page,
                 per_page: perPage,
                 sorting,
                 customer_id: selectedCustomer,
@@ -582,10 +583,10 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
         setSelectedCustomer(value);
         router.get(
             route("sales_returns.index"),
-            { 
-                search, 
-                page: 1, 
-                per_page: perPage, 
+            {
+                search,
+                page: 1,
+                per_page: perPage,
                 sorting,
                 customer_id: value,
                 date_range: dateRange,
@@ -599,10 +600,10 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
         setDateRange(dates);
         router.get(
             route("sales_returns.index"),
-            { 
-                search, 
-                page: 1, 
-                per_page: perPage, 
+            {
+                search,
+                page: 1,
+                per_page: perPage,
                 sorting,
                 customer_id: selectedCustomer,
                 date_range: dates,
@@ -616,10 +617,10 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
         setSelectedStatus(value);
         router.get(
             route("sales_returns.index"),
-            { 
-                search, 
-                page: 1, 
-                per_page: perPage, 
+            {
+                search,
+                page: 1,
+                per_page: perPage,
                 sorting,
                 customer_id: selectedCustomer,
                 date_range: dateRange,
@@ -716,9 +717,9 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                                     <Button variant="outline" className="relative">
                                         <Trash2 className="h-8 w-8" />
                                         {trashed_sales_returns > 0 && (
-                                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                                            {trashed_sales_returns}
-                                        </span>
+                                            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
+                                                {trashed_sales_returns}
+                                            </span>
                                         )}
                                     </Button>
                                 </Link>

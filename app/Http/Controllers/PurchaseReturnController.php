@@ -464,71 +464,40 @@ class PurchaseReturnController extends Controller
                         'amount' => ($purchaseItem->sub_total / 100) * $tax->rate,
                     ]));
 
-                    if (has_permission('purchase_returns.bulk_approve') || request()->isOwner) {
-                        $transaction              = new Transaction();
-                        $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                        $transaction->account_id  = $tax->account_id;
-                        $transaction->dr_cr       = 'cr';
-                        $transaction->transaction_currency    = $request->currency;
-                        $transaction->currency_rate = $purchaseReturn->exchange_rate;
-                        $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseItem->sub_total / $purchaseReturn->exchange_rate) / 100) * $tax->rate));
-                        $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseItem->sub_total / $purchaseReturn->exchange_rate) / 100) * $tax->rate);
-                        $transaction->description = _lang('Purchase Return Tax') . ' #' . $purchaseReturn->return_number;
-                        $transaction->ref_id      = $purchaseReturn->id;
-                        $transaction->ref_type    = 'purchase return tax';
-                        $transaction->tax_id      = $tax->id;
-                        $transaction->save();
-                    } else {
-                        $transaction              = new PendingTransaction();
-                        $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                        $transaction->account_id  = $tax->account_id;
-                        $transaction->dr_cr       = 'cr';
-                        $transaction->transaction_currency    = $request->currency;
-                        $transaction->currency_rate = $purchaseReturn->exchange_rate;
-                        $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseItem->sub_total / $purchaseReturn->exchange_rate) / 100) * $tax->rate));
-                        $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseItem->sub_total / $purchaseReturn->exchange_rate) / 100) * $tax->rate);
-                        $transaction->description = _lang('Purchase Return Tax') . ' #' . $purchaseReturn->return_number;
-                        $transaction->ref_id      = $purchaseReturn->id;
-                        $transaction->ref_type    = 'purchase return tax';
-                        $transaction->tax_id      = $tax->id;
-                        $transaction->save();
-                    }
+                    $transaction              = new Transaction();
+                    $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                    $transaction->account_id  = $tax->account_id;
+                    $transaction->dr_cr       = 'cr';
+                    $transaction->transaction_currency    = $request->currency;
+                    $transaction->currency_rate = $purchaseReturn->exchange_rate;
+                    $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseItem->sub_total / $purchaseReturn->exchange_rate) / 100) * $tax->rate));
+                    $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseItem->sub_total / $purchaseReturn->exchange_rate) / 100) * $tax->rate);
+                    $transaction->description = _lang('Purchase Return Tax') . ' #' . $purchaseReturn->return_number;
+                    $transaction->ref_id      = $purchaseReturn->id;
+                    $transaction->ref_type    = 'purchase return tax';
+                    $transaction->tax_id      = $tax->id;
+                    $transaction->save();
                 }
             }
 
-            if (has_permission('purchase_returns.bulk_approve') || request()->isOwner) {
-                $transaction              = new Transaction();
-                $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-                $transaction->account_id  = $request->input('account_id')[$i];
-                $transaction->dr_cr       = 'cr';
-                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $purchaseItem->sub_total / $purchaseReturn->exchange_rate);
-                $transaction->transaction_currency    = $request->currency;
-                $transaction->currency_rate = $purchaseReturn->exchange_rate;
-                $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $purchaseItem->sub_total / $purchaseReturn->exchange_rate));
-                $transaction->ref_type    = 'purchase return';
-                $transaction->vendor_id   = $purchaseReturn->vendor_id;
-                $transaction->ref_id      = $purchaseReturn->id;
-                $transaction->description = 'Purchase Return #' . $purchaseReturn->return_number;
-                $transaction->save();
-            } else {
-                $transaction              = new PendingTransaction();
-                $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-                $transaction->account_id  = $request->input('account_id')[$i];
-                $transaction->dr_cr       = 'cr';
-                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $purchaseItem->sub_total / $purchaseReturn->exchange_rate);
-                $transaction->transaction_currency    = $request->currency;
-                $transaction->currency_rate = $purchaseReturn->exchange_rate;
-                $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $purchaseItem->sub_total / $purchaseReturn->exchange_rate));
-                $transaction->ref_type    = 'purchase return';
-                $transaction->vendor_id   = $purchaseReturn->vendor_id;
-                $transaction->ref_id      = $purchaseReturn->id;
-                $transaction->description = 'Purchase Return #' . $purchaseReturn->return_number;
-                $transaction->save();
-            }
+            // Per-item account transaction (credits the item's account, e.g. Inventory)
+            $transaction              = new Transaction();
+            $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+            $transaction->account_id  = $request->input('account_id')[$i];
+            $transaction->dr_cr       = 'cr';
+            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $purchaseItem->sub_total / $purchaseReturn->exchange_rate);
+            $transaction->transaction_currency    = $request->currency;
+            $transaction->currency_rate = $purchaseReturn->exchange_rate;
+            $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $purchaseItem->sub_total / $purchaseReturn->exchange_rate));
+            $transaction->ref_type    = 'purchase return';
+            $transaction->vendor_id   = $purchaseReturn->vendor_id;
+            $transaction->ref_id      = $purchaseReturn->id;
+            $transaction->description = 'Purchase Return #' . $purchaseReturn->return_number;
+            $transaction->save();
 
             // update stock
             if ($purchaseItem->product->type == 'product' && $purchaseItem->product->stock_management == 1) {
-                $purchaseItem->product->stock = $purchaseItem->product->stock + $request->quantity[$i];
+                $purchaseItem->product->stock = $purchaseItem->product->stock - $request->quantity[$i];
                 $purchaseItem->product->save();
             }
         }
@@ -538,83 +507,60 @@ class PurchaseReturnController extends Controller
 
         DB::commit();
 
-        if (has_permission('purchase_returns.bulk_approve') || request()->isOwner) {
+        // Accounts Payable transaction (debit - supplier owes us less)
+        $transaction              = new Transaction();
+        $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+        $transaction->account_id  = get_account('Accounts Payable')->id;
+        $transaction->dr_cr       = 'dr';
+        $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
+        $transaction->transaction_currency    = $request->currency;
+        $transaction->currency_rate = $purchaseReturn->exchange_rate;
+        $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
+        $transaction->ref_type    = 'purchase return';
+        $transaction->vendor_id   = $purchaseReturn->vendor_id;
+        $transaction->ref_id      = $purchaseReturn->id;
+        $transaction->description = 'Purchase Return #' . $purchaseReturn->return_number;
+        $transaction->save();
+
+        // Discount transaction
+        if ($request->input('discount_value') > 0) {
             $transaction              = new Transaction();
-            $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-            $transaction->account_id  = get_account('Accounts Payable')->id;
+            $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+            $transaction->account_id  = get_account('Purchase Discount Allowed')->id;
             $transaction->dr_cr       = 'dr';
-            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
+            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
             $transaction->transaction_currency    = $request->currency;
-            $transaction->currency_rate = $purchaseReturn->exchange_rate;
-            $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
+            $transaction->currency_rate           = $purchaseReturn->exchange_rate;
+            $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
+            $transaction->description = _lang('Purchase Return Discount') . ' #' . $purchaseReturn->return_number;
+            $transaction->ref_id      = $purchaseReturn->id;
             $transaction->ref_type    = 'purchase return';
             $transaction->vendor_id   = $purchaseReturn->vendor_id;
-            $transaction->ref_id      = $purchaseReturn->id;
-            $transaction->description = 'Purchase Return #' . $purchaseReturn->return_number;
             $transaction->save();
-
-            if ($request->input('discount_value') > 0) {
-                $transaction              = new Transaction();
-                $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                $transaction->account_id  = get_account('Purchase Discount Allowed')->id;
-                $transaction->dr_cr       = 'dr';
-                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
-                $transaction->transaction_currency    = $request->currency;
-                $transaction->currency_rate           = $purchaseReturn->exchange_rate;
-                $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
-                $transaction->description = _lang('Purchase Return Discount') . ' #' . $purchaseReturn->return_number;
-                $transaction->ref_id      = $purchaseReturn->id;
-                $transaction->ref_type    = 'purchase return';
-                $transaction->vendor_id   = $purchaseReturn->vendor_id;
-                $transaction->save();
-            } else {
-                $transaction              = new PendingTransaction();
-                $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-                $transaction->account_id  = get_account('Accounts Payable')->id;
-                $transaction->dr_cr       = 'dr';
-                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
-                $transaction->transaction_currency    = $request->currency;
-                $transaction->currency_rate = $purchaseReturn->exchange_rate;
-                $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
-                $transaction->ref_type    = 'purchase return';
-                $transaction->vendor_id   = $purchaseReturn->vendor_id;
-                $transaction->ref_id      = $purchaseReturn->id;
-                $transaction->description = 'Purchase Return #' . $purchaseReturn->return_number;
-                $transaction->save();
-            }
-
-            if ($request->input('discount_value') > 0) {
-                $transaction              = new PendingTransaction();
-                $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                $transaction->account_id  = get_account('Purchase Discount Allowed')->id;
-                $transaction->dr_cr       = 'dr';
-                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
-                $transaction->transaction_currency    = $request->currency;
-                $transaction->currency_rate           = $purchaseReturn->exchange_rate;
-                $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
-                $transaction->description = _lang('Purchase Return Discount') . ' #' . $purchaseReturn->return_number;
-                $transaction->ref_id      = $purchaseReturn->id;
-                $transaction->ref_type    = 'purchase return';
-                $transaction->vendor_id   = $purchaseReturn->vendor_id;
-                $transaction->save();
-            }
         }
 
         // audit log
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = Auth::id();
-        $audit->event = 'Purchase Return Updated' . ' ' . $purchaseReturn->return_number;
+        $audit->event = 'Purchase Return Created' . ' ' . $purchaseReturn->return_number;
         $audit->save();
 
-        return redirect()->route('purchase_returns.show', $purchaseReturn->id)->with('success', _lang('Updated Successfully'));
+        return redirect()->route('purchase_returns.show', $purchaseReturn->id)->with('success', _lang('Saved Successfully'));
     }
 
     public function edit($id)
     {
         Gate::authorize('purchase_returns.update');
 
-        $purchase_return = PurchaseReturn::with(['business', 'items', 'taxes', 'vendor'])->find($id);
+        $purchase_return = PurchaseReturn::with(['business', 'items', 'taxes', 'vendor'])
+            ->where('id', $id)
+            ->where('status', '!=', 1)
+            ->first();
+
+        if ($purchase_return == null) {
+            return back()->with('error', _lang('This purchase return is already refunded'));
+        }
 
         if (!has_permission('purchase_returns.bulk_approve') && !request()->isOwner && $purchase_return->approval_status == 1) {
             return back()->with('error', _lang('Permission denied'));
@@ -697,7 +643,7 @@ class PurchaseReturnController extends Controller
                     $account_obj->account_type = 'Other Current Asset';
                 }
                 if ($account == 'Purchase Tax Payable') {
-                    $account_obj->dr_cr   = 'dr';
+                    $account_obj->dr_cr   = 'cr';
                 } elseif ($account == 'Purchase Discount Allowed') {
                     $account_obj->dr_cr   = 'cr';
                 } elseif ($account == 'Inventory') {
@@ -787,30 +733,24 @@ class PurchaseReturnController extends Controller
             }
         }
 
-        //Update Purchase Return item
+        //Update Purchase Return item - revert stock and delete old items
         foreach ($purchaseReturn->items as $purchaseReturnItem) {
             $product = $purchaseReturnItem->product;
             if ($product->type == 'product' && $product->stock_management == 1) {
-                $product->stock = $product->stock - $purchaseReturnItem->quantity;
+                $product->stock = $product->stock + $purchaseReturnItem->quantity;
                 $product->save();
             }
 
-            $purchaseReturnItem->delete();
-
-            // delete transaction
-            $transaction = Transaction::where('ref_id', $purchaseReturn->id)->whereIn('ref_type', ['purchase return', 'purchase return tax', 'purchase return payment', 'purchase return tax payment'])->get();
-
-            foreach ($transaction as $t) {
-                $t->forceDelete();
-            }
-
-            // delete pending transaction
-            $pending_transaction = PendingTransaction::where('ref_id', $purchaseReturn->id)->whereIn('ref_type', ['purchase return', 'purchase return tax', 'purchase return payment', 'purchase return tax payment'])->get();
-
-            foreach ($pending_transaction as $t) {
-                $t->forceDelete();
-            }
+            // delete item taxes (forceDelete because table lacks deleted_at column)
+            $purchaseReturnItem->taxes()->forceDelete();
+            $purchaseReturnItem->forceDelete();
         }
+
+        // delete all transactions for this purchase return (done once, outside the loop)
+        Transaction::where('ref_id', $purchaseReturn->id)->whereIn('ref_type', ['purchase return', 'purchase return tax', 'purchase return payment', 'purchase return tax payment'])->forceDelete();
+
+        // delete pending transactions
+        PendingTransaction::where('ref_id', $purchaseReturn->id)->whereIn('ref_type', ['purchase return', 'purchase return tax', 'purchase return payment', 'purchase return tax payment'])->forceDelete();
 
         $currentTime = Carbon::now();
 
@@ -837,137 +777,76 @@ class PurchaseReturnController extends Controller
                         'amount' => ($purchaseReturnItem->sub_total / 100) * $tax->rate,
                     ]));
 
-                    if (has_permission('purchase_returns.bulk_approve') || request()->isOwner) {
-                        $transaction              = new Transaction();
-                        $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                        $transaction->account_id  = $tax->account_id;
-                        $transaction->dr_cr       = 'cr';
-                        $transaction->transaction_currency    = $request->currency;
-                        $transaction->currency_rate = $purchaseReturn->exchange_rate;
-                        $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseReturnItem->sub_total / $purchaseReturn->exchange_rate) / 100) * $tax->rate));
-                        $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseReturnItem->sub_total / $purchaseReturn->exchange_rate) / 100) * $tax->rate);
-                        $transaction->description = _lang('Purchase Return Tax') . ' #' . $purchaseReturn->return_number;
-                        $transaction->ref_id      = $purchaseReturn->id;
-                        $transaction->ref_type    = 'purchase return tax';
-                        $transaction->tax_id      = $tax->id;
-                        $transaction->save();
-                    } else {
-                        $transaction              = new PendingTransaction();
-                        $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                        $transaction->account_id  = $tax->account_id;
-                        $transaction->dr_cr       = 'cr';
-                        $transaction->transaction_currency    = $request->currency;
-                        $transaction->currency_rate = $purchaseReturn->exchange_rate;
-                        $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseReturnItem->sub_total / $purchaseReturn->exchange_rate) / 100) * $tax->rate));
-                        $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseReturnItem->sub_total / $purchaseReturn->exchange_rate) / 100) * $tax->rate);
-                        $transaction->description = _lang('Purchase Return Tax') . ' #' . $purchaseReturn->return_number;
-                        $transaction->ref_id      = $purchaseReturn->id;
-                        $transaction->ref_type    = 'purchase return tax';
-                        $transaction->tax_id      = $tax->id;
-                        $transaction->save();
-                    }
+                    $transaction              = new Transaction();
+                    $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+                    $transaction->account_id  = $tax->account_id;
+                    $transaction->dr_cr       = 'cr';
+                    $transaction->transaction_currency    = $request->currency;
+                    $transaction->currency_rate = $purchaseReturn->exchange_rate;
+                    $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseReturnItem->sub_total / $purchaseReturn->exchange_rate) / 100) * $tax->rate));
+                    $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseReturnItem->sub_total / $purchaseReturn->exchange_rate) / 100) * $tax->rate);
+                    $transaction->description = _lang('Purchase Return Tax') . ' #' . $purchaseReturn->return_number;
+                    $transaction->ref_id      = $purchaseReturn->id;
+                    $transaction->ref_type    = 'purchase return tax';
+                    $transaction->tax_id      = $tax->id;
+                    $transaction->save();
                 }
             }
 
-            if (has_permission('purchase_returns.bulk_approve') || request()->isOwner) {
-                $transaction              = new Transaction();
-                $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-                $transaction->account_id  = $request->input('account_id')[$i];
-                $transaction->dr_cr       = 'cr';
-                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $purchaseReturnItem->sub_total / $purchaseReturn->exchange_rate);
-                $transaction->transaction_currency    = $request->currency;
-                $transaction->currency_rate = $purchaseReturn->exchange_rate;
-                $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $purchaseReturnItem->sub_total / $purchaseReturn->exchange_rate));
-                $transaction->ref_type    = 'purchase return';
-                $transaction->vendor_id   = $purchaseReturn->vendor_id;
-                $transaction->ref_id      = $purchaseReturn->id;
-                $transaction->description = 'Purchase Return #' . $purchaseReturn->return_number;
-                $transaction->save();
-            } else {
-                $transaction              = new PendingTransaction();
-                $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-                $transaction->account_id  = $request->input('account_id')[$i];
-                $transaction->dr_cr       = 'cr';
-                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $purchaseReturnItem->sub_total / $purchaseReturn->exchange_rate);
-                $transaction->transaction_currency    = $request->currency;
-                $transaction->currency_rate = $purchaseReturn->exchange_rate;
-                $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $purchaseReturnItem->sub_total / $purchaseReturn->exchange_rate));
-                $transaction->ref_type    = 'purchase return';
-                $transaction->vendor_id   = $purchaseReturn->vendor_id;
-                $transaction->ref_id      = $purchaseReturn->id;
-                $transaction->description = 'Purchase Return #' . $purchaseReturn->return_number;
-                $transaction->save();
-            }
+            // Per-item account transaction (credits the item's account, e.g. Inventory)
+            $transaction              = new Transaction();
+            $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+            $transaction->account_id  = $request->input('account_id')[$i];
+            $transaction->dr_cr       = 'cr';
+            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $purchaseReturnItem->sub_total / $purchaseReturn->exchange_rate);
+            $transaction->transaction_currency    = $request->currency;
+            $transaction->currency_rate = $purchaseReturn->exchange_rate;
+            $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $purchaseReturnItem->sub_total / $purchaseReturn->exchange_rate));
+            $transaction->ref_type    = 'purchase return';
+            $transaction->vendor_id   = $purchaseReturn->vendor_id;
+            $transaction->ref_id      = $purchaseReturn->id;
+            $transaction->description = 'Purchase Return #' . $purchaseReturn->return_number;
+            $transaction->save();
 
-            // update stock
+            // update stock (purchase return decreases stock - returning to supplier)
             if ($purchaseReturnItem->product->type == 'product' && $purchaseReturnItem->product->stock_management == 1) {
-                $purchaseReturnItem->product->stock = $purchaseReturnItem->product->stock + $request->quantity[$i];
+                $purchaseReturnItem->product->stock = $purchaseReturnItem->product->stock - $request->quantity[$i];
                 $purchaseReturnItem->product->save();
             }
         }
 
         DB::commit();
 
-        if (has_permission('purchase_returns.bulk_approve') || request()->isOwner) {
+        // Accounts Payable transaction (debit - supplier owes us less)
+        $transaction              = new Transaction();
+        $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
+        $transaction->account_id  = get_account('Accounts Payable')->id;
+        $transaction->dr_cr       = 'dr';
+        $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
+        $transaction->transaction_currency    = $request->currency;
+        $transaction->currency_rate = $purchaseReturn->exchange_rate;
+        $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
+        $transaction->ref_type    = 'purchase return';
+        $transaction->vendor_id   = $purchaseReturn->vendor_id;
+        $transaction->ref_id      = $purchaseReturn->id;
+        $transaction->description = 'Purchase Return #' . $purchaseReturn->return_number;
+        $transaction->save();
+
+        // Discount transaction
+        if ($request->input('discount_value') > 0) {
             $transaction              = new Transaction();
-            $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-            $transaction->account_id  = get_account('Accounts Payable')->id;
+            $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+            $transaction->account_id  = get_account('Purchase Discount Allowed')->id;
             $transaction->dr_cr       = 'dr';
-            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
+            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
             $transaction->transaction_currency    = $request->currency;
-            $transaction->currency_rate = $purchaseReturn->exchange_rate;
-            $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
+            $transaction->currency_rate           = $purchaseReturn->exchange_rate;
+            $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
+            $transaction->description = _lang('Purchase Return Discount') . ' #' . $purchaseReturn->return_number;
+            $transaction->ref_id      = $purchaseReturn->id;
             $transaction->ref_type    = 'purchase return';
             $transaction->vendor_id   = $purchaseReturn->vendor_id;
-            $transaction->ref_id      = $purchaseReturn->id;
-            $transaction->description = 'Purchase Return Payable #' . $purchaseReturn->return_number;
             $transaction->save();
-
-            if ($request->input('discount_value') > 0) {
-                $transaction              = new Transaction();
-                $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                $transaction->account_id  = get_account('Purchase Discount Allowed')->id;
-                $transaction->dr_cr       = 'dr';
-                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
-                $transaction->transaction_currency    = $request->currency;
-                $transaction->currency_rate           = $purchaseReturn->exchange_rate;
-                $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
-                $transaction->description = _lang('Purchase Return Discount') . ' #' . $purchaseReturn->return_number;
-                $transaction->ref_id      = $purchaseReturn->id;
-                $transaction->ref_type    = 'purchase return';
-                $transaction->vendor_id   = $purchaseReturn->vendor_id;
-                $transaction->save();
-            }
-        } else {
-            $transaction              = new PendingTransaction();
-            $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-            $transaction->account_id  = get_account('Accounts Payable')->id;
-            $transaction->dr_cr       = 'dr';
-            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
-            $transaction->transaction_currency    = $request->currency;
-            $transaction->currency_rate = $purchaseReturn->exchange_rate;
-            $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
-            $transaction->ref_type    = 'purchase return';
-            $transaction->vendor_id   = $purchaseReturn->vendor_id;
-            $transaction->ref_id      = $purchaseReturn->id;
-            $transaction->description = 'Purchase Return Payable #' . $purchaseReturn->return_number;
-            $transaction->save();
-
-            if ($request->input('discount_value') > 0) {
-                $transaction              = new PendingTransaction();
-                $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                $transaction->account_id  = get_account('Purchase Discount Allowed')->id;
-                $transaction->dr_cr       = 'dr';
-                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
-                $transaction->transaction_currency    = $request->currency;
-                $transaction->currency_rate           = $purchaseReturn->exchange_rate;
-                $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
-                $transaction->description = _lang('Purchase Return Discount') . ' #' . $purchaseReturn->return_number;
-                $transaction->ref_id      = $purchaseReturn->id;
-                $transaction->ref_type    = 'purchase return';
-                $transaction->vendor_id   = $purchaseReturn->vendor_id;
-                $transaction->save();
-            }
         }
 
         // audit log
@@ -1044,7 +923,7 @@ class PurchaseReturnController extends Controller
             $transaction->delete();
         }
 
-        // increase stock
+        // restore stock (undo the purchase return's stock decrease)
         foreach ($return->items as $item) {
             if ($item->product_id) {
                 $product = Product::find($item->product_id);
@@ -1090,7 +969,7 @@ class PurchaseReturnController extends Controller
                 $transaction->delete();
             }
 
-            // increase stock
+            // restore stock (undo the purchase return's stock decrease)
             foreach ($return->items as $item) {
                 if ($item->product_id) {
                     $product = Product::find($item->product_id);
@@ -1238,6 +1117,43 @@ class PurchaseReturnController extends Controller
         return redirect()->route('purchase_returns.index')->with('success', _lang('Saved Successfully'));
     }
 
+    public function unrefund($id)
+    {
+        Gate::authorize('purchase_returns.refund');
+
+        $purchaseReturn = PurchaseReturn::findOrFail($id);
+
+        DB::beginTransaction();
+
+        try {
+            $transactions = Transaction::where('ref_id', $purchaseReturn->id)
+                ->where('ref_type', 'p refund')
+                ->get();
+
+            foreach ($transactions as $transaction) {
+                $transaction->delete();
+            }
+
+            $purchaseReturn->paid = 0;
+            $purchaseReturn->status = 0; // Active
+            $purchaseReturn->save();
+
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = Auth::id();
+            $audit->event = 'Purchase Return Unrefund' . ' ' . $purchaseReturn->return_number;
+            $audit->save();
+
+            DB::commit();
+
+            return redirect()->route('purchase_returns.index')->with('success', _lang('Unrefund completed successfully'));
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            return back()->with('error', _lang('Something going wrong, Please try again'));
+        }
+    }
+
     public function restore($id)
     {
         Gate::authorize('purchase_returns.restore');
@@ -1263,7 +1179,7 @@ class PurchaseReturnController extends Controller
             $transaction->restore();
         }
 
-        // decrease stock
+        // re-apply stock decrease (restoring the purchase return's effect)
         foreach ($purchaseReturn->items as $item) {
             if ($item->product_id) {
                 $product = Product::find($item->product_id);
@@ -1304,7 +1220,7 @@ class PurchaseReturnController extends Controller
                 $transaction->restore();
             }
 
-            // decrease stock
+            // re-apply stock decrease (restoring the purchase return's effect)
             foreach ($purchaseReturn->items as $item) {
                 if ($item->product_id) {
                     $product = Product::find($item->product_id);

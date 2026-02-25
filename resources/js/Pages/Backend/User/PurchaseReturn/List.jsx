@@ -26,7 +26,7 @@ import {
     DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, RefreshCcw, CalendarIcon, ChevronUp, ChevronDown, ShoppingCart, DollarSign, FileText, CreditCard } from "lucide-react";
+import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, RefreshCcw, ChevronUp, ChevronDown, ShoppingCart, DollarSign, FileText, CreditCard } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -34,16 +34,11 @@ import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 import { Label } from "@/Components/ui/label";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
-import { Calendar } from "@/Components/ui/calendar";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/Components/ui/popover";
-import { cn, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import InputError from "@/Components/InputError";
 import { format } from "date-fns";
 import DateTimePicker from "@/Components/DateTimePicker";
+import { Badge } from "@/Components/ui/badge";
 
 const DeletePurchaseReturnModal = ({ show, onClose, onConfirm, processing }) => (
     <Modal show={show} onClose={onClose}>
@@ -82,34 +77,11 @@ const RefundPurchaseReturnModal = ({ show, onClose, onConfirm, processing, accou
                             Refund Date *
                         </Label>
                         <div className="md:col-span-9 col-span-12 md:mt-0 mt-2">
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        variant={"outline"}
-                                        className={cn(
-                                            "w-full justify-start text-left font-normal",
-                                            !refundDate && "text-muted-foreground"
-                                        )}
-                                    >
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {refundDate ? (
-                                            format(new Date(refundDate), "PPP")
-                                        ) : (
-                                            <span>Pick a date</span>
-                                        )}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                        mode="single"
-                                        selected={refundDate ? new Date(refundDate) : undefined}
-                                        onSelect={(date) =>
-                                            setRefundDate(date ? format(date, "yyyy-MM-dd") : "")
-                                        }
-                                        initialFocus
-                                    />
-                                </PopoverContent>
-                            </Popover>
+                            <DateTimePicker
+                                value={refundDate}
+                                onChange={(date) => setRefundDate(date)}
+                                required
+                            />
                             <InputError message={errors.refund_date} className="text-sm" />
                         </div>
                     </div>
@@ -311,31 +283,61 @@ const RejectAllPurchaseReturnModal = ({ show, onClose, onConfirm, processing, co
     </Modal>
 );
 
+const UnrefundPurchaseReturnModal = ({ show, onClose, onConfirm, processing }) => (
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
+            <h2 className="text-lg font-medium">
+                Unrefund this purchase return?
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+                This will delete the related refund payment transactions and set the purchase return status to Active.
+            </p>
+            <div className="mt-6 flex justify-end">
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={onClose}
+                    className="mr-3"
+                >
+                    Cancel
+                </Button>
+                <Button
+                    type="submit"
+                    variant="destructive"
+                    disabled={processing}
+                >
+                    Unrefund Purchase Return
+                </Button>
+            </div>
+        </form>
+    </Modal>
+);
+
 const PurchaseReturnStatusBadge = ({ status }) => {
     const statusMap = {
-        0: { label: "Active", className: "text-blue-700 bg-blue-50 py-1 px-3 rounded-md" },
-        1: { label: "Refunded", className: "text-green-600 bg-green-50 py-1 px-3 rounded-md" },
-        2: { label: "Partially Refunded", className: "text-yellow-600 bg-yellow-50 py-1 px-3 rounded-md" },
+        0: { label: "Active", className: "gap-1 text-blue-600 border-blue-600" },
+        1: { label: "Refunded", className: "gap-1 text-green-600 border-green-600" },
+        2: { label: "Partially Refunded", className: "gap-1 text-yellow-600 border-yellow-600" },
     };
 
     return (
-        <span className={statusMap[status].className}>
+        <Badge variant="outline" className={statusMap[status].className}>
             {statusMap[status].label}
-        </span>
+        </Badge>
     );
 };
 
 const PurchaseReturnApprovalStatusBadge = ({ status }) => {
     const statusMap = {
-        0: { label: "Pending", className: "text-yellow-600 bg-yellow-50 py-1 px-3 rounded-md" },
-        1: { label: "Approved", className: "text-green-600 bg-green-50 py-1 px-3 rounded-md" },
-        2: { label: "Rejected", className: "text-red-600 bg-red-50 py-1 px-3 rounded-md" },
+        0: { label: "Pending", className: "gap-1 text-yellow-600 border-yellow-600" },
+        1: { label: "Approved", className: "gap-1 text-green-600 border-green-600" },
+        2: { label: "Rejected", className: "gap-1 text-red-600 border-red-600" },
     };
 
     return (
-        <span className={statusMap[status].className}>
+        <Badge variant="outline" className={statusMap[status].className}>
             {statusMap[status].label}
-        </span>
+        </Badge>
     );
 };
 
@@ -415,6 +417,8 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
     // Refund confirmation modal states
     const [showRefundModal, setShowRefundModal] = useState(false);
     const [purchaseReturnToRefund, setPurchaseReturnToRefund] = useState(null);
+    const [showUnrefundModal, setShowUnrefundModal] = useState(false);
+    const [purchaseReturnToUnrefund, setPurchaseReturnToUnrefund] = useState(null);
 
     const [refundDate, setRefundDate] = useState(format(new Date(), "yyyy-MM-dd"));
     const [refundAmount, setRefundAmount] = useState("");
@@ -488,7 +492,7 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
         setCurrentPage(page);
         router.get(
             route("purchase_returns.index"),
-            { 
+            {
                 search,
                 page,
                 per_page: perPage,
@@ -535,6 +539,11 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
         setShowRefundModal(true);
     };
 
+    const handleUnrefundConfirm = (id) => {
+        setPurchaseReturnToUnrefund(id);
+        setShowUnrefundModal(true);
+    };
+
     const handleDelete = (e) => {
         e.preventDefault();
         setProcessing(true);
@@ -555,18 +564,38 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
         e.preventDefault();
         setProcessing(true);
 
-        router.post(route('purchase_returns.refund.store', purchaseReturnToRefund), {
-            refund_date: refundDate,
-            amount: refundAmount,
-            account_id: paymentAccount,
+        router.post(
+            route('purchase_returns.refund.store', purchaseReturnToRefund),
+            {
+                refund_date: refundDate ? format(new Date(refundDate), "yyyy-MM-dd") : "",
+                amount: refundAmount,
+                account_id: paymentAccount,
+            },
+            {
+                onSuccess: () => {
+                    setShowRefundModal(false);
+                    setPurchaseReturnToRefund(null);
+                    setProcessing(false);
+                    setRefundDate(new Date());
+                    setRefundAmount('');
+                    setPaymentAccount('');
+                },
+                onError: () => {
+                    setProcessing(false);
+                }
+            }
+        );
+    };
+
+    const handleUnrefund = (e) => {
+        e.preventDefault();
+        setProcessing(true);
+
+        router.post(route('purchase_returns.unrefund', purchaseReturnToUnrefund), {}, {
             onSuccess: () => {
-                setShowRefundModal(false);
-                setPurchaseReturnToRefund(null);
+                setShowUnrefundModal(false);
+                setPurchaseReturnToUnrefund(null);
                 setProcessing(false);
-                toast.success('Refund created successfully');
-                setRefundDate('');
-                setRefundAmount('');
-                setPaymentAccount('');
             },
             onError: () => {
                 setProcessing(false);
@@ -780,9 +809,9 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                                     <Button variant="outline" className="relative">
                                         <Trash2 className="h-8 w-8" />
                                         {trashed_purchase_returns > 0 && (
-                                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
-                                            {trashed_purchase_returns}
-                                        </span>
+                                            <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold">
+                                                {trashed_purchase_returns}
+                                            </span>
                                         )}
                                     </Button>
                                 </Link>
@@ -917,11 +946,11 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                                                         onCheckedChange={() => toggleSelectPurchaseReturns(purchase_return.id)}
                                                     />
                                                 </TableCell>
-                                                    <TableCell>
-                                                        <Link href={route("purchase_returns.show", purchase_return.id)} className="underline text-blue-500">
-                                                            {purchase_return.return_number}
-                                                        </Link>
-                                                    </TableCell>
+                                                <TableCell>
+                                                    <Link href={route("purchase_returns.show", purchase_return.id)} className="underline text-blue-500">
+                                                        {purchase_return.return_number}
+                                                    </Link>
+                                                </TableCell>
                                                 <TableCell>{purchase_return.vendor ? purchase_return.vendor.name : "-"}</TableCell>
                                                 <TableCell>{purchase_return.return_date}</TableCell>
                                                 <TableCell className="text-right">{formatCurrency(purchase_return.grand_total)}</TableCell>
@@ -951,6 +980,11 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                                                                 icon: <RefreshCcw className="h-4 w-4" />,
                                                                 onClick: () => handleRefundConfirm(purchase_return.id),
                                                             },
+                                                            ...(Number(purchase_return.paid) > 0 || Number(purchase_return.status) !== 0 ? [{
+                                                                label: "Unrefund",
+                                                                icon: <RefreshCcw className="h-4 w-4" />,
+                                                                onClick: () => handleUnrefundConfirm(purchase_return.id),
+                                                            }] : []),
                                                             {
                                                                 label: "Delete",
                                                                 icon: <Trash2 className="h-4 w-4" />,
@@ -1039,6 +1073,13 @@ export default function List({ returns = [], meta = {}, filters = {}, accounts =
                 paymentAccount={paymentAccount}
                 setPaymentAccount={setPaymentAccount}
                 errors={errors}
+            />
+
+            <UnrefundPurchaseReturnModal
+                show={showUnrefundModal}
+                onClose={() => setShowUnrefundModal(false)}
+                onConfirm={handleUnrefund}
+                processing={processing}
             />
 
             <DeleteAllPurchaseReturnModal

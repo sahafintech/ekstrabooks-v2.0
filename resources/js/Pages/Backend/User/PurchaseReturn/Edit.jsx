@@ -92,8 +92,8 @@ export default function Edit({ vendors = [], products = [], purchase_return, cur
     setData("product_id", purchaseItems.map(i => i.product_id));
     setData("product_name", purchaseItems.map(i => i.product_name)
       .concat(purchaseReturnAccounts.map(a => a.product_name || "")));
-    setData("account_id", purchaseReturnAccounts.map(a => a.account_id)
-      .concat(purchaseItems.map(a => a.account_id || "")));
+    setData("account_id", purchaseItems.map(i => i.account_id || "")
+      .concat(purchaseReturnAccounts.map(a => a.account_id)));
     setData("description", purchaseItems.map(i => i.description)
       .concat(purchaseReturnAccounts.map(a => a.description || "")));
     setData("quantity", purchaseItems.map(i => i.quantity)
@@ -149,7 +149,7 @@ export default function Edit({ vendors = [], products = [], purchase_return, cur
       if (product) {
         console.log("Selected product:", product);
         updatedItems[index].product_name = product.name;
-        updatedItems[index].unit_cost = product.selling_price;
+        updatedItems[index].unit_cost = product.purchase_cost;
         updatedItems[index].account_id = inventory.id;
 
         // Also update the description if it's empty
@@ -315,7 +315,7 @@ export default function Edit({ vendors = [], products = [], purchase_return, cur
         ...purchaseReturnAccounts.map(account => account.quantity || 1)
       ],
       unit_cost: [
-        ...purchaseItems.map(item => item.unit_cost * item.quantity),
+        ...purchaseItems.map(item => item.unit_cost),
         ...purchaseReturnAccounts.map(account => account.unit_cost)
       ],
       account_id: [

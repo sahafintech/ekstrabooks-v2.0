@@ -60,8 +60,8 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     setData("product_id", purchaseReturnItems.map(i => i.product_id));
     setData("product_name", purchaseReturnItems.map(i => i.product_name)
       .concat(purchaseReturnAccounts.map(a => a.product_name || "")));
-    setData("account_id", purchaseReturnAccounts.map(a => a.account_id)
-      .concat(purchaseReturnItems.map(a => a.account_id || "")));
+    setData("account_id", purchaseReturnItems.map(i => i.account_id || "")
+      .concat(purchaseReturnAccounts.map(a => a.account_id)));
     setData("description", purchaseReturnItems.map(i => i.description)
       .concat(purchaseReturnAccounts.map(a => a.description || "")));
     setData("quantity", purchaseReturnItems.map(i => i.quantity)
@@ -116,7 +116,7 @@ export default function Create({ vendors = [], products = [], currencies = [], t
       const product = products.find(p => p.id === parseInt(value, 10));
       if (product) {
         updatedItems[index].product_name = product.name;
-        updatedItems[index].unit_cost = product.selling_price;
+        updatedItems[index].unit_cost = product.purchase_cost;
         updatedItems[index].account_id = inventory.id;
         // Also update the description if it's empty
         if (!updatedItems[index].description) {
@@ -270,13 +270,12 @@ export default function Create({ vendors = [], products = [], currencies = [], t
       quantity: purchaseReturnItems.map(item => item.quantity).concat(
         purchaseReturnAccounts.map(account => account.quantity || 1)
       ),
-      unit_cost: purchaseReturnItems.map(item => item.unit_cost),
       account_id: [
-        ...purchaseReturnItems.map(item => item.account_id || "Inventory"),
+        ...purchaseReturnItems.map(item => item.account_id || inventory.id),
         ...purchaseReturnAccounts.map(account => account.account_id)
       ],
       unit_cost: [
-        ...purchaseReturnItems.map(item => item.unit_cost * item.quantity),
+        ...purchaseReturnItems.map(item => item.unit_cost),
         ...purchaseReturnAccounts.map(account => account.unit_cost)
       ],
     };
