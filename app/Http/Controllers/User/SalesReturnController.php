@@ -906,43 +906,21 @@ class SalesReturnController extends Controller
 
         $currentTime = Carbon::now();
 
-        //Update return item
+        //Update return item - revert stock and delete old items
         foreach ($return->items as $return_item) {
             $product = $return_item->product;
             if ($product->type == 'product' && $product->stock_management == 1) {
                 $product->stock = $product->stock - $return_item->quantity;
                 $product->save();
             }
-            $return_item->delete();
 
-            $transaction = Transaction::where('ref_id', $return->id)->where('ref_type', 's return')
-                ->where('account_id', $product->income_account_id)
-                ->first();
-
-            if ($transaction != null) {
-                $transaction->delete();
-            }
-
-            if ($product->stock_management == 1) {
-                $transaction = Transaction::where('ref_id', $return->id)->where('ref_type', 's return')
-                    ->where('account_id', get_account('Inventory')->id)
-                    ->first();
-
-                if ($transaction != null) {
-                    $transaction->delete();
-                }
-            }
-
-            if ($product->allow_for_purchasing == 1) {
-                $transaction = Transaction::where('ref_id', $return->id)->where('ref_type', 's return')
-                    ->where('account_id', $product->expense_account_id)
-                    ->first();
-
-                if ($transaction != null) {
-                    $transaction->delete();
-                }
-            }
+            // delete item taxes (forceDelete because table may lack deleted_at column)
+            $return_item->taxes()->forceDelete();
+            $return_item->forceDelete();
         }
+
+        // delete all transactions for this sales return (done once, outside the loop)
+        Transaction::where('ref_id', $return->id)->whereIn('ref_type', ['s return', 's return tax'])->forceDelete();
 
         for ($i = 0; $i < count($request->product_id); $i++) {
             $returnItem = $return->items()->save(new SalesReturnItem([
@@ -1003,15 +981,6 @@ class SalesReturnController extends Controller
             }
 
             if (isset($request->taxes)) {
-                $transaction = Transaction::where('ref_id', $return->id)->where('ref_type', 's return tax')
-                    ->get();
-
-                foreach ($transaction as $trans) {
-                    $trans->delete();
-                }
-
-                $returnItem->taxes()->delete();
-
                 foreach ($request->taxes as $taxId) {
                     $tax = Tax::find($taxId);
 
@@ -1048,73 +1017,50 @@ class SalesReturnController extends Controller
         DB::commit();
 
         if ($request->type == 'credit') {
-            $transaction = Transaction::where('ref_id', $return->id)->where('ref_type', 's return')
-                ->where('account_id', get_account('Accounts Receivable')->id)
-                ->first();
-            $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
+            $transaction              = new Transaction();
+            $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+            $transaction->account_id  = get_account('Accounts Receivable')->id;
+            $transaction->dr_cr       = 'cr';
+            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
+            $transaction->transaction_currency    = $request->currency;
+            $transaction->currency_rate = $return->exchange_rate;
             $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
+            $transaction->ref_id      = $return->id;
+            $transaction->ref_type    = 's return';
+            $transaction->description = 'Sales Return #' . $return->return_number;
             $transaction->save();
         }
 
-        if ($request->input('discount_value') == 0) {
-            $transaction = Transaction::where('ref_id', $return->id)->where('ref_type', 's return')
-                ->where('account_id', get_account('Sales Discount Allowed')->id)
-                ->first();
-            if ($transaction != null) {
-                $transaction->delete();
-            }
-        }
-
         if ($request->input('discount_value') > 0) {
-            $transaction = Transaction::where('ref_id', $return->id)->where('ref_type', 's return')
-                ->where('account_id', get_account('Sales Discount Allowed')->id)
-                ->first();
-            if ($transaction == null) {
-                $transaction              = new Transaction();
-                $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                $transaction->account_id  = get_account('Sales Discount Allowed')->id;
-                $transaction->dr_cr       = 'cr';
-                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
-                $transaction->transaction_currency    = $request->currency;
-                $transaction->currency_rate = $return->exchange_rate;
-                $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
-                $transaction->description = _lang('Sales Return Discount') . ' #' . $return->return_number;
-                $transaction->ref_id      = $return->id;
-                $transaction->ref_type    = 's return';
-                $transaction->save();
-            } else {
-                $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
-                $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
-                $transaction->save();
-            }
+            $transaction              = new Transaction();
+            $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+            $transaction->account_id  = get_account('Sales Discount Allowed')->id;
+            $transaction->dr_cr       = 'cr';
+            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
+            $transaction->transaction_currency    = $request->currency;
+            $transaction->currency_rate = $return->exchange_rate;
+            $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
+            $transaction->description = _lang('Sales Return Discount') . ' #' . $return->return_number;
+            $transaction->ref_id      = $return->id;
+            $transaction->ref_type    = 's return';
+            $transaction->save();
         }
 
         if ($request->type == 'cash') {
-            $transaction = Transaction::where('ref_id', $return->id)->where('ref_type', 's return')
-                ->where('account_id', $request->input('account_id'))
-                ->first();
-
-            if ($transaction != null) {
-                $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
-                $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
-                $transaction->transaction_method = $request->input('method');
-                $transaction->save();
-            } else {
-                $transaction              = new Transaction();
-                $transaction->customer_id  = $request->input('customer_id') ?? NULL;
-                $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                $transaction->account_id  = $request->input('account_id');
-                $transaction->dr_cr       = 'cr';
-                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
-                $transaction->transaction_currency    = $request->currency;
-                $transaction->transaction_method = $request->input('method');
-                $transaction->currency_rate           = $return->exchange_rate;
-                $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
-                $transaction->description = 'Sales Return #' . $return->return_number;
-                $transaction->ref_id      = $return->id;
-                $transaction->ref_type    = 's return';
-                $transaction->save();
-            }
+            $transaction              = new Transaction();
+            $transaction->customer_id  = $request->input('customer_id') ?? NULL;
+            $transaction->trans_date  = Carbon::parse($request->input('return_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+            $transaction->account_id  = $request->input('account_id');
+            $transaction->dr_cr       = 'cr';
+            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
+            $transaction->transaction_currency    = $request->currency;
+            $transaction->transaction_method = $request->input('method');
+            $transaction->currency_rate           = $return->exchange_rate;
+            $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
+            $transaction->description = 'Sales Return #' . $return->return_number;
+            $transaction->ref_id      = $return->id;
+            $transaction->ref_type    = 's return';
+            $transaction->save();
 
             $return->paid = $summary['grandTotal'];
             $return->status = 1; //Paid
