@@ -194,7 +194,7 @@ export default function View({ payment, decimalPlace, attachments }) {
                                     </div>
                                 </div>
                                 <div className="sm:text-right">
-                                    <h1 className="text-2xl font-bold">Payment Voucher</h1>
+                                    <h1 className="text-2xl font-bold">Receipt Voucher</h1>
                                     <div className="mt-2 text-sm">
                                         <p><span className="font-medium">Payment #:</span> {payment.id}</p>
                                         <p><span className="font-medium">Payment Date:</span> {payment.date}</p>
@@ -202,7 +202,7 @@ export default function View({ payment, decimalPlace, attachments }) {
                                         <p><span className="font-medium">Payment Type:</span> {payment.type}</p>
                                     </div>
                                     <div className="mt-4 sm:flex sm:justify-end">
-                                        <QRCodeSVG 
+                                        <QRCodeSVG
                                             value={route('receive_payments.show_public_receive_payment', payment.id)}
                                             size={100}
                                             level="H"
@@ -261,6 +261,10 @@ export default function View({ payment, decimalPlace, attachments }) {
                                     <div className="flex justify-between py-2 border-t">
                                         <span className="font-medium">Total Paid:</span>
                                         <span>{formatCurrency(payment.amount, payment.business.currency, decimalPlace)}</span>
+                                    </div>
+                                    <div className="flex justify-between py-2 border-t">
+                                        <span className="font-medium">Total Due:</span>
+                                        <span>{formatCurrency(payment.invoices.reduce((sum, invoice) => sum + (invoice.grand_total - invoice.paid), 0), payment.business.currency, decimalPlace)}</span>
                                     </div>
                                 </div>
                             </div>
