@@ -495,10 +495,10 @@ export default function List({
     );
     const [dateRange, setDateRange] = useState(filters.date_range || null);
     const [selectedApprovalStatus, setSelectedApprovalStatus] = useState(
-        filters.approval_status || ""
+        filters.approval_status !== null && filters.approval_status !== undefined && filters.approval_status !== "" ? String(filters.approval_status) : ""
     );
     const [selectedBillStatus, setSelectedBillStatus] = useState(
-        filters.status || ""
+        filters.status !== null && filters.status !== undefined && filters.status !== "" ? String(filters.status) : ""
     );
 
     // Delete confirmation modal states
@@ -788,7 +788,7 @@ export default function List({
                 vendor_id: selectedVendor,
                 date_range: dateRange,
                 approval_status: selectedApprovalStatus,
-                status: value || null
+                status: value !== "" ? value : null
             },
             { preserveState: true }
         );
@@ -804,7 +804,7 @@ export default function List({
                 per_page: perPage,
                 vendor_id: selectedVendor,
                 date_range: dateRange,
-                approval_status: value || null,
+                approval_status: value !== "" ? value : null,
                 status: selectedBillStatus
             },
             { preserveState: true }

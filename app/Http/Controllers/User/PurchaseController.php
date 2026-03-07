@@ -102,11 +102,11 @@ class PurchaseController extends Controller
 				->whereDate('purchase_date', '<=', Carbon::parse($dateRange[1])->format('Y-m-d'));
 		}
 
-		if ($approvalStatus) {
+		if ($approvalStatus !== null && $approvalStatus !== '') {
 			$query->where('approval_status', $approvalStatus);
 		}
 
-		if ($status) {
+		if ($status !== null && $status !== '') {
 			$query->where('status', $status);
 		}
 
@@ -223,11 +223,11 @@ class PurchaseController extends Controller
 				->whereDate('purchase_date', '<=', Carbon::parse($dateRange[1])->format('Y-m-d'));
 		}
 
-		if ($approvalStatus) {
+		if ($approvalStatus !== null && $approvalStatus !== '') {
 			$query->where('approval_status', $approvalStatus);
 		}
 
-		if ($status) {
+		if ($status !== null && $status !== '') {
 			$query->where('status', $status);
 		}
 
@@ -2325,9 +2325,9 @@ class PurchaseController extends Controller
 					'action_date' => now(),
 				]);
 
-				// Reset bill approval_status to Pending (back to Verified state)
+				// Set bill approval_status to Rejected
 				$purchase->update([
-					'approval_status' => 0,
+					'approval_status' => 2,
 					'approved_by' => null,
 				]);
 
@@ -2365,10 +2365,10 @@ class PurchaseController extends Controller
 					'action_date' => now(),
 				]);
 
-				// Reset bill checker_status to Pending AND approval_status to Pending
+				// Reset checker_status to pending and set bill approval_status to Rejected
 				$purchase->update([
 					'checker_status' => 0,
-					'approval_status' => 0, // Reset to Pending
+					'approval_status' => 2,
 					'checked_by' => null,
 				]);
 
@@ -2508,8 +2508,7 @@ public function approve(Request $request, $id)
 
 /**
  * Reject a bill invoice (conditional based on bill status)
- * - If Verified: Reset checker_status to Pending and mark checker record as Rejected
- * - If Approved: Reset approval_status to Pending and mark approver record as Rejected
+ * - If Verified/Approved: mark reviewer record as Rejected and set bill status to Rejected
  */
 public function reject(Request $request, $id)
 {
@@ -2530,7 +2529,7 @@ public function reject(Request $request, $id)
 
 	// Determine rejection type based on bill status
 	// If bill is Approved (approval_status = 1), reject as approver
-	// If bill is Verified (checker_status = 1, approval_status = 0), reject as checker
+	// If bill is in checker-verified stage (checker_status = 1), reject as checker
 	
 	if ($purchase->approval_status == 1) {
 		// Bill is in Approved state - reject as approver
@@ -2562,9 +2561,9 @@ public function reject(Request $request, $id)
 			'action_date' => now(),
 		]);
 
-		// Reset bill approval_status to Pending (back to Verified state)
+		// Set bill approval_status to Rejected
 		$purchase->update([
-			'approval_status' => 0,
+			'approval_status' => 2,
 			'approved_by' => null,
 		]);
 
@@ -2578,7 +2577,7 @@ public function reject(Request $request, $id)
 		$audit->event = 'Rejected Approved Bill Invoice ' . $purchase->bill_no . ' by ' . auth()->user()->name . ' (Approver)';
 		$audit->save();
 
-		return back()->with('success', _lang('Bill approval rejected. Status reset to Verified.'));
+		return back()->with('success', _lang('Bill rejected successfully. Status updated to Rejected.'));
 
 	} elseif ($purchase->checker_status == 1) {
 		// Bill is in Verified state - reject as checker
@@ -2610,10 +2609,10 @@ public function reject(Request $request, $id)
 			'action_date' => now(),
 		]);
 
-		// Reset bill checker_status to Pending AND approval_status to Pending
+		// Reset checker_status to pending and set bill approval_status to Rejected
 		$purchase->update([
 			'checker_status' => 0,
-			'approval_status' => 0, // Reset to Pending
+			'approval_status' => 2,
 			'checked_by' => null,
 		]);
 
@@ -2624,7 +2623,7 @@ public function reject(Request $request, $id)
 		$audit->event = 'Rejected Verified Bill Invoice ' . $purchase->bill_no . ' by ' . auth()->user()->name . ' (Checker)';
 		$audit->save();
 
-		return back()->with('success', _lang('Bill verification rejected. Status reset to Pending.'));
+		return back()->with('success', _lang('Bill rejected successfully. Status updated to Rejected.'));
 
 	} elseif ($purchase->approval_status == 0) {
 		// Bill is in Pending state - mark it as Rejected

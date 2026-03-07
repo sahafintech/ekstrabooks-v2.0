@@ -237,7 +237,7 @@ class CashPurchaseController extends Controller
 		}
 
 		// Filter by status
-		if ($status) {
+		if ($status !== null && $status !== '') {
 			$query->where('approval_status', $status);
 		}
 
@@ -265,7 +265,7 @@ class CashPurchaseController extends Controller
 			$allPurchases->whereBetween('purchase_date', $dateRange);
 		}
 
-		if ($status) {
+		if ($status !== null && $status !== '') {
 			$allPurchases->where('approval_status', $status);
 		}
 
@@ -2885,7 +2885,7 @@ class CashPurchaseController extends Controller
 
 			// Reset purchase approval_status to Pending (back to Verified state)
 			$purchase->update([
-				'approval_status' => 0,
+				'approval_status' => 2,
 				'approved_by' => null,
 			]);
 
@@ -2934,7 +2934,7 @@ class CashPurchaseController extends Controller
 			// Reset purchase checker_status to Pending AND approval_status to Pending
 			$purchase->update([
 				'checker_status' => 0,
-				'approval_status' => 0, // Reset to Pending
+				'approval_status' => 2,
 				'checked_by' => null,
 			]);
 

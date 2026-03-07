@@ -165,7 +165,9 @@ export default function TrashList({ purchases = [], meta = {}, filters = {}, ven
   const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
   const [selectedVendor, setSelectedVendor] = useState(filters.vendor_id || "");
   const [dateRange, setDateRange] = useState(filters.date_range || []);
-  const [selectedStatus, setSelectedStatus] = useState(filters.status || "");
+  const [selectedStatus, setSelectedStatus] = useState(
+    filters.status !== null && filters.status !== undefined && filters.status !== "" ? String(filters.status) : ""
+  );
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -321,9 +323,9 @@ export default function TrashList({ purchases = [], meta = {}, filters = {}, ven
     setCurrentPage(page);
     router.get(
       route("cash_purchases.trash"),
-      { 
-        search, 
-        page, 
+      {
+        search,
+        page,
         per_page: perPage,
         vendor_id: selectedVendor,
         date_range: dateRange,
@@ -337,7 +339,7 @@ export default function TrashList({ purchases = [], meta = {}, filters = {}, ven
   const handleBulkAction = () => {
     if (bulkAction === "delete" && selectedPurchases.length > 0) {
       setShowDeleteAllModal(true);
-    }else if (bulkAction === "restore" && selectedPurchases.length > 0) {
+    } else if (bulkAction === "restore" && selectedPurchases.length > 0) {
       setShowRestoreAllModal(true);
     }
   };
@@ -416,9 +418,9 @@ export default function TrashList({ purchases = [], meta = {}, filters = {}, ven
     // Use the new value directly in the request instead of state
     router.get(
       route("cash_purchases.trash"),
-      { 
-        search, 
-        page: 1, 
+      {
+        search,
+        page: 1,
         per_page: perPage,
         vendor_id: filterType === 'vendor' ? value : selectedVendor,
         date_range: filterType === 'date' ? value : dateRange,
@@ -440,11 +442,11 @@ export default function TrashList({ purchases = [], meta = {}, filters = {}, ven
           />
           <div className="p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-            <   div>
-                    <div className="text-red-500">
-                        Total trashed cash purchases: {meta.total}
-                    </div>
+              <   div>
+                <div className="text-red-500">
+                  Total trashed cash purchases: {meta.total}
                 </div>
+              </div>
               <div className="flex flex-col md:flex-row gap-4 md:items-center">
                 <Input
                   placeholder="Search cash purchases..."
@@ -566,7 +568,7 @@ export default function TrashList({ purchases = [], meta = {}, filters = {}, ven
                           <PurchaseApprovalStatusBadge status={purchase.approval_status} />
                         </TableCell>
                         <TableCell className="text-right">
-                        <TableActions
+                          <TableActions
                             actions={[
                               {
                                 label: "Restore",

@@ -348,7 +348,9 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
   const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
   const [selectedVendor, setSelectedVendor] = useState(filters.vendor_id || "");
   const [dateRange, setDateRange] = useState(filters.date_range || []);
-  const [selectedStatus, setSelectedStatus] = useState(filters.status || "");
+  const [selectedStatus, setSelectedStatus] = useState(
+    filters.status !== null && filters.status !== undefined && filters.status !== "" ? String(filters.status) : ""
+  );
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
@@ -822,7 +824,7 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Bulk actions" />
                   </SelectTrigger>
-                    <SelectContent>
+                  <SelectContent>
                     {approvers.length > 0 && (
                       <SelectItem value="share_email">
                         <span className="flex items-center gap-2">

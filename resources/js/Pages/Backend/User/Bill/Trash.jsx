@@ -222,10 +222,10 @@ export default function TrashList({
     );
     const [dateRange, setDateRange] = useState(filters.date_range || null);
     const [selectedApprovalStatus, setSelectedApprovalStatus] = useState(
-        filters.approval_status || ""
+        filters.approval_status !== null && filters.approval_status !== undefined && filters.approval_status !== "" ? String(filters.approval_status) : ""
     );
     const [selectedBillStatus, setSelectedBillStatus] = useState(
-        filters.status || ""
+        filters.status !== null && filters.status !== undefined && filters.status !== "" ? String(filters.status) : ""
     );
 
     // Delete confirmation modal states
@@ -474,14 +474,14 @@ export default function TrashList({
         setSelectedBillStatus(value);
         router.get(
             route("bill_invoices.index"),
-            { 
-                search, 
-                page: 1, 
+            {
+                search,
+                page: 1,
                 per_page: perPage,
                 vendor_id: selectedVendor,
                 date_range: dateRange,
                 approval_status: selectedApprovalStatus,
-                status: value || null
+                status: value !== "" ? value : null
             },
             { preserveState: true }
         );
@@ -491,13 +491,13 @@ export default function TrashList({
         setSelectedApprovalStatus(value);
         router.get(
             route("bill_invoices.index"),
-            { 
-                search, 
-                page: 1, 
+            {
+                search,
+                page: 1,
                 per_page: perPage,
                 vendor_id: selectedVendor,
                 date_range: dateRange,
-                approval_status: value || null,
+                approval_status: value !== "" ? value : null,
                 status: selectedBillStatus
             },
             { preserveState: true }
@@ -507,7 +507,7 @@ export default function TrashList({
     const handleBulkAction = () => {
         if (bulkAction === "delete" && selectedBills.length > 0) {
             setShowDeleteAllModal(true);
-        }else if (bulkAction === "restore" && selectedBills.length > 0) {
+        } else if (bulkAction === "restore" && selectedBills.length > 0) {
             setShowRestoreAllModal(true);
         }
     };
@@ -534,18 +534,16 @@ export default function TrashList({
         return (
             <span className="inline-flex flex-col ml-1">
                 <ChevronUp
-                    className={`w-3 h-3 ${
-                        isActive && sorting.direction === "asc"
+                    className={`w-3 h-3 ${isActive && sorting.direction === "asc"
                             ? "text-gray-800"
                             : "text-gray-300"
-                    }`}
+                        }`}
                 />
                 <ChevronDown
-                    className={`w-3 h-3 -mt-1 ${
-                        isActive && sorting.direction === "desc"
+                    className={`w-3 h-3 -mt-1 ${isActive && sorting.direction === "desc"
                             ? "text-gray-800"
                             : "text-gray-300"
-                    }`}
+                        }`}
                 />
             </span>
         );
@@ -824,15 +822,15 @@ export default function TrashList({
                                                     {bill.due_date}
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                {bill.grand_total !== bill.converted_total ? (
-                                                    <span>
-                                                    {formatCurrency({ amount: bill.grand_total, currency: bill.business.currency })} ({formatCurrency({ amount: bill.converted_total, currency: bill.currency })})
-                                                    </span>
-                                                ) : (
-                                                    <span>
-                                                    {formatCurrency({ amount: bill.grand_total, currency: bill.business.currency })}
-                                                    </span>
-                                                )}
+                                                    {bill.grand_total !== bill.converted_total ? (
+                                                        <span>
+                                                            {formatCurrency({ amount: bill.grand_total, currency: bill.business.currency })} ({formatCurrency({ amount: bill.converted_total, currency: bill.currency })})
+                                                        </span>
+                                                    ) : (
+                                                        <span>
+                                                            {formatCurrency({ amount: bill.grand_total, currency: bill.business.currency })}
+                                                        </span>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     {formatCurrency({
@@ -840,15 +838,15 @@ export default function TrashList({
                                                     })}
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                {bill.grand_total !== bill.converted_total ? (
-                                                    <span>
-                                                    {formatCurrency({ amount: bill.grand_total - bill.paid, currency: bill.business.currency })} ({formatCurrency({ amount: bill.converted_total - bill.paid, currency: bill.currency })})
-                                                    </span>
-                                                ) : (
-                                                    <span>
-                                                    {formatCurrency({ amount: bill.grand_total - bill.paid, currency: bill.business.currency })}
-                                                    </span>
-                                                )}
+                                                    {bill.grand_total !== bill.converted_total ? (
+                                                        <span>
+                                                            {formatCurrency({ amount: bill.grand_total - bill.paid, currency: bill.business.currency })} ({formatCurrency({ amount: bill.converted_total - bill.paid, currency: bill.currency })})
+                                                        </span>
+                                                    ) : (
+                                                        <span>
+                                                            {formatCurrency({ amount: bill.grand_total - bill.paid, currency: bill.business.currency })}
+                                                        </span>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell>
                                                     <BillApprovalStatusBadge
@@ -863,21 +861,21 @@ export default function TrashList({
                                                     />
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                <TableActions
-                                                    actions={[
-                                                    {
-                                                        label: "Restore",
-                                                        icon: <RotateCcw className="h-4 w-4" />,
-                                                        onClick: () => handleRestoreConfirm(bill.id)
-                                                    },
-                                                    {
-                                                        label: "Permanently Delete",
-                                                        icon: <Trash className="h-4 w-4" />,
-                                                        onClick: () => handleDeleteConfirm(bill.id),
-                                                        destructive: true,
-                                                    },
-                                                    ]}
-                                                />
+                                                    <TableActions
+                                                        actions={[
+                                                            {
+                                                                label: "Restore",
+                                                                icon: <RotateCcw className="h-4 w-4" />,
+                                                                onClick: () => handleRestoreConfirm(bill.id)
+                                                            },
+                                                            {
+                                                                label: "Permanently Delete",
+                                                                icon: <Trash className="h-4 w-4" />,
+                                                                onClick: () => handleDeleteConfirm(bill.id),
+                                                                destructive: true,
+                                                            },
+                                                        ]}
+                                                    />
                                                 </TableCell>
                                             </TableRow>
                                         ))

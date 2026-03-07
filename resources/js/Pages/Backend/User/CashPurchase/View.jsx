@@ -163,31 +163,29 @@ export default function View({ bill, attachments, decimalPlace, approvalUsersCou
         });
     };
 
-    // Get current user's approval status
+    // Current user assignment
     const userApproval = bill.approvals?.find(approval => approval.action_user?.id === usePage().props.auth.user.id);
-    // User can only take approval actions if:
-    // 1. There are configured approvers in the system
-    // 2. AND the user is one of the assigned approvers
-    // 3. AND the purchase is verified (approval_status === 4)
-    const canApprove = hasConfiguredApprovers && userApproval !== undefined && bill.approval_status === 4;
-    const currentStatus = userApproval?.status || null;
-    // Check individual user's approval status:
-    // - status 0 (pending): Show both Approve and Reject buttons
-    // - status 1 (approved): Show only Reject button (to change vote)
-    // - status 2 (rejected): Show only Approve button (to change vote)
-    const hasAlreadyApproved = currentStatus === 1;
-    const hasAlreadyRejected = currentStatus === 2;
-
-    // Get current user's checker status
     const userChecker = bill.checkers?.find(checker => checker.action_user?.id === usePage().props.auth.user.id);
-    // User can only take checker actions if:
-    // 1. There are configured checkers in the system
-    // 2. AND the user is one of the assigned checkers
-    // 3. AND the purchase is pending (approval_status === 0)
-    const canVerify = hasConfiguredCheckers && userChecker !== undefined && bill.approval_status === 0;
-    const currentCheckerStatus = userChecker?.status || null;
-    const hasAlreadyVerified = currentCheckerStatus === 1;
-    const hasAlreadyRejectedVerification = currentCheckerStatus === 2;
+
+    // Purchase workflow states
+    const isPending = bill.approval_status === 0;
+    const isApproved = bill.approval_status === 1;
+    const isRejected = bill.approval_status === 2;
+    const isVerified = bill.approval_status === 4;
+
+    // User can act only if assigned to that role
+    const canApprove = hasConfiguredApprovers && userApproval !== undefined;
+    const canVerify = hasConfiguredCheckers && userChecker !== undefined;
+    const hasAlreadyVerified = userChecker?.status === 1;
+
+    // Expected workflow actions:
+    // Pending -> Verify
+    // Verified -> Approve + Reject
+    // Rejected -> Approve
+    // Approved -> Reject
+    const showVerifyAction = canVerify && isPending && !hasAlreadyVerified;
+    const showApproveAction = canApprove && (isVerified || isRejected);
+    const showRejectAction = canApprove && (isVerified || isApproved);
 
     const handlePrint = () => {
         setIsLoading(prev => ({ ...prev, print: true }));
@@ -338,7 +336,7 @@ export default function View({ bill, attachments, decimalPlace, approvalUsersCou
                                     <ShareIcon className="mr-2 h-4 w-4" />
                                     <span>Share Link</span>
                                 </DropdownMenuItem>
-                                {canVerify && !hasAlreadyVerified && (
+                                {showVerifyAction && (
                                     <DropdownMenuItem onClick={() => handleVerifyAction('verify')}>
                                         <ShieldCheck className="mr-2 h-4 w-4 text-blue-600" />
                                         <span>Verify</span>
@@ -346,13 +344,13 @@ export default function View({ bill, attachments, decimalPlace, approvalUsersCou
                                 )}
                                 {canApprove && (
                                     <>
-                                        {!hasAlreadyApproved && (
+                                        {showApproveAction && (
                                             <DropdownMenuItem onClick={() => handleApprovalAction('approve')}>
                                                 <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
                                                 <span>Approve</span>
                                             </DropdownMenuItem>
                                         )}
-                                        {!hasAlreadyRejected && (
+                                        {showRejectAction && (
                                             <DropdownMenuItem onClick={() => handleApprovalAction('reject')}>
                                                 <XCircle className="mr-2 h-4 w-4 text-red-600" />
                                                 <span>Reject</span>
