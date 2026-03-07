@@ -271,7 +271,7 @@ const PurchaseApprovalStatusBadge = ({ status }) => {
     0: { label: "Pending", className: "gap-1 text-gray-600 border-gray-400" },
     2: { label: "Rejected", className: "gap-1 text-red-600 border-red-600" },
     1: { label: "Approved", className: "gap-1 text-green-600 border-green-600" },
-    4: { label: "Verified", className: "gap-1 text-blue-600 border-blue-600" },
+    4: { label: "Verified", className: "gap-1 text-purple-600 border-purple-600" },
   };
 
   const statusConfig = statusMap[status] || statusMap[0];

@@ -380,7 +380,7 @@ const BillApprovalStatusBadge = ({ status }) => {
         },
         4: {
             label: "Verified",
-            className: "gap-1 text-blue-600 border-blue-600",
+            className: "gap-1 text-purple-600 border-purple-600",
         }
     };
     const statusConfig = statusMap[status] || statusMap[0];

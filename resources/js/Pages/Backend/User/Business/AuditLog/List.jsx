@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Head, Link, router, usePage } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
-import { Checkbox } from "@/Components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -19,14 +18,18 @@ import { useToast } from "@/hooks/use-toast";
 import PageHeader from "@/Components/PageHeader";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/Components/ui/select";
 import { ChevronUp, ChevronDown } from "lucide-react";
+import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
+import DateTimePicker from "@/Components/DateTimePicker";
 
-export default function List({ auditLogs = [], meta = {}, filters = {} }) {
+export default function List({ auditLogs = [], meta = {}, filters = {}, users = [] }) {
   const { flash = {} } = usePage().props;
   const { toast } = useToast();
   const [search, setSearch] = useState(filters.search || "");
-  const [perPage, setPerPage] = useState(meta.per_page || 50);
+  const [perPage, setPerPage] = useState(filters.per_page || meta.per_page || 50);
   const [currentPage, setCurrentPage] = useState(meta.current_page || 1);
   const [sorting, setSorting] = useState(filters.sorting || { column: "date_changed", direction: "desc" });
+  const [selectedUser, setSelectedUser] = useState(filters.changed_by || "");
+  const [dateRange, setDateRange] = useState(filters.date_range || null);
 
   useEffect(() => {
     if (flash && flash.success) {
@@ -45,23 +48,39 @@ export default function List({ auditLogs = [], meta = {}, filters = {} }) {
     }
   }, [flash, toast]);
 
+  useEffect(() => {
+    setCurrentPage(meta.current_page || 1);
+  }, [meta.current_page]);
+
+  const getQueryParams = (overrides = {}) => ({
+    search,
+    page: currentPage,
+    per_page: perPage,
+    sorting,
+    changed_by: selectedUser,
+    date_range: dateRange,
+    ...overrides,
+  });
+
   const handleSearch = (e) => {
-    e.preventDefault();
     const value = e.target.value;
     setSearch(value);
+    setCurrentPage(1);
 
     router.get(
       route("audit_logs.index"),
-      { search: value, page: 1, per_page: perPage, sorting },
+      getQueryParams({ search: value, page: 1 }),
       { preserveState: true }
     );
   };
 
   const handlePerPageChange = (value) => {
-    setPerPage(value);
+    const nextPerPage = parseInt(value, 10);
+    setPerPage(nextPerPage);
+    setCurrentPage(1);
     router.get(
       route("audit_logs.index"),
-      { search, page: 1, per_page: value, sorting },
+      getQueryParams({ per_page: nextPerPage, page: 1 }),
       { preserveState: true }
     );
   };
@@ -70,7 +89,7 @@ export default function List({ auditLogs = [], meta = {}, filters = {} }) {
     setCurrentPage(page);
     router.get(
       route("audit_logs.index"),
-      { search, page, per_page: perPage, sorting },
+      getQueryParams({ page }),
       { preserveState: true }
     );
   };
@@ -80,10 +99,32 @@ export default function List({ auditLogs = [], meta = {}, filters = {} }) {
     if (sorting.column === column && sorting.direction === "asc") {
       direction = "desc";
     }
-    setSorting({ column, direction });
+    const nextSorting = { column, direction };
+    setSorting(nextSorting);
+    setCurrentPage(1);
     router.get(
       route("audit_logs.index"),
-      { ...filters, sorting: { column, direction } },
+      getQueryParams({ sorting: nextSorting, page: 1 }),
+      { preserveState: true }
+    );
+  };
+
+  const handleUserChange = (value) => {
+    setSelectedUser(value);
+    setCurrentPage(1);
+    router.get(
+      route("audit_logs.index"),
+      getQueryParams({ changed_by: value, page: 1 }),
+      { preserveState: true }
+    );
+  };
+
+  const handleDateRangeChange = (dates) => {
+    setDateRange(dates);
+    setCurrentPage(1);
+    router.get(
+      route("audit_logs.index"),
+      getQueryParams({ date_range: dates, page: 1 }),
       { preserveState: true }
     );
   };
@@ -103,7 +144,7 @@ export default function List({ auditLogs = [], meta = {}, filters = {} }) {
   };
 
   const renderPageNumbers = () => {
-    const totalPages = meta.last_page;
+    const totalPages = meta.last_page || 1;
     const pages = [];
     const maxPagesToShow = 5;
 
@@ -156,6 +197,27 @@ export default function List({ auditLogs = [], meta = {}, filters = {} }) {
             </div>
 
             <div className="mb-4 flex flex-col md:flex-row gap-4 justify-between">
+              <div className="flex flex-col md:flex-row gap-4">
+                <SearchableCombobox
+                  options={users.map((user) => ({
+                    id: user.id,
+                    name: `${user.name} (${user.email})`,
+                  }))}
+                  value={selectedUser}
+                  onChange={handleUserChange}
+                  placeholder="Filter by user"
+                  className="w-full md:w-[280px]"
+                />
+
+                <DateTimePicker
+                  value={dateRange}
+                  onChange={handleDateRangeChange}
+                  isRange={true}
+                  className="w-full md:w-[280px]"
+                  placeholder="Select date range"
+                />
+              </div>
+
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Show</span>
                 <Select value={perPage.toString()} onValueChange={handlePerPageChange}>
@@ -193,7 +255,11 @@ export default function List({ auditLogs = [], meta = {}, filters = {} }) {
                     auditLogs.map((auditLog) => (
                       <TableRow key={auditLog.id}>
                         <TableCell>{auditLog.date_changed}</TableCell>
-                        <TableCell>{auditLog.changed_user.name} - {auditLog.changed_user.email}</TableCell>
+                        <TableCell>
+                          {auditLog.changed_user
+                            ? `${auditLog.changed_user.name} - ${auditLog.changed_user.email}`
+                            : "N/A"}
+                        </TableCell>
                         <TableCell>{auditLog.event}</TableCell>
                       </TableRow>
                     ))

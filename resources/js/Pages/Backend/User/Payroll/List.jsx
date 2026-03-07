@@ -952,7 +952,7 @@ export default function List({
         const statusMap = {
             0: { label: "Draft", className: "gap-1 text-gray-600 border-gray-400" },
             1: { label: "Approved", className: "gap-1 text-blue-600 border-blue-600" },
-            2: { label: "Accrued", className: "gap-1 text-green-600 border-green-600" },
+            2: { label: "Accrued", className: "gap-1 text-purple-600 border-purple-600" },
             3: { label: "Partially Paid", className: "gap-1 text-yellow-600 border-yellow-600" },
             4: { label: "Paid", className: "gap-1 text-green-600 border-green-600" },
         };
