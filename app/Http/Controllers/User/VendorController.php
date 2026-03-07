@@ -630,9 +630,15 @@ class VendorController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function export_vendors($type)
+    public function export_vendors(Request $request)
     {
         Gate::authorize('vendors.csv.export');
+        $type = strtolower((string) $request->query('type', 'xlsx'));
+
+        if (!in_array($type, ['xlsx', 'xls', 'csv'])) {
+            $type = 'xlsx';
+        }
+
         $filename = date('Y-m-d') . '_vendors.' . $type;
 
         // audit log
