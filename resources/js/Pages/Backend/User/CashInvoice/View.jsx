@@ -244,6 +244,7 @@ export default function View({ receipt, attachments, decimalPlace }) {
                                             <p>Bank Name: <strong>{bank.bank_name}</strong></p>
                                             <p>Account Number: <strong>{bank.account_number}</strong></p>
                                             <p>Account Name: <strong>{bank.account_name}</strong></p>
+                                            <p>Swift Code: <strong>{bank.swift_code}</strong></p>
                                         </div>
                                     ))}
                                 </div>
