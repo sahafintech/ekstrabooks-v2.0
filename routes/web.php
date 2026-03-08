@@ -523,6 +523,10 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('bill_invoices/bulk_restore', [PurchaseController::class, 'bulk_restore'])->name('bill_invoices.bulk_restore');
 		Route::post('bill_invoices/bulk_permanent_destroy', [PurchaseController::class, 'bulk_permanent_destroy'])->name('bill_invoices.bulk_permanent_destroy');
 		Route::delete('bill_invoices/{id}/permanent_destroy', [PurchaseController::class, 'permanent_destroy'])->name('bill_invoices.permanent_destroy');
+		Route::get('bill_invoices/import', [PurchaseController::class, 'import'])->name('bill_invoices.import.page');
+		Route::match(['get', 'post'], 'bill_invoices/import/upload', [PurchaseController::class, 'uploadImportFile'])->name('bill_invoices.import.upload');
+		Route::match(['get', 'post'], 'bill_invoices/import/preview', [PurchaseController::class, 'previewImport'])->name('bill_invoices.import.preview');
+		Route::match(['get', 'post'], 'bill_invoices/import/execute', [PurchaseController::class, 'executeImport'])->name('bill_invoices.import.execute');
 		Route::resource('bill_invoices', PurchaseController::class);
 		Route::post('import_bills', [PurchaseController::class, 'import_bills'])->name('bill_invoices.import');
 		Route::post('bill_invoices/filter', [PurchaseController::class, 'bill_invoices_filter'])->name('bill_invoices.filter');
@@ -533,6 +537,10 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('bill_payments/bulk_restore', [BillPaymentsController::class, 'bulk_restore'])->name('bill_payments.bulk_restore');
 		Route::post('bill_payments/bulk_permanent_destroy', [BillPaymentsController::class, 'bulk_permanent_destroy'])->name('bill_payments.bulk_permanent_destroy');
 		Route::delete('bill_payments/{id}/permanent_destroy', [BillPaymentsController::class, 'permanent_destroy'])->name('bill_payments.permanent_destroy');
+		Route::get('bill_payments/import', [BillPaymentsController::class, 'import'])->name('bill_payments.import.page');
+		Route::match(['get', 'post'], 'bill_payments/import/upload', [BillPaymentsController::class, 'uploadImportFile'])->name('bill_payments.import.upload');
+		Route::match(['get', 'post'], 'bill_payments/import/preview', [BillPaymentsController::class, 'previewImport'])->name('bill_payments.import.preview');
+		Route::match(['get', 'post'], 'bill_payments/import/execute', [BillPaymentsController::class, 'executeImport'])->name('bill_payments.import.execute');
 		Route::resource('bill_payments', BillPaymentsController::class);
 		Route::post('bill_payments/bulk_destroy', [BillPaymentsController::class, 'bulk_destroy'])->name('bill_payments.bulk_destroy');
 		Route::get('bill_payments/{id}/pdf', [BillPaymentsController::class, 'pdf'])->name('bill_payments.pdf');
