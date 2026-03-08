@@ -405,6 +405,16 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
   };
 
   const buildEmailBody = (recipientId) => {
+    const origin = (
+      (typeof window !== "undefined" ? window.location.origin : "") ||
+      appUrl ||
+      ""
+    ).replace(/\/$/, "");
+    const makeAbsoluteUrl = (path) => {
+      const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+      return origin ? `${origin}${normalizedPath}` : normalizedPath;
+    };
+
     const recipient = approvers.find((u) => u.id.toString() === (recipientId || "").toString());
     const companyName = purchases[0]?.business?.business_name || purchases[0]?.business?.name || "";
     const selected = purchases.filter((p) => selectedPurchases.includes(p.id));
@@ -421,7 +431,7 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
     const rows = selected
       .map((p) => {
         let row = rowTemplate;
-        row = row.replace(/{{purchaseUrl}}/g, route("cash_purchases.show", p.id, true));
+        row = row.replace(/{{purchaseUrl}}/g, makeAbsoluteUrl(`/user/cash_purchases/${p.id}`));
         row = row.replace(/{{purchaseNumber}}/g, p.bill_no);
         row = row.replace(/{{supplier}}/g, p.vendor?.name || "-");
         row = row.replace(/{{purchaseDate}}/g, p.purchase_date);

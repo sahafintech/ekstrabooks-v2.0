@@ -555,6 +555,16 @@ export default function List({
     };
 
     const buildEmailBody = (recipientId) => {
+        const origin = (
+            (typeof window !== "undefined" ? window.location.origin : "") ||
+            appUrl ||
+            ""
+        ).replace(/\/$/, "");
+        const makeAbsoluteUrl = (path) => {
+            const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+            return origin ? `${origin}${normalizedPath}` : normalizedPath;
+        };
+
         const recipient = approvers.find(
             (u) => u.id.toString() === (recipientId || "").toString()
         );
@@ -575,7 +585,7 @@ export default function List({
         const rows = selected
             .map((b) => {
                 let row = rowTemplate;
-                row = row.replace(/{{purchaseUrl}}/g, route("bill_invoices.show", b.id, true));
+                row = row.replace(/{{purchaseUrl}}/g, makeAbsoluteUrl(`/user/bill_invoices/${b.id}`));
                 row = row.replace(/{{purchaseNumber}}/g, b.bill_no);
                 row = row.replace(/{{supplier}}/g, b.vendor?.name || "-");
                 row = row.replace(/{{purchaseDate}}/g, b.purchase_date);
