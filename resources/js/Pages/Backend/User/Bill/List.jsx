@@ -363,7 +363,37 @@ const ShareSelectedModal = ({
     </Modal>
 );
 
-const DEFAULT_BILL_TEMPLATE = `<div style="font-family: Arial, sans-serif; font-size: 14px; color: #333333;"><h2 style="color: #333333;">Purchase Approval Required</h2><p>Dear {{approverName}},</p><p>We hope this email finds you well. The following purchase requests have been submitted and are awaiting your review and approval.</p><p>Please review the details below and take the necessary action at your earliest convenience.</p><table style="border-collapse: collapse; width: 100%; margin-top: 15px;"><thead><tr style="background-color: #f2f2f2;"><th style="border: 1px solid #dddddd; padding: 8px; text-align: left;">Purchase No</th><th style="border: 1px solid #dddddd; padding: 8px; text-align: left;">Supplier</th><th style="border: 1px solid #dddddd; padding: 8px; text-align: left;">Purchase Date</th><th style="border: 1px solid #dddddd; padding: 8px; text-align: right;">Total Amount</th><th style="border: 1px solid #dddddd; padding: 8px; text-align: left;">Status</th></tr></thead><tbody>{{#each purchases}}<tr><td style="border: 1px solid #dddddd; padding: 8px;"><a href="{{purchaseUrl}}" style="color:#1a73e8; text-decoration:none;">{{purchaseNumber}}</a></td><td style="border: 1px solid #dddddd; padding: 8px;">{{supplier}}</td><td style="border: 1px solid #dddddd; padding: 8px;">{{purchaseDate}}</td><td style="border: 1px solid #dddddd; padding: 8px; text-align: right;">{{totalAmount}}</td><td style="border: 1px solid #dddddd; padding: 8px;">{{status}}</td></tr>{{/each}}</tbody></table><p style="margin-top: 15px;">Status values may include <strong>Pending</strong>, <strong>Approved</strong>, or <strong>Verified</strong>.</p><p>If you have already reviewed these purchases, please disregard this email. Otherwise, we kindly request you to complete the approval process to avoid any delays.</p><p>If you have any questions or require further information, please do not hesitate to contact us.</p><p>Thank you for your time and cooperation.</p><p>Best regards,<br />{{companyName}}</p></div>`;
+const DEFAULT_BILL_TEMPLATE = `
+<div style="font-family: Arial, sans-serif; font-size: 14px; color: #333333;">
+    <h2 style="color: #333333;">Purchase Approval Required</h2>
+    <p>Dear {{approverName}},</p>
+    <p>Please review the following purchases and take action.</p>
+    <table style="border-collapse: collapse; width: 100%; margin-top: 12px;">
+        <thead>
+            <tr style="background-color: #f2f2f2;">
+                <th style="border: 1px solid #dddddd; padding: 8px; text-align: left;">Purchase No</th>
+                <th style="border: 1px solid #dddddd; padding: 8px; text-align: left;">Supplier</th>
+                <th style="border: 1px solid #dddddd; padding: 8px; text-align: left;">Purchase Date</th>
+                <th style="border: 1px solid #dddddd; padding: 8px; text-align: right;">Total Amount</th>
+                <th style="border: 1px solid #dddddd; padding: 8px; text-align: left;">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#each purchases}}
+            <tr>
+                <td style="border: 1px solid #dddddd; padding: 8px;">
+                    <a href="{{purchaseUrl}}" style="color: #1a73e8; text-decoration: none;">{{purchaseNumber}}</a>
+                </td>
+                <td style="border: 1px solid #dddddd; padding: 8px;">{{supplier}}</td>
+                <td style="border: 1px solid #dddddd; padding: 8px;">{{purchaseDate}}</td>
+                <td style="border: 1px solid #dddddd; padding: 8px; text-align: right;">{{totalAmount}}</td>
+                <td style="border: 1px solid #dddddd; padding: 8px;">{{status}}</td>
+            </tr>
+            {{/each}}
+        </tbody>
+    </table>
+    <p style="margin-top: 12px;">Best regards,<br />{{companyName}}</p>
+</div>`;
 const BillApprovalStatusBadge = ({ status }) => {
     const statusMap = {
         0: {
@@ -525,7 +555,11 @@ export default function List({
     };
 
     const buildEmailBody = (recipientId) => {
-        const baseUrl = appUrl || (typeof window !== "undefined" ? window.location.origin : "");
+        const baseUrl = (
+            (typeof window !== "undefined" ? window.location.origin : "") ||
+            appUrl ||
+            ""
+        ).replace(/\/$/, "");
         const recipient = approvers.find(
             (u) => u.id.toString() === (recipientId || "").toString()
         );
