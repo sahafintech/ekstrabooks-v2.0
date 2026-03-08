@@ -2585,6 +2585,7 @@ class CashPurchaseController extends Controller
 		$customMessage = [
 			'subject' => $request->subject,
 			'message' => $request->message,
+			'origin' => rtrim($request->getSchemeAndHttpHost(), '/'),
 		];
 
 		$purchase = Purchase::find($id);
@@ -2639,6 +2640,7 @@ class CashPurchaseController extends Controller
 		$customMessage = [
 			'subject' => $request->subject,
 			'message' => $request->message,
+			'origin' => rtrim($request->getSchemeAndHttpHost(), '/'),
 		];
 
 		try {
