@@ -76,8 +76,8 @@ export default function Create({ vendors = [], products = [], currencies = [], t
     setData("product_id", purchaseItems.map(i => i.product_id));
     setData("product_name", purchaseItems.map(i => i.product_name)
       .concat(purchaseAccounts.map(a => a.product_name || "")));
-    setData("account_id", purchaseAccounts.map(a => a.account_id)
-      .concat(purchaseItems.map(a => a.account_id || "")));
+    setData("account_id", purchaseItems.map(a => a.account_id || "")
+      .concat(purchaseAccounts.map(a => a.account_id)));
     setData("description", purchaseItems.map(i => i.description)
       .concat(purchaseAccounts.map(a => a.description || "")));
     setData("quantity", purchaseItems.map(i => i.quantity)
@@ -406,28 +406,45 @@ export default function Create({ vendors = [], products = [], currencies = [], t
       return;
     }
 
-    // Create a new data object with all the required fields
+    const allLines = [
+      ...purchaseItems.map(item => ({
+        product_id: item.product_id || null,
+        product_name: item.product_name || "",
+        description: item.description || "",
+        quantity: Number(item.quantity) || 0,
+        unit_cost: Number(item.unit_cost) || 0,
+        account_id: item.account_id || inventory.id || "",
+        project_id: item.project_id ?? null,
+        project_task_id: item.project_task_id ?? null,
+        cost_code_id: item.cost_code_id ?? null,
+      })),
+      ...purchaseAccounts.map(account => ({
+        product_id: null,
+        product_name: account.product_name || "",
+        description: account.description || "",
+        quantity: Number(account.quantity) || 0,
+        unit_cost: Number(account.unit_cost) || 0,
+        account_id: account.account_id || "",
+        project_id: account.project_id ?? null,
+        project_task_id: account.project_task_id ?? null,
+        cost_code_id: account.cost_code_id ?? null,
+      }))
+    ];
+
+    // Create a new data object with aligned line arrays
     const formData = {
       ...data,
       currency: selectedCurrency.name,
       exchange_rate: exchangeRate,
-      product_id: purchaseItems.map(item => item.product_id),
-      product_name: purchaseItems.map(item => item.product_name),
-      description: purchaseItems.map(item => item.description).concat(
-        purchaseAccounts.map(account => account.description || "")
-      ),
-      quantity: purchaseItems.map(item => item.quantity).concat(
-        purchaseAccounts.map(account => account.quantity || 1)
-      ),
-      unit_cost: purchaseItems.map(item => item.unit_cost),
-      account_id: [
-        ...purchaseItems.map(item => item.account_id || "Inventory"),
-        ...purchaseAccounts.map(account => account.account_id)
-      ],
-      unit_cost: [
-        ...purchaseItems.map(item => item.unit_cost * item.quantity),
-        ...purchaseAccounts.map(account => account.unit_cost)
-      ]
+      product_id: allLines.map(line => line.product_id),
+      product_name: allLines.map(line => line.product_name),
+      description: allLines.map(line => line.description),
+      quantity: allLines.map(line => line.quantity),
+      unit_cost: allLines.map(line => line.unit_cost),
+      account_id: allLines.map(line => line.account_id),
+      project_id: allLines.map(line => line.project_id),
+      project_task_id: allLines.map(line => line.project_task_id),
+      cost_code_id: allLines.map(line => line.cost_code_id),
     };
 
     // Log the data being sent to help debug

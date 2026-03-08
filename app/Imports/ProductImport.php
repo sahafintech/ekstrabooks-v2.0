@@ -18,6 +18,7 @@ use Maatwebsite\Excel\Concerns\SkipsOnFailure;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithBatchInserts;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
 
 final class ProductImport implements SkipsOnFailure, ToModel, WithBatchInserts, WithChunkReading, WithHeadingRow
 {
@@ -170,7 +171,7 @@ final class ProductImport implements SkipsOnFailure, ToModel, WithBatchInserts, 
         if (!empty($data['expiry_date'])) {
             try {
                 if (is_numeric($data['expiry_date'])) {
-                    $expiryDate = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($data['expiry_date']);
+                    $expiryDate = Date::excelToDateTimeObject($data['expiry_date']);
                 } else {
                     $expiryDate = Carbon::parse($data['expiry_date']);
                 }

@@ -382,6 +382,10 @@ export default function View({ payment, decimalPlace, attachments }) {
                                         <span className="font-medium">Total Paid:</span>
                                         <span>{formatCurrency(payment.amount, payment.business.currency, decimalPlace)}</span>
                                     </div>
+                                    <div className="flex justify-between py-2 border-t">
+                                        <span className="font-medium">Total Due:</span>
+                                        <span>{formatCurrency(payment.purchases.reduce((sum, purchase) => sum + (purchase.grand_total - purchase.paid), 0), payment.business.currency, decimalPlace)}</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>

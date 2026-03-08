@@ -1038,14 +1038,11 @@ export default function List({
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                        <DropdownMenuItem
-                                            onClick={() =>
-                                                setShowImportModal(true)
-                                            }
-                                        >
-                                            <FileUp className="mr-2 h-4 w-4" />{" "}
-                                            Import
-                                        </DropdownMenuItem>
+                                        <Link href={route("bill_invoices.import.page")}>
+                                            <DropdownMenuItem>
+                                                <FileUp className="mr-2 h-4 w-4" /> Import
+                                            </DropdownMenuItem>
+                                        </Link>
                                         <DropdownMenuItem
                                             onClick={handleExport}
                                         >

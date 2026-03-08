@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace App\Imports;
 
 use App\Models\Account;
+use App\Models\Approvals;
 use App\Models\BusinessSetting;
+use App\Models\PendingTransaction;
 use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
-use App\Models\Transaction;
+use App\Models\PurchaseItemTax;
+use App\Models\Tax;
+use App\Models\User;
 use App\Models\Vendor;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -149,6 +153,7 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
 
         // Calculate totals from items
         $subTotal = 0;
+        $totalTax = 0;
         $itemsData = [];
         $inventoryAccount = get_account('Inventory');
 
@@ -159,6 +164,8 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             $subTotal += $lineTotal;
             $isInventory = $this->parseIsInventoryValue($itemData['is_inventory'] ?? 1);
             $productName = trim((string) ($itemData['product_name'] ?? ''));
+            $itemTaxes = [];
+            $itemTaxTotal = 0;
 
             // Find product
             $product = null;
@@ -186,6 +193,25 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
                 throw new \RuntimeException('Unable to resolve an account for imported purchase item "' . ($productName !== '' ? $productName : 'N/A') . '".');
             }
 
+            foreach ($this->parseTaxNames($itemData['tax'] ?? null) as $taxName) {
+                $tax = Tax::where('name', 'like', '%' . $taxName . '%')->first();
+
+                if (!$tax) {
+                    throw new \RuntimeException('Tax "' . $taxName . '" was not found in Tax Database.');
+                }
+
+                $taxAmount = ($lineTotal / 100) * $tax->rate;
+                $itemTaxTotal += $taxAmount;
+
+                $itemTaxes[] = [
+                    'tax_id' => $tax->id,
+                    'name' => $tax->name . ' ' . $tax->rate . ' %',
+                    'amount' => $taxAmount,
+                ];
+            }
+
+            $totalTax += $itemTaxTotal;
+
             $itemsData[] = [
                 'product' => $product,
                 'product_id' => $isInventory === 1 ? ($product->id ?? null) : null,
@@ -196,6 +222,8 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
                 'unit_cost' => $unitCost,
                 'sub_total' => $lineTotal,
                 'account_id' => $itemAccountId,
+                'item_taxes' => $itemTaxes,
+                'tax_total' => $itemTaxTotal,
             ];
         }
 
@@ -212,7 +240,7 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             $discountAmount = $discountValue;
         }
 
-        $grandTotal = $subTotal - $discountAmount;
+        $grandTotal = ($subTotal + $totalTax) - $discountAmount;
         $exchangeRate = floatval($header['exchange_rate'] ?? 1);
         $currency = trim((string) ($header['currency'] ?? request()->activeBusiness->currency));
 
@@ -247,21 +275,19 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
         $purchase->note = trim((string) ($header['note'] ?? ''));
         $purchase->footer = get_business_option('purchase_footer');
 
-        // Set approval status
-        if (has_permission('cash_purchases.bulk_approve') || request()->isOwner) {
-            $purchase->approval_status = 1;
-            $purchase->approved_by = auth()->user()->id;
-        } else {
-            $purchase->approval_status = 0;
-            $purchase->approved_by = null;
-        }
-
+        // All imported cash purchases begin in pending state and move to transactions after approval.
+        $purchase->approval_status = 0;
+        $purchase->checker_status = 0;
+        $purchase->approved_by = null;
+        $purchase->checked_by = null;
         $purchase->created_by = auth()->user()->id;
         $purchase->benificiary = trim((string) ($header['beneficiary'] ?? ''));
         $purchase->short_code = rand(100000, 9999999) . uniqid();
         $purchase->status = 2;
 
         $purchase->save();
+        $this->createPurchaseApprovalRecords($purchase);
+        $this->createPurchaseCheckerRecords($purchase);
 
         // Create purchase items
         foreach ($itemsData as $item) {
@@ -277,6 +303,15 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             ]);
             $purchase->items()->save($purchaseItem);
 
+            foreach ($item['item_taxes'] as $itemTax) {
+                $purchaseItem->taxes()->save(new PurchaseItemTax([
+                    'purchase_id' => $purchase->id,
+                    'tax_id' => $itemTax['tax_id'],
+                    'name' => $itemTax['name'],
+                    'amount' => $itemTax['amount'],
+                ]));
+            }
+
             // Update stock only for inventory rows.
             if (
                 $item['is_inventory'] === 1 &&
@@ -289,16 +324,13 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             }
         }
 
-        // Create transactions if approved
-        if ($purchase->approval_status == 1) {
-            $this->createTransactions($purchase, $paymentAccount);
-        }
+        $this->createPendingTransactions($purchase, $paymentAccount);
     }
 
     /**
-     * Create accounting transactions for the purchase
+     * Create accounting transactions in pending_transactions for the purchase.
      */
-    private function createTransactions(Purchase $purchase, ?Account $paymentAccount): void
+    private function createPendingTransactions(Purchase $purchase, ?Account $paymentAccount): void
     {
         $currentTime = Carbon::now();
         $currency = $purchase->currency;
@@ -314,14 +346,17 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             return;
         }
 
-        $transDate = Carbon::parse($purchase->purchase_date)
+        $transactionDate = $purchase->getRawOriginal('purchase_date') ?: $purchase->purchase_date;
+        $transDate = Carbon::parse($transactionDate)
             ->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)
             ->format('Y-m-d H:i:s');
+        $purchase->load('items.taxes');
+        $taxCache = [];
 
         // Debit the expense accounts (one per item)
         foreach ($purchase->items as $item) {
             if ($item->account_id && $item->sub_total > 0) {
-                $transaction = new Transaction();
+                $transaction = new PendingTransaction();
                 $transaction->trans_date = $transDate;
                 $transaction->account_id = $item->account_id;
                 $transaction->dr_cr = 'dr';
@@ -335,10 +370,40 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
                 $transaction->vendor_id = $purchase->vendor_id;
                 $transaction->save();
             }
+
+            foreach ($item->taxes as $itemTax) {
+                if ($itemTax->amount <= 0 || !$itemTax->tax_id) {
+                    continue;
+                }
+
+                if (!array_key_exists((int) $itemTax->tax_id, $taxCache)) {
+                    $taxCache[(int) $itemTax->tax_id] = Tax::find($itemTax->tax_id);
+                }
+
+                $tax = $taxCache[(int) $itemTax->tax_id];
+                if (!$tax || !$tax->account_id) {
+                    continue;
+                }
+
+                $taxTransaction = new PendingTransaction();
+                $taxTransaction->trans_date = $transDate;
+                $taxTransaction->account_id = $tax->account_id;
+                $taxTransaction->dr_cr = 'dr';
+                $taxTransaction->transaction_currency = $currency;
+                $taxTransaction->currency_rate = $exchangeRate;
+                $taxTransaction->base_currency_amount = $itemTax->amount;
+                $taxTransaction->transaction_amount = $itemTax->amount * $exchangeRate;
+                $taxTransaction->description = 'Cash Purchase Tax #' . $purchase->bill_no;
+                $taxTransaction->ref_id = $purchase->id;
+                $taxTransaction->ref_type = 'cash purchase tax';
+                $taxTransaction->tax_id = $itemTax->tax_id;
+                $taxTransaction->vendor_id = $purchase->vendor_id;
+                $taxTransaction->save();
+            }
         }
 
         // Credit the payment account
-        $transaction = new Transaction();
+        $transaction = new PendingTransaction();
         $transaction->trans_date = $transDate;
         $transaction->account_id = $paymentAccount->id;
         $transaction->dr_cr = 'cr';
@@ -356,7 +421,7 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
         if ($purchase->discount > 0) {
             $discountAccount = get_account('Purchase Discount Allowed');
             if ($discountAccount) {
-                $transaction = new Transaction();
+                $transaction = new PendingTransaction();
                 $transaction->trans_date = $transDate;
                 $transaction->account_id = $discountAccount->id;
                 $transaction->dr_cr = 'cr';
@@ -369,6 +434,72 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
                 $transaction->ref_type = 'cash purchase';
                 $transaction->vendor_id = $purchase->vendor_id;
                 $transaction->save();
+            }
+        }
+    }
+
+    private function createPurchaseApprovalRecords(Purchase $purchase): void
+    {
+        $purchaseApprovalUsersJson = get_business_option('purchase_approval_users', '[]');
+        $configuredUserIds = json_decode($purchaseApprovalUsersJson, true);
+
+        if (!is_array($configuredUserIds) || empty($configuredUserIds)) {
+            return;
+        }
+
+        $validUserIds = User::whereIn('id', $configuredUserIds)->pluck('id')->toArray();
+        if (empty($validUserIds)) {
+            return;
+        }
+
+        foreach ($validUserIds as $userId) {
+            $exists = Approvals::where('ref_id', $purchase->id)
+                ->where('ref_name', 'purchase')
+                ->where('checker_type', 'approval')
+                ->where('action_user', $userId)
+                ->exists();
+
+            if (!$exists) {
+                Approvals::create([
+                    'ref_id' => $purchase->id,
+                    'ref_name' => 'purchase',
+                    'checker_type' => 'approval',
+                    'action_user' => $userId,
+                    'status' => 0,
+                ]);
+            }
+        }
+    }
+
+    private function createPurchaseCheckerRecords(Purchase $purchase): void
+    {
+        $purchaseCheckerUsersJson = get_business_option('purchase_checker_users', '[]');
+        $configuredUserIds = json_decode($purchaseCheckerUsersJson, true);
+
+        if (!is_array($configuredUserIds) || empty($configuredUserIds)) {
+            return;
+        }
+
+        $validUserIds = User::whereIn('id', $configuredUserIds)->pluck('id')->toArray();
+        if (empty($validUserIds)) {
+            return;
+        }
+
+        foreach ($validUserIds as $userId) {
+            $exists = Approvals::where('ref_id', $purchase->id)
+                ->where('ref_name', 'purchase')
+                ->where('checker_type', 'checker')
+                ->where('action_user', $userId)
+                ->exists();
+
+            if (!$exists) {
+                Approvals::create([
+                    'ref_id' => $purchase->id,
+                    'ref_name' => 'purchase',
+                    'checker_type' => 'checker',
+                    'action_user' => $userId,
+                    'status' => 0,
+                ]);
             }
         }
     }
@@ -409,6 +540,32 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
     }
 
     /**
+     * Parse tax names from cell value. Supports comma/semicolon separated names.
+     */
+    private function parseTaxNames($value): array
+    {
+        if ($value === null) {
+            return [];
+        }
+
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return [];
+        }
+
+        $parts = preg_split('/[;,]/', $raw) ?: [];
+        $names = [];
+        foreach ($parts as $part) {
+            $name = trim((string) $part);
+            if ($name !== '') {
+                $names[] = $name;
+            }
+        }
+
+        return array_values(array_unique($names));
+    }
+
+    /**
      * Parse date from various formats
      */
     private function parseDate($date): string
@@ -426,9 +583,37 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             }
         }
 
-        // Try to parse as date string
+        $rawDate = trim((string) $date);
+
+        // Excel text dates like 08/03/2026 should be treated as dd/mm/yyyy.
+        if (preg_match('/^\d{1,2}\/\d{1,2}\/\d{4}$/', $rawDate) === 1) {
+            try {
+                return Carbon::createFromFormat('d/m/Y', $rawDate)->format('Y-m-d');
+            } catch (\Exception $e) {
+                // Fall through to other parsers.
+            }
+        }
+
+        if (preg_match('/^\d{1,2}-\d{1,2}-\d{4}$/', $rawDate) === 1) {
+            try {
+                return Carbon::createFromFormat('d-m-Y', $rawDate)->format('Y-m-d');
+            } catch (\Exception $e) {
+                // Fall through to other parsers.
+            }
+        }
+
+        // Try a few explicit formats before generic parsing.
+        foreach (['Y-m-d', 'Y/m/d', 'm/d/Y', 'm-d-Y', 'n/j/Y', 'n-j-Y'] as $format) {
+            try {
+                return Carbon::createFromFormat($format, $rawDate)->format('Y-m-d');
+            } catch (\Exception $e) {
+                // Continue trying formats.
+            }
+        }
+
+        // Final fallback
         try {
-            return Carbon::parse($date)->format('Y-m-d');
+            return Carbon::parse($rawDate)->format('Y-m-d');
         } catch (\Exception $e) {
             return now()->format('Y-m-d');
         }

@@ -2142,6 +2142,376 @@ class PurchaseController extends Controller
 		return back()->with('success', _lang('Email has been sent'));
 	}
 
+	/**
+	 * Show the bill import page.
+	 */
+	public function import()
+	{
+		Gate::authorize('bill_invoices.csv.import');
+
+		return Inertia::render('Backend/User/Bill/Import');
+	}
+
+	/**
+	 * Handle bill import file upload and return headers for mapping.
+	 */
+	public function uploadImportFile(Request $request)
+	{
+		Gate::authorize('bill_invoices.csv.import');
+
+		if ($request->isMethod('get')) {
+			return redirect()->route('bill_invoices.import.page');
+		}
+
+		$request->validate([
+			'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
+		]);
+
+		try {
+			$sessionId = session()->getId();
+			$tempDir = storage_path("app/imports/temp/{$sessionId}");
+
+			if (!is_dir($tempDir)) {
+				mkdir($tempDir, 0755, true);
+			}
+
+			$fileName = uniqid() . '_' . $request->file('file')->getClientOriginalName();
+			$fullPath = $tempDir . '/' . $fileName;
+
+			$request->file('file')->move($tempDir, $fileName);
+
+			if (!file_exists($fullPath)) {
+				throw new \Exception('Failed to store uploaded file');
+			}
+
+			$relativePath = "imports/temp/{$sessionId}/{$fileName}";
+
+			$spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+			$worksheet = $spreadsheet->getActiveSheet();
+			$headers = [];
+
+			foreach ($worksheet->getRowIterator(1, 1) as $row) {
+				$cellIterator = $row->getCellIterator();
+				$cellIterator->setIterateOnlyExistingCells(false);
+
+				foreach ($cellIterator as $cell) {
+					$value = $cell->getValue();
+					if ($value) {
+						$headers[] = (string) $value;
+					}
+				}
+			}
+
+			session()->put('bill_import_file_path', $relativePath);
+			session()->put('bill_import_full_path', $fullPath);
+			session()->put('bill_import_file_name', $request->file('file')->getClientOriginalName());
+			session()->put('bill_import_headers', $headers);
+			session()->save();
+
+			return Inertia::render('Backend/User/Bill/Import', [
+				'previewData' => [
+					'headers' => $headers,
+				],
+			]);
+		} catch (\Exception $e) {
+			return back()->with('error', 'Failed to process file: ' . $e->getMessage());
+		}
+	}
+
+	/**
+	 * Preview bill import data with validation.
+	 */
+	public function previewImport(Request $request)
+	{
+		Gate::authorize('bill_invoices.csv.import');
+
+		if ($request->isMethod('get')) {
+			return redirect()->route('bill_invoices.import.page');
+		}
+
+		$mappings = $request->input('mappings', []);
+		$fullPath = session('bill_import_full_path');
+		$headers = session('bill_import_headers', []);
+
+		if (!$fullPath || !file_exists($fullPath)) {
+			return back()->with('error', 'Import session expired or file not found. Please upload your file again.');
+		}
+
+		try {
+			$spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+			$worksheet = $spreadsheet->getActiveSheet();
+
+			$previewRecords = [];
+			$validCount = 0;
+			$errorCount = 0;
+			$warningCount = 0;
+			$totalRows = 0;
+			$uniqueBillGroups = [];
+			$productLookupCache = [];
+			$vendorLookupCache = [];
+			$accountLookupCache = [];
+			$taxLookupCache = [];
+			$currencyLookupCache = [];
+
+			$resolveIsInventory = static function ($value): array {
+				if ($value === null) {
+					return ['value' => 1, 'valid' => true];
+				}
+
+				$normalized = trim((string) $value);
+				if ($normalized === '') {
+					return ['value' => 1, 'valid' => true];
+				}
+
+				$normalizedLower = strtolower($normalized);
+				if ($normalized === '1' || $normalizedLower === 'true') {
+					return ['value' => 1, 'valid' => true];
+				}
+
+				if ($normalized === '0' || $normalizedLower === 'false') {
+					return ['value' => 0, 'valid' => true];
+				}
+
+				return ['value' => null, 'valid' => false];
+			};
+
+			$parseTaxNames = static function ($value): array {
+				if ($value === null) {
+					return [];
+				}
+
+				$raw = trim((string) $value);
+				if ($raw === '') {
+					return [];
+				}
+
+				$parts = preg_split('/[;,]/', $raw) ?: [];
+				$names = [];
+				foreach ($parts as $part) {
+					$name = trim((string) $part);
+					if ($name !== '') {
+						$names[] = $name;
+					}
+				}
+
+				return array_values(array_unique($names));
+			};
+
+			foreach ($worksheet->getRowIterator(2) as $row) {
+				$rowIndex = $row->getRowIndex();
+				$totalRows++;
+
+				$cellIterator = $row->getCellIterator();
+				$cellIterator->setIterateOnlyExistingCells(false);
+
+				$rowData = [];
+				$cellIndex = 0;
+
+				foreach ($cellIterator as $cell) {
+					if ($cellIndex < count($headers)) {
+						$header = $headers[$cellIndex];
+						$systemField = $mappings[$header] ?? null;
+
+						if ($systemField && $systemField !== 'skip') {
+							$rowData[$systemField] = $cell->getValue();
+						}
+					}
+					$cellIndex++;
+				}
+
+				$billNumber = isset($rowData['bill_number']) ? trim((string) $rowData['bill_number']) : '';
+				$productName = isset($rowData['product_name']) ? trim((string) $rowData['product_name']) : '';
+
+				if ($billNumber === '' && $productName === '') {
+					$totalRows--;
+					continue;
+				}
+
+				$rowData['bill_number'] = $billNumber !== '' ? $billNumber : null;
+
+				if ($billNumber !== '') {
+					$uniqueBillGroups['bill::' . strtolower($billNumber)] = true;
+				} else {
+					$uniqueBillGroups['row::' . $rowIndex] = true;
+				}
+
+				$errors = [];
+				$isInventoryResult = $resolveIsInventory($rowData['is_inventory'] ?? null);
+				$isInventory = $isInventoryResult['value'] ?? 1;
+
+				if (!$isInventoryResult['valid']) {
+					$errors[] = 'is_inventory must be 1 or 0';
+				}
+
+				$rowData['is_inventory'] = $isInventory;
+
+				if ($productName === '') {
+					$errors[] = 'Product name is required';
+				} elseif ($isInventory === 1) {
+					$productCacheKey = strtolower($productName);
+					if (!array_key_exists($productCacheKey, $productLookupCache)) {
+						$productLookupCache[$productCacheKey] = Product::where('name', 'like', '%' . $productName . '%')->first();
+					}
+
+					if (!$productLookupCache[$productCacheKey]) {
+						$errors[] = 'Product "' . $productName . '" not found';
+					}
+				}
+
+				if (empty($rowData['invoice_date'])) {
+					$errors[] = 'Invoice date is required';
+				}
+
+				if (empty($rowData['due_date'])) {
+					$errors[] = 'Due date is required';
+				}
+
+				if (empty($rowData['quantity']) || floatval($rowData['quantity']) <= 0) {
+					$errors[] = 'Quantity must be greater than 0';
+				}
+
+				if (!isset($rowData['unit_cost']) || $rowData['unit_cost'] === '' || floatval($rowData['unit_cost']) < 0) {
+					$errors[] = 'Unit cost is required and must be non-negative';
+				}
+
+				$expenseAccountName = isset($rowData['expense_account']) ? trim((string) $rowData['expense_account']) : '';
+				if ($isInventory === 0) {
+					if ($expenseAccountName === '') {
+						$errors[] = 'Expense account is required when is_inventory is 0';
+					} else {
+						$accountCacheKey = strtolower($expenseAccountName);
+						if (!array_key_exists($accountCacheKey, $accountLookupCache)) {
+							$accountLookupCache[$accountCacheKey] = Account::where('account_name', 'like', '%' . $expenseAccountName . '%')->first();
+						}
+
+						if (!$accountLookupCache[$accountCacheKey]) {
+							$errors[] = 'Expense account "' . $expenseAccountName . '" not found';
+						}
+					}
+				}
+
+				if (!empty($rowData['supplier_name'])) {
+					$supplierName = trim((string) $rowData['supplier_name']);
+					$vendorCacheKey = strtolower($supplierName);
+
+					if (!array_key_exists($vendorCacheKey, $vendorLookupCache)) {
+						$vendorLookupCache[$vendorCacheKey] = Vendor::where('name', 'like', '%' . $supplierName . '%')->first();
+					}
+
+					if (!$vendorLookupCache[$vendorCacheKey]) {
+						$warningCount++;
+					}
+				}
+
+				if (!empty($rowData['transaction_currency'])) {
+					$currencyName = trim((string) $rowData['transaction_currency']);
+					$currencyCacheKey = strtolower($currencyName);
+					if (!array_key_exists($currencyCacheKey, $currencyLookupCache)) {
+						$currencyLookupCache[$currencyCacheKey] = Currency::where('name', 'like', '%' . $currencyName . '%')->first();
+					}
+
+					if (!$currencyLookupCache[$currencyCacheKey]) {
+						$errors[] = 'Transaction currency "' . $currencyName . '" not found';
+					}
+				}
+
+				foreach ($parseTaxNames($rowData['tax'] ?? null) as $taxName) {
+					$taxCacheKey = strtolower($taxName);
+					if (!array_key_exists($taxCacheKey, $taxLookupCache)) {
+						$taxLookupCache[$taxCacheKey] = Tax::where('name', 'like', '%' . $taxName . '%')->first();
+					}
+
+					if (!$taxLookupCache[$taxCacheKey]) {
+						$errors[] = 'Tax "' . $taxName . '" not found';
+					}
+				}
+
+				$status = count($errors) > 0 ? 'error' : 'valid';
+				if ($status === 'error') {
+					$errorCount++;
+				} else {
+					$validCount++;
+				}
+
+				if ($status === 'error' && count($previewRecords) < 50) {
+					$previewRecords[] = [
+						'row' => $rowIndex,
+						'data' => $rowData,
+						'status' => $status,
+						'errors' => $errors,
+					];
+				}
+			}
+
+			session()->put('bill_import_mappings', $mappings);
+			session()->save();
+
+			return Inertia::render('Backend/User/Bill/Import', [
+				'previewData' => [
+					'headers' => $headers,
+					'total_rows' => $totalRows,
+					'unique_bills' => count($uniqueBillGroups),
+					'preview_records' => $previewRecords,
+					'valid_count' => $validCount,
+					'error_count' => $errorCount,
+					'warning_count' => $warningCount,
+				],
+			]);
+		} catch (\Exception $e) {
+			return back()->with('error', 'Failed to preview import: ' . $e->getMessage());
+		}
+	}
+
+	/**
+	 * Execute the bill import.
+	 */
+	public function executeImport(Request $request)
+	{
+		Gate::authorize('bill_invoices.csv.import');
+
+		if ($request->isMethod('get')) {
+			return redirect()->route('bill_invoices.import.page');
+		}
+
+		$mappings = session('bill_import_mappings', []);
+		$fullPath = session('bill_import_full_path');
+
+		if (!$fullPath || !file_exists($fullPath)) {
+			return redirect()
+				->route('bill_invoices.index')
+				->with('error', 'Import session expired or file not found. Please start over.');
+		}
+
+		try {
+			Excel::import(new BillInvoiceImport($mappings), $fullPath);
+
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = auth()->user()->id;
+			$audit->event = 'Bill Invoices Imported - ' . session('bill_import_file_name');
+			$audit->save();
+
+			if (file_exists($fullPath)) {
+				unlink($fullPath);
+			}
+			session()->forget([
+				'bill_import_file_path',
+				'bill_import_full_path',
+				'bill_import_file_name',
+				'bill_import_headers',
+				'bill_import_mappings',
+			]);
+
+			return redirect()
+				->route('bill_invoices.index')
+				->with('success', 'Bills imported successfully.');
+		} catch (\Exception $e) {
+			return redirect()
+				->route('bill_invoices.index')
+				->with('error', 'Import failed: ' . $e->getMessage());
+		}
+	}
+
 	public function import_bills(Request $request)
 	{
 		Gate::authorize('bill_invoices.csv.import');

@@ -448,6 +448,22 @@ class CashPurchaseController extends Controller
 			return redirect()->back()->withInput()->with('error', _lang('Account is required for each item'));
 		}
 
+		$productNames = array_values((array) $request->input('product_name', []));
+		$quantities = array_values((array) $request->input('quantity', []));
+		$unitCosts = array_values((array) $request->input('unit_cost', []));
+		$accountIds = array_values((array) $request->input('account_id', []));
+
+		$lineFieldCounts = [
+			count($productNames),
+			count($quantities),
+			count($unitCosts),
+			count($accountIds),
+		];
+
+		if (count(array_unique($lineFieldCounts)) !== 1) {
+			return redirect()->back()->withInput()->with('error', _lang('Line item data is misaligned. Please refresh the page and try again.'));
+		}
+
 		$default_accounts = ['Purchase Tax Payable', 'Purchase Discount Allowed', 'Inventory'];
 
 		// if these accounts are not exists then create it
@@ -567,17 +583,28 @@ class CashPurchaseController extends Controller
 		}
 
 		$currentTime = Carbon::now();
+		$storeInTransactions = $purchase->approval_status == 1;
+		$lineCount = count($accountIds);
 
-		for ($i = 0; $i < count($request->product_name); $i++) {
+		for ($i = 0; $i < $lineCount; $i++) {
+			$lineQuantity = (float) ($quantities[$i] ?? 0);
+			$lineUnitCost = (float) ($unitCosts[$i] ?? 0);
+			$lineAccountId = $accountIds[$i] ?? null;
+			$lineProductName = trim((string) ($productNames[$i] ?? ''));
+
+			if ($lineProductName === '') {
+				$lineProductName = _lang('Item') . ' ' . ($i + 1);
+			}
+
 			$purchaseItem = $purchase->items()->save(new PurchaseItem([
 				'purchase_id' => $purchase->id,
 				'product_id' => isset($request->product_id[$i]) ? $request->product_id[$i] : null,
-				'product_name' => $request->product_name[$i],
-				'description' => $request->description[$i],
-				'quantity' => $request->quantity[$i],
-				'unit_cost' => $request->unit_cost[$i],
-				'sub_total' => ($request->unit_cost[$i] * $request->quantity[$i]),
-				'account_id' => $request->account_id[$i],
+				'product_name' => $lineProductName,
+				'description' => $request->description[$i] ?? '',
+				'quantity' => $lineQuantity,
+				'unit_cost' => $lineUnitCost,
+				'sub_total' => ($lineUnitCost * $lineQuantity),
+				'account_id' => $lineAccountId,
 				'project_id' => isset($request->project_id[$i]) ? $request->project_id[$i] : null,
 				'project_task_id' => isset($request->project_task_id[$i]) ? $request->project_task_id[$i] : null,
 				'cost_code_id' => isset($request->cost_code_id[$i]) ? $request->cost_code_id[$i] : null,
@@ -604,7 +631,7 @@ class CashPurchaseController extends Controller
 						'amount' => ($purchaseItem->sub_total / 100) * $tax->rate,
 					]));
 
-					if (has_permission('cash_purchases.bulk_approve') || request()->isOwner) {
+					if ($storeInTransactions) {
 						if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
 							$transaction              = new Transaction();
 							$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
@@ -680,12 +707,12 @@ class CashPurchaseController extends Controller
 				}
 			}
 
-			if (has_permission('cash_purchases.bulk_approve') || request()->isOwner) {
+			if ($storeInTransactions) {
 
 				if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
 					$transaction              = new Transaction();
 					$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-					$transaction->account_id  = $request->input('account_id')[$i];
+					$transaction->account_id  = $lineAccountId;
 					$transaction->dr_cr       = 'dr';
 					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, ($purchaseItem->sub_total / $purchase->exchange_rate) + $purchaseItem->taxes->sum('amount'));
 					$transaction->transaction_currency    = $request->currency;
@@ -702,7 +729,7 @@ class CashPurchaseController extends Controller
 				} else {
 					$transaction              = new Transaction();
 					$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-					$transaction->account_id  = $request->input('account_id')[$i];
+					$transaction->account_id  = $lineAccountId;
 					$transaction->dr_cr       = 'dr';
 					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $purchaseItem->sub_total / $purchase->exchange_rate);
 					$transaction->transaction_currency    = $request->currency;
@@ -721,7 +748,7 @@ class CashPurchaseController extends Controller
 				if (isset($request->withholding_tax) && $request->withholding_tax == 1) {
 					$transaction              = new PendingTransaction();
 					$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-					$transaction->account_id  = $request->input('account_id')[$i];
+					$transaction->account_id  = $lineAccountId;
 					$transaction->dr_cr       = 'dr';
 					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, ($purchaseItem->sub_total / $purchase->exchange_rate) + $purchaseItem->taxes->sum('amount'));
 					$transaction->transaction_currency    = $request->currency;
@@ -738,7 +765,7 @@ class CashPurchaseController extends Controller
 				} else {
 					$transaction              = new PendingTransaction();
 					$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i');
-					$transaction->account_id  = $request->input('account_id')[$i];
+					$transaction->account_id  = $lineAccountId;
 					$transaction->dr_cr       = 'dr';
 					$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $purchaseItem->sub_total / $purchase->exchange_rate);
 					$transaction->transaction_currency    = $request->currency;
@@ -757,7 +784,7 @@ class CashPurchaseController extends Controller
 
 			// update stock
 			if ($purchaseItem->product->type == 'product' && $purchaseItem->product->stock_management == 1) {
-				$purchaseItem->product->stock = $purchaseItem->product->stock + $request->quantity[$i];
+				$purchaseItem->product->stock = $purchaseItem->product->stock + $lineQuantity;
 				$purchaseItem->product->save();
 			}
 		}
@@ -770,7 +797,7 @@ class CashPurchaseController extends Controller
 		// Create multiple payment transactions
 		if ($request->has('payment_accounts') && is_array($request->payment_accounts) && count($request->payment_accounts) > 0) {
 			foreach ($request->payment_accounts as $index => $payment) {
-				if (has_permission('cash_purchases.bulk_approve') || request()->isOwner) {
+				if ($storeInTransactions) {
 					$transaction = new Transaction();
 				} else {
 					$transaction = new PendingTransaction();
@@ -795,7 +822,7 @@ class CashPurchaseController extends Controller
 			}
 		} else {
 			// Fallback to single payment for backward compatibility
-			if (has_permission('cash_purchases.bulk_approve') || request()->isOwner) {
+			if ($storeInTransactions) {
 				$transaction = new Transaction();
 			} else {
 				$transaction = new PendingTransaction();
@@ -820,7 +847,11 @@ class CashPurchaseController extends Controller
 		}
 
 			if ($request->input('discount_value') > 0) {
-				$transaction              = new Transaction();
+				if ($storeInTransactions) {
+					$transaction = new Transaction();
+				} else {
+					$transaction = new PendingTransaction();
+				}
 				$transaction->trans_date  = Carbon::parse($request->input('purchase_date'))->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
 				$transaction->account_id  = get_account('Purchase Discount Allowed')->id;
 				$transaction->dr_cr       = 'cr';
@@ -1863,6 +1894,7 @@ class CashPurchaseController extends Controller
 			$productLookupCache = [];
 			$vendorLookupCache = [];
 			$accountLookupCache = [];
+			$taxLookupCache = [];
 
 			$resolveIsInventory = static function ($value): array {
 				if ($value === null) {
@@ -1884,6 +1916,28 @@ class CashPurchaseController extends Controller
 				}
 
 				return ['value' => null, 'valid' => false];
+			};
+
+			$parseTaxNames = static function ($value): array {
+				if ($value === null) {
+					return [];
+				}
+
+				$raw = trim((string) $value);
+				if ($raw === '') {
+					return [];
+				}
+
+				$parts = preg_split('/[;,]/', $raw) ?: [];
+				$names = [];
+				foreach ($parts as $part) {
+					$name = trim((string) $part);
+					if ($name !== '') {
+						$names[] = $name;
+					}
+				}
+
+				return array_values(array_unique($names));
 			};
 
 			// Process rows (skip header row)
@@ -1992,6 +2046,18 @@ class CashPurchaseController extends Controller
 
 					if (!$vendorLookupCache[$vendorCacheKey]) {
 						$warningCount++;
+					}
+				}
+
+				// Tax validation (optional; supports comma or semicolon separated names)
+				foreach ($parseTaxNames($rowData['tax'] ?? null) as $taxName) {
+					$taxCacheKey = strtolower($taxName);
+					if (!array_key_exists($taxCacheKey, $taxLookupCache)) {
+						$taxLookupCache[$taxCacheKey] = Tax::where('name', 'like', '%' . $taxName . '%')->first();
+					}
+
+					if (!$taxLookupCache[$taxCacheKey]) {
+						$errors[] = 'Tax "' . $taxName . '" not found';
 					}
 				}
 

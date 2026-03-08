@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Imports\BillPaymentImport;
 use App\Models\Account;
 use App\Models\Attachment;
 use App\Models\AuditLog;
@@ -14,8 +15,10 @@ use App\Models\Vendor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 use function Spatie\LaravelPdf\Support\pdf;
 
 class BillPaymentsController extends Controller
@@ -177,6 +180,423 @@ class BillPaymentsController extends Controller
             'accounts' => $accounts,
             'methods' => $methods,
         ]);
+    }
+
+    /**
+     * Show bill payment import page.
+     */
+    public function import()
+    {
+        Gate::authorize('bill_payments.create');
+
+        return Inertia::render('Backend/User/BillPayment/Import');
+    }
+
+    /**
+     * Upload bill payment import file and return header row for mapping.
+     */
+    public function uploadImportFile(Request $request)
+    {
+        Gate::authorize('bill_payments.create');
+
+        if ($request->isMethod('get')) {
+            return redirect()->route('bill_payments.import.page');
+        }
+
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
+        ]);
+
+        try {
+            $sessionId = session()->getId();
+            $tempDir = storage_path("app/imports/temp/{$sessionId}");
+
+            if (!is_dir($tempDir)) {
+                mkdir($tempDir, 0755, true);
+            }
+
+            $fileName = uniqid() . '_' . $request->file('file')->getClientOriginalName();
+            $fullPath = $tempDir . '/' . $fileName;
+
+            $request->file('file')->move($tempDir, $fileName);
+
+            if (!file_exists($fullPath)) {
+                throw new \Exception('Failed to store uploaded file');
+            }
+
+            $relativePath = "imports/temp/{$sessionId}/{$fileName}";
+
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+            $worksheet = $spreadsheet->getActiveSheet();
+            $headers = [];
+
+            foreach ($worksheet->getRowIterator(1, 1) as $row) {
+                $cellIterator = $row->getCellIterator();
+                $cellIterator->setIterateOnlyExistingCells(false);
+
+                foreach ($cellIterator as $cell) {
+                    $value = $cell->getValue();
+                    if ($value) {
+                        $headers[] = (string) $value;
+                    }
+                }
+            }
+
+            session()->put('bill_payment_import_file_path', $relativePath);
+            session()->put('bill_payment_import_full_path', $fullPath);
+            session()->put('bill_payment_import_file_name', $request->file('file')->getClientOriginalName());
+            session()->put('bill_payment_import_headers', $headers);
+            session()->save();
+
+            return Inertia::render('Backend/User/BillPayment/Import', [
+                'previewData' => [
+                    'headers' => $headers,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to process file: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Preview bill payment import rows with validation output.
+     */
+    public function previewImport(Request $request)
+    {
+        Gate::authorize('bill_payments.create');
+
+        if ($request->isMethod('get')) {
+            return redirect()->route('bill_payments.import.page');
+        }
+
+        $mappings = $request->input('mappings', []);
+        $fullPath = session('bill_payment_import_full_path');
+        $headers = session('bill_payment_import_headers', []);
+
+        if (!$fullPath || !file_exists($fullPath)) {
+            return back()->with('error', 'Import session expired or file not found. Please upload your file again.');
+        }
+
+        try {
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+            $worksheet = $spreadsheet->getActiveSheet();
+
+            $previewRecords = [];
+            $validCount = 0;
+            $errorCount = 0;
+            $totalRows = 0;
+            $validPaymentGroups = [];
+
+            $vendorLookupCache = [];
+            $accountLookupCache = [];
+            $methodLookupCache = [];
+            $billLookupCache = [];
+            $billRemainingDueCache = [];
+            $groupHeaderCache = [];
+
+            $parseDate = static function ($date): ?string {
+                if ($date === null || $date === '') {
+                    return null;
+                }
+
+                if (is_numeric($date)) {
+                    try {
+                        return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($date)->format('Y-m-d');
+                    } catch (\Exception $e) {
+                        return null;
+                    }
+                }
+
+                $rawDate = trim((string) $date);
+                if ($rawDate === '') {
+                    return null;
+                }
+
+                if (preg_match('/^\d{1,2}\/\d{1,2}\/\d{4}$/', $rawDate) === 1) {
+                    try {
+                        return Carbon::createFromFormat('d/m/Y', $rawDate)->format('Y-m-d');
+                    } catch (\Exception $e) {
+                    }
+                }
+
+                if (preg_match('/^\d{1,2}-\d{1,2}-\d{4}$/', $rawDate) === 1) {
+                    try {
+                        return Carbon::createFromFormat('d-m-Y', $rawDate)->format('Y-m-d');
+                    } catch (\Exception $e) {
+                    }
+                }
+
+                foreach (['Y-m-d', 'Y/m/d', 'm/d/Y', 'm-d-Y', 'n/j/Y', 'n-j-Y'] as $format) {
+                    try {
+                        return Carbon::createFromFormat($format, $rawDate)->format('Y-m-d');
+                    } catch (\Exception $e) {
+                    }
+                }
+
+                try {
+                    return Carbon::parse($rawDate)->format('Y-m-d');
+                } catch (\Exception $e) {
+                    return null;
+                }
+            };
+
+            foreach ($worksheet->getRowIterator(2) as $row) {
+                $rowIndex = $row->getRowIndex();
+                $totalRows++;
+
+                $cellIterator = $row->getCellIterator();
+                $cellIterator->setIterateOnlyExistingCells(false);
+
+                $rowData = [];
+                $cellIndex = 0;
+
+                foreach ($cellIterator as $cell) {
+                    if ($cellIndex < count($headers)) {
+                        $header = $headers[$cellIndex];
+                        $systemField = $mappings[$header] ?? null;
+
+                        if ($systemField && $systemField !== 'skip') {
+                            $rowData[$systemField] = $cell->getValue();
+                        }
+                    }
+                    $cellIndex++;
+                }
+
+                $supplierName = trim((string) ($rowData['supplier_name'] ?? ''));
+                $billNumber = trim((string) ($rowData['bill_number'] ?? ''));
+                $amountRaw = $rowData['amount'] ?? null;
+                $paymentDateRaw = $rowData['payment_date'] ?? null;
+                $paymentAccountName = trim((string) ($rowData['payment_account'] ?? ''));
+                $paymentMethodName = trim((string) ($rowData['payment_method'] ?? ''));
+                $reference = trim((string) ($rowData['reference'] ?? ''));
+
+                $isEmptyRow = $supplierName === ''
+                    && $billNumber === ''
+                    && ($amountRaw === null || trim((string) $amountRaw) === '')
+                    && ($paymentDateRaw === null || trim((string) $paymentDateRaw) === '')
+                    && $paymentAccountName === ''
+                    && $paymentMethodName === ''
+                    && $reference === '';
+
+                if ($isEmptyRow) {
+                    $totalRows--;
+                    continue;
+                }
+
+                $errors = [];
+                $vendor = null;
+                $purchase = null;
+                $account = null;
+                $paymentDate = $parseDate($paymentDateRaw);
+
+                if ($supplierName === '') {
+                    $errors[] = 'Supplier name is required';
+                } else {
+                    $vendorCacheKey = strtolower($supplierName);
+                    if (!array_key_exists($vendorCacheKey, $vendorLookupCache)) {
+                        $vendorLookupCache[$vendorCacheKey] = Vendor::where('name', 'like', '%' . $supplierName . '%')->first();
+                    }
+                    $vendor = $vendorLookupCache[$vendorCacheKey];
+                    if (!$vendor) {
+                        $errors[] = 'Supplier "' . $supplierName . '" not found';
+                    }
+                }
+
+                if ($billNumber === '') {
+                    $errors[] = 'Bill number is required';
+                }
+
+                if ($paymentDate === null) {
+                    $errors[] = 'Payment date is required or invalid';
+                } else {
+                    $rowData['payment_date'] = $paymentDate;
+                }
+
+                if ($paymentAccountName === '') {
+                    $errors[] = 'Payment account is required';
+                } else {
+                    $accountCacheKey = strtolower($paymentAccountName);
+                    if (!array_key_exists($accountCacheKey, $accountLookupCache)) {
+                        $accountLookupCache[$accountCacheKey] = Account::where(function ($query) {
+                            $query->where('account_type', 'Bank')
+                                ->orWhere('account_type', 'Cash');
+                        })->where('account_name', 'like', '%' . $paymentAccountName . '%')->first();
+                    }
+                    $account = $accountLookupCache[$accountCacheKey];
+                    if (!$account) {
+                        $errors[] = 'Payment account "' . $paymentAccountName . '" not found';
+                    }
+                }
+
+                if ($paymentMethodName !== '') {
+                    $methodCacheKey = strtolower($paymentMethodName);
+                    if (!array_key_exists($methodCacheKey, $methodLookupCache)) {
+                        $methodLookupCache[$methodCacheKey] = TransactionMethod::where('name', 'like', '%' . $paymentMethodName . '%')->first();
+                    }
+
+                    if (!$methodLookupCache[$methodCacheKey]) {
+                        $errors[] = 'Payment method "' . $paymentMethodName . '" not found';
+                    }
+                }
+
+                $amountValue = null;
+                if ($amountRaw === null || trim((string) $amountRaw) === '') {
+                    $errors[] = 'Amount is required';
+                } else {
+                    $normalizedAmount = str_replace([',', ' '], '', (string) $amountRaw);
+                    if (!is_numeric($normalizedAmount) || floatval($normalizedAmount) <= 0) {
+                        $errors[] = 'Amount must be greater than 0';
+                    } else {
+                        $amountValue = (float) $normalizedAmount;
+                        $rowData['amount'] = $amountValue;
+                    }
+                }
+
+                if ($vendor && $billNumber !== '') {
+                    $billCacheKey = strtolower((string) $vendor->id . '::' . $billNumber);
+
+                    if (!array_key_exists($billCacheKey, $billLookupCache)) {
+                        $billLookupCache[$billCacheKey] = Purchase::where('vendor_id', $vendor->id)
+                            ->where('cash', 0)
+                            ->where('order', 0)
+                            ->where('bill_no', $billNumber)
+                            ->first();
+                    }
+
+                    $purchase = $billLookupCache[$billCacheKey];
+                    if (!$purchase) {
+                        $errors[] = 'Bill "' . $billNumber . '" was not found for supplier "' . $supplierName . '"';
+                    }
+                }
+
+                if ($purchase && $amountValue !== null) {
+                    $purchaseId = (int) $purchase->id;
+                    if (!array_key_exists($purchaseId, $billRemainingDueCache)) {
+                        $billRemainingDueCache[$purchaseId] = (float) $purchase->getRawOriginal('grand_total') - (float) $purchase->getRawOriginal('paid');
+                    }
+
+                    $remainingDue = $billRemainingDueCache[$purchaseId];
+                    $rowData['due_amount'] = $remainingDue;
+
+                    if ($remainingDue <= 0) {
+                        $errors[] = 'Bill "' . $billNumber . '" is already fully paid';
+                    } elseif ($amountValue > $remainingDue + 0.00001) {
+                        $errors[] = 'Amount must be less than or equal to due amount (' . number_format($remainingDue, 2, '.', '') . ')';
+                    }
+                }
+
+                if ($vendor && $paymentDate !== null && $account && count($errors) === 0) {
+                    $groupKey = strtolower((string) $vendor->id . '|' . $paymentDate);
+                    $normalizedHeaderData = [
+                        'account_id' => (int) $account->id,
+                        'payment_method' => strtolower($paymentMethodName),
+                        'reference' => strtolower($reference),
+                    ];
+
+                    if (!isset($groupHeaderCache[$groupKey])) {
+                        $groupHeaderCache[$groupKey] = $normalizedHeaderData;
+                    } else {
+                        $currentHeader = $groupHeaderCache[$groupKey];
+                        if (
+                            $currentHeader['account_id'] !== $normalizedHeaderData['account_id']
+                            || $currentHeader['payment_method'] !== $normalizedHeaderData['payment_method']
+                            || $currentHeader['reference'] !== $normalizedHeaderData['reference']
+                        ) {
+                            $errors[] = 'Rows with same supplier and payment date must use the same payment account, payment method, and reference';
+                        }
+                    }
+                }
+
+                if ($purchase && $amountValue !== null && count($errors) === 0) {
+                    $purchaseId = (int) $purchase->id;
+                    $billRemainingDueCache[$purchaseId] = $billRemainingDueCache[$purchaseId] - $amountValue;
+                }
+
+                $status = count($errors) > 0 ? 'error' : 'valid';
+                if ($status === 'error') {
+                    $errorCount++;
+                } else {
+                    $validCount++;
+                    if ($vendor && $paymentDate !== null) {
+                        $validPaymentGroups[strtolower((string) $vendor->id . '|' . $paymentDate)] = true;
+                    }
+                }
+
+                $previewRecords[] = [
+                    'row' => $rowIndex,
+                    'data' => $rowData,
+                    'status' => $status,
+                    'errors' => $errors,
+                ];
+            }
+
+            session()->put('bill_payment_import_mappings', $mappings);
+            session()->save();
+
+            return Inertia::render('Backend/User/BillPayment/Import', [
+                'previewData' => [
+                    'headers' => $headers,
+                    'total_rows' => $totalRows,
+                    'unique_payments' => count($validPaymentGroups),
+                    'preview_records' => $previewRecords,
+                    'valid_count' => $validCount,
+                    'error_count' => $errorCount,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to preview import: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Execute bill payment import.
+     */
+    public function executeImport(Request $request)
+    {
+        Gate::authorize('bill_payments.create');
+
+        if ($request->isMethod('get')) {
+            return redirect()->route('bill_payments.import.page');
+        }
+
+        $mappings = session('bill_payment_import_mappings', []);
+        $fullPath = session('bill_payment_import_full_path');
+
+        if (!$fullPath || !file_exists($fullPath)) {
+            return redirect()
+                ->route('bill_payments.index')
+                ->with('error', 'Import session expired or file not found. Please start over.');
+        }
+
+        try {
+            Excel::import(new BillPaymentImport($mappings), $fullPath);
+
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = 'Bill Payments Imported - ' . session('bill_payment_import_file_name');
+            $audit->save();
+
+            if (file_exists($fullPath)) {
+                unlink($fullPath);
+            }
+
+            session()->forget([
+                'bill_payment_import_file_path',
+                'bill_payment_import_full_path',
+                'bill_payment_import_file_name',
+                'bill_payment_import_headers',
+                'bill_payment_import_mappings',
+            ]);
+
+            return redirect()
+                ->route('bill_payments.index')
+                ->with('success', 'Bill payments imported successfully.');
+        } catch (\Exception $e) {
+            return redirect()
+                ->route('bill_payments.index')
+                ->with('error', 'Import failed: ' . $e->getMessage());
+        }
     }
 
     public function store(Request $request)

@@ -23,28 +23,26 @@ import {
   Info
 } from "lucide-react";
 
-// System fields for cash purchase import
-// Note: Multiple rows with the same bill_no will be grouped into one purchase with multiple items
+// System fields for credit purchase (bill) import.
+// Note: Multiple rows with the same bill_number are grouped into one bill with multiple items.
 const SYSTEM_FIELDS = [
-  { value: "bill_no", label: "Bill Number", required: false, description: "Rows with same bill_no become one purchase with multiple items" },
-  { value: "purchase_date", label: "Purchase Date", required: true },
-  { value: "vendor_name", label: "Vendor/Supplier Name", required: false },
+  { value: "bill_number", label: "Bill Number", required: false, description: "Rows with same bill_number become one bill with multiple items" },
+  { value: "supplier_name", label: "Supplier Name", required: false },
+  { value: "title", label: "Title", required: false },
+  { value: "order_number", label: "Order Number", required: false },
+  { value: "invoice_date", label: "Invoice Date", required: true },
+  { value: "due_date", label: "Due Date", required: true },
+  { value: "transaction_currency", label: "Transaction Currency", required: false },
+  { value: "discount_type", label: "Discount Type (0=%, 1=Fixed)", required: false },
+  { value: "discount_value", label: "Discount Value", required: false },
+  { value: "is_inventory", label: "Is Inventory (1=Yes, 0=No)", required: false, description: "1 increases stock, 0 records as account purchase" },
+  { value: "expense_account", label: "Expense Account", required: false },
+  { value: "note", label: "Note", required: false },
   { value: "product_name", label: "Product Name", required: true },
   { value: "description", label: "Item Description", required: false },
   { value: "quantity", label: "Quantity", required: true },
   { value: "unit_cost", label: "Unit Cost", required: true },
   { value: "tax", label: "Tax Name", required: false, description: "Optional. Use tax names from Tax Database" },
-  { value: "is_inventory", label: "Is Inventory (1=Yes, 0=No)", required: false, description: "1 increases stock, 0 records as account purchase" },
-  { value: "expense_account", label: "Expense Account", required: false },
-  { value: "payment_account", label: "Payment Account", required: false },
-  { value: "title", label: "Purchase Title", required: false },
-  { value: "po_so_number", label: "PO/SO Number", required: false },
-  { value: "currency", label: "Currency", required: false },
-  { value: "exchange_rate", label: "Exchange Rate", required: false },
-  { value: "discount_type", label: "Discount Type (0=%, 1=Fixed)", required: false },
-  { value: "discount_value", label: "Discount Value", required: false },
-  { value: "note", label: "Note", required: false },
-  { value: "beneficiary", label: "Beneficiary", required: false },
   { value: "skip", label: "Skip this column", required: false }
 ];
 
@@ -94,12 +92,20 @@ export default function Import() {
           score = 90;
         } else if (normalizedHeader.includes("product") && field.value === "product_name") {
           score = 85;
-        } else if (normalizedHeader.includes("vendor") && field.value === "vendor_name") {
+        } else if (normalizedHeader.includes("supplier") && field.value === "supplier_name") {
           score = 85;
-        } else if (normalizedHeader.includes("supplier") && field.value === "vendor_name") {
+        } else if (normalizedHeader.includes("vendor") && field.value === "supplier_name") {
           score = 85;
-        } else if (normalizedHeader.includes("bill") && field.value === "bill_no") {
+        } else if (normalizedHeader.includes("bill") && field.value === "bill_number") {
           score = 85;
+        } else if ((normalizedHeader.includes("invoice") || normalizedHeader.includes("purchase")) && field.value === "invoice_date") {
+          score = 85;
+        } else if (normalizedHeader.includes("due") && field.value === "due_date") {
+          score = 85;
+        } else if (normalizedHeader.includes("order") && field.value === "order_number") {
+          score = 80;
+        } else if (normalizedHeader.includes("currency") && field.value === "transaction_currency") {
+          score = 80;
         } else if (
           (normalizedHeader.includes("is_inventory") || normalizedHeader.includes("inventory_flag")) &&
           field.value === "is_inventory"
@@ -107,8 +113,6 @@ export default function Import() {
           score = 90;
         } else if (normalizedHeader === "inventory" && field.value === "is_inventory") {
           score = 85;
-        } else if (normalizedHeader.includes("date") && field.value === "purchase_date") {
-          score = 80;
         } else if (normalizedHeader.includes("qty") && field.value === "quantity") {
           score = 80;
         } else if (normalizedHeader.includes("cost") && field.value === "unit_cost") {
@@ -178,7 +182,7 @@ export default function Import() {
     formData.append("file", selectedFile);
 
     setIsUploading(true);
-    router.post(route("cash_purchases.import.upload"), formData, {
+    router.post(route("bill_invoices.import.upload"), formData, {
       onSuccess: () => {
         setCurrentStep(1);
       },
@@ -208,7 +212,7 @@ export default function Import() {
   const handleGeneratePreview = useCallback(() => {
     setIsProcessing(true);
     router.post(
-      route("cash_purchases.import.preview"),
+      route("bill_invoices.import.preview"),
       { mappings: fieldMappings },
       {
         onSuccess: () => {
@@ -227,11 +231,11 @@ export default function Import() {
   const handleConfirmImport = useCallback(() => {
     setIsProcessing(true);
     router.post(
-      route("cash_purchases.import.execute"),
+      route("bill_invoices.import.execute"),
       { mappings: fieldMappings },
       {
         onSuccess: () => {
-          router.visit(route("cash_purchases.index"));
+          router.visit(route("bill_invoices.index"));
         },
         onFinish: () => {
           setIsProcessing(false);
@@ -241,7 +245,7 @@ export default function Import() {
   }, [fieldMappings]);
 
   const handleCancel = useCallback(() => {
-    router.visit(route("cash_purchases.index"));
+    router.visit(route("bill_invoices.index"));
   }, []);
 
   const handleBack = useCallback(() => {
@@ -252,22 +256,23 @@ export default function Import() {
 
   // Check if required fields are mapped
   const isProductNameMapped = Object.values(fieldMappings).includes("product_name");
-  const isPurchaseDateMapped = Object.values(fieldMappings).includes("purchase_date");
+  const isInvoiceDateMapped = Object.values(fieldMappings).includes("invoice_date");
+  const isDueDateMapped = Object.values(fieldMappings).includes("due_date");
   const isQuantityMapped = Object.values(fieldMappings).includes("quantity");
   const isUnitCostMapped = Object.values(fieldMappings).includes("unit_cost");
-  const isAllRequiredMapped = isProductNameMapped && isPurchaseDateMapped && isQuantityMapped && isUnitCostMapped;
+  const isAllRequiredMapped = isProductNameMapped && isInvoiceDateMapped && isDueDateMapped && isQuantityMapped && isUnitCostMapped;
 
   const steps = ["Upload File", "Map Fields", "Preview & Import"];
 
   return (
     <AuthenticatedLayout>
-      <Head title="Import Cash Purchases" />
+      <Head title="Import Credit Purchases" />
       <SidebarInset>
         <div className="main-content">
           <PageHeader
-            page="Cash Purchases"
+            page="Credit Purchases"
             subpage="Import"
-            url="cash_purchases.index"
+            url="bill_invoices.index"
           />
 
           <div className="max-w-4xl mx-auto pb-8 px-4">
@@ -301,7 +306,7 @@ export default function Import() {
               <Card>
                 <CardHeader>
                   <CardTitle>Upload File</CardTitle>
-                  <CardDescription>Select an Excel or CSV file to import cash purchases</CardDescription>
+                  <CardDescription>Select an Excel or CSV file to import credit purchases (bills)</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
                   {/* File Upload Area */}
@@ -371,11 +376,11 @@ export default function Import() {
                   <Alert className="border-blue-500/30 bg-blue-500/5">
                     <Info className="h-4 w-4 text-blue-600" />
                     <AlertDescription>
-                      <h4 className="font-medium mb-2 text-blue-700">Multi-item Purchase Import</h4>
+                      <h4 className="font-medium mb-2 text-blue-700">Multi-item Bill Import</h4>
                       <ul className="text-sm space-y-1 text-blue-600">
-                        <li>- Duplicate <strong>Bill Number</strong> values are supported and grouped into one purchase with multiple items</li>
+                        <li>- Duplicate <strong>Bill Number</strong> values are supported and grouped into one bill with multiple items</li>
                         <li>- Use <strong>is_inventory</strong> column: <strong>1</strong> adds to inventory stock, <strong>0</strong> records as account purchase</li>
-                        <li>- Header fields (vendor, date, etc.) come from the first row in each bill number group</li>
+                        <li>- Header fields (supplier, dates, currency, discount) come from the first row in each bill number group</li>
                       </ul>
                     </AlertDescription>
                   </Alert>
@@ -387,11 +392,11 @@ export default function Import() {
                       <h4 className="font-medium mb-2">Import Guidelines</h4>
                       <ul className="text-sm space-y-1">
                         <li>- First row should contain column headers</li>
-                        <li>- Required fields: Product Name, Quantity, Unit Cost, Purchase Date</li>
+                        <li>- Required fields: Product Name, Quantity, Unit Cost, Invoice Date, Due Date</li>
                         <li>- Optional <strong>Tax</strong> column: enter tax name exactly as configured in Tax Database</li>
                         <li>- For <strong>is_inventory = 1</strong>, product should exist and stock will increase</li>
                         <li>- For <strong>is_inventory = 0</strong>, provide an Expense Account for account posting</li>
-                        <li>- Vendors and accounts are matched by name</li>
+                        <li>- Suppliers and accounts are matched by name</li>
                       </ul>
                     </AlertDescription>
                   </Alert>
@@ -402,7 +407,7 @@ export default function Import() {
                       <p className="font-medium text-sm">Need a template?</p>
                       <p className="text-sm text-muted-foreground">Download our sample Excel file</p>
                     </div>
-                    <a href="/uploads/media/default/sample_cash_purchases.xlsx" download>
+                    <a href="/uploads/media/default/sample_bills.xlsx" download>
                       <Button variant="outline" size="sm">
                         <Download className="size-4 mr-1.5" />
                         Download
@@ -445,7 +450,7 @@ export default function Import() {
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
                     <CardTitle>Map Columns</CardTitle>
-                    <CardDescription>Map your file columns to cash purchase fields</CardDescription>
+                    <CardDescription>Map your file columns to credit purchase fields</CardDescription>
                   </div>
                   <Button
                     type="button"
@@ -476,7 +481,8 @@ export default function Import() {
                         <AlertDescription className="text-yellow-600 font-medium">
                           Map the required fields to continue: 
                           {!isProductNameMapped && <span className="ml-1">"Product Name"</span>}
-                          {!isPurchaseDateMapped && <span className="ml-1">"Purchase Date"</span>}
+                          {!isInvoiceDateMapped && <span className="ml-1">"Invoice Date"</span>}
+                          {!isDueDateMapped && <span className="ml-1">"Due Date"</span>}
                           {!isQuantityMapped && <span className="ml-1">"Quantity"</span>}
                           {!isUnitCostMapped && <span className="ml-1">"Unit Cost"</span>}
                         </AlertDescription>
@@ -560,8 +566,8 @@ export default function Import() {
                     <p className="text-sm text-muted-foreground mt-1">Total Rows</p>
                   </Card>
                   <Card className="text-center p-4">
-                    <p className="text-3xl font-bold text-blue-600">{previewData.unique_purchases || '—'}</p>
-                    <p className="text-sm text-muted-foreground mt-1">Unique Purchases</p>
+                    <p className="text-3xl font-bold text-blue-600">{previewData.unique_bills || "N/A"}</p>
+                    <p className="text-sm text-muted-foreground mt-1">Unique Bills</p>
                   </Card>
                   <Card className="text-center p-4">
                     <p className="text-3xl font-bold text-green-600">{previewData.valid_count}</p>
@@ -574,11 +580,11 @@ export default function Import() {
                 </div>
 
                 {/* Info about grouping */}
-                {previewData.unique_purchases && previewData.unique_purchases < previewData.total_rows && (
+                {previewData.unique_bills && previewData.unique_bills < previewData.total_rows && (
                   <Alert className="border-blue-500/30 bg-blue-500/5">
                     <Info className="h-4 w-4 text-blue-600" />
                     <AlertDescription className="text-blue-600">
-                      <span className="font-medium">{previewData.total_rows} rows</span> will be grouped into <span className="font-medium">{previewData.unique_purchases} purchases</span> based on their bill numbers.
+                      <span className="font-medium">{previewData.total_rows} rows</span> will be grouped into <span className="font-medium">{previewData.unique_bills} bills</span> based on their bill numbers.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -630,16 +636,16 @@ export default function Import() {
                                 </span>
                               </TableCell>
                               <TableCell className="text-muted-foreground">
-                                {record.data.bill_no || <span className="italic">—</span>}
+                                {record.data.bill_number || <span className="italic">N/A</span>}
                               </TableCell>
                               <TableCell className="text-muted-foreground">
-                                {record.data.product_name || <span className="italic">—</span>}
+                                {record.data.product_name || <span className="italic">N/A</span>}
                               </TableCell>
                               <TableCell>
                                 {record.errors && record.errors.length > 0 ? (
                                   <ul className="space-y-1">
                                     {record.errors.map((error, i) => (
-                                      <li key={i} className="text-sm text-destructive">• {error}</li>
+                                      <li key={i} className="text-sm text-destructive">- {error}</li>
                                     ))}
                                   </ul>
                                 ) : (
@@ -700,3 +706,5 @@ export default function Import() {
     </AuthenticatedLayout>
   );
 }
+
+

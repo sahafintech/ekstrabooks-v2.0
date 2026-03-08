@@ -20,7 +20,7 @@ import {
     SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { Edit, EyeIcon, Plus, Trash, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
+import { Edit, EyeIcon, Plus, Trash, ChevronUp, ChevronDown, Trash2, Upload } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
@@ -348,6 +348,12 @@ export default function List({ payments = [], meta = {}, filters = {}, vendors =
                                     <Button>
                                         <Plus className="w-4 h-4 mr-2" />
                                         Add Payment
+                                    </Button>
+                                </Link>
+                                <Link href={route("bill_payments.import.page")}>
+                                    <Button variant="outline">
+                                        <Upload className="w-4 h-4 mr-2" />
+                                        Import
                                     </Button>
                                 </Link>
                                 <Link href={route("bill_payments.trash")}>
