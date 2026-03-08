@@ -33,6 +33,7 @@ const SYSTEM_FIELDS = [
   { value: "description", label: "Item Description", required: false },
   { value: "quantity", label: "Quantity", required: true },
   { value: "unit_cost", label: "Unit Cost", required: true },
+  { value: "is_inventory", label: "Is Inventory (1=Yes, 0=No)", required: false, description: "1 increases stock, 0 records as account purchase" },
   { value: "expense_account", label: "Expense Account", required: false },
   { value: "payment_account", label: "Payment Account", required: false },
   { value: "title", label: "Purchase Title", required: false },
@@ -97,6 +98,13 @@ export default function Import() {
         } else if (normalizedHeader.includes("supplier") && field.value === "vendor_name") {
           score = 85;
         } else if (normalizedHeader.includes("bill") && field.value === "bill_no") {
+          score = 85;
+        } else if (
+          (normalizedHeader.includes("is_inventory") || normalizedHeader.includes("inventory_flag")) &&
+          field.value === "is_inventory"
+        ) {
+          score = 90;
+        } else if (normalizedHeader === "inventory" && field.value === "is_inventory") {
           score = 85;
         } else if (normalizedHeader.includes("date") && field.value === "purchase_date") {
           score = 80;
@@ -364,9 +372,9 @@ export default function Import() {
                     <AlertDescription>
                       <h4 className="font-medium mb-2 text-blue-700">Multi-item Purchase Import</h4>
                       <ul className="text-sm space-y-1 text-blue-600">
-                        <li>• Multiple rows with the <strong>same Bill Number</strong> will be grouped into one purchase with multiple items</li>
-                        <li>• Each row represents one purchase item (product)</li>
-                        <li>• Header row fields (vendor, date, etc.) from the first row of each group are used</li>
+                        <li>- Duplicate <strong>Bill Number</strong> values are supported and grouped into one purchase with multiple items</li>
+                        <li>- Use <strong>is_inventory</strong> column: <strong>1</strong> adds to inventory stock, <strong>0</strong> records as account purchase</li>
+                        <li>- Header fields (vendor, date, etc.) come from the first row in each bill number group</li>
                       </ul>
                     </AlertDescription>
                   </Alert>
@@ -377,10 +385,11 @@ export default function Import() {
                     <AlertDescription>
                       <h4 className="font-medium mb-2">Import Guidelines</h4>
                       <ul className="text-sm space-y-1">
-                        <li>• First row should contain column headers</li>
-                        <li>• Required fields: Product Name, Quantity, Unit Cost, Purchase Date</li>
-                        <li>• Products must already exist in the system</li>
-                        <li>• Vendors and accounts will be matched by name</li>
+                        <li>- First row should contain column headers</li>
+                        <li>- Required fields: Product Name, Quantity, Unit Cost, Purchase Date</li>
+                        <li>- For <strong>is_inventory = 1</strong>, product should exist and stock will increase</li>
+                        <li>- For <strong>is_inventory = 0</strong>, provide an Expense Account for account posting</li>
+                        <li>- Vendors and accounts are matched by name</li>
                       </ul>
                     </AlertDescription>
                   </Alert>
@@ -689,3 +698,4 @@ export default function Import() {
     </AuthenticatedLayout>
   );
 }
+
