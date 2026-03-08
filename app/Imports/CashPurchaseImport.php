@@ -78,39 +78,47 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
         // Ensure default accounts exist
         $this->ensureDefaultAccounts();
 
-        // Group rows by bill_no
+        // Group rows by bill_no (duplicate bill_no = multi-item purchase)
         $groupedPurchases = [];
+        $autoGroupCounter = 0;
 
         foreach ($rows as $row) {
             $data = $this->mapRowData($row->toArray());
+            $billNo = $this->normalizeBillNo($data['bill_no'] ?? null);
+            $productName = trim((string) ($data['product_name'] ?? ''));
 
             // Skip empty rows
-            if (empty($data['bill_no']) && empty($data['product_name'])) {
+            if ($billNo === null && $productName === '') {
                 continue;
             }
 
-            $billNo = !empty($data['bill_no']) ? trim((string) $data['bill_no']) : 'AUTO_' . uniqid();
+            // Rows without bill_no become their own purchases
+            $groupKey = $billNo !== null
+                ? 'bill::' . strtolower($billNo)
+                : 'auto::' . (++$autoGroupCounter);
 
-            if (!isset($groupedPurchases[$billNo])) {
-                $groupedPurchases[$billNo] = [
+            if (!isset($groupedPurchases[$groupKey])) {
+                $groupedPurchases[$groupKey] = [
+                    'bill_no' => $billNo,
                     'header' => $data,
                     'items' => [],
                 ];
             }
 
-            $groupedPurchases[$billNo]['items'][] = $data;
+            $groupedPurchases[$groupKey]['items'][] = $data;
         }
 
         // Process each grouped purchase
-        foreach ($groupedPurchases as $billNo => $purchaseData) {
+        foreach ($groupedPurchases as $groupKey => $purchaseData) {
             DB::beginTransaction();
             try {
-                $this->createPurchase((string) $billNo, $purchaseData);
+                $this->createPurchase($purchaseData);
                 DB::commit();
             } catch (\Exception $e) {
                 DB::rollBack();
                 // Log error but continue with other purchases
-                \Log::error("Error importing purchase {$billNo}: " . $e->getMessage());
+                $loggedBillNo = $purchaseData['bill_no'] ?? $groupKey;
+                \Log::error("Error importing purchase {$loggedBillNo}: " . $e->getMessage());
             }
         }
     }
@@ -118,8 +126,9 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
     /**
      * Create a purchase with its items
      */
-    private function createPurchase(string $billNo, array $purchaseData): void
+    private function createPurchase(array $purchaseData): void
     {
+        $billNo = $purchaseData['bill_no'] ?? null;
         $header = $purchaseData['header'];
         $items = $purchaseData['items'];
 
@@ -141,17 +150,20 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
         // Calculate totals from items
         $subTotal = 0;
         $itemsData = [];
+        $inventoryAccount = get_account('Inventory');
 
         foreach ($items as $itemData) {
             $quantity = floatval($itemData['quantity'] ?? 1);
             $unitCost = floatval($itemData['unit_cost'] ?? 0);
             $lineTotal = $quantity * $unitCost;
             $subTotal += $lineTotal;
+            $isInventory = $this->parseIsInventoryValue($itemData['is_inventory'] ?? 1);
+            $productName = trim((string) ($itemData['product_name'] ?? ''));
 
             // Find product
             $product = null;
-            if (!empty($itemData['product_name'])) {
-                $product = Product::where('name', 'like', '%' . trim((string) $itemData['product_name']) . '%')->first();
+            if ($productName !== '') {
+                $product = Product::where('name', 'like', '%' . $productName . '%')->first();
             }
 
             // Find expense account
@@ -160,14 +172,30 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
                 $expenseAccount = Account::where('account_name', 'like', '%' . trim((string) $itemData['expense_account']) . '%')->first();
             }
 
+            // Inventory rows debit Inventory account and can update stock.
+            // Account rows debit provided expense account and never update stock.
+            $itemAccountId = $isInventory === 1
+                ? ($inventoryAccount->id ?? $expenseAccount->id ?? null)
+                : ($expenseAccount->id ?? null);
+
+            if ($isInventory === 0 && !$expenseAccount) {
+                throw new \RuntimeException('Expense account is required for account purchase rows (is_inventory = 0).');
+            }
+
+            if ($itemAccountId === null) {
+                throw new \RuntimeException('Unable to resolve an account for imported purchase item "' . ($productName !== '' ? $productName : 'N/A') . '".');
+            }
+
             $itemsData[] = [
                 'product' => $product,
-                'product_name' => $product->name ?? trim((string) ($itemData['product_name'] ?? 'Unknown Product')),
+                'product_id' => $isInventory === 1 ? ($product->id ?? null) : null,
+                'is_inventory' => $isInventory,
+                'product_name' => $product->name ?? ($productName !== '' ? $productName : 'Unknown Product'),
                 'description' => trim((string) ($itemData['description'] ?? ($product->descriptions ?? ''))),
                 'quantity' => $quantity,
                 'unit_cost' => $unitCost,
                 'sub_total' => $lineTotal,
-                'account_id' => $expenseAccount->id ?? null,
+                'account_id' => $itemAccountId,
             ];
         }
 
@@ -194,7 +222,7 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
         $purchase->title = trim((string) ($header['title'] ?? ''));
 
         // Use provided bill_no or generate new one
-        if (strpos($billNo, 'AUTO_') === 0) {
+        if ($billNo === null || $billNo === '') {
             $purchase->bill_no = get_business_option('purchase_number');
             BusinessSetting::where('name', 'purchase_number')->increment('value');
         } else {
@@ -239,7 +267,7 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
         foreach ($itemsData as $item) {
             $purchaseItem = new PurchaseItem([
                 'purchase_id' => $purchase->id,
-                'product_id' => $item['product']->id ?? null,
+                'product_id' => $item['product_id'],
                 'product_name' => $item['product_name'],
                 'description' => $item['description'],
                 'quantity' => $item['quantity'],
@@ -249,8 +277,13 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             ]);
             $purchase->items()->save($purchaseItem);
 
-            // Update stock if applicable
-            if ($item['product'] && $item['product']->type == 'product' && $item['product']->stock_management == 1) {
+            // Update stock only for inventory rows.
+            if (
+                $item['is_inventory'] === 1 &&
+                $item['product'] &&
+                $item['product']->type == 'product' &&
+                $item['product']->stock_management == 1
+            ) {
                 $item['product']->stock += $item['quantity'];
                 $item['product']->save();
             }
@@ -338,6 +371,41 @@ class CashPurchaseImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
                 $transaction->save();
             }
         }
+    }
+
+    /**
+     * Normalize bill number; empty values return null.
+     */
+    private function normalizeBillNo($billNo): ?string
+    {
+        if ($billNo === null) {
+            return null;
+        }
+
+        $normalized = trim((string) $billNo);
+        return $normalized === '' ? null : $normalized;
+    }
+
+    /**
+     * Parse is_inventory flag.
+     * 1 = inventory item (increase stock), 0 = account purchase row.
+     */
+    private function parseIsInventoryValue($value): int
+    {
+        if ($value === null) {
+            return 1;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+        if ($normalized === '' || $normalized === '1' || $normalized === 'true') {
+            return 1;
+        }
+
+        if ($normalized === '0' || $normalized === 'false') {
+            return 0;
+        }
+
+        return 1;
     }
 
     /**

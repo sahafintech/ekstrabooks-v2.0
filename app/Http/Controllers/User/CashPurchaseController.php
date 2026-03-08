@@ -1859,7 +1859,32 @@ class CashPurchaseController extends Controller
 			$errorCount = 0;
 			$warningCount = 0;
 			$totalRows = 0;
-			$uniqueBillNos = [];
+			$uniquePurchaseGroups = [];
+			$productLookupCache = [];
+			$vendorLookupCache = [];
+			$accountLookupCache = [];
+
+			$resolveIsInventory = static function ($value): array {
+				if ($value === null) {
+					return ['value' => 1, 'valid' => true];
+				}
+
+				$normalized = trim((string) $value);
+				if ($normalized === '') {
+					return ['value' => 1, 'valid' => true];
+				}
+
+				$normalizedLower = strtolower($normalized);
+				if ($normalized === '1' || $normalizedLower === 'true') {
+					return ['value' => 1, 'valid' => true];
+				}
+
+				if ($normalized === '0' || $normalizedLower === 'false') {
+					return ['value' => 0, 'valid' => true];
+				}
+
+				return ['value' => null, 'valid' => false];
+			};
 
 			// Process rows (skip header row)
 			foreach ($worksheet->getRowIterator(2) as $row) {
@@ -1885,27 +1910,47 @@ class CashPurchaseController extends Controller
 				}
 
 				// Skip completely empty rows
-				if (empty($rowData['bill_no']) && empty($rowData['product_name'])) {
+				$billNo = isset($rowData['bill_no']) ? trim((string) $rowData['bill_no']) : '';
+				$productName = isset($rowData['product_name']) ? trim((string) $rowData['product_name']) : '';
+
+				if ($billNo === '' && $productName === '') {
 					$totalRows--;
 					continue;
 				}
 
-				// Track unique bill numbers
-				if (!empty($rowData['bill_no'])) {
-					$uniqueBillNos[trim((string) $rowData['bill_no'])] = true;
+				$rowData['bill_no'] = $billNo !== '' ? $billNo : null;
+
+				// Track grouped purchase count
+				if ($billNo !== '') {
+					$uniquePurchaseGroups['bill::' . strtolower($billNo)] = true;
+				} else {
+					// Rows without bill number become separate purchases
+					$uniquePurchaseGroups['row::' . $rowIndex] = true;
 				}
 
 				// Validate row
 				$errors = [];
+				$isInventoryResult = $resolveIsInventory($rowData['is_inventory'] ?? null);
+				$isInventory = $isInventoryResult['value'] ?? 1;
+
+				if (!$isInventoryResult['valid']) {
+					$errors[] = 'is_inventory must be 1 or 0';
+				}
+
+				$rowData['is_inventory'] = $isInventory;
 
 				// Product name is required
-				if (empty($rowData['product_name'])) {
+				if ($productName === '') {
 					$errors[] = 'Product name is required';
-				} else {
-					// Check if product exists
-					$product = Product::where('name', 'like', '%' . trim((string) $rowData['product_name']) . '%')->first();
-					if (!$product) {
-						$errors[] = 'Product "' . $rowData['product_name'] . '" not found';
+				} elseif ($isInventory === 1) {
+					// For inventory items, product must exist
+					$productCacheKey = strtolower($productName);
+					if (!array_key_exists($productCacheKey, $productLookupCache)) {
+						$productLookupCache[$productCacheKey] = Product::where('name', 'like', '%' . $productName . '%')->first();
+					}
+
+					if (!$productLookupCache[$productCacheKey]) {
+						$errors[] = 'Product "' . $productName . '" not found';
 					}
 				}
 
@@ -1919,10 +1964,33 @@ class CashPurchaseController extends Controller
 					$errors[] = 'Unit cost is required and must be non-negative';
 				}
 
+				// Expense account is required for account purchase rows
+				$expenseAccountName = isset($rowData['expense_account']) ? trim((string) $rowData['expense_account']) : '';
+				if ($isInventory === 0) {
+					if ($expenseAccountName === '') {
+						$errors[] = 'Expense account is required when is_inventory is 0';
+					} else {
+						$accountCacheKey = strtolower($expenseAccountName);
+						if (!array_key_exists($accountCacheKey, $accountLookupCache)) {
+							$accountLookupCache[$accountCacheKey] = Account::where('account_name', 'like', '%' . $expenseAccountName . '%')->first();
+						}
+
+						if (!$accountLookupCache[$accountCacheKey]) {
+							$errors[] = 'Expense account "' . $expenseAccountName . '" not found';
+						}
+					}
+				}
+
 				// Vendor validation (optional but should exist if provided)
 				if (!empty($rowData['vendor_name'])) {
-					$vendor = Vendor::where('name', 'like', '%' . trim((string) $rowData['vendor_name']) . '%')->first();
-					if (!$vendor) {
+					$vendorName = trim((string) $rowData['vendor_name']);
+					$vendorCacheKey = strtolower($vendorName);
+
+					if (!array_key_exists($vendorCacheKey, $vendorLookupCache)) {
+						$vendorLookupCache[$vendorCacheKey] = Vendor::where('name', 'like', '%' . $vendorName . '%')->first();
+					}
+
+					if (!$vendorLookupCache[$vendorCacheKey]) {
 						$warningCount++;
 					}
 				}
@@ -1952,7 +2020,7 @@ class CashPurchaseController extends Controller
 				'previewData' => [
 					'headers' => $headers,
 					'total_rows' => $totalRows,
-					'unique_purchases' => count($uniqueBillNos),
+					'unique_purchases' => count($uniquePurchaseGroups),
 					'preview_records' => $previewRecords,
 					'valid_count' => $validCount,
 					'error_count' => $errorCount,
