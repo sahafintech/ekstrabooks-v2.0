@@ -22,7 +22,7 @@
             <td>{{ $purchase->po_so_number }}</td>
             <td>{{ $purchase->purchase_date }}</td>
             <td>{{ $purchase->due_date }}</td>
-            <td>{{ $purchase->transaction_currency }}</td>
+            <td>{{ $purchase->currency }}</td>
             <td>{{ $purchase->discount_type }}</td>
             <td>{{ $purchase->discount_value }}</td>
             <td>{{ $purchase->note }}</td>

@@ -94,7 +94,6 @@ class SendPurchaseApprovalRequest extends Notification
             $suffix .= '#' . $fragment;
         }
 
-        // Fix malformed host-style links such as http://bill_invoices/3479
         if (in_array($host, ['bill_invoices', 'cash_purchases'], true) && $path !== '') {
             return $this->makeAbsoluteUrl('/user/' . $host . '/' . ltrim($path, '/')) . $suffix;
         }
@@ -107,8 +106,6 @@ class SendPurchaseApprovalRequest extends Notification
             }
         }
 
-        // Capture /user/bill_invoices/{id}, /bill_invoices/{id}, bill_invoices/{id},
-        // and file://.../bill_invoices/{id} variants.
         if (preg_match('~(?:^|/)(user/)?(bill_invoices|cash_purchases)/([^/?#]+)~i', $href, $matches)) {
             $entity = strtolower($matches[2]);
             $id = $matches[3];

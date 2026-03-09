@@ -544,7 +544,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('bill_payments', BillPaymentsController::class);
 		Route::post('bill_payments/bulk_destroy', [BillPaymentsController::class, 'bulk_destroy'])->name('bill_payments.bulk_destroy');
 		Route::get('bill_payments/{id}/pdf', [BillPaymentsController::class, 'pdf'])->name('bill_payments.pdf');
-		Route::get('export_bill_invoices', [PurchaseController::class, 'export_bill_invoices'])->name('bill_invoices.export');
+		Route::get('export_purchases', [PurchaseController::class, 'export_purchases'])->name('bill_invoices.export');
 		Route::post('bill_invoices/bulk_approve', [PurchaseController::class, 'bulk_approve'])->name('bill_invoices.bulk_approve');
 		Route::post('bill_invoices/bulk_reject', [PurchaseController::class, 'bulk_reject'])->name('bill_invoices.bulk_reject');
 		Route::post('bill_invoices/bulk_destroy', [PurchaseController::class, 'bulk_destroy'])->name('bill_invoices.bulk_destroy');
