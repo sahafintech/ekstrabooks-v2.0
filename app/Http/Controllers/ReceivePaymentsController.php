@@ -200,25 +200,21 @@ class ReceivePaymentsController extends Controller
         $payment->save();
 
         // if attachments then upload
-		if (isset($request->attachments)) {
-			if ($request->attachments != null) {
-				for ($i = 0; $i < count($request->attachments); $i++) {
-					$theFile = $request->file("attachments.$i");
-					if ($theFile == null) {
-						continue;
-					}
-					$theAttachment = rand() . time() . $theFile->getClientOriginalName();
-					$theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
-
-					$attachment = new Attachment();
-					$attachment->file_name = $request->attachments[$i]->getClientOriginalName();
-					$attachment->path = "/uploads/media/attachments/" . $theAttachment;
-					$attachment->ref_type = 'receive payment';
-					$attachment->ref_id = $payment->id;
-					$attachment->save();
-				}
-			}
-		}
+        if (isset($request->attachments) && $request->attachments != null) {
+            for ($i = 0; $i < count($request->attachments); $i++) {
+                $theFile = $request->file("attachments.$i");
+                if ($theFile == null) {
+                    continue;
+                }
+                app(\App\Services\AttachmentStorageService::class)->storeUploadedFile(
+                    $theFile,
+                    'receive payment',
+                    $payment->id,
+                    $request->attachments[$i]->getClientOriginalName(),
+                    $request
+                );
+            }
+        }
 
         $currentTime = Carbon::now();
 
@@ -398,25 +394,21 @@ class ReceivePaymentsController extends Controller
 		}
 
 		// if attachments then upload
-		if (isset($request->attachments)) {
-			if ($request->attachments != null) {
-				for ($i = 0; $i < count($request->attachments); $i++) {
-					$theFile = $request->file("attachments.$i");
-					if ($theFile == null) {
-						continue;
-					}
-					$theAttachment = rand() . time() . $theFile->getClientOriginalName();
-					$theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
-
-					$attachment = new Attachment();
-					$attachment->file_name = $request->attachments[$i]->getClientOriginalName();
-					$attachment->path = "/uploads/media/attachments/" . $theAttachment;
-					$attachment->ref_type = 'receive payment';
-					$attachment->ref_id = $payment->id;
-					$attachment->save();
-				}
-			}
-		}
+        if (isset($request->attachments) && $request->attachments != null) {
+            for ($i = 0; $i < count($request->attachments); $i++) {
+                $theFile = $request->file("attachments.$i");
+                if ($theFile == null) {
+                    continue;
+                }
+                app(\App\Services\AttachmentStorageService::class)->storeUploadedFile(
+                    $theFile,
+                    'receive payment',
+                    $payment->id,
+                    $request->attachments[$i]->getClientOriginalName(),
+                    $request
+                );
+            }
+        }
 
         $currentTime = Carbon::now();
         DB::beginTransaction();

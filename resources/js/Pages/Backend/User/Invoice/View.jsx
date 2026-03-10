@@ -762,7 +762,7 @@ export default function View({
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                             <a
-                                                                href={`${attachment.path}`}
+                                                                href={attachment.download_url || attachment.path}
                                                                 target="_blank"
                                                                 className="text-blue-600 hover:text-blue-800 hover:underline flex items-center"
                                                                 download

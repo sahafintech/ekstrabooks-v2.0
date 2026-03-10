@@ -294,23 +294,20 @@ class ProjectSubcontractController extends Controller
 
 
         // if attachments then upload
-        if (isset($request->attachments)) {
-            if ($request->attachments != null) {
-                for ($i = 0; $i < count($request->attachments); $i++) {
-                    $theFile = $request->file("attachments.$i.file");
-                    if ($theFile == null) {
-                        continue;
-                    }
-                    $theAttachment = rand() . time() . $theFile->getClientOriginalName();
-                    $theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
-
-                    $attachment = new Attachment();
-                    $attachment->file_name = $request->attachments[$i]['file_name'];
-                    $attachment->path = "/uploads/media/attachments/" . $theAttachment;
-                    $attachment->ref_type = 'project subcontract';
-                    $attachment->ref_id = $projectSubcontract->id;
-                    $attachment->save();
+        if (isset($request->attachments) && $request->attachments != null) {
+            for ($i = 0; $i < count($request->attachments); $i++) {
+                $theFile = $request->file("attachments.$i.file");
+                if ($theFile == null) {
+                    continue;
                 }
+
+                app(\App\Services\AttachmentStorageService::class)->storeUploadedFile(
+                    $theFile,
+                    'project subcontract',
+                    $projectSubcontract->id,
+                    $request->attachments[$i]['file_name'],
+                    $request
+                );
             }
         }
 
@@ -860,23 +857,20 @@ class ProjectSubcontractController extends Controller
         }
 
         // if attachments then upload
-        if (isset($request->attachments)) {
-            if ($request->attachments != null) {
-                for ($i = 0; $i < count($request->attachments); $i++) {
-                    $theFile = $request->file("attachments.$i.file");
-                    if ($theFile == null) {
-                        continue;
-                    }
-                    $theAttachment = rand() . time() . $theFile->getClientOriginalName();
-                    $theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
-
-                    $attachment = new Attachment();
-                    $attachment->file_name = $request->attachments[$i]['file_name'];
-                    $attachment->path = "/uploads/media/attachments/" . $theAttachment;
-                    $attachment->ref_type = 'project subcontract';
-                    $attachment->ref_id = $projectSubcontract->id;
-                    $attachment->save();
+        if (isset($request->attachments) && $request->attachments != null) {
+            for ($i = 0; $i < count($request->attachments); $i++) {
+                $theFile = $request->file("attachments.$i.file");
+                if ($theFile == null) {
+                    continue;
                 }
+
+                app(\App\Services\AttachmentStorageService::class)->storeUploadedFile(
+                    $theFile,
+                    'project subcontract',
+                    $projectSubcontract->id,
+                    $request->attachments[$i]['file_name'],
+                    $request
+                );
             }
         }
 

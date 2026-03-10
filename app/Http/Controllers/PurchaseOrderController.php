@@ -351,25 +351,21 @@ class PurchaseOrderController extends Controller
 
 
 		// if attachments then upload
-		if (isset($request->attachments)) {
-			if ($request->attachments != null) {
-				for ($i = 0; $i < count($request->attachments); $i++) {
-					$theFile = $request->file("attachments.$i");
-					if ($theFile == null) {
-						continue;
-					}
-					$theAttachment = rand() . time() . $theFile->getClientOriginalName();
-					$theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
-
-					$attachment = new Attachment();
-					$attachment->file_name = $request->attachments[$i]->getClientOriginalName();
-					$attachment->path = "/uploads/media/attachments/" . $theAttachment;
-					$attachment->ref_type = 'purchase order';
-					$attachment->ref_id = $purchase->id;
-					$attachment->save();
-				}
-			}
-		}
+        if (isset($request->attachments) && $request->attachments != null) {
+            for ($i = 0; $i < count($request->attachments); $i++) {
+                $theFile = $request->file("attachments.$i");
+                if ($theFile == null) {
+                    continue;
+                }
+                app(\App\Services\AttachmentStorageService::class)->storeUploadedFile(
+                    $theFile,
+                    'purchase order',
+                    $purchase->id,
+                    $request->attachments[$i]->getClientOriginalName(),
+                    $request
+                );
+            }
+        }
 
 		for ($i = 0; $i < count($request->product_name); $i++) {
 			$purchaseItem = $purchase->items()->save(new PurchaseOrderItem([
@@ -615,25 +611,21 @@ class PurchaseOrderController extends Controller
 		}
 
 		// if attachments then upload
-		if (isset($request->attachments)) {
-			if ($request->attachments != null) {
-				for ($i = 0; $i < count($request->attachments); $i++) {
-					$theFile = $request->file("attachments.$i");
-					if ($theFile == null) {
-						continue;
-					}
-					$theAttachment = rand() . time() . $theFile->getClientOriginalName();
-					$theFile->move(public_path() . "/uploads/media/attachments/", $theAttachment);
-
-					$attachment = new Attachment();
-					$attachment->file_name = $request->attachments[$i]->getClientOriginalName();
-					$attachment->path = "/uploads/media/attachments/" . $theAttachment;
-					$attachment->ref_type = 'purchase order';
-					$attachment->ref_id = $purchase->id;
-					$attachment->save();
-				}
-			}
-		}
+        if (isset($request->attachments) && $request->attachments != null) {
+            for ($i = 0; $i < count($request->attachments); $i++) {
+                $theFile = $request->file("attachments.$i");
+                if ($theFile == null) {
+                    continue;
+                }
+                app(\App\Services\AttachmentStorageService::class)->storeUploadedFile(
+                    $theFile,
+                    'purchase order',
+                    $purchase->id,
+                    $request->attachments[$i]->getClientOriginalName(),
+                    $request
+                );
+            }
+        }
 
 		//Update Invoice item
 		foreach ($purchase->items as $purchase_item) {

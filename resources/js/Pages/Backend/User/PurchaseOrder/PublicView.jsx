@@ -379,7 +379,7 @@ export default function PublicView({ purchase_order, attachments }) {
                                         className="border rounded p-4"
                                     >
                                         <a
-                                            href={attachment.path}
+                                            href={attachment.download_url || attachment.path}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-blue-600 hover:underline"

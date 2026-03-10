@@ -50,6 +50,7 @@ use App\Http\Controllers\ProjectSubcontractController;
 use App\Http\Controllers\ProjectSubcontractPaymentController;
 use App\Http\Controllers\ProjectTaskController;
 use App\Http\Controllers\SalaryAdvanceController;
+use App\Http\Controllers\StorageController;
 use App\Http\Controllers\TimesheetController;
 use App\Http\Controllers\User\CustomerController;
 use App\Http\Controllers\User\CustomerDocumentController;
@@ -109,6 +110,9 @@ if ($ev == 1) {
 }
 
 Route::get('server-error', [ServerErrorController::class, 'index'])->name('500.server-error');
+Route::get('attachments/{attachment}/download', [StorageController::class, 'download'])
+	->name('attachments.download')
+	->middleware('signed:relative');
 
 Route::group(['middleware' => $initialMiddleware], function () {
 
@@ -204,6 +208,10 @@ Route::group(['middleware' => $initialMiddleware], function () {
 				'edit',
 				'update',
 			]);
+
+			// storage
+			Route::post('storage/test-connection', [StorageController::class, 'testConnection'])->name('storage.test_connection');
+			Route::resource('storage', StorageController::class);
 		});
 	});
 

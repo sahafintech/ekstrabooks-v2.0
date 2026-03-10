@@ -1,5 +1,31 @@
 <?php
 
+use League\Flysystem\GoogleCloudStorage\UniformBucketLevelAccessVisibility;
+
+$gcsKeyPath = env('GOOGLE_CLOUD_STORAGE_KEY_PATH');
+
+$resolveGcsKeyPath = static function (?string $path): ?string {
+    if (blank($path)) {
+        return null;
+    }
+
+    if (preg_match('/^[A-Za-z]:[\\\\\\/]/', $path) || str_starts_with($path, DIRECTORY_SEPARATOR)) {
+        return $path;
+    }
+
+    $storageCandidate = storage_path($path);
+    if (file_exists($storageCandidate)) {
+        return $storageCandidate;
+    }
+
+    $baseCandidate = base_path($path);
+    if (file_exists($baseCandidate)) {
+        return $baseCandidate;
+    }
+
+    return $storageCandidate;
+};
+
 return [
 
     /*
@@ -14,6 +40,8 @@ return [
     */
 
     'default' => env('FILESYSTEM_DISK', 'local'),
+
+    'default_upload_disk' => env('FILESYSTEM_UPLOAD_DISK', 'public'),
 
     /*
     |--------------------------------------------------------------------------
@@ -53,6 +81,17 @@ return [
             'url' => env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'throw' => false,
+        ],
+
+        'gcs' => [
+            'driver' => 'gcs',
+            'project_id' => env('GOOGLE_CLOUD_PROJECT_ID'),
+            'key_file_path' => $resolveGcsKeyPath($gcsKeyPath),
+            'bucket' => env('GOOGLE_CLOUD_STORAGE_BUCKET'),
+            'path_prefix' => env('GOOGLE_CLOUD_STORAGE_PATH_PREFIX', ''),
+            'storage_api_uri' => env('GOOGLE_CLOUD_STORAGE_API_URI'),
+            'visibility_handler' => UniformBucketLevelAccessVisibility::class,
             'throw' => false,
         ],
 

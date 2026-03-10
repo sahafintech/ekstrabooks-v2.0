@@ -400,7 +400,7 @@ export default function View({purchase_order,attachments,email_templates}) {
                                             </TableCell>
                                             <TableCell>
                                                 <a
-                                                    href={`${attachment.path}`}
+                                                    href={attachment.download_url || attachment.path}
                                                     target="_blank"
                                                     className="text-blue-600 hover:text-blue-800 hover:underline flex items-center"
                                                     download
