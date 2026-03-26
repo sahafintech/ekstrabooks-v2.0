@@ -1169,8 +1169,413 @@ class ReceiptController extends Controller
         ]);
     }
 
+    public function import()
+    {
+        Gate::authorize('receipts.create');
+
+        return Inertia::render('Backend/User/CashInvoice/Import');
+    }
+
+    public function uploadImportFile(Request $request)
+    {
+        Gate::authorize('receipts.create');
+
+        if ($request->isMethod('get')) {
+            return redirect()->route('receipts.import.page');
+        }
+
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
+        ]);
+
+        try {
+            $sessionId = session()->getId();
+            $tempDir = storage_path("app/imports/temp/{$sessionId}");
+
+            if (!is_dir($tempDir)) {
+                mkdir($tempDir, 0755, true);
+            }
+
+            $fileName = uniqid() . '_' . $request->file('file')->getClientOriginalName();
+            $fullPath = $tempDir . '/' . $fileName;
+            $request->file('file')->move($tempDir, $fileName);
+
+            if (!file_exists($fullPath)) {
+                throw new \Exception('Failed to store uploaded file');
+            }
+
+            $relativePath = "imports/temp/{$sessionId}/{$fileName}";
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+            $worksheet = $spreadsheet->getActiveSheet();
+            $headers = [];
+
+            foreach ($worksheet->getRowIterator(1, 1) as $row) {
+                $cellIterator = $row->getCellIterator();
+                $cellIterator->setIterateOnlyExistingCells(false);
+
+                foreach ($cellIterator as $cell) {
+                    $value = $cell->getValue();
+                    if ($value) {
+                        $headers[] = (string) $value;
+                    }
+                }
+            }
+
+            session()->put('cash_invoice_import_file_path', $relativePath);
+            session()->put('cash_invoice_import_full_path', $fullPath);
+            session()->put('cash_invoice_import_file_name', $request->file('file')->getClientOriginalName());
+            session()->put('cash_invoice_import_headers', $headers);
+            session()->save();
+
+            return Inertia::render('Backend/User/CashInvoice/Import', [
+                'previewData' => [
+                    'headers' => $headers,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to process file: ' . $e->getMessage());
+        }
+    }
+
+    public function previewImport(Request $request)
+    {
+        Gate::authorize('receipts.create');
+
+        if ($request->isMethod('get')) {
+            return redirect()->route('receipts.import.page');
+        }
+
+        $mappings = $request->input('mappings', []);
+        $fullPath = session('cash_invoice_import_full_path');
+        $headers = session('cash_invoice_import_headers', []);
+
+        if (!$fullPath || !file_exists($fullPath)) {
+            return back()->with('error', 'Import session expired or file not found. Please upload your file again.');
+        }
+
+        try {
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+            $worksheet = $spreadsheet->getActiveSheet();
+
+            $previewRecords = [];
+            $validCount = 0;
+            $errorCount = 0;
+            $totalRows = 0;
+            $groupedReceipts = [];
+            $autoGroupCounter = 0;
+
+            foreach ($worksheet->getRowIterator(2) as $row) {
+                $rowIndex = $row->getRowIndex();
+
+                $cellIterator = $row->getCellIterator();
+                $cellIterator->setIterateOnlyExistingCells(false);
+
+                $rawRow = [];
+                $cellIndex = 0;
+
+                foreach ($cellIterator as $cell) {
+                    if ($cellIndex < count($headers)) {
+                        $rawRow[$headers[$cellIndex]] = $cell->getValue();
+                    }
+                    $cellIndex++;
+                }
+
+                $rowData = $this->mapReceiptImportRow($rawRow, $mappings);
+                $receiptNumber = $this->normalizeReceiptImportNumber($rowData['receipt_number'] ?? null);
+                $productName = trim((string) ($rowData['product_name'] ?? ''));
+
+                if ($receiptNumber === null && $productName === '') {
+                    continue;
+                }
+
+                $totalRows++;
+
+                $groupKey = $receiptNumber !== null
+                    ? 'receipt::' . strtolower($receiptNumber)
+                    : 'auto::' . (++$autoGroupCounter);
+
+                if (!isset($groupedReceipts[$groupKey])) {
+                    $groupedReceipts[$groupKey] = [
+                        'receipt_number' => $receiptNumber,
+                        'header' => $rowData,
+                        'rows' => [],
+                    ];
+                }
+
+                $groupedReceipts[$groupKey]['rows'][] = [
+                    'row' => $rowIndex,
+                    'data' => $rowData,
+                ];
+            }
+
+            $customerLookupCache = [];
+            $projectLookupCache = [];
+            $currencyLookupCache = [];
+            $accountLookupCache = [];
+            $methodLookupCache = [];
+            $productLookupCache = [];
+            $taxLookupCache = [];
+
+            foreach ($groupedReceipts as $group) {
+                $header = $group['header'];
+                $groupErrors = [];
+
+                $receiptDateRaw = $header['receipt_date'] ?? null;
+                if (($receiptDateRaw === null || trim((string) $receiptDateRaw) === '') && $receiptDateRaw !== 0) {
+                    $groupErrors[] = 'Invoice date is required';
+                } elseif ($this->parseReceiptImportDate($receiptDateRaw) === null) {
+                    $groupErrors[] = 'Invoice date is invalid';
+                }
+
+                $paymentAccountName = trim((string) ($header['payment_account'] ?? ''));
+                if ($paymentAccountName === '') {
+                    $groupErrors[] = 'Payment account is required';
+                } else {
+                    $accountKey = strtolower($paymentAccountName);
+                    if (!array_key_exists($accountKey, $accountLookupCache)) {
+                        $accountLookupCache[$accountKey] = $this->findReceiptImportPaymentAccount($paymentAccountName);
+                    }
+
+                    if (!$accountLookupCache[$accountKey]) {
+                        $groupErrors[] = 'Payment account "' . $paymentAccountName . '" not found';
+                    }
+                }
+
+                $paymentMethodName = trim((string) ($header['payment_method'] ?? ''));
+                if ($paymentMethodName === '') {
+                    $groupErrors[] = 'Payment method is required';
+                } else {
+                    $methodKey = strtolower($paymentMethodName);
+                    if (!array_key_exists($methodKey, $methodLookupCache)) {
+                        $methodLookupCache[$methodKey] = TransactionMethod::where('name', 'like', '%' . $paymentMethodName . '%')->first();
+                    }
+
+                    if (!$methodLookupCache[$methodKey]) {
+                        $groupErrors[] = 'Payment method "' . $paymentMethodName . '" not found';
+                    }
+                }
+
+                if (!empty($header['customer_name'])) {
+                    $customerName = trim((string) $header['customer_name']);
+                    $customerKey = strtolower($customerName);
+                    if (!array_key_exists($customerKey, $customerLookupCache)) {
+                        $customerLookupCache[$customerKey] = Customer::where('name', 'like', '%' . $customerName . '%')->first();
+                    }
+
+                    if (!$customerLookupCache[$customerKey]) {
+                        $groupErrors[] = 'Customer "' . $customerName . '" not found';
+                    }
+                }
+
+                if (!empty($header['project_name'])) {
+                    $projectName = trim((string) $header['project_name']);
+                    $projectKey = strtolower($projectName);
+                    if (!array_key_exists($projectKey, $projectLookupCache)) {
+                        $projectLookupCache[$projectKey] = Project::where('project_name', 'like', '%' . $projectName . '%')->first();
+                    }
+
+                    if (!$projectLookupCache[$projectKey]) {
+                        $groupErrors[] = 'Project "' . $projectName . '" not found';
+                    }
+                }
+
+                if (!empty($header['currency'])) {
+                    $currencyName = trim((string) $header['currency']);
+                    $currencyKey = strtolower($currencyName);
+                    if (!array_key_exists($currencyKey, $currencyLookupCache)) {
+                        $currencyLookupCache[$currencyKey] = Currency::where('name', $currencyName)->first();
+                    }
+
+                    if (!$currencyLookupCache[$currencyKey]) {
+                        $groupErrors[] = 'Currency "' . $currencyName . '" not found';
+                    }
+                }
+
+                if (
+                    isset($header['exchange_rate']) &&
+                    $header['exchange_rate'] !== null &&
+                    trim((string) $header['exchange_rate']) !== '' &&
+                    (!is_numeric($header['exchange_rate']) || (float) $header['exchange_rate'] <= 0)
+                ) {
+                    $groupErrors[] = 'Exchange rate must be greater than 0';
+                }
+
+                if (
+                    isset($header['discount_type']) &&
+                    $header['discount_type'] !== null &&
+                    trim((string) $header['discount_type']) !== '' &&
+                    !in_array(trim((string) $header['discount_type']), ['0', '1'], true)
+                ) {
+                    $groupErrors[] = 'Discount type must be 0 or 1';
+                }
+
+                if (
+                    isset($header['discount_value']) &&
+                    $header['discount_value'] !== null &&
+                    trim((string) $header['discount_value']) !== '' &&
+                    (!is_numeric($header['discount_value']) || (float) $header['discount_value'] < 0)
+                ) {
+                    $groupErrors[] = 'Discount value must be a non-negative number';
+                }
+
+                foreach ($group['rows'] as $rowEntry) {
+                    $rowData = $rowEntry['data'];
+                    $rowErrors = $groupErrors;
+                    $productName = trim((string) ($rowData['product_name'] ?? ''));
+
+                    if ($productName === '') {
+                        $rowErrors[] = 'Product name is required';
+                    } else {
+                        $productKey = strtolower($productName);
+                        if (!array_key_exists($productKey, $productLookupCache)) {
+                            $productLookupCache[$productKey] = Product::where('name', 'like', '%' . $productName . '%')->first();
+                        }
+
+                        $product = $productLookupCache[$productKey];
+
+                        if (!$product) {
+                            $rowErrors[] = 'Product "' . $productName . '" not found';
+                        } else {
+                            if ((int) $product->allow_for_selling === 1 && empty($product->income_account_id)) {
+                                $rowErrors[] = 'Product "' . $product->name . '" is missing an income account';
+                            }
+
+                            if (
+                                (int) $product->stock_management === 1 &&
+                                (int) $product->allow_for_purchasing === 1 &&
+                                empty($product->expense_account_id)
+                            ) {
+                                $rowErrors[] = 'Product "' . $product->name . '" is missing an expense account';
+                            }
+
+                            if (
+                                $rowData['quantity'] !== null &&
+                                $rowData['quantity'] !== '' &&
+                                is_numeric($rowData['quantity']) &&
+                                (int) $product->stock_management === 1 &&
+                                $product->type === 'product' &&
+                                (float) $product->stock < (float) $rowData['quantity']
+                            ) {
+                                $rowErrors[] = 'Insufficient stock for product "' . $product->name . '"';
+                            }
+                        }
+                    }
+
+                    if (!isset($rowData['quantity']) || $rowData['quantity'] === '' || !is_numeric($rowData['quantity']) || (float) $rowData['quantity'] <= 0) {
+                        $rowErrors[] = 'Quantity must be greater than 0';
+                    }
+
+                    if (!isset($rowData['unit_cost']) || $rowData['unit_cost'] === '' || !is_numeric($rowData['unit_cost']) || (float) $rowData['unit_cost'] < 0) {
+                        $rowErrors[] = 'Unit cost is required and must be non-negative';
+                    }
+
+                    foreach ($this->parseReceiptImportTaxNames($rowData['tax'] ?? null) as $taxName) {
+                        $taxKey = strtolower($taxName);
+                        if (!array_key_exists($taxKey, $taxLookupCache)) {
+                            $taxLookupCache[$taxKey] = Tax::where('name', 'like', '%' . $taxName . '%')->first();
+                        }
+
+                        $tax = $taxLookupCache[$taxKey];
+                        if (!$tax) {
+                            $rowErrors[] = 'Tax "' . $taxName . '" not found';
+                        } elseif (!$tax->account_id) {
+                            $rowErrors[] = 'Tax "' . $tax->name . '" is missing an account';
+                        }
+                    }
+
+                    $rowErrors = array_values(array_unique($rowErrors));
+                    $status = $rowErrors === [] ? 'valid' : 'error';
+
+                    if ($status === 'error') {
+                        $errorCount++;
+                    } else {
+                        $validCount++;
+                    }
+
+                    if ($status === 'error' && count($previewRecords) < 50) {
+                        $previewRecords[] = [
+                            'row' => $rowEntry['row'],
+                            'data' => [
+                                'receipt_number' => $group['receipt_number'],
+                                'product_name' => $rowData['product_name'] ?? null,
+                            ],
+                            'status' => $status,
+                            'errors' => $rowErrors,
+                        ];
+                    }
+                }
+            }
+
+            session()->put('cash_invoice_import_mappings', $mappings);
+            session()->save();
+
+            return Inertia::render('Backend/User/CashInvoice/Import', [
+                'previewData' => [
+                    'headers' => $headers,
+                    'total_rows' => $totalRows,
+                    'unique_invoices' => count($groupedReceipts),
+                    'preview_records' => $previewRecords,
+                    'valid_count' => $validCount,
+                    'error_count' => $errorCount,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to preview import: ' . $e->getMessage());
+        }
+    }
+
+    public function executeImport(Request $request)
+    {
+        Gate::authorize('receipts.create');
+
+        if ($request->isMethod('get')) {
+            return redirect()->route('receipts.import.page');
+        }
+
+        $mappings = session('cash_invoice_import_mappings', []);
+        $fullPath = session('cash_invoice_import_full_path');
+
+        if (!$fullPath || !file_exists($fullPath)) {
+            return redirect()
+                ->route('receipts.index')
+                ->with('error', 'Import session expired or file not found. Please start over.');
+        }
+
+        try {
+            Excel::import(new CashInvoiceImport($mappings), $fullPath);
+
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->id();
+            $audit->event = 'Cash Invoices Imported - ' . session('cash_invoice_import_file_name');
+            $audit->save();
+
+            if (file_exists($fullPath)) {
+                unlink($fullPath);
+            }
+
+            session()->forget([
+                'cash_invoice_import_file_path',
+                'cash_invoice_import_full_path',
+                'cash_invoice_import_file_name',
+                'cash_invoice_import_headers',
+                'cash_invoice_import_mappings',
+            ]);
+
+            return redirect()
+                ->route('receipts.index')
+                ->with('success', 'Cash invoices imported successfully.');
+        } catch (\Exception $e) {
+            return redirect()
+                ->route('receipts.index')
+                ->with('error', 'Import failed: ' . $e->getMessage());
+        }
+    }
+
     public function import_receipts(Request $request)
     {
+        Gate::authorize('receipts.create');
+
         $request->validate([
             'receipts_file' => 'required|mimes:xls,xlsx',
         ]);
@@ -1189,6 +1594,159 @@ class ReceiptController extends Controller
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }
+    }
+
+    private function mapReceiptImportRow(array $row, array $mappings): array
+    {
+        $mappedData = [];
+
+        foreach ($row as $header => $value) {
+            if ($mappings !== []) {
+                $normalizedHeader = $this->normalizeReceiptImportHeader((string) $header);
+
+                foreach ($mappings as $excelHeader => $systemField) {
+                    if ($this->normalizeReceiptImportHeader((string) $excelHeader) !== $normalizedHeader) {
+                        continue;
+                    }
+
+                    $normalizedField = $this->normalizeReceiptImportField((string) $systemField);
+                    if ($normalizedField !== null && $normalizedField !== 'skip') {
+                        $mappedData[$normalizedField] = $value;
+                    }
+
+                    continue 2;
+                }
+
+                continue;
+            }
+
+            $normalizedField = $this->normalizeReceiptImportField((string) $header);
+            if ($normalizedField !== null && $normalizedField !== 'skip') {
+                $mappedData[$normalizedField] = $value;
+            }
+        }
+
+        return $mappedData;
+    }
+
+    private function normalizeReceiptImportHeader(string $header): string
+    {
+        return trim((string) preg_replace('/_+/', '_', strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', trim($header)))));
+    }
+
+    private function normalizeReceiptImportField(string $field): ?string
+    {
+        $normalized = $this->normalizeReceiptImportHeader($field);
+
+        $aliases = [
+            'invoice_number' => 'receipt_number',
+            'receipt_no' => 'receipt_number',
+            'invoice_no' => 'receipt_number',
+            'invoice_date' => 'receipt_date',
+            'transaction_currency' => 'currency',
+            'debit_account' => 'payment_account',
+            'account' => 'payment_account',
+            'payment_account_name' => 'payment_account',
+            'payment_reference_number' => 'payment_reference',
+            'reference' => 'payment_reference',
+            'project' => 'project_name',
+        ];
+
+        return $aliases[$normalized] ?? $normalized;
+    }
+
+    private function normalizeReceiptImportNumber($receiptNumber): ?string
+    {
+        if ($receiptNumber === null) {
+            return null;
+        }
+
+        $normalized = trim((string) $receiptNumber);
+        return $normalized === '' ? null : $normalized;
+    }
+
+    private function parseReceiptImportTaxNames($value): array
+    {
+        if ($value === null) {
+            return [];
+        }
+
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return [];
+        }
+
+        $parts = preg_split('/[;,]/', $raw) ?: [];
+        $names = [];
+
+        foreach ($parts as $part) {
+            $name = trim((string) $part);
+            if ($name !== '') {
+                $names[] = $name;
+            }
+        }
+
+        return array_values(array_unique($names));
+    }
+
+    private function parseReceiptImportDate($date): ?string
+    {
+        if ($date === null || trim((string) $date) === '') {
+            return null;
+        }
+
+        if (is_numeric($date)) {
+            try {
+                return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($date)->format('Y-m-d');
+            } catch (\Exception $e) {
+                return null;
+            }
+        }
+
+        $rawDate = trim((string) $date);
+
+        if (preg_match('/^\d{1,2}\/\d{1,2}\/\d{4}$/', $rawDate) === 1) {
+            try {
+                return Carbon::createFromFormat('d/m/Y', $rawDate)->format('Y-m-d');
+            } catch (\Exception $e) {
+            }
+        }
+
+        if (preg_match('/^\d{1,2}-\d{1,2}-\d{4}$/', $rawDate) === 1) {
+            try {
+                return Carbon::createFromFormat('d-m-Y', $rawDate)->format('Y-m-d');
+            } catch (\Exception $e) {
+            }
+        }
+
+        foreach (['Y-m-d', 'Y/m/d', 'm/d/Y', 'm-d-Y', 'n/j/Y', 'n-j-Y'] as $format) {
+            try {
+                return Carbon::createFromFormat($format, $rawDate)->format('Y-m-d');
+            } catch (\Exception $e) {
+            }
+        }
+
+        try {
+            return Carbon::parse($rawDate)->format('Y-m-d');
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    private function findReceiptImportPaymentAccount(string $accountName): ?Account
+    {
+        if ($accountName === '') {
+            return null;
+        }
+
+        return Account::where(function ($query) {
+            $query->where('account_type', 'Bank')
+                ->orWhere('account_type', 'Cash')
+                ->orWhere('account_type', 'bank')
+                ->orWhere('account_type', 'cash');
+        })
+            ->where('account_name', 'like', '%' . $accountName . '%')
+            ->first();
     }
 
     public function receipts_filter(Request $request)

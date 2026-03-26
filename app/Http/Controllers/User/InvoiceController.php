@@ -1596,6 +1596,549 @@ class InvoiceController extends Controller
         );
     }
 
+    public function import()
+    {
+        Gate::authorize('invoices.csv.import');
+
+        return Inertia::render('Backend/User/Invoice/Import');
+    }
+
+    public function uploadImportFile(Request $request)
+    {
+        Gate::authorize('invoices.csv.import');
+
+        if ($request->isMethod('get')) {
+            return redirect()->route('invoices.import.page');
+        }
+
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
+        ]);
+
+        try {
+            $sessionId = session()->getId();
+            $tempDir = storage_path("app/imports/temp/{$sessionId}");
+
+            if (!is_dir($tempDir)) {
+                mkdir($tempDir, 0755, true);
+            }
+
+            $fileName = uniqid() . '_' . $request->file('file')->getClientOriginalName();
+            $fullPath = $tempDir . '/' . $fileName;
+            $request->file('file')->move($tempDir, $fileName);
+
+            if (!file_exists($fullPath)) {
+                throw new \Exception('Failed to store uploaded file');
+            }
+
+            $relativePath = "imports/temp/{$sessionId}/{$fileName}";
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+            $worksheet = $spreadsheet->getActiveSheet();
+            $headers = [];
+
+            foreach ($worksheet->getRowIterator(1, 1) as $row) {
+                $cellIterator = $row->getCellIterator();
+                $cellIterator->setIterateOnlyExistingCells(false);
+
+                foreach ($cellIterator as $cell) {
+                    $value = $cell->getValue();
+                    if ($value !== null && trim((string) $value) !== '') {
+                        $headers[] = (string) $value;
+                    }
+                }
+            }
+
+            session()->put('invoice_import_file_path', $relativePath);
+            session()->put('invoice_import_full_path', $fullPath);
+            session()->put('invoice_import_file_name', $request->file('file')->getClientOriginalName());
+            session()->put('invoice_import_headers', $headers);
+            session()->save();
+
+            return Inertia::render('Backend/User/Invoice/Import', [
+                'previewData' => [
+                    'headers' => $headers,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to process file: ' . $e->getMessage());
+        }
+    }
+
+    public function previewImport(Request $request)
+    {
+        Gate::authorize('invoices.csv.import');
+
+        if ($request->isMethod('get')) {
+            return redirect()->route('invoices.import.page');
+        }
+
+        $mappings = $request->input('mappings', []);
+        $fullPath = session('invoice_import_full_path');
+        $headers = session('invoice_import_headers', []);
+
+        if (!$fullPath || !file_exists($fullPath)) {
+            return back()->with('error', 'Import session expired or file not found. Please upload your file again.');
+        }
+
+        try {
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+            $worksheet = $spreadsheet->getActiveSheet();
+
+            $previewRecords = [];
+            $validCount = 0;
+            $errorCount = 0;
+            $totalRows = 0;
+            $groupedInvoices = [];
+            $autoGroupCounter = 0;
+
+            foreach ($worksheet->getRowIterator(2) as $row) {
+                $rowIndex = $row->getRowIndex();
+
+                $cellIterator = $row->getCellIterator();
+                $cellIterator->setIterateOnlyExistingCells(false);
+
+                $rawRow = [];
+                $cellIndex = 0;
+
+                foreach ($cellIterator as $cell) {
+                    if ($cellIndex < count($headers)) {
+                        $rawRow[$headers[$cellIndex]] = $cell->getValue();
+                    }
+                    $cellIndex++;
+                }
+
+                $rowData = $this->mapInvoiceImportRow($rawRow, $mappings);
+                $invoiceNumber = $this->normalizeInvoiceImportNumber($rowData['invoice_number'] ?? null);
+                $productName = trim((string) ($rowData['product_name'] ?? ''));
+
+                if ($invoiceNumber === null && $productName === '') {
+                    continue;
+                }
+
+                $totalRows++;
+
+                $groupKey = $invoiceNumber !== null
+                    ? 'invoice::' . strtolower($invoiceNumber)
+                    : 'auto::' . (++$autoGroupCounter);
+
+                if (!isset($groupedInvoices[$groupKey])) {
+                    $groupedInvoices[$groupKey] = [
+                        'invoice_number' => $invoiceNumber,
+                        'header' => $rowData,
+                        'rows' => [],
+                    ];
+                }
+
+                $groupedInvoices[$groupKey]['rows'][] = [
+                    'row' => $rowIndex,
+                    'data' => $rowData,
+                ];
+            }
+
+            $customerLookupCache = [];
+            $clientLookupCache = [];
+            $projectLookupCache = [];
+            $currencyLookupCache = [];
+            $productLookupCache = [];
+            $taxLookupCache = [];
+
+            foreach ($groupedInvoices as $group) {
+                $header = $group['header'];
+                $groupErrors = [];
+
+                $invoiceDateRaw = $header['invoice_date'] ?? null;
+                $invoiceDate = null;
+                if (($invoiceDateRaw === null || trim((string) $invoiceDateRaw) === '') && $invoiceDateRaw !== 0) {
+                    $groupErrors[] = 'Invoice date is required';
+                } else {
+                    $invoiceDate = $this->parseInvoiceImportDate($invoiceDateRaw);
+                    if ($invoiceDate === null) {
+                        $groupErrors[] = 'Invoice date is invalid';
+                    }
+                }
+
+                $dueDateRaw = $header['due_date'] ?? null;
+                $dueDate = null;
+                if (($dueDateRaw === null || trim((string) $dueDateRaw) === '') && $dueDateRaw !== 0) {
+                    $groupErrors[] = 'Due date is required';
+                } else {
+                    $dueDate = $this->parseInvoiceImportDate($dueDateRaw);
+                    if ($dueDate === null) {
+                        $groupErrors[] = 'Due date is invalid';
+                    }
+                }
+
+                if ($invoiceDate !== null && $dueDate !== null && Carbon::parse($dueDate)->lt(Carbon::parse($invoiceDate))) {
+                    $groupErrors[] = 'Due date must be on or after the invoice date';
+                }
+
+                $customerName = trim((string) ($header['customer_name'] ?? ''));
+                if ($customerName === '') {
+                    $groupErrors[] = 'Customer name is required';
+                } else {
+                    $customerKey = strtolower($customerName);
+                    if (!array_key_exists($customerKey, $customerLookupCache)) {
+                        $customerLookupCache[$customerKey] = Customer::where('name', 'like', '%' . $customerName . '%')->first();
+                    }
+
+                    if (!$customerLookupCache[$customerKey]) {
+                        $groupErrors[] = 'Customer "' . $customerName . '" not found';
+                    }
+                }
+
+                if (!empty($header['client_name'])) {
+                    $clientName = trim((string) $header['client_name']);
+                    $clientKey = strtolower($clientName);
+                    if (!array_key_exists($clientKey, $clientLookupCache)) {
+                        $clientLookupCache[$clientKey] = Customer::where('name', 'like', '%' . $clientName . '%')->first();
+                    }
+
+                    if (!$clientLookupCache[$clientKey]) {
+                        $groupErrors[] = 'Client "' . $clientName . '" not found';
+                    }
+                }
+
+                if (!empty($header['project_name'])) {
+                    $projectName = trim((string) $header['project_name']);
+                    $projectKey = strtolower($projectName);
+                    if (!array_key_exists($projectKey, $projectLookupCache)) {
+                        $projectLookupCache[$projectKey] = Project::where('project_name', 'like', '%' . $projectName . '%')->first();
+                    }
+
+                    if (!$projectLookupCache[$projectKey]) {
+                        $groupErrors[] = 'Project "' . $projectName . '" not found';
+                    }
+                }
+
+                if (!empty($header['currency'])) {
+                    $currencyName = trim((string) $header['currency']);
+                    $currencyKey = strtolower($currencyName);
+                    if (!array_key_exists($currencyKey, $currencyLookupCache)) {
+                        $currencyLookupCache[$currencyKey] = Currency::where('name', $currencyName)->first();
+                    }
+
+                    if (!$currencyLookupCache[$currencyKey]) {
+                        $groupErrors[] = 'Currency "' . $currencyName . '" not found';
+                    }
+                }
+
+                if (
+                    isset($header['exchange_rate']) &&
+                    $header['exchange_rate'] !== null &&
+                    trim((string) $header['exchange_rate']) !== '' &&
+                    (!is_numeric($header['exchange_rate']) || (float) $header['exchange_rate'] <= 0)
+                ) {
+                    $groupErrors[] = 'Exchange rate must be greater than 0';
+                }
+
+                if (
+                    isset($header['discount_type']) &&
+                    $header['discount_type'] !== null &&
+                    trim((string) $header['discount_type']) !== '' &&
+                    !in_array(trim((string) $header['discount_type']), ['0', '1'], true)
+                ) {
+                    $groupErrors[] = 'Discount type must be 0 or 1';
+                }
+
+                if (
+                    isset($header['discount_value']) &&
+                    $header['discount_value'] !== null &&
+                    trim((string) $header['discount_value']) !== '' &&
+                    (!is_numeric($header['discount_value']) || (float) $header['discount_value'] < 0)
+                ) {
+                    $groupErrors[] = 'Discount value must be a non-negative number';
+                }
+
+                foreach ($group['rows'] as $rowEntry) {
+                    $rowData = $rowEntry['data'];
+                    $rowErrors = $groupErrors;
+                    $productName = trim((string) ($rowData['product_name'] ?? ''));
+
+                    if ($productName === '') {
+                        $rowErrors[] = 'Product name is required';
+                    } else {
+                        $productKey = strtolower($productName);
+                        if (!array_key_exists($productKey, $productLookupCache)) {
+                            $productLookupCache[$productKey] = Product::where('name', 'like', '%' . $productName . '%')->first();
+                        }
+
+                        $product = $productLookupCache[$productKey];
+
+                        if (!$product) {
+                            $rowErrors[] = 'Product "' . $productName . '" not found';
+                        } else {
+                            if ((int) $product->allow_for_selling === 1 && empty($product->income_account_id)) {
+                                $rowErrors[] = 'Product "' . $product->name . '" is missing an income account';
+                            }
+
+                            if ((int) $product->allow_for_purchasing === 1 && empty($product->expense_account_id)) {
+                                $rowErrors[] = 'Product "' . $product->name . '" is missing an expense account';
+                            }
+
+                            if (
+                                $rowData['quantity'] !== null &&
+                                $rowData['quantity'] !== '' &&
+                                is_numeric($rowData['quantity']) &&
+                                (int) $product->stock_management === 1 &&
+                                $product->type === 'product' &&
+                                (float) $product->stock < (float) $rowData['quantity']
+                            ) {
+                                $rowErrors[] = 'Insufficient stock for product "' . $product->name . '"';
+                            }
+                        }
+                    }
+
+                    if (!isset($rowData['quantity']) || $rowData['quantity'] === '' || !is_numeric($rowData['quantity']) || (float) $rowData['quantity'] <= 0) {
+                        $rowErrors[] = 'Quantity must be greater than 0';
+                    }
+
+                    if (!isset($rowData['unit_cost']) || $rowData['unit_cost'] === '' || !is_numeric($rowData['unit_cost']) || (float) $rowData['unit_cost'] < 0) {
+                        $rowErrors[] = 'Unit cost is required and must be non-negative';
+                    }
+
+                    foreach ($this->parseInvoiceImportTaxNames($rowData['tax'] ?? null) as $taxName) {
+                        $taxKey = strtolower($taxName);
+                        if (!array_key_exists($taxKey, $taxLookupCache)) {
+                            $taxLookupCache[$taxKey] = Tax::where('name', 'like', '%' . $taxName . '%')->first();
+                        }
+
+                        $tax = $taxLookupCache[$taxKey];
+                        if (!$tax) {
+                            $rowErrors[] = 'Tax "' . $taxName . '" not found';
+                        } elseif (!$tax->account_id) {
+                            $rowErrors[] = 'Tax "' . $tax->name . '" is missing an account';
+                        }
+                    }
+
+                    $rowErrors = array_values(array_unique($rowErrors));
+                    $status = $rowErrors === [] ? 'valid' : 'error';
+
+                    if ($status === 'error') {
+                        $errorCount++;
+                    } else {
+                        $validCount++;
+                    }
+
+                    if ($status === 'error' && count($previewRecords) < 50) {
+                        $previewRecords[] = [
+                            'row' => $rowEntry['row'],
+                            'data' => [
+                                'invoice_number' => $group['invoice_number'],
+                                'product_name' => $rowData['product_name'] ?? null,
+                            ],
+                            'status' => $status,
+                            'errors' => $rowErrors,
+                        ];
+                    }
+                }
+            }
+
+            session()->put('invoice_import_mappings', $mappings);
+            session()->save();
+
+            return Inertia::render('Backend/User/Invoice/Import', [
+                'previewData' => [
+                    'headers' => $headers,
+                    'total_rows' => $totalRows,
+                    'unique_invoices' => count($groupedInvoices),
+                    'preview_records' => $previewRecords,
+                    'valid_count' => $validCount,
+                    'error_count' => $errorCount,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to preview import: ' . $e->getMessage());
+        }
+    }
+
+    public function executeImport(Request $request)
+    {
+        Gate::authorize('invoices.csv.import');
+
+        if ($request->isMethod('get')) {
+            return redirect()->route('invoices.import.page');
+        }
+
+        $mappings = session('invoice_import_mappings', []);
+        $fullPath = session('invoice_import_full_path');
+
+        if (!$fullPath || !file_exists($fullPath)) {
+            return redirect()
+                ->route('invoices.index')
+                ->with('error', 'Import session expired or file not found. Please start over.');
+        }
+
+        try {
+            Excel::import(new CreditInvoiceImport($mappings), $fullPath);
+
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->id();
+            $audit->event = 'Imported Invoices - ' . session('invoice_import_file_name');
+            $audit->save();
+
+            if (file_exists($fullPath)) {
+                unlink($fullPath);
+            }
+
+            session()->forget([
+                'invoice_import_file_path',
+                'invoice_import_full_path',
+                'invoice_import_file_name',
+                'invoice_import_headers',
+                'invoice_import_mappings',
+            ]);
+
+            return redirect()
+                ->route('invoices.index')
+                ->with('success', 'Invoices imported successfully.');
+        } catch (\Exception $e) {
+            return redirect()
+                ->route('invoices.index')
+                ->with('error', 'Import failed: ' . $e->getMessage());
+        }
+    }
+
+    private function mapInvoiceImportRow(array $row, array $mappings): array
+    {
+        $mappedData = [];
+
+        foreach ($row as $header => $value) {
+            if ($mappings !== []) {
+                $normalizedHeader = $this->normalizeInvoiceImportHeader((string) $header);
+
+                foreach ($mappings as $excelHeader => $systemField) {
+                    if ($this->normalizeInvoiceImportHeader((string) $excelHeader) !== $normalizedHeader) {
+                        continue;
+                    }
+
+                    $normalizedField = $this->normalizeInvoiceImportField((string) $systemField);
+                    if ($normalizedField !== null && $normalizedField !== 'skip') {
+                        $mappedData[$normalizedField] = $value;
+                    }
+
+                    continue 2;
+                }
+
+                continue;
+            }
+
+            $normalizedField = $this->normalizeInvoiceImportField((string) $header);
+            if ($normalizedField !== null && $normalizedField !== 'skip') {
+                $mappedData[$normalizedField] = $value;
+            }
+        }
+
+        return $mappedData;
+    }
+
+    private function normalizeInvoiceImportHeader(string $header): string
+    {
+        return trim((string) preg_replace('/_+/', '_', strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', trim($header)))));
+    }
+
+    private function normalizeInvoiceImportField(string $field): ?string
+    {
+        $normalized = $this->normalizeInvoiceImportHeader($field);
+
+        $aliases = [
+            'invoice_no' => 'invoice_number',
+            'invoice_num' => 'invoice_number',
+            'invoice_reference' => 'invoice_number',
+            'customer' => 'customer_name',
+            'client' => 'client_name',
+            'project' => 'project_name',
+            'transaction_currency' => 'currency',
+            'currency_code' => 'currency',
+            'product' => 'product_name',
+            'item_description' => 'description',
+            'details' => 'description',
+            'unit_price' => 'unit_cost',
+            'price' => 'unit_cost',
+            'taxes' => 'tax',
+        ];
+
+        return $aliases[$normalized] ?? $normalized;
+    }
+
+    private function normalizeInvoiceImportNumber($invoiceNumber): ?string
+    {
+        if ($invoiceNumber === null) {
+            return null;
+        }
+
+        $normalized = trim((string) $invoiceNumber);
+        return $normalized === '' ? null : $normalized;
+    }
+
+    private function parseInvoiceImportTaxNames($value): array
+    {
+        if ($value === null) {
+            return [];
+        }
+
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return [];
+        }
+
+        $parts = preg_split('/[;,]/', $raw) ?: [];
+        $names = [];
+
+        foreach ($parts as $part) {
+            $name = trim((string) $part);
+            if ($name !== '') {
+                $names[] = $name;
+            }
+        }
+
+        return array_values(array_unique($names));
+    }
+
+    private function parseInvoiceImportDate($date): ?string
+    {
+        if ($date === null || trim((string) $date) === '') {
+            return null;
+        }
+
+        if (is_numeric($date)) {
+            try {
+                return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($date)->format('Y-m-d');
+            } catch (\Exception $e) {
+                return null;
+            }
+        }
+
+        $rawDate = trim((string) $date);
+
+        if (preg_match('/^\d{1,2}\/\d{1,2}\/\d{4}$/', $rawDate) === 1) {
+            try {
+                return Carbon::createFromFormat('d/m/Y', $rawDate)->format('Y-m-d');
+            } catch (\Exception $e) {
+            }
+        }
+
+        if (preg_match('/^\d{1,2}-\d{1,2}-\d{4}$/', $rawDate) === 1) {
+            try {
+                return Carbon::createFromFormat('d-m-Y', $rawDate)->format('Y-m-d');
+            } catch (\Exception $e) {
+            }
+        }
+
+        foreach (['Y-m-d', 'Y/m/d', 'm/d/Y', 'm-d-Y', 'n/j/Y', 'n-j-Y'] as $format) {
+            try {
+                return Carbon::createFromFormat($format, $rawDate)->format('Y-m-d');
+            } catch (\Exception $e) {
+            }
+        }
+
+        try {
+            return Carbon::parse($rawDate)->format('Y-m-d');
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
     public function import_invoices(Request $request)
     {
         Gate::authorize('invoices.csv.import');

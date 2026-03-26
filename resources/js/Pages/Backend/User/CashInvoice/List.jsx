@@ -221,7 +221,6 @@ export default function List({ receipts = [], meta = {}, filters = {}, customers
   const [selectedRows, setSelectedRows] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [currentReceiptId, setCurrentReceiptId] = useState(null);
   const [processing, setProcessing] = useState(false);
@@ -354,27 +353,6 @@ export default function List({ receipts = [], meta = {}, filters = {}, customers
     });
   };
 
-  const closeImportModal = () => {
-    setShowImportModal(false);
-  };
-
-  const handleImport = (e) => {
-    e.preventDefault();
-    setProcessing(true);
-
-    const formData = new FormData(e.target);
-
-    router.post(route("receipts.import"), formData, {
-      onSuccess: () => {
-        closeImportModal();
-        setProcessing(false);
-      },
-      onError: (errors) => {
-        setProcessing(false);
-      },
-    });
-  };
-
   const openDeleteAllModal = () => {
     setShowDeleteAllModal(true);
   };
@@ -497,7 +475,7 @@ export default function List({ receipts = [], meta = {}, filters = {}, customers
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setShowImportModal(true)}>
+                    <DropdownMenuItem onClick={() => router.visit(route("receipts.import.page"))}>
                       <FileUp className="mr-2 h-4 w-4" /> Import
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={exportReceipts}>
@@ -731,13 +709,6 @@ export default function List({ receipts = [], meta = {}, filters = {}, customers
         show={showDeleteModal}
         onClose={closeDeleteModal}
         onConfirm={confirmDelete}
-        processing={processing}
-      />
-
-      <ImportReceiptsModal
-        show={showImportModal}
-        onClose={closeImportModal}
-        onSubmit={handleImport}
         processing={processing}
       />
 

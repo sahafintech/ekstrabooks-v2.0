@@ -64,6 +64,7 @@ const DeleteInvoiceModal = ({ show, onClose, onConfirm, processing }) => (
   </Modal>
 );
 
+/*
 const ImportInvoicesModal = ({ show, onClose, onSubmit, processing }) => (
   <Modal show={show} onClose={onClose} maxWidth="3xl">
     <form onSubmit={onSubmit}>
@@ -126,6 +127,7 @@ const ImportInvoicesModal = ({ show, onClose, onSubmit, processing }) => (
     </form>
   </Modal>
 );
+*/
 
 const DeleteAllInvoicesModal = ({ show, onClose, onConfirm, processing, count }) => (
   <Modal show={show} onClose={onClose}>
@@ -239,7 +241,6 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
 
   // Delete confirmation modal states
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState(null);
   const [processing, setProcessing] = useState(false);
@@ -473,22 +474,6 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
     );
   };
 
-  const handleImport = (e) => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    setProcessing(true);
-
-    router.post(route('invoices.import'), formData, {
-      onSuccess: () => {
-        setShowImportModal(false);
-        setProcessing(false);
-      },
-      onError: () => {
-        setProcessing(false);
-      }
-    });
-  };
-
   const renderPageNumbers = () => {
     const totalPages = meta.last_page;
     const pages = [];
@@ -550,7 +535,7 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setShowImportModal(true)}>
+                    <DropdownMenuItem onClick={() => router.visit(route("invoices.import.page"))}>
                       <FileUp className="mr-2 h-4 w-4" /> Import
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={exportInvoices}>
@@ -793,12 +778,6 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
         count={selectedInvoices.length}
       />
 
-      <ImportInvoicesModal
-        show={showImportModal}
-        onClose={() => setShowImportModal(false)}
-        onSubmit={handleImport}
-        processing={processing}
-      />
     </AuthenticatedLayout>
   );
 }

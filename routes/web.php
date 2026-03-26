@@ -421,6 +421,10 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('invoices/bulk_restore', [InvoiceController::class, 'bulk_restore'])->name('invoices.bulk_restore');
 		Route::post('invoices/bulk_permanent_destroy', [InvoiceController::class, 'bulk_permanent_destroy'])->name('invoices.bulk_permanent_destroy');
 		Route::delete('invoices/{id}/permanent_destroy', [InvoiceController::class, 'permanent_destroy'])->name('invoices.permanent_destroy');
+		Route::get('invoices/import', [InvoiceController::class, 'import'])->name('invoices.import.page');
+		Route::match(['get', 'post'], 'invoices/import/upload', [InvoiceController::class, 'uploadImportFile'])->name('invoices.import.upload');
+		Route::match(['get', 'post'], 'invoices/import/preview', [InvoiceController::class, 'previewImport'])->name('invoices.import.preview');
+		Route::match(['get', 'post'], 'invoices/import/execute', [InvoiceController::class, 'executeImport'])->name('invoices.import.execute');
 		Route::resource('invoices', InvoiceController::class);
 		Route::get('receive_payments/{id}/pdf', [ReceivePaymentsController::class, 'pdf'])->name('receive_payments.pdf');
 		Route::resource('receive_payments', ReceivePaymentsController::class);
@@ -479,6 +483,10 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('receipts/bulk_restore', [ReceiptController::class, 'bulk_restore'])->name('receipts.bulk_restore');
 		Route::post('receipts/bulk_permanent_destroy', [ReceiptController::class, 'bulk_permanent_destroy'])->name('receipts.bulk_permanent_destroy');
 		Route::delete('receipts/{id}/permanent_destroy', [ReceiptController::class, 'permanent_destroy'])->name('receipts.permanent_destroy');
+		Route::get('receipts/import', [ReceiptController::class, 'import'])->name('receipts.import.page');
+		Route::match(['get', 'post'], 'receipts/import/upload', [ReceiptController::class, 'uploadImportFile'])->name('receipts.import.upload');
+		Route::match(['get', 'post'], 'receipts/import/preview', [ReceiptController::class, 'previewImport'])->name('receipts.import.preview');
+		Route::match(['get', 'post'], 'receipts/import/execute', [ReceiptController::class, 'executeImport'])->name('receipts.import.execute');
 		Route::resource('receipts', ReceiptController::class);
 		Route::match(['get', 'post'], 'receipts/{id}/send_email', [ReceiptController::class, 'send_email'])->name('receipts.send_email');
 		Route::match(['get', 'post'], 'receipts/receive_payment', [ReceiptController::class, 'receive_payment'])->name('receipts.receive_payment');
