@@ -614,6 +614,10 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('purchase_orders/bulk_restore', [PurchaseOrderController::class, 'bulk_restore'])->name('purchase_orders.bulk_restore');
 		Route::post('purchase_orders/bulk_permanent_destroy', [PurchaseOrderController::class, 'bulk_permanent_destroy'])->name('purchase_orders.bulk_permanent_destroy');
 		Route::delete('purchase_orders/{id}/permanent_destroy', [PurchaseOrderController::class, 'permanent_destroy'])->name('purchase_orders.permanent_destroy');
+		Route::get('purchase_orders/import', [PurchaseOrderController::class, 'import'])->name('purchase_orders.import.page');
+		Route::match(['get', 'post'], 'purchase_orders/import/upload', [PurchaseOrderController::class, 'uploadImportFile'])->name('purchase_orders.import.upload');
+		Route::match(['get', 'post'], 'purchase_orders/import/preview', [PurchaseOrderController::class, 'previewImport'])->name('purchase_orders.import.preview');
+		Route::match(['get', 'post'], 'purchase_orders/import/execute', [PurchaseOrderController::class, 'executeImport'])->name('purchase_orders.import.execute');
 		Route::resource('purchase_orders', PurchaseOrderController::class);
 		Route::post('import_purchase_orders', [PurchaseOrderController::class, 'import_purchase_orders'])->name('purchase_orders.import');
 		Route::post('purchase_orders/filter', [PurchaseOrderController::class, 'purchase_orders_filter'])->name('purchase_orders.filter');

@@ -358,7 +358,6 @@ export default function List({
 
     // Delete confirmation modal states
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [showImportModal, setShowImportModal] = useState(false);
     const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
     const [purchaseOrderToDelete, setPurchaseOrderToDelete] = useState(null);
     const [processing, setProcessing] = useState(false);
@@ -541,33 +540,6 @@ export default function List({
         );
     };
 
-    const handleImport = (e) => {
-        e.preventDefault();
-        setProcessing(true);
-
-        const formData = new FormData(e.target);
-
-        router.post(route("purchase_orders.import"), formData, {
-            onSuccess: () => {
-                setShowImportModal(false);
-                setProcessing(false);
-                toast({
-                    title: "Import Successful",
-                    description:
-                        "Purchase orders have been imported successfully.",
-                });
-            },
-            onError: (errors) => {
-                setProcessing(false);
-                toast({
-                    variant: "destructive",
-                    title: "Import Failed",
-                    description: Object.values(errors).flat().join(", "),
-                });
-            },
-        });
-    };
-
     const handleSearch = (e) => {
         e.preventDefault();
         const value = e.target.value;
@@ -723,9 +695,7 @@ export default function List({
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                         <DropdownMenuItem
-                                            onClick={() =>
-                                                setShowImportModal(true)
-                                            }
+                                            onClick={() => router.visit(route("purchase_orders.import.page"))}
                                         >
                                             <FileUp className="mr-2 h-4 w-4" />{" "}
                                             Import
@@ -1099,12 +1069,6 @@ export default function List({
                 count={selectedPurchaseOrders.length}
             />
 
-            <ImportPurchaseOrdersModal
-                show={showImportModal}
-                onClose={() => setShowImportModal(false)}
-                onSubmit={handleImport}
-                processing={processing}
-            />
         </AuthenticatedLayout>
     );
 }

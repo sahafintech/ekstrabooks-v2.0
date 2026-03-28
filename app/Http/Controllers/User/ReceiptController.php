@@ -2719,7 +2719,7 @@ class ReceiptController extends Controller
         return redirect()->route('receipts.trash')->with('success', _lang('Restored Successfully'));
     }
 
-    public function export_receipts()
+    public function export_receipts(Request $request)
     {
         // audit log
         $audit = new AuditLog();
@@ -2728,7 +2728,19 @@ class ReceiptController extends Controller
         $audit->event = 'Exported Cash Invoices';
         $audit->save();
 
-        return Excel::download(new CashInvoiceExport, 'cash invoices ' . now()->format('d m Y') . '.xlsx');
+        $receipts = Receipt::with([
+            'customer',
+            'project',
+            'taxes',
+            'items.product',
+            'items.taxes',
+            'transactions.account',
+        ])
+            ->orderBy('receipt_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->get();
+
+        return Excel::download(new CashInvoiceExport($receipts), 'cash invoices ' . now()->format('d m Y') . '.xlsx');
     }
 
     public function pos_products_category($id)
