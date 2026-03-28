@@ -525,7 +525,7 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setShowImportModal(true)}>
+                    <DropdownMenuItem onClick={() => router.visit(route("deffered_invoices.import.page"))}>
                       <FileUp className="mr-2 h-4 w-4" /> Import
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={exportInvoices}>

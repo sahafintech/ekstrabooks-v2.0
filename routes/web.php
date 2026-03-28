@@ -507,12 +507,17 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('deffered_invoices/bulk_restore', [DefferedInvoiceController::class, 'bulk_restore'])->name('deffered_invoices.bulk_restore');
 		Route::post('deffered_invoices/bulk_permanent_destroy', [DefferedInvoiceController::class, 'bulk_permanent_destroy'])->name('deffered_invoices.bulk_permanent_destroy');
 		Route::delete('deffered_invoices/{id}/permanent_destroy', [DefferedInvoiceController::class, 'permanent_destroy'])->name('deffered_invoices.permanent_destroy');
+		Route::get('deffered_invoices/import', [DefferedInvoiceController::class, 'import'])->name('deffered_invoices.import.page');
+		Route::match(['get', 'post'], 'deffered_invoices/import/upload', [DefferedInvoiceController::class, 'uploadImportFile'])->name('deffered_invoices.import.upload');
+		Route::match(['get', 'post'], 'deffered_invoices/import/preview', [DefferedInvoiceController::class, 'previewImport'])->name('deffered_invoices.import.preview');
+		Route::match(['get', 'post'], 'deffered_invoices/import/execute', [DefferedInvoiceController::class, 'executeImport'])->name('deffered_invoices.import.execute');
 		Route::resource('deffered_invoices', DefferedInvoiceController::class);
 		Route::get('deffered_invoices/{id}/pdf', [DefferedInvoiceController::class, 'pdf'])->name('deffered_invoices.pdf');
 		Route::get('deffered_invoices/payments/{id}', [DefferedInvoiceController::class, 'payments'])->name('deffered_invoices.payments');
 		Route::get('deffered_invoices/earnings/{id}', [DefferedInvoiceController::class, 'earnings'])->name('deffered_invoices.earnings');
 		Route::post('deffered_invoices/filter', [DefferedInvoiceController::class, 'deffered_invoices_filter'])->name('deffered_invoices.filter');
 		Route::post('deffered_invoices/bulk_destroy', [DefferedInvoiceController::class, 'bulk_destroy'])->name('deffered_invoices.bulk_destroy');
+		Route::post('import_deffered_invoices', [DefferedInvoiceController::class, 'import_deffered_invoices'])->name('deffered_invoices.import');
 		Route::post('deffered_invoices/send_email/{id}', [DefferedInvoiceController::class, 'send_email'])->name('deffered_invoices.send_email');
 
 		// deffered payments
