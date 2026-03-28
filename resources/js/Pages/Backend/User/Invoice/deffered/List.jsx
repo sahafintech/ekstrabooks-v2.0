@@ -629,6 +629,9 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
                     <TableHead className="cursor-pointer" onClick={() => handleSort("order_number")}>
                       Policy Number {renderSortIcon("order_number")}
                     </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("invoice_number")}>
+                      Invoice Number {renderSortIcon("invoice_number")}
+                    </TableHead>
                     <TableHead className="cursor-pointer" onClick={() => handleSort("deffered_start")}>
                       Policy Start {renderSortIcon("deffered_start")}
                     </TableHead>
@@ -670,6 +673,7 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
                           />
                         </TableCell>
                         <TableCell>{invoice.order_number}</TableCell>
+                        <TableCell>{invoice.invoice_number}</TableCell>
                         <TableCell>{invoice.deffered_start}</TableCell>
                         <TableCell>{invoice.deffered_end}</TableCell>
                         <TableCell>{invoice.customer ? invoice.customer.name : "-"}</TableCell>
@@ -707,7 +711,7 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={12} className="h-24 text-center">
+                      <TableCell colSpan={13} className="h-24 text-center">
                         No invoices found.
                       </TableCell>
                     </TableRow>

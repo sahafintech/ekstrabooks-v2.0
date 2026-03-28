@@ -68,6 +68,7 @@ class DefferedInvoiceController extends Controller
                 $q->whereHas('customer', function ($q2) use ($search) {
                     $q2->where('name', 'like', "%{$search}%");
                 })
+                    ->orWhere('invoice_number', 'like', "%{$search}%")
                     ->orWhere('grand_total', 'like', "%{$search}%")
                     ->orWhere('order_number', 'like', "%{$search}%");
             });
@@ -133,6 +134,7 @@ class DefferedInvoiceController extends Controller
                 $q->whereHas('customer', function ($q2) use ($search) {
                     $q2->where('name', 'like', "%{$search}%");
                 })
+                    ->orWhere('invoice_number', 'like', "%{$search}%")
                     ->orWhere('grand_total', 'like', "%{$search}%")
                     ->orWhere('order_number', 'like', "%{$search}%");
             });

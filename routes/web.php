@@ -427,6 +427,10 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::match(['get', 'post'], 'invoices/import/execute', [InvoiceController::class, 'executeImport'])->name('invoices.import.execute');
 		Route::resource('invoices', InvoiceController::class);
 		Route::get('receive_payments/{id}/pdf', [ReceivePaymentsController::class, 'pdf'])->name('receive_payments.pdf');
+		Route::get('receive_payments/import', [ReceivePaymentsController::class, 'import'])->name('receive_payments.import.page');
+		Route::match(['get', 'post'], 'receive_payments/import/upload', [ReceivePaymentsController::class, 'uploadImportFile'])->name('receive_payments.import.upload');
+		Route::match(['get', 'post'], 'receive_payments/import/preview', [ReceivePaymentsController::class, 'previewImport'])->name('receive_payments.import.preview');
+		Route::match(['get', 'post'], 'receive_payments/import/execute', [ReceivePaymentsController::class, 'executeImport'])->name('receive_payments.import.execute');
 		Route::resource('receive_payments', ReceivePaymentsController::class);
 		Route::post('import_invoices', [InvoiceController::class, 'import_invoices'])->name('invoices.import');
 		Route::post('invoices/filter', [InvoiceController::class, 'invoices_filter'])->name('invoices.filter');

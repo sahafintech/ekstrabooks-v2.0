@@ -20,7 +20,7 @@ import {
     SelectValue,
 } from "@/Components/ui/select";
 import { Input } from "@/Components/ui/input";
-import { Edit, EyeIcon, Plus, Trash, ChevronUp, ChevronDown } from "lucide-react";
+import { Edit, EyeIcon, Plus, Trash, ChevronUp, ChevronDown, Upload } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
@@ -337,12 +337,20 @@ export default function List({ payments = [], meta = {}, filters = {}, customers
                     />
                     <div className="p-4">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                            <Link href={route("receive_payments.create")}>
-                                <Button>
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    Add Payment
-                                </Button>
-                            </Link>
+                            <div className="flex flex-col md:flex-row gap-2">
+                                <Link href={route("receive_payments.create")}>
+                                    <Button>
+                                        <Plus className="w-4 h-4 mr-2" />
+                                        Add Payment
+                                    </Button>
+                                </Link>
+                                <Link href={route("receive_payments.import.page")}>
+                                    <Button variant="outline">
+                                        <Upload className="w-4 h-4 mr-2" />
+                                        Import
+                                    </Button>
+                                </Link>
+                            </div>
                             <div className="flex flex-col md:flex-row gap-4 md:items-center">
                                 <form onSubmit={handleSearch} className="flex gap-2">
                                     <Input
