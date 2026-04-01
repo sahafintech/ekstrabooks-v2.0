@@ -11,18 +11,42 @@ import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
 import { Plus, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 import DateTimePicker from "@/Components/DateTimePicker";
 
-export default function Create({ customers = [], products = [], currencies = [], taxes = [], quotation_title, base_currency }) {
-    const [quotationItems, setQuotationItems] = useState([{
-        product_id: "",
-        product_name: "",
-        description: "",
-        quantity: 1,
-        unit_cost: 0,
-    }]);
+const createEmptyQuotationItem = () => ({
+    product_id: "",
+    product_name: "",
+    description: "",
+    quantity: 1,
+    unit_cost: 0,
+    benefits: "",
+    family_size: "",
+    sum_insured: "",
+});
+
+const quotationTypeOptions = [
+    { id: "0", name: "Normal Quotation" },
+    { id: "1", name: "Deferred Quotation" },
+];
+
+const deferredQuotationCategoryOptions = [
+    { id: "medical", name: "Medical Insurance Quotation" },
+    { id: "gpa", name: "GPA Insurance Quotation" },
+    { id: "other", name: "Other Insurance Quotation" },
+];
+
+export default function Create({
+    customers = [],
+    products = [],
+    currencies = [],
+    taxes = [],
+    familySizes = [],
+    quotation_title,
+    base_currency,
+}) {
+    const [quotationItems, setQuotationItems] = useState([createEmptyQuotationItem()]);
 
     const [exchangeRate, setExchangeRate] = useState(1);
     const [baseCurrencyInfo, setBaseCurrencyInfo] = useState(null);
@@ -31,7 +55,7 @@ export default function Create({ customers = [], products = [], currencies = [],
         customer_id: "",
         title: quotation_title,
         quotation_number: "",
-        order_number: "",
+        po_so_number: "",
         quotation_date: new Date(),
         expired_date: "",
         currency: base_currency,
@@ -43,74 +67,112 @@ export default function Create({ customers = [], products = [], currencies = [],
         note: "",
         footer: "",
         attachment: null,
+        is_deffered: "0",
+        invoice_category: "",
         product_id: [],
         product_name: [],
         description: [],
         quantity: [],
         unit_cost: [],
+        benefits: [],
+        family_size: [],
+        sum_insured: [],
         taxes: [],
     });
 
+    const isDeferredQuotation = data.is_deffered === "1";
+    const canManageItems = !isDeferredQuotation || data.invoice_category !== "";
+
+    const syncQuotationItems = (items) => {
+        setData("product_id", items.map((item) => item.product_id));
+        setData("product_name", items.map((item) => item.product_name));
+        setData("description", items.map((item) => item.description));
+        setData("quantity", items.map((item) => item.quantity));
+        setData("unit_cost", items.map((item) => item.unit_cost));
+        setData("benefits", items.map((item) => item.benefits));
+        setData("family_size", items.map((item) => item.family_size));
+        setData("sum_insured", items.map((item) => item.sum_insured));
+    };
+
+    const sanitizeDeferredItemFields = (items, deferred, category) =>
+        items.map((item) => ({
+            ...item,
+            benefits: deferred ? item.benefits ?? "" : "",
+            family_size: deferred && category === "medical" ? item.family_size ?? "" : "",
+            sum_insured: deferred && category === "other" ? item.sum_insured ?? "" : "",
+        }));
+
+    const updateItems = (items) => {
+        setQuotationItems(items);
+        syncQuotationItems(items);
+    };
+
+    const parseNumericValue = (value) => {
+        if (value === "" || value === null || value === undefined) {
+            return "";
+        }
+
+        const parsedValue = parseFloat(value);
+        return Number.isNaN(parsedValue) ? "" : parsedValue;
+    };
+
     const addQuotationItem = () => {
-        setQuotationItems([...quotationItems, {
-            product_id: "",
-            product_name: "",
-            description: "",
-            quantity: 1,
-            unit_cost: 0,
-        }]);
-        setData("product_id", [...data.product_id, ""]);
-        setData("product_name", [...data.product_name, ""]);
-        setData("description", [...data.description, ""]);
-        setData("quantity", [...data.quantity, 1]);
-        setData("unit_cost", [...data.unit_cost, 0]);
+        updateItems([...quotationItems, createEmptyQuotationItem()]);
     };
 
     const removeQuotationItem = (index) => {
-        const updatedItems = quotationItems.filter((_, i) => i !== index);
-        setQuotationItems(updatedItems);
-        setData("product_id", updatedItems.map(item => item.product_id));
-        setData("product_name", updatedItems.map(item => item.product_name));
-        setData("description", updatedItems.map(item => item.description));
-        setData("quantity", updatedItems.map(item => item.quantity));
-        setData("unit_cost", updatedItems.map(item => item.unit_cost));
+        updateItems(quotationItems.filter((_, itemIndex) => itemIndex !== index));
+    };
+
+    const handleQuotationTypeChange = (value) => {
+        setData("is_deffered", value);
+
+        const nextCategory = value === "1" ? data.invoice_category : "";
+        if (value !== "1") {
+            setData("invoice_category", "");
+        }
+
+        updateItems(sanitizeDeferredItemFields(quotationItems, value === "1", nextCategory));
+    };
+
+    const handleInvoiceCategoryChange = (value) => {
+        setData("invoice_category", value);
+        updateItems(sanitizeDeferredItemFields(quotationItems, true, value));
     };
 
     const updateQuotationItem = (index, field, value) => {
         const updatedItems = [...quotationItems];
-        updatedItems[index][field] = value;
+        updatedItems[index] = {
+            ...updatedItems[index],
+            [field]: value,
+        };
 
         if (field === "product_id") {
-            const product = products.find(p => p.id === parseInt(value, 10));
+            const product = products.find((productItem) => productItem.id === parseInt(value, 10));
             if (product) {
                 updatedItems[index].product_name = product.name;
                 updatedItems[index].unit_cost = product.selling_price;
 
-                // Also update the description if it's empty
                 if (!updatedItems[index].description) {
                     updatedItems[index].description = product.description || "";
                 }
             }
         }
 
-        setQuotationItems(updatedItems);
-        setData("product_id", updatedItems.map(item => item.product_id));
-        setData("product_name", updatedItems.map(item => item.product_name));
-        setData("description", updatedItems.map(item => item.description));
-        setData("quantity", updatedItems.map(item => item.quantity));
-        setData("unit_cost", updatedItems.map(item => item.unit_cost));
+        updateItems(updatedItems);
     };
 
-    const calculateSubtotal = () => {
-        return quotationItems.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
-    };
+    const calculateSubtotal = () =>
+        quotationItems.reduce(
+            (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unit_cost) || 0),
+            0
+        );
 
-    // build this once, outside of calculateTaxes
-    const taxRateMap = new Map(taxes.map(t => [t.id, Number(t.rate)]));
+    const taxRateMap = new Map(taxes.map((tax) => [tax.id, Number(tax.rate)]));
 
     const calculateTaxes = () => {
         return quotationItems.reduce((sum, item) => {
-            const base = Number(item.quantity) * Number(item.unit_cost);
+            const base = (Number(item.quantity) || 0) * (Number(item.unit_cost) || 0);
 
             const itemTax = data.taxes.reduce((taxSum, taxIdStr) => {
                 // convert the incoming tax‐ID string to a Number
@@ -128,18 +190,14 @@ export default function Create({ customers = [], products = [], currencies = [],
 
     const calculateDiscount = () => {
         const subtotal = calculateSubtotal();
+        const discountValue = Number(data.discount_value) || 0;
         if (data.discount_type === "0") {
-            return (subtotal * data.discount_value) / 100;
+            return (subtotal * discountValue) / 100;
         }
-        return data.discount_value;
+        return discountValue;
     };
 
-    const calculateTotal = () => {
-        const subtotal = calculateSubtotal();
-        const taxes = calculateTaxes();
-        const discount = calculateDiscount();
-        return (subtotal + taxes) - discount;
-    };
+    const calculateTotal = () => calculateSubtotal() + calculateTaxes() - calculateDiscount();
 
     // Find and set base currency on component mount
     useEffect(() => {
@@ -233,7 +291,6 @@ export default function Create({ customers = [], products = [], currencies = [],
     const submit = (e) => {
         e.preventDefault();
 
-        // Find the selected currency object to get its name
         const selectedCurrency = currencies.find(c => c.name === data.currency);
 
         if (!selectedCurrency) {
@@ -241,7 +298,11 @@ export default function Create({ customers = [], products = [], currencies = [],
             return;
         }
 
-        // Create a new data object with all the required fields
+        if (isDeferredQuotation && !data.invoice_category) {
+            toast.error("Please select a deferred quotation category");
+            return;
+        }
+
         const formData = {
             ...data,
             currency: selectedCurrency.name,
@@ -251,24 +312,17 @@ export default function Create({ customers = [], products = [], currencies = [],
             description: quotationItems.map(item => item.description),
             quantity: quotationItems.map(item => item.quantity),
             unit_cost: quotationItems.map(item => item.unit_cost),
+            benefits: quotationItems.map(item => item.benefits),
+            family_size: quotationItems.map(item => item.family_size),
+            sum_insured: quotationItems.map(item => item.sum_insured),
         };
 
-        // Log the data being sent to help debug
-        console.log("Submitting form with data:", formData);
-
-        // Post the form data directly instead of using setData first
         post(route("quotations.store"), formData, {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success("Quotation created successfully");
                 reset();
-                setQuotationItems([{
-                    product_id: "",
-                    product_name: "",
-                    description: "",
-                    quantity: 1,
-                    unit_cost: 0,
-                }]);
+                setQuotationItems([createEmptyQuotationItem()]);
             },
         });
     };
@@ -318,18 +372,57 @@ export default function Create({ customers = [], products = [], currencies = [],
                         </div>
 
                         <div className="grid grid-cols-12 mt-2">
-                            <Label htmlFor="order_number" className="md:col-span-2 col-span-12">
-                                Order Number
+                            <Label htmlFor="is_deffered" className="md:col-span-2 col-span-12">
+                                Quotation Type *
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                <div className="md:w-1/2 w-full">
+                                    <SearchableCombobox
+                                        options={quotationTypeOptions}
+                                        value={data.is_deffered}
+                                        onChange={handleQuotationTypeChange}
+                                        placeholder="Select quotation type"
+                                    />
+                                </div>
+                                <p className="mt-2 text-sm text-muted-foreground">
+                                    Choose a normal quotation for the standard flow, or a deferred quotation to capture insurance-specific item details.
+                                </p>
+                                <InputError message={errors.is_deffered} className="text-sm" />
+                            </div>
+                        </div>
+
+                        {isDeferredQuotation && (
+                            <div className="grid grid-cols-12 mt-2">
+                                <Label htmlFor="invoice_category" className="md:col-span-2 col-span-12">
+                                    Deferred Category *
+                                </Label>
+                                <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                    <div className="md:w-1/2 w-full">
+                                        <SearchableCombobox
+                                            options={deferredQuotationCategoryOptions}
+                                            value={data.invoice_category}
+                                            onChange={handleInvoiceCategoryChange}
+                                            placeholder="Select deferred quotation category"
+                                        />
+                                    </div>
+                                    <InputError message={errors.invoice_category} className="text-sm" />
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label htmlFor="po_so_number" className="md:col-span-2 col-span-12">
+                                {isDeferredQuotation ? "Quotation Number" : "Order Number"}
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                 <Input
-                                    id="order_number"
+                                    id="po_so_number"
                                     type="text"
-                                    value={data.order_number}
-                                    onChange={(e) => setData("order_number", e.target.value)}
+                                    value={data.po_so_number}
+                                    onChange={(e) => setData("po_so_number", e.target.value)}
                                     className="md:w-1/2 w-full"
                                 />
-                                <InputError message={errors.order_number} className="text-sm" />
+                                <InputError message={errors.po_so_number} className="text-sm" />
                             </div>
                         </div>
 
@@ -373,13 +466,10 @@ export default function Create({ customers = [], products = [], currencies = [],
                                         className="mt-1"
                                         options={currencies.map(currency => ({
                                             id: currency.name,
-                                            value: currency.name,
-                                            label: currency.name,
                                             name: `${currency.name} - ${currency.description} (${currency.exchange_rate})`
                                         }))}
                                         value={data.currency}
                                         onChange={(selectedValue) => {
-                                            console.log("Currency selected:", selectedValue);
                                             setData("currency", selectedValue);
                                             handleCurrencyChange(selectedValue);
                                         }}
@@ -395,84 +485,150 @@ export default function Create({ customers = [], products = [], currencies = [],
                         <div className="space-y-4">
                             <div className="flex justify-between items-center">
                                 <h3 className="text-lg font-medium">Quotation Items</h3>
-                                <Button variant="secondary" type="button" onClick={addQuotationItem}>
+                                <Button
+                                    variant="secondary"
+                                    type="button"
+                                    onClick={addQuotationItem}
+                                    disabled={!canManageItems}
+                                >
                                     <Plus className="w-4 h-4 mr-2" />
                                     Add Item
                                 </Button>
                             </div>
 
-                            {quotationItems.map((item, index) => (
-                                <div key={index} className="border rounded-lg p-4 space-y-4 bg-gray-50">
-                                    {/* First Row */}
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                        <div>
-                                            <Label>Product *</Label>
-                                            <SearchableCombobox
-                                                options={products.map(product => ({
-                                                    id: product.id,
-                                                    name: product.name
-                                                }))}
-                                                value={item.product_id}
-                                                onChange={(value) => updateQuotationItem(index, "product_id", value)}
-                                                placeholder="Select product"
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <Label>Quantity *</Label>
-                                            <Input
-                                                type="number"
-                                                step="0.01"
-                                                value={item.quantity}
-                                                onChange={(e) => updateQuotationItem(index, "quantity", parseFloat(e.target.value))}
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <Label>Unit Cost *</Label>
-                                            <Input
-                                                type="number"
-                                                step="0.01"
-                                                value={item.unit_cost}
-                                                onChange={(e) => updateQuotationItem(index, "unit_cost", parseFloat(e.target.value))}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Second Row */}
-                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
-                                        <div className="md:col-span-6">
-                                            <Label>Description</Label>
-                                            <Textarea
-                                                value={item.description}
-                                                onChange={(e) => updateQuotationItem(index, "description", e.target.value)}
-                                                rows={1}
-                                            />
-                                        </div>
-
-                                        <div className="md:col-span-4">
-                                            <Label>Subtotal</Label>
-                                            <div className="p-2 bg-white rounded mt-2 text-right">
-                                                {(item.quantity * item.unit_cost).toFixed(2)}
+                            {isDeferredQuotation && !data.invoice_category ? (
+                                <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                                    Select a deferred quotation category first to unlock the matching insurance item fields.
+                                </div>
+                            ) : (
+                                quotationItems.map((item, index) => (
+                                    <div key={index} className="border rounded-lg p-4 space-y-4 bg-gray-50">
+                                        <div
+                                            className={`grid grid-cols-1 gap-2 ${
+                                                isDeferredQuotation ? "md:grid-cols-2 lg:grid-cols-4" : "md:grid-cols-3"
+                                            }`}
+                                        >
+                                            <div>
+                                                <Label>Product *</Label>
+                                                <SearchableCombobox
+                                                    options={products.map(product => ({
+                                                        id: product.id,
+                                                        name: product.name
+                                                    }))}
+                                                    value={item.product_id}
+                                                    onChange={(value) => updateQuotationItem(index, "product_id", value)}
+                                                    placeholder="Select product"
+                                                />
                                             </div>
-                                        </div>
 
-                                        <div className="md:col-span-2 flex items-center justify-end">
-                                            {quotationItems.length > 1 && (
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="text-red-500"
-                                                    onClick={() => removeQuotationItem(index)}
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </Button>
+                                            {isDeferredQuotation && (
+                                                <div>
+                                                    <Label>Benefits</Label>
+                                                    <Textarea
+                                                        value={item.benefits}
+                                                        onChange={(e) => updateQuotationItem(index, "benefits", e.target.value)}
+                                                        rows={1}
+                                                        className="min-h-[40px] resize-y"
+                                                    />
+                                                </div>
+                                            )}
+
+                                            <div>
+                                                <Label>{data.invoice_category === "medical" ? "Members *" : "Quantity *"}</Label>
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={item.quantity}
+                                                    onChange={(e) => updateQuotationItem(index, "quantity", parseNumericValue(e.target.value))}
+                                                />
+                                            </div>
+
+                                            {isDeferredQuotation && data.invoice_category === "medical" && (
+                                                <div>
+                                                    <Label>Family Size *</Label>
+                                                    <SearchableCombobox
+                                                        options={familySizes.map(size => ({
+                                                            id: size.size,
+                                                            name: size.size
+                                                        }))}
+                                                        value={item.family_size}
+                                                        onChange={(value) => updateQuotationItem(index, "family_size", value)}
+                                                        placeholder="Select family size"
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {isDeferredQuotation && data.invoice_category === "other" && (
+                                                <div>
+                                                    <Label>Sum Insured</Label>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={item.sum_insured}
+                                                        onChange={(e) => updateQuotationItem(index, "sum_insured", parseNumericValue(e.target.value))}
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {!isDeferredQuotation && (
+                                                <div>
+                                                    <Label>Unit Cost *</Label>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={item.unit_cost}
+                                                        onChange={(e) => updateQuotationItem(index, "unit_cost", parseNumericValue(e.target.value))}
+                                                    />
+                                                </div>
                                             )}
                                         </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
+                                            <div className={isDeferredQuotation ? "md:col-span-4" : "md:col-span-6"}>
+                                                <Label>Description</Label>
+                                                <Textarea
+                                                    value={item.description}
+                                                    onChange={(e) => updateQuotationItem(index, "description", e.target.value)}
+                                                    rows={1}
+                                                />
+                                            </div>
+
+                                            {isDeferredQuotation && (
+                                                <div className="md:col-span-3">
+                                                    <Label>Rate *</Label>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={item.unit_cost}
+                                                        onChange={(e) => updateQuotationItem(index, "unit_cost", parseNumericValue(e.target.value))}
+                                                    />
+                                                </div>
+                                            )}
+
+                                            <div className={isDeferredQuotation ? "md:col-span-3" : "md:col-span-4"}>
+                                                <Label>Subtotal</Label>
+                                                <div className="p-2 bg-white rounded mt-2 text-right">
+                                                    {((Number(item.quantity) || 0) * (Number(item.unit_cost) || 0)).toFixed(2)}
+                                                </div>
+                                            </div>
+
+                                            <div className="md:col-span-2 flex items-center justify-end">
+                                                {quotationItems.length > 1 && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="text-red-500"
+                                                        onClick={() => removeQuotationItem(index)}
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))
+                            )}
                         </div>
 
                         <SidebarSeparator className="my-4" />
@@ -528,7 +684,7 @@ export default function Create({ customers = [], products = [], currencies = [],
                                     step="0.01"
                                     min="0"
                                     value={data.discount_value}
-                                    onChange={(e) => setData("discount_value", parseFloat(e.target.value))}
+                                    onChange={(e) => setData("discount_value", parseNumericValue(e.target.value))}
                                     className="md:w-1/2 w-full"
                                 />
                                 <InputError message={errors.discount_value} className="text-sm" />
@@ -581,13 +737,7 @@ export default function Create({ customers = [], products = [], currencies = [],
                                     variant="secondary"
                                     onClick={() => {
                                         reset();
-                                        setQuotationItems([{
-                                            product_id: "",
-                                            product_name: "",
-                                            description: "",
-                                            quantity: 1,
-                                            unit_cost: 0,
-                                        }]);
+                                        setQuotationItems([createEmptyQuotationItem()]);
                                     }}
                                 >
                                     Reset

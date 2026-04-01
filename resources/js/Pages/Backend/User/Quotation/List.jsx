@@ -26,15 +26,16 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Input } from "@/Components/ui/input";
-import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown, FileText, DollarSign, Clock, CheckCircle } from "lucide-react";
+import { MoreVertical, FileUp, FileDown, Plus, Eye, Trash2, Edit, ChevronUp, ChevronDown, FileText, DollarSign, Clock, CheckCircle, CircleOff } from "lucide-react";
 import { Toaster } from "@/Components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import DateTimePicker from "@/Components/DateTimePicker";
+import { Badge } from "@/Components/ui/badge";
 
 const DeleteQuotationModal = ({ show, onClose, onConfirm, processing }) => (
   <Modal show={show} onClose={onClose}>
@@ -153,16 +154,29 @@ const DeleteAllQuotationsModal = ({ show, onClose, onConfirm, processing, count 
   </Modal>
 );
 
-const QuotationStatusBadge = ({ expired_date }) => {
+const QuotationStatusBadge = ({ quotation }) => {
   const statusMap = {
-    0: { label: "Active", className: "text-blue-600" },
-    1: { label: "Expired", className: "text-red-600" },
+    0: { label: "Active", className: "gap-1 text-blue-600 border-blue-600" },
+    1: { label: "Expired", className: "gap-1 text-red-600 border-red-600" },
+    2: { label: "Accepted", className: "gap-1 text-green-600 border-green-600" },
+    3: { label: "Rejected", className: "gap-1 text-red-600 border-red-600" },
   };
 
+  const parsedExpirationDate = parseDateObject(quotation.expired_date);
+  const expirationDate = parsedExpirationDate ? new Date(parsedExpirationDate) : null;
+  const quotationStatus = Number(quotation.status ?? 0);
+
+  if (expirationDate) {
+    expirationDate.setHours(23, 59, 59, 999);
+  }
+
+  const isActive = expirationDate ? expirationDate >= new Date() : false;
+  const displayStatus = quotationStatus === 1 ? 2 : quotationStatus === 2 ? 3 : isActive ? 0 : 1;
+
   return (
-    <span className={statusMap[expired_date > new Date() ? 0 : 1].className}>
-      {statusMap[expired_date > new Date() ? 0 : 1].label}
-    </span>
+    <Badge variant="outline" className={statusMap[displayStatus].className}>
+      {statusMap[displayStatus].label}
+    </Badge>
   );
 };
 
@@ -431,6 +445,36 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
     setShowDeleteModal(true);
   };
 
+  const handleConvertQuotation = (quotationId) => {
+    setProcessing(true);
+
+    router.post(
+      route("quotations.convert_to_invoice", quotationId),
+      {},
+      {
+        preserveScroll: true,
+        onFinish: () => setProcessing(false),
+      }
+    );
+  };
+
+  const handleRejectQuotation = (quotationId) => {
+    if (!window.confirm("Are you sure you want to reject this quotation?")) {
+      return;
+    }
+
+    setProcessing(true);
+
+    router.post(
+      route("quotations.reject", quotationId),
+      {},
+      {
+        preserveScroll: true,
+        onFinish: () => setProcessing(false),
+      }
+    );
+  };
+
   const handleDelete = (e) => {
     e.preventDefault();
     setProcessing(true);
@@ -609,7 +653,9 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
                   options={[
                     { id: "", name: "All Status" },
                     { id: "0", name: "Active" },
-                    { id: "1", name: "Expired" }
+                    { id: "1", name: "Expired" },
+                    { id: "2", name: "Accepted" },
+                    { id: "3", name: "Rejected" },
                   ]}
                   value={selectedStatus}
                   onChange={handleStatusChange}
@@ -647,6 +693,9 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
                     <TableHead className="cursor-pointer" onClick={() => handleSort("quotation_number")}>
                       Quotation Number {renderSortIcon("quotation_number")}
                     </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("is_deffered")}>
+                      Deferred {renderSortIcon("is_deffered")}
+                    </TableHead>
                     <TableHead className="cursor-pointer" onClick={() => handleSort("customer.name")}>
                       Customer {renderSortIcon("customer.name")}
                     </TableHead>
@@ -665,7 +714,10 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
                 </TableHeader>
                 <TableBody>
                   {quotations.length > 0 ? (
-                    quotations.map((quotation) => (
+                    quotations.map((quotation) => {
+                      const isPendingQuotation = Number(quotation.status ?? 0) === 0;
+
+                      return (
                       <TableRow key={quotation.id}>
                         <TableCell>
                           <Checkbox
@@ -674,16 +726,34 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
                           />
                         </TableCell>
                         <TableCell>{quotation.quotation_number}</TableCell>
+                        <TableCell><Badge variant="outline" className={quotation.is_deffered ? "gap-1 text-green-600 border-green-600" : "gap-1 text-blue-600 border-blue-400"}>
+                          {quotation.is_deffered ? "Deferred" : "Normal"}
+                        </Badge></TableCell>
                         <TableCell>{quotation.customer ? quotation.customer.name : "-"}</TableCell>
                         <TableCell>{quotation.quotation_date}</TableCell>
                         <TableCell>{quotation.expired_date}</TableCell>
                         <TableCell className="text-right">{formatCurrency(quotation.grand_total)}</TableCell>
                         <TableCell>
-                          <QuotationStatusBadge expired_date={quotation.expired_date} />
+                          <QuotationStatusBadge quotation={quotation} />
                         </TableCell>
                         <TableCell className="text-right">
                           <TableActions
                             actions={[
+                              ...(isPendingQuotation
+                                ? [
+                                    {
+                                      label: "Convert",
+                                      icon: <FileDown className="h-4 w-4" />,
+                                      onClick: () => handleConvertQuotation(quotation.id),
+                                    },
+                                    {
+                                      label: "Reject",
+                                      icon: <CircleOff className="h-4 w-4" />,
+                                      onClick: () => handleRejectQuotation(quotation.id),
+                                      destructive: true,
+                                    },
+                                  ]
+                                : []),
                               {
                                 label: "View",
                                 icon: <Eye className="h-4 w-4" />,
@@ -704,7 +774,7 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
                           />
                         </TableCell>
                       </TableRow>
-                    ))
+                    )})
                   ) : (
                     <TableRow>
                       <TableCell colSpan={10} className="h-24 text-center">

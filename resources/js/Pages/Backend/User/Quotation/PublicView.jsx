@@ -23,6 +23,8 @@ export default function PublicView({ quotation }) {
         pdf: false,
     });
     const contentRef = useRef(null);
+    const isDeferredQuotation = Number(quotation?.is_deffered) === 1;
+    const quantityLabel = isDeferredQuotation && quotation?.invoice_category === "medical" ? "Members" : "Quantity";
 
     useEffect(() => {
         if (flash && flash.success) {
@@ -169,12 +171,22 @@ export default function PublicView({ quotation }) {
                                         </span>{" "}
                                         {quotation.quotation_date}
                                     </p>
-                                    {quotation.order_number && (
+                                    {quotation.po_so_number && (
                                         <p>
                                             <span className="font-medium">
-                                                Order Number:
+                                                {isDeferredQuotation ? "Policy Number:" : "Order Number:"}
                                             </span>{" "}
-                                            {quotation.order_number}
+                                            {quotation.po_so_number}
+                                        </p>
+                                    )}
+                                    <p>
+                                        <span className="font-medium">Quotation Type:</span>{" "}
+                                        {isDeferredQuotation ? "Deferred" : "Normal"}
+                                    </p>
+                                    {isDeferredQuotation && quotation.invoice_category && (
+                                        <p>
+                                            <span className="font-medium">Deferred Category:</span>{" "}
+                                            {quotation.invoice_category.toUpperCase()}
                                         </p>
                                     )}
                                 </div>
@@ -208,11 +220,18 @@ export default function PublicView({ quotation }) {
                                     <TableRow>
                                         <TableHead>Item</TableHead>
                                         <TableHead>Description</TableHead>
+                                        {isDeferredQuotation && <TableHead>Benefit</TableHead>}
+                                        {isDeferredQuotation && quotation.invoice_category === "other" && (
+                                            <TableHead className="text-right">Sum Insured</TableHead>
+                                        )}
+                                        {isDeferredQuotation && quotation.invoice_category === "medical" && (
+                                            <TableHead>Family Size</TableHead>
+                                        )}
                                         <TableHead className="text-right">
-                                            Quantity
+                                            {quantityLabel}
                                         </TableHead>
                                         <TableHead className="text-right">
-                                            Unit Cost
+                                            {isDeferredQuotation ? "Rate" : "Unit Cost"}
                                         </TableHead>
                                         <TableHead className="text-right">
                                             Total
@@ -228,6 +247,17 @@ export default function PublicView({ quotation }) {
                                             <TableCell>
                                                 {item.description}
                                             </TableCell>
+                                            {isDeferredQuotation && (
+                                                <TableCell>{item.benefits}</TableCell>
+                                            )}
+                                            {isDeferredQuotation && quotation.invoice_category === "other" && (
+                                                <TableCell className="text-right">
+                                                    {formatCurrency(item.sum_insured, quotation.currency)}
+                                                </TableCell>
+                                            )}
+                                            {isDeferredQuotation && quotation.invoice_category === "medical" && (
+                                                <TableCell>{item.family_size}</TableCell>
+                                            )}
                                             <TableCell className="text-right">
                                                 {item.quantity}
                                             </TableCell>

@@ -3,14 +3,18 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
+use App\Models\Account;
 use App\Models\AuditLog;
 use App\Models\BusinessSetting;
 use App\Models\Currency;
 use App\Models\Customer;
+use App\Models\DefferedEarning;
 use App\Models\EmailTemplate;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\InvoiceItemTax;
+use App\Models\InsuranceBenefit;
+use App\Models\InsuranceFamilySize;
 use App\Models\Product;
 use App\Models\Quotation;
 use App\Models\quotationItem;
@@ -101,12 +105,8 @@ class QuotationController extends Controller
         }
 
         // Filter by status
-        if ($request->status) {
-            if ($request->status === '0') {
-                $query->where('expired_date', '>', now());
-            } else if ($request->status === '1') {
-                $query->where('expired_date', '<=', now());
-            }
+        if ($request->has('status') && $request->status !== '') {
+            $this->applyQuotationStatusFilter($query, (string) $request->status);
         }
 
         // Get summary statistics for all quotations matching filters
@@ -131,12 +131,8 @@ class QuotationController extends Controller
                 ->orWhere('quotation_date', '<=', $request->date_range[1]);
         }
 
-        if ($request->status) {
-            if ($request->status === '0') {
-                $allQuotations->where('expired_date', '>', now());
-            } else if ($request->status === '1') {
-                $allQuotations->where('expired_date', '<=', now());
-            }
+        if ($request->has('status') && $request->status !== '') {
+            $this->applyQuotationStatusFilter($allQuotations, (string) $request->status);
         }
 
         $allQuotations = $allQuotations->get();
@@ -145,10 +141,10 @@ class QuotationController extends Controller
             'total_quotations' => $allQuotations->count(),
             'grand_total' => $allQuotations->sum('grand_total'),
             'active_quotations' => $allQuotations->filter(function ($quotation) {
-                return Carbon::createFromFormat(get_date_format(), $quotation->expired_date)->isFuture();
+                return Carbon::parse($quotation->getRawOriginal('expired_date'))->greaterThanOrEqualTo(Carbon::today());
             })->count(),
             'expired_quotations' => $allQuotations->filter(function ($quotation) {
-                return Carbon::createFromFormat(get_date_format(), $quotation->expired_date)->isPast();
+                return Carbon::parse($quotation->getRawOriginal('expired_date'))->lessThan(Carbon::today());
             })->count(),
         ];
 
@@ -223,12 +219,8 @@ class QuotationController extends Controller
         }
 
         // Filter by status
-        if ($request->status) {
-            if ($request->status === '0') {
-                $query->where('expired_date', '>', now());
-            } else if ($request->status === '1') {
-                $query->where('expired_date', '<=', now());
-            }
+        if ($request->has('status') && $request->status !== '') {
+            $this->applyQuotationStatusFilter($query, (string) $request->status);
         }
 
         // Handle sorting
@@ -282,12 +274,16 @@ class QuotationController extends Controller
         $currencies = Currency::all();
         $products = Product::all();
         $taxes = Tax::all();
+        $familySizes = InsuranceFamilySize::all();
+        $benefits = InsuranceBenefit::all();
 
         return Inertia::render('Backend/User/Quotation/Create', [
             'customers' => $customers,
             'currencies' => $currencies,
             'products' => $products,
             'taxes' => $taxes,
+            'familySizes' => $familySizes,
+            'benefits' => $benefits,
             'quotation_title' => $quotation_title,
             'base_currency' => get_business_option('currency')
         ]);
@@ -309,7 +305,9 @@ class QuotationController extends Controller
             'quotation_date'   => 'required',
             'expired_date'     => 'required',
             'product_id'       => 'required',
-            'currency'          => 'required',
+            'currency'         => 'required',
+            'is_deffered'      => 'nullable|in:0,1',
+            'invoice_category' => 'nullable|required_if:is_deffered,1|in:medical,gpa,other',
         ], [
             'product_id.required' => _lang('You must add at least one item'),
         ]);
@@ -338,7 +336,7 @@ class QuotationController extends Controller
         $quotation->customer_id      = $request->input('customer_id');
         $quotation->title            = $request->input('title');
         $quotation->quotation_number = BusinessSetting::where('name', 'quotation_number')->first()->value;
-        $quotation->po_so_number     = $request->input('po_so_number');
+        $quotation->po_so_number     = $this->getQuotationReferenceNumber($request);
         $quotation->quotation_date   = Carbon::parse($request->input('quotation_date'))->format('Y-m-d');
         $quotation->expired_date     = Carbon::parse($request->input('expired_date'))->format('Y-m-d');
         $quotation->sub_total        = $summary['subTotal'];
@@ -353,20 +351,19 @@ class QuotationController extends Controller
         $quotation->template         = $request->input('template') ?? 'default';
         $quotation->note             = $request->input('note');
         $quotation->footer           = $request->input('footer');
+        $quotation->is_deffered      = $this->isDeferredQuotation($request);
+        $quotation->invoice_category = $this->isDeferredQuotation($request) ? $request->input('invoice_category') : null;
         $quotation->short_code       = rand(100000, 9999999) . uniqid();
 
         $quotation->save();
 
         for ($i = 0; $i < count($request->product_id); $i++) {
-            $quotationItem = $quotation->items()->save(new quotationItem([
-                'quotation_id' => $quotation->id,
-                'product_id'   => $request->product_id[$i],
-                'product_name' => $request->product_name[$i],
-                'description'  => $request->description[$i],
-                'quantity'     => $request->quantity[$i],
-                'unit_cost'    => $request->unit_cost[$i],
-                'sub_total'    => ($request->unit_cost[$i] * $request->quantity[$i]),
-            ]));
+            $quotationItem = $quotation->items()->save(new quotationItem(
+                array_merge(
+                    ['quotation_id' => $quotation->id],
+                    $this->buildQuotationItemPayload($request, $i)
+                )
+            ));
 
             if (isset($request->taxes)) {
                 foreach ($request->taxes as $taxId) {
@@ -410,10 +407,12 @@ class QuotationController extends Controller
         $quotation = quotation::with(['business', 'items', 'customer', 'taxes'])->find($id);
         $email_templates = EmailTemplate::whereIn('slug', ['NEW_QUOTATION_CREATED'])
             ->where('email_status', 1)->get();
+        $decimalPlace = get_business_option('decimal_place', 2);
 
         return Inertia::render('Backend/User/Quotation/View', [
             'quotation' => $quotation,
-            'email_templates' => $email_templates
+            'email_templates' => $email_templates,
+            'decimalPlace' => $decimalPlace,
         ]);
     }
 
@@ -508,6 +507,8 @@ class QuotationController extends Controller
         $currencies = Currency::all();
         $products = Product::all();
         $taxes = Tax::all();
+        $familySizes = InsuranceFamilySize::all();
+        $benefits = InsuranceBenefit::all();
 
         $decimalPlace = get_business_option('decimal_place', 2);
 
@@ -517,6 +518,8 @@ class QuotationController extends Controller
             'currencies' => $currencies,
             'products' => $products,
             'taxes' => $taxes,
+            'familySizes' => $familySizes,
+            'benefits' => $benefits,
             'decimalPlace' => $decimalPlace,
             'taxIds' => $taxIds
         ]);
@@ -539,8 +542,9 @@ class QuotationController extends Controller
             'quotation_date'   => 'required',
             'expired_date'     => 'required',
             'product_id'       => 'required',
-            'template'         => 'required',
-            'currency'         => 'required'
+            'currency'         => 'required',
+            'is_deffered'      => 'nullable|in:0,1',
+            'invoice_category' => 'nullable|required_if:is_deffered,1|in:medical,gpa,other',
         ], [
             'product_id.required' => _lang('You must add at least one item'),
         ]);
@@ -568,7 +572,7 @@ class QuotationController extends Controller
         $quotation                   = Quotation::find($id);
         $quotation->customer_id      = $request->input('customer_id');
         $quotation->title            = $request->input('title');
-        $quotation->po_so_number     = $request->input('po_so_number');
+        $quotation->po_so_number     = $this->getQuotationReferenceNumber($request);
         $quotation->quotation_date   = Carbon::parse($request->input('quotation_date'))->format('Y-m-d');
         $quotation->expired_date     = Carbon::parse($request->input('expired_date'))->format('Y-m-d');
         $quotation->sub_total        = $summary['subTotal'];
@@ -580,26 +584,25 @@ class QuotationController extends Controller
         $quotation->discount_type    = $request->input('discount_type');
         $quotation->discount_value   = $request->input('discount_value') ?? 0;
         $quotation->template_type    = is_numeric($request->template) ? 1 : 0;
-        $quotation->template         = $request->input('template');
+        $quotation->template         = $request->input('template') ?? 'default';
         $quotation->note             = $request->input('note');
         $quotation->footer           = $request->input('footer');
+        $quotation->is_deffered      = $this->isDeferredQuotation($request);
+        $quotation->invoice_category = $this->isDeferredQuotation($request) ? $request->input('invoice_category') : null;
 
         $quotation->save();
 
+        quotationItemTax::where('quotation_id', $quotation->id)->delete();
         $quotation->items()->delete();
         for ($i = 0; $i < count($request->product_id); $i++) {
-            $quotationItem = $quotation->items()->save(new quotationItem([
-                'quotation_id' => $quotation->id,
-                'product_id'   => $request->product_id[$i],
-                'product_name' => $request->product_name[$i],
-                'description'  => $request->description[$i],
-                'quantity'     => $request->quantity[$i],
-                'unit_cost'    => $request->unit_cost[$i],
-                'sub_total'    => ($request->unit_cost[$i] * $request->quantity[$i]),
-            ]));
+            $quotationItem = $quotation->items()->save(new quotationItem(
+                array_merge(
+                    ['quotation_id' => $quotation->id],
+                    $this->buildQuotationItemPayload($request, $i)
+                )
+            ));
 
             if (isset($request->taxes)) {
-                $quotationItem->taxes()->delete();
                 foreach ($request->taxes as $taxId) {
                     $tax = Tax::find($taxId);
 
@@ -663,176 +666,77 @@ class QuotationController extends Controller
     {
         Gate::authorize('quotations.convert_to_invoice');
 
+        $quotation = Quotation::with(['items.taxes'])->findOrFail($id);
+
+        if ((int) ($quotation->status ?? 0) === 1) {
+            return back()->with('error', _lang('This quotation has already been accepted.'));
+        }
+
+        if ((int) ($quotation->status ?? 0) === 2) {
+            return back()->with('error', _lang('Rejected quotations cannot be converted.'));
+        }
+
+        if ((int) $quotation->is_deffered === 1 && package()->deffered_invoice != 1) {
+            return back()->with('error', _lang('Sorry, This module is not available in your current package !'));
+        }
+
         DB::beginTransaction();
 
-        $quotation = Quotation::find($id);
-
-        $invoice                  = new Invoice();
-        $invoice->customer_id     = $quotation->customer_id;
-        $invoice->title           = get_business_option('invoice_title', 'Invoice');
-        $invoice->invoice_number  = get_business_option('invoice_number', '100001');
-        $invoice->order_number    = $quotation->po_so_number;
-        $invoice->invoice_date    = date('Y-m-d');
-        $invoice->due_date        = date('Y-m-d');
-        $invoice->sub_total       = $quotation->sub_total;
-        $invoice->grand_total     = $quotation->grand_total;
-        $invoice->currency        = $quotation->currency;
-        $invoice->converted_total = $quotation->converted_total;
-        $invoice->exchange_rate   = $quotation->exchange_rate;
-        $invoice->paid            = 0;
-        $invoice->discount        = $quotation->discount;
-        $invoice->discount_type   = $quotation->discount_type;
-        $invoice->discount_value  = $quotation->discount_value;
-        $invoice->template_type   = $quotation->template_type;
-        $invoice->template        = $quotation->template;
-        $invoice->note            = $quotation->note;
-        $invoice->footer          = $quotation->footer;
-        $invoice->short_code      = rand(100000, 9999999) . uniqid();
-
-        $invoice->save();
-
-        $currentTime = Carbon::now();
-
-        foreach ($quotation->items as $item) {
-            $invoiceItem = $invoice->items()->save(new InvoiceItem([
-                'invoice_id'   => $invoice->id,
-                'product_id'   => $item->product_id,
-                'product_name' => $item->product_name,
-                'description'  => $item->description,
-                'quantity'     => $item->quantity,
-                'unit_cost'    => $item->unit_cost,
-                'sub_total'    => $item->sub_total,
-            ]));
-
-            $product = Product::where('id', $item->product_id)->first();
-
-            if ($product->allow_for_selling == 1) {
-                $transaction              = new Transaction();
-                $transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $invoice->invoice_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                $transaction->account_id  = $product->income_account_id;
-                $transaction->dr_cr       = 'cr';
-                $transaction->transaction_currency    = $invoice->currency;
-                $transaction->currency_rate = $invoice->exchange_rate;
-                $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $invoiceItem->sub_total));
-                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $invoice->currency, $invoiceItem->sub_total);
-                $transaction->description = _lang('Credit Invoice Income') . ' #' . $invoice->invoice_number;
-                $transaction->ref_id      = $invoice->id;
-                $transaction->ref_type    = 'invoice';
-
-                $transaction->save();
+        try {
+            if ((int) $quotation->is_deffered === 1) {
+                $invoice = $this->createDeferredInvoiceFromQuotation($request, $quotation);
+                $redirectRoute = 'deffered_invoices.edit';
+                $auditEvent = 'Quotation Converted to Deffered Invoice';
+            } else {
+                $invoice = $this->createNormalInvoiceFromQuotation($request, $quotation);
+                $redirectRoute = 'invoices.edit';
+                $auditEvent = 'Quotation Converted to Invoice';
             }
 
-            if ($product->stock_management == 1) {
-                $transaction              = new Transaction();
-                $transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $invoice->invoice_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                $transaction->account_id  = get_account('Inventory')->id;
-                $transaction->dr_cr       = 'cr';
-                $transaction->transaction_currency    = $invoice->currency;
-                $transaction->currency_rate           = $invoice->exchange_rate;
-                $transaction->base_currency_amount    = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $product->purchase_cost * $invoiceItem->quantity));
-                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $invoice->currency, $product->purchase_cost * $invoiceItem->quantity);
-                $transaction->description = $invoiceItem->product_name . ' Sales #' . $invoiceItem->quantity;
-                $transaction->ref_id      = $invoice->id;
-                $transaction->ref_type    = 'invoice';
-                $transaction->save();
-            }
+            $quotation->status = 1;
+            $quotation->save();
 
-            if ($product->allow_for_purchasing == 1) {
-                $transaction              = new Transaction();
-                $transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $invoice->invoice_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                $transaction->account_id  = $product->expense_account_id;
-                $transaction->dr_cr       = 'dr';
-                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $invoice->currency, $product->purchase_cost * $invoiceItem->quantity);
-                $transaction->transaction_currency    = $invoice->currency;
-                $transaction->currency_rate = $invoice->exchange_rate;
-                $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $product->purchase_cost * $invoiceItem->quantity));
-                $transaction->ref_type    = 'invoice';
-                $transaction->ref_id      = $invoice->id;
-                $transaction->description = 'Credit Invoice #' . $invoice->invoice_number;
-                $transaction->save();
-            }
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->user()->id;
+            $audit->event = $auditEvent . ' ' . $quotation->quotation_number . ' -> ' . $invoice->invoice_number;
+            $audit->save();
 
-            if (isset($quotation->taxes)) {
-                foreach ($quotation->taxes as $tax) {
-                    $tax = Tax::find($tax->tax_id);
+            DB::commit();
 
-                    $invoiceItem->taxes()->save(new InvoiceItemTax([
-                        'invoice_id' => $invoice->id,
-                        'tax_id'     => $$tax->id,
-                        'name'       => $tax->name . ' ' . $tax->rate . ' %',
-                        'amount'     => ($invoiceItem->sub_total / 100) * $tax->rate,
-                    ]));
+            return redirect()->route($redirectRoute, $invoice->id)
+                ->with('success', _lang('Quotation converted successfully'));
+        } catch (\Throwable $e) {
+            DB::rollBack();
 
-                    $transaction              = new Transaction();
-                    $transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $invoice->invoice_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                    $transaction->account_id  = $tax->account_id;
-                    $transaction->dr_cr       = 'cr';
-                    $transaction->transaction_currency    = $invoice->currency;
-                    $transaction->currency_rate = $invoice->exchange_rate;
-                    $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, ($invoiceItem->sub_total / 100) * $tax->rate));
-                    $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $invoice->currency, ($invoiceItem->sub_total / 100) * $tax->rate);
-                    $transaction->description = _lang('Credit Invoice Tax') . ' #' . $invoice->invoice_number;
-                    $transaction->ref_id      = $invoice->id;
-                    $transaction->ref_type    = 'invoice tax';
-                    $transaction->save();
-                }
-            }
+            return back()->with('error', $e->getMessage());
+        }
+    }
 
-            //Update Stock
-            $product = $invoiceItem->product;
-            if ($product->type == 'product' && $product->stock_management == 1) {
-                //Check Available Stock Quantity
-                if ($product->stock < $item->quantity) {
-                    DB::rollBack();
-                    return back()->with('error', $product->name . ' ' . _lang('Stock is not available!'));
-                }
+    public function reject($id)
+    {
+        Gate::authorize('quotations.update');
 
-                $product->stock = $product->stock - $item->quantity;
-                $product->save();
-            }
+        $quotation = Quotation::findOrFail($id);
+
+        if ((int) ($quotation->status ?? 0) === 1) {
+            return back()->with('error', _lang('Accepted quotations cannot be rejected.'));
         }
 
-        //Increment Invoice Number
-        BusinessSetting::where('name', 'invoice_number')->increment('value');
-
-        DB::commit();
-
-        $transaction              = new Transaction();
-        $transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $invoice->invoice_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-        $transaction->account_id  = get_account('Accounts Receivable')->id;
-        $transaction->dr_cr       = 'dr';
-        $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $invoice->currency, $invoice->grand_total);
-        $transaction->transaction_currency    = $invoice->currency;
-        $transaction->currency_rate           = $invoice->exchange_rate;
-        $transaction->base_currency_amount    = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $invoice->grand_total));
-        $transaction->ref_id      = $invoice->id;
-        $transaction->ref_type    = 'invoice';
-        $transaction->description = 'Credit Invoice #' . $invoice->invoice_number;
-        $transaction->save();
-
-        if ($quotation->discount_value > 0) {
-            $transaction              = new Transaction();
-            $transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $invoice->invoice_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-            $transaction->account_id  = get_account('Sales Discount Allowed')->id;
-            $transaction->dr_cr       = 'dr';
-            $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $invoice->currency, $invoice->discount);
-            $transaction->transaction_currency    = $invoice->currency;
-            $transaction->currency_rate           = $invoice->exchange_rate;
-            $transaction->base_currency_amount    = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $invoice->discount));
-            $transaction->description = _lang('Credit Invoice Discount') . ' #' . $invoice->invoice_number;
-            $transaction->ref_id      = $invoice->id;
-            $transaction->ref_type    = 'invoice';
-            $transaction->save();
+        if ((int) ($quotation->status ?? 0) === 2) {
+            return back()->with('error', _lang('This quotation has already been rejected.'));
         }
 
-        // audit log
+        $quotation->status = 2;
+        $quotation->save();
+
         $audit = new AuditLog();
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = auth()->user()->id;
-        $audit->event = 'Quotation Converted to Invoice' . ' ' . $quotation->quotation_number . ' -> ' . $invoice->invoice_number;
+        $audit->event = 'Quotation Rejected ' . $quotation->quotation_number;
         $audit->save();
 
-        return redirect()->route('invoices.edit', $invoice->id);
+        return redirect()->route('quotations.index')->with('success', _lang('Rejected Successfully'));
     }
 
     /**
@@ -947,6 +851,544 @@ class QuotationController extends Controller
             $quotation->restore();
         }
         return redirect()->route('quotations.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    private function applyQuotationStatusFilter($query, string $status): void
+    {
+        switch ($status) {
+            case '0':
+                $query->where('status', 0)
+                    ->whereDate('expired_date', '>=', Carbon::today());
+                break;
+            case '1':
+                $query->where('status', 0)
+                    ->whereDate('expired_date', '<', Carbon::today());
+                break;
+            case '2':
+                $query->where('status', 1);
+                break;
+            case '3':
+                $query->where('status', 2);
+                break;
+        }
+    }
+
+    private function ensureDefaultAccounts(Request $request, bool $includeUnearnedRevenue = false): void
+    {
+        $defaultAccounts = ['Accounts Receivable', 'Sales Tax Payable', 'Sales Discount Allowed', 'Inventory'];
+
+        if ($includeUnearnedRevenue) {
+            $defaultAccounts[] = 'Unearned Revenue';
+        }
+
+        foreach ($defaultAccounts as $accountName) {
+            if (Account::where('account_name', $accountName)->where('business_id', $request->activeBusiness->id)->exists()) {
+                continue;
+            }
+
+            $account = new Account();
+
+            switch ($accountName) {
+                case 'Accounts Receivable':
+                    $account->account_code = '1100';
+                    $account->account_type = 'Other Current Asset';
+                    $account->dr_cr = 'dr';
+                    break;
+                case 'Sales Tax Payable':
+                    $account->account_code = '2200';
+                    $account->account_type = 'Current Liability';
+                    $account->dr_cr = 'cr';
+                    break;
+                case 'Sales Discount Allowed':
+                    $account->account_code = '4009';
+                    $account->account_type = 'Other Income';
+                    $account->dr_cr = 'dr';
+                    break;
+                case 'Inventory':
+                    $account->account_code = '1000';
+                    $account->account_type = 'Other Current Asset';
+                    $account->dr_cr = 'dr';
+                    break;
+                case 'Unearned Revenue':
+                    $account->account_code = '2300';
+                    $account->account_type = 'Current Liability';
+                    $account->dr_cr = 'cr';
+                    break;
+            }
+
+            $account->account_name = $accountName;
+            $account->business_id = $request->activeBusiness->id;
+            $account->user_id = $request->activeBusiness->user->id;
+            $account->opening_date = now()->format('Y-m-d');
+            $account->save();
+        }
+    }
+
+    private function isDeferredQuotation(Request $request): bool
+    {
+        return (string) $request->input('is_deffered', '0') === '1';
+    }
+
+    private function getQuotationReferenceNumber(Request $request): ?string
+    {
+        return $request->input('po_so_number', $request->input('order_number'));
+    }
+
+    private function buildQuotationItemPayload(Request $request, int $index): array
+    {
+        $isDeferred = $this->isDeferredQuotation($request);
+        $invoiceCategory = $isDeferred ? $request->input('invoice_category') : null;
+
+        return [
+            'product_id'   => $request->product_id[$index],
+            'product_name' => $request->product_name[$index],
+            'description'  => $request->description[$index] ?? null,
+            'quantity'     => $request->quantity[$index],
+            'unit_cost'    => $request->unit_cost[$index],
+            'sub_total'    => ($request->unit_cost[$index] * $request->quantity[$index]),
+            'benefits'     => $isDeferred ? ($request->benefits[$index] ?? null) : null,
+            'family_size'  => $isDeferred && $invoiceCategory === 'medical' ? ($request->family_size[$index] ?? null) : null,
+            'sum_insured'  => $isDeferred && $invoiceCategory === 'other'
+                ? (($request->input("sum_insured.$index") !== null && $request->input("sum_insured.$index") !== '') ? $request->input("sum_insured.$index") : 0)
+                : 0,
+        ];
+    }
+
+    private function buildDeferredEarningsSchedule(Quotation $quotation): array
+    {
+        $decimalPlace = (int) get_business_option('decimal_place', 2);
+        $startDate = Carbon::parse($quotation->getRawOriginal('quotation_date'))->startOfDay();
+        $endDate = Carbon::parse($quotation->getRawOriginal('expired_date'))->startOfDay();
+
+        if ($endDate->lt($startDate)) {
+            $endDate = $startDate->copy();
+        }
+
+        $totalDays = max($startDate->diffInDays($endDate) + 1, 1);
+        $factor = (int) pow(10, $decimalPlace);
+        $subTotalUnits = (int) round(((float) $quotation->getRawOriginal('sub_total')) * $factor);
+        $unitsPerDay = intdiv($subTotalUnits, $totalDays);
+
+        $scheduleUnits = [];
+        $cursor = $startDate->copy();
+        $usedUnits = 0;
+
+        while ($cursor->lte($endDate)) {
+            $sliceStart = $cursor->copy();
+            $sliceEnd = $cursor->copy()->endOfMonth();
+
+            if ($sliceEnd->gt($endDate)) {
+                $sliceEnd = $endDate->copy();
+            }
+
+            $days = $sliceStart->diffInDays($sliceEnd) + 1;
+            $sliceUnits = $unitsPerDay * $days;
+
+            $scheduleUnits[] = [
+                'start_date' => $sliceStart->format('Y-m-d'),
+                'end_date' => $sliceEnd->format('Y-m-d'),
+                'number_of_days' => $days,
+                'slice_units' => $sliceUnits,
+            ];
+
+            $usedUnits += $sliceUnits;
+            $cursor = $sliceEnd->copy()->addDay()->startOfDay();
+        }
+
+        $remainder = $subTotalUnits - $usedUnits;
+
+        if (!empty($scheduleUnits) && $remainder !== 0) {
+            $scheduleUnits[array_key_last($scheduleUnits)]['slice_units'] += $remainder;
+        }
+
+        $schedule = array_map(function ($entry) use ($quotation, $factor, $decimalPlace) {
+            return [
+                'start_date' => $entry['start_date'],
+                'end_date' => $entry['end_date'],
+                'number_of_days' => $entry['number_of_days'],
+                'currency' => $quotation->currency,
+                'exchange_rate' => $quotation->exchange_rate,
+                'transaction_amount' => round($entry['slice_units'] / $factor, $decimalPlace),
+            ];
+        }, $scheduleUnits);
+
+        $costPerDay = $totalDays > 0 ? round(($subTotalUnits / $factor) / $totalDays, $decimalPlace) : 0;
+
+        return [
+            'schedule' => $schedule,
+            'total_days' => $totalDays,
+            'cost_per_day' => $costPerDay,
+        ];
+    }
+
+    private function createNormalInvoiceFromQuotation(Request $request, Quotation $quotation): Invoice
+    {
+        $this->ensureDefaultAccounts($request);
+
+        $invoice = new Invoice();
+        $invoice->customer_id = $quotation->customer_id;
+        $invoice->title = $quotation->title ?: get_business_option('invoice_title', 'Invoice');
+        $invoice->invoice_number = get_business_option('invoice_number', '100001');
+        $invoice->order_number = $quotation->po_so_number;
+        $invoice->invoice_date = Carbon::today()->format('Y-m-d');
+        $invoice->due_date = Carbon::today()->format('Y-m-d');
+        $invoice->sub_total = $quotation->getRawOriginal('sub_total');
+        $invoice->grand_total = $quotation->getRawOriginal('grand_total');
+        $invoice->currency = $quotation->currency;
+        $invoice->converted_total = $quotation->converted_total;
+        $invoice->exchange_rate = $quotation->exchange_rate;
+        $invoice->paid = 0;
+        $invoice->discount = $quotation->getRawOriginal('discount');
+        $invoice->discount_type = $quotation->discount_type;
+        $invoice->discount_value = $quotation->discount_value;
+        $invoice->template_type = $quotation->template_type;
+        $invoice->template = $quotation->template;
+        $invoice->note = $quotation->note;
+        $invoice->footer = $quotation->footer;
+        $invoice->short_code = rand(100000, 9999999) . uniqid();
+        $invoice->save();
+
+        $currentTime = Carbon::now();
+        $transactionDate = Carbon::parse($invoice->getRawOriginal('invoice_date'))
+            ->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)
+            ->format('Y-m-d H:i:s');
+
+        foreach ($quotation->items as $item) {
+            $invoiceItem = $invoice->items()->save(new InvoiceItem([
+                'invoice_id' => $invoice->id,
+                'product_id' => $item->product_id,
+                'product_name' => $item->product_name,
+                'description' => $item->description,
+                'quantity' => $item->quantity,
+                'unit_cost' => $item->getRawOriginal('unit_cost'),
+                'sub_total' => $item->getRawOriginal('sub_total'),
+            ]));
+
+            $product = Product::find($item->product_id);
+
+            if (!$product) {
+                throw new \RuntimeException(_lang('Selected product is not available!'));
+            }
+
+            if ($product->allow_for_selling == 1) {
+                $transaction = new Transaction();
+                $transaction->trans_date = $transactionDate;
+                $transaction->account_id = $product->income_account_id;
+                $transaction->dr_cr = 'cr';
+                $transaction->transaction_currency = $invoice->currency;
+                $transaction->currency_rate = $invoice->exchange_rate;
+                $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $invoiceItem->getRawOriginal('sub_total')));
+                $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $invoice->currency, $invoiceItem->getRawOriginal('sub_total'));
+                $transaction->description = _lang('Credit Invoice Income') . ' #' . $invoice->invoice_number;
+                $transaction->ref_id = $invoice->id;
+                $transaction->ref_type = 'invoice';
+                $transaction->customer_id = $invoice->customer_id;
+                $transaction->save();
+            }
+
+            if ($product->stock_management == 1) {
+                $transaction = new Transaction();
+                $transaction->trans_date = $transactionDate;
+                $transaction->account_id = get_account('Inventory')->id;
+                $transaction->dr_cr = 'cr';
+                $transaction->transaction_currency = $invoice->currency;
+                $transaction->currency_rate = $invoice->exchange_rate;
+                $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $product->purchase_cost * $invoiceItem->quantity));
+                $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $invoice->currency, $product->purchase_cost * $invoiceItem->quantity);
+                $transaction->description = $invoiceItem->product_name . ' Sales #' . $invoiceItem->quantity;
+                $transaction->ref_id = $invoice->id;
+                $transaction->ref_type = 'invoice';
+                $transaction->customer_id = $invoice->customer_id;
+                $transaction->save();
+            }
+
+            if ($product->allow_for_purchasing == 1) {
+                $transaction = new Transaction();
+                $transaction->trans_date = $transactionDate;
+                $transaction->account_id = $product->expense_account_id;
+                $transaction->dr_cr = 'dr';
+                $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $invoice->currency, $product->purchase_cost * $invoiceItem->quantity);
+                $transaction->transaction_currency = $invoice->currency;
+                $transaction->currency_rate = $invoice->exchange_rate;
+                $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $product->purchase_cost * $invoiceItem->quantity));
+                $transaction->ref_type = 'invoice';
+                $transaction->ref_id = $invoice->id;
+                $transaction->description = 'Credit Invoice #' . $invoice->invoice_number;
+                $transaction->customer_id = $invoice->customer_id;
+                $transaction->save();
+            }
+
+            foreach ($item->taxes as $quotationItemTax) {
+                $tax = Tax::find($quotationItemTax->tax_id);
+
+                if (!$tax) {
+                    continue;
+                }
+
+                $taxAmount = $quotationItemTax->getRawOriginal('amount');
+
+                $invoiceItem->taxes()->save(new InvoiceItemTax([
+                    'invoice_id' => $invoice->id,
+                    'tax_id' => $tax->id,
+                    'name' => $tax->name . ' ' . $tax->rate . ' %',
+                    'amount' => $taxAmount,
+                ]));
+
+                $transaction = new Transaction();
+                $transaction->trans_date = $transactionDate;
+                $transaction->account_id = $tax->account_id;
+                $transaction->dr_cr = 'cr';
+                $transaction->transaction_currency = $invoice->currency;
+                $transaction->currency_rate = $invoice->exchange_rate;
+                $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $taxAmount));
+                $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $invoice->currency, $taxAmount);
+                $transaction->description = _lang('Credit Invoice Tax') . ' #' . $invoice->invoice_number;
+                $transaction->ref_id = $invoice->id;
+                $transaction->ref_type = 'invoice tax';
+                $transaction->tax_id = $tax->id;
+                $transaction->customer_id = $invoice->customer_id;
+                $transaction->save();
+            }
+
+            if ($product->type == 'product' && $product->stock_management == 1) {
+                if ($product->stock < $item->quantity) {
+                    throw new \RuntimeException($product->name . ' ' . _lang('Stock is not available!'));
+                }
+
+                $product->stock = $product->stock - $item->quantity;
+                $product->save();
+            }
+        }
+
+        BusinessSetting::where('name', 'invoice_number')->increment('value');
+
+        $transaction = new Transaction();
+        $transaction->trans_date = $transactionDate;
+        $transaction->account_id = get_account('Accounts Receivable')->id;
+        $transaction->dr_cr = 'dr';
+        $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $invoice->currency, $invoice->getRawOriginal('grand_total'));
+        $transaction->transaction_currency = $invoice->currency;
+        $transaction->currency_rate = $invoice->exchange_rate;
+        $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $invoice->getRawOriginal('grand_total')));
+        $transaction->ref_id = $invoice->id;
+        $transaction->ref_type = 'invoice';
+        $transaction->description = 'Credit Invoice #' . $invoice->invoice_number;
+        $transaction->customer_id = $invoice->customer_id;
+        $transaction->save();
+
+        if ((float) ($quotation->discount_value ?? 0) > 0) {
+            $transaction = new Transaction();
+            $transaction->trans_date = $transactionDate;
+            $transaction->account_id = get_account('Sales Discount Allowed')->id;
+            $transaction->dr_cr = 'dr';
+            $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $invoice->currency, $invoice->getRawOriginal('discount'));
+            $transaction->transaction_currency = $invoice->currency;
+            $transaction->currency_rate = $invoice->exchange_rate;
+            $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $invoice->getRawOriginal('discount')));
+            $transaction->description = _lang('Credit Invoice Discount') . ' #' . $invoice->invoice_number;
+            $transaction->ref_id = $invoice->id;
+            $transaction->ref_type = 'invoice';
+            $transaction->customer_id = $invoice->customer_id;
+            $transaction->save();
+        }
+
+        return $invoice;
+    }
+
+    private function createDeferredInvoiceFromQuotation(Request $request, Quotation $quotation): Invoice
+    {
+        $this->ensureDefaultAccounts($request, true);
+
+        $earnings = $this->buildDeferredEarningsSchedule($quotation);
+
+        $invoice = new Invoice();
+        $invoice->customer_id = $quotation->customer_id;
+        $invoice->title = $quotation->title ?: get_business_option('invoice_title', 'Invoice');
+        $invoice->invoice_number = get_business_option('invoice_number', '100001');
+        $invoice->order_number = $quotation->po_so_number;
+        $invoice->invoice_date = Carbon::today()->format('Y-m-d');
+        $invoice->due_date = Carbon::today()->format('Y-m-d');
+        $invoice->sub_total = $quotation->getRawOriginal('sub_total');
+        $invoice->grand_total = $quotation->getRawOriginal('grand_total');
+        $invoice->currency = $quotation->currency;
+        $invoice->converted_total = $quotation->converted_total;
+        $invoice->exchange_rate = $quotation->exchange_rate;
+        $invoice->paid = 0;
+        $invoice->discount = $quotation->getRawOriginal('discount');
+        $invoice->discount_type = $quotation->discount_type;
+        $invoice->discount_value = $quotation->discount_value;
+        $invoice->template_type = $quotation->template_type;
+        $invoice->template = $quotation->template;
+        $invoice->note = $quotation->note;
+        $invoice->footer = $quotation->footer;
+        $invoice->short_code = rand(100000, 9999999) . uniqid();
+        $invoice->is_deffered = 1;
+        $invoice->invoice_category = $quotation->invoice_category;
+        $invoice->deffered_start = $quotation->getRawOriginal('quotation_date');
+        $invoice->deffered_end = $quotation->getRawOriginal('expired_date');
+        $invoice->active_days = $earnings['total_days'];
+        $invoice->cost_per_day = $earnings['cost_per_day'];
+        $invoice->save();
+
+        foreach ($earnings['schedule'] as $earning) {
+            $defferedEarning = new DefferedEarning();
+            $defferedEarning->invoice_id = $invoice->id;
+            $defferedEarning->start_date = $earning['start_date'];
+            $defferedEarning->end_date = $earning['end_date'];
+            $defferedEarning->days = $earning['number_of_days'];
+            $defferedEarning->currency = $earning['currency'];
+            $defferedEarning->exchange_rate = $earning['exchange_rate'];
+            $defferedEarning->base_currency_amount = convert_currency($request->activeBusiness->currency, $invoice->currency, $earning['transaction_amount']);
+            $defferedEarning->transaction_amount = $earning['transaction_amount'];
+            $defferedEarning->save();
+        }
+
+        $currentTime = Carbon::now();
+        $transactionDate = Carbon::parse($invoice->getRawOriginal('invoice_date'))
+            ->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)
+            ->format('Y-m-d H:i:s');
+
+        foreach ($quotation->items as $item) {
+            $invoiceItem = $invoice->items()->save(new InvoiceItem([
+                'invoice_id' => $invoice->id,
+                'product_id' => $item->product_id,
+                'product_name' => $item->product_name,
+                'description' => $item->description,
+                'sum_insured' => $item->getRawOriginal('sum_insured'),
+                'benefits' => $item->benefits,
+                'family_size' => $item->family_size,
+                'quantity' => $item->quantity,
+                'unit_cost' => $item->getRawOriginal('unit_cost'),
+                'sub_total' => $item->getRawOriginal('sub_total'),
+            ]));
+
+            $product = Product::find($item->product_id);
+
+            if (!$product) {
+                throw new \RuntimeException(_lang('Selected product is not available!'));
+            }
+
+            if ($product->stock_management == 1) {
+                $transaction = new Transaction();
+                $transaction->trans_date = $transactionDate;
+                $transaction->account_id = get_account('Inventory')->id;
+                $transaction->dr_cr = 'cr';
+                $transaction->transaction_currency = $invoice->currency;
+                $transaction->currency_rate = $invoice->exchange_rate;
+                $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $product->purchase_cost * $invoiceItem->quantity));
+                $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $invoice->currency, $product->purchase_cost * $invoiceItem->quantity);
+                $transaction->description = $invoiceItem->product_name . ' Sales #' . $invoiceItem->quantity;
+                $transaction->ref_id = $invoice->id;
+                $transaction->ref_type = 'd invoice';
+                $transaction->customer_id = $invoice->customer_id;
+                $transaction->save();
+            }
+
+            if ($product->allow_for_purchasing == 1) {
+                $transaction = new Transaction();
+                $transaction->trans_date = $transactionDate;
+                $transaction->account_id = $product->expense_account_id;
+                $transaction->dr_cr = 'dr';
+                $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $invoice->currency, $product->purchase_cost * $invoiceItem->quantity);
+                $transaction->transaction_currency = $invoice->currency;
+                $transaction->currency_rate = $invoice->exchange_rate;
+                $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $product->purchase_cost * $invoiceItem->quantity));
+                $transaction->ref_type = 'd invoice';
+                $transaction->customer_id = $invoice->customer_id;
+                $transaction->ref_id = $invoice->id;
+                $transaction->description = 'Deffered Invoice #' . $invoice->invoice_number;
+                $transaction->save();
+            }
+
+            foreach ($item->taxes as $quotationItemTax) {
+                $tax = Tax::find($quotationItemTax->tax_id);
+
+                if (!$tax) {
+                    continue;
+                }
+
+                $taxAmount = $quotationItemTax->getRawOriginal('amount');
+
+                $invoiceItem->taxes()->save(new InvoiceItemTax([
+                    'invoice_id' => $invoice->id,
+                    'tax_id' => $tax->id,
+                    'name' => $tax->name . ' ' . $tax->rate . ' %',
+                    'amount' => $taxAmount,
+                ]));
+
+                $transaction = new Transaction();
+                $transaction->trans_date = $transactionDate;
+                $transaction->account_id = $tax->account_id;
+                $transaction->dr_cr = 'cr';
+                $transaction->transaction_currency = $invoice->currency;
+                $transaction->currency_rate = $invoice->exchange_rate;
+                $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $taxAmount));
+                $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $invoice->currency, $taxAmount);
+                $transaction->description = _lang('Deffered Invoice Tax') . ' #' . $invoice->invoice_number;
+                $transaction->ref_id = $invoice->id;
+                $transaction->ref_type = 'd invoice tax';
+                $transaction->tax_id = $tax->id;
+                $transaction->customer_id = $invoice->customer_id;
+                $transaction->save();
+            }
+
+            if ($product->type == 'product' && $product->stock_management == 1) {
+                if ($product->stock < $item->quantity) {
+                    throw new \RuntimeException($product->name . ' ' . _lang('Stock is not available!'));
+                }
+
+                $product->stock = $product->stock - $item->quantity;
+                $product->save();
+            }
+        }
+
+        BusinessSetting::where('name', 'invoice_number')->increment('value');
+
+        $transaction = new Transaction();
+        $transaction->trans_date = $transactionDate;
+        $transaction->account_id = get_account('Unearned Revenue')->id;
+        $transaction->dr_cr = 'cr';
+        $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $invoice->currency, $invoice->getRawOriginal('sub_total'));
+        $transaction->transaction_currency = $invoice->currency;
+        $transaction->currency_rate = $invoice->exchange_rate;
+        $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $invoice->getRawOriginal('sub_total')));
+        $transaction->description = _lang('Deffered Invoice Liability') . ' #' . $invoice->invoice_number;
+        $transaction->ref_id = $invoice->id;
+        $transaction->ref_type = 'd invoice';
+        $transaction->customer_id = $invoice->customer_id;
+        $transaction->save();
+
+        $transaction = new Transaction();
+        $transaction->trans_date = $transactionDate;
+        $transaction->account_id = get_account('Accounts Receivable')->id;
+        $transaction->dr_cr = 'dr';
+        $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $invoice->currency, $invoice->getRawOriginal('grand_total'));
+        $transaction->transaction_currency = $invoice->currency;
+        $transaction->currency_rate = $invoice->exchange_rate;
+        $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $invoice->getRawOriginal('grand_total')));
+        $transaction->ref_id = $invoice->id;
+        $transaction->ref_type = 'd invoice';
+        $transaction->customer_id = $invoice->customer_id;
+        $transaction->description = 'Deffered Invoice #' . $invoice->invoice_number;
+        $transaction->save();
+
+        if ((float) ($quotation->discount_value ?? 0) > 0) {
+            $transaction = new Transaction();
+            $transaction->trans_date = $transactionDate;
+            $transaction->account_id = get_account('Sales Discount Allowed')->id;
+            $transaction->dr_cr = 'dr';
+            $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $invoice->currency, $invoice->getRawOriginal('discount'));
+            $transaction->transaction_currency = $invoice->currency;
+            $transaction->currency_rate = $invoice->exchange_rate;
+            $transaction->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $invoice->currency, $invoice->getRawOriginal('discount')));
+            $transaction->description = _lang('Deffered Invoice Discount') . ' #' . $invoice->invoice_number;
+            $transaction->ref_id = $invoice->id;
+            $transaction->ref_type = 'd invoice';
+            $transaction->customer_id = $invoice->customer_id;
+            $transaction->save();
+        }
+
+        return $invoice;
     }
 
     private function calculateTotal(Request $request)

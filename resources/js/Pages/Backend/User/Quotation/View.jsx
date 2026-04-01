@@ -73,6 +73,8 @@ export default function View({ quotation, decimalPlace }) {
     });
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [shareLink, setShareLink] = useState('');
+    const isDeferredQuotation = Number(quotation?.is_deffered) === 1;
+    const quantityLabel = isDeferredQuotation && quotation?.invoice_category === "medical" ? "Members" : "Quantity";
 
     const handlePrint = () => {
         setIsLoading(prev => ({ ...prev, print: true }));
@@ -211,8 +213,23 @@ export default function View({ quotation, decimalPlace }) {
                                     <div className="mt-2 text-sm">
                                         <p><span className="font-medium">Quotation #:</span> {quotation.quotation_number}</p>
                                         <p><span className="font-medium">Quotation Date:</span> {quotation.quotation_date}</p>
-                                        {quotation.order_number && (
-                                            <p><span className="font-medium">Order Number:</span> {quotation.order_number}</p>
+                                        {quotation.po_so_number && (
+                                            <p>
+                                                <span className="font-medium">
+                                                    {isDeferredQuotation ? "Quotation Number:" : "Order Number:"}
+                                                </span>{" "}
+                                                {quotation.po_so_number}
+                                            </p>
+                                        )}
+                                        <p>
+                                            <span className="font-medium">Quotation Type:</span>{" "}
+                                            {isDeferredQuotation ? "Deferred" : "Normal"}
+                                        </p>
+                                        {isDeferredQuotation && quotation.invoice_category && (
+                                            <p>
+                                                <span className="font-medium">Deferred Category:</span>{" "}
+                                                {quotation.invoice_category.toUpperCase()}
+                                            </p>
                                         )}
                                     </div>
                                     <div className="mt-4 sm:flex sm:justify-end">
@@ -248,8 +265,15 @@ export default function View({ quotation, decimalPlace }) {
                                         <TableRow>
                                             <TableHead>Item</TableHead>
                                             <TableHead>Description</TableHead>
-                                            <TableHead className="text-right">Quantity</TableHead>
-                                            <TableHead className="text-right">Unit Cost</TableHead>
+                                            {isDeferredQuotation && <TableHead>Benefit</TableHead>}
+                                            {isDeferredQuotation && quotation.invoice_category === "other" && (
+                                                <TableHead className="text-right">Sum Insured</TableHead>
+                                            )}
+                                            {isDeferredQuotation && quotation.invoice_category === "medical" && (
+                                                <TableHead>Family Size</TableHead>
+                                            )}
+                                            <TableHead className="text-right">{quantityLabel}</TableHead>
+                                            <TableHead className="text-right">{isDeferredQuotation ? "Rate" : "Unit Cost"}</TableHead>
                                             <TableHead className="text-right">Total</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -258,6 +282,15 @@ export default function View({ quotation, decimalPlace }) {
                                             <TableRow key={index}>
                                                 <TableCell className="font-medium">{item.product_name}</TableCell>
                                                 <TableCell>{item.description}</TableCell>
+                                                {isDeferredQuotation && <TableCell>{item.benefits}</TableCell>}
+                                                {isDeferredQuotation && quotation.invoice_category === "other" && (
+                                                    <TableCell className="text-right">
+                                                        {formatCurrency(item.sum_insured, quotation.currency, decimalPlace)}
+                                                    </TableCell>
+                                                )}
+                                                {isDeferredQuotation && quotation.invoice_category === "medical" && (
+                                                    <TableCell>{item.family_size}</TableCell>
+                                                )}
                                                 <TableCell className="text-right">{item.quantity}</TableCell>
                                                 <TableCell className="text-right">{formatCurrency(item.unit_cost, quotation.currency, decimalPlace)}</TableCell>
                                                 <TableCell className="text-right">

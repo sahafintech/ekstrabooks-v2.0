@@ -32,6 +32,11 @@ return new class extends Migration
             $table->text('note')->nullable();
             $table->text('footer')->nullable();
             $table->string('short_code')->nullable();
+
+            // deffered quotation
+            $table->string('invoice_category')->nullable();
+            $table->tinyInteger('is_deffered')->default(0);
+            $table->tinyInteger('status')->default(0)->comment('0 = pending | 1 = accepted | 2 = rejected');
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
             $table->bigInteger('created_user_id')->nullable();

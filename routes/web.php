@@ -535,7 +535,8 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::delete('quotations/{id}/permanent_destroy', [QuotationController::class, 'permanent_destroy'])->name('quotations.permanent_destroy');
 		Route::match(['get', 'post'], 'quotations/{id}/send_email', [QuotationController::class, 'send_email'])->name('quotations.send_email');
 		Route::get('quotations/{id}/pdf', [QuotationController::class, 'pdf'])->name('quotations.pdf');
-		Route::get('quotations/{id}/convert_to_invoice', [QuotationController::class, 'convert_to_invoice'])->name('quotations.convert_to_invoice');
+		Route::match(['get', 'post'], 'quotations/{id}/convert_to_invoice', [QuotationController::class, 'convert_to_invoice'])->name('quotations.convert_to_invoice');
+		Route::post('quotations/{id}/reject', [QuotationController::class, 'reject'])->name('quotations.reject');
 		Route::get('quotations/{id}/duplicate', [QuotationController::class, 'duplicate'])->name('quotations.duplicate');
 		Route::post('quotations/bulk_destroy', [QuotationController::class, 'bulk_destroy'])->name('quotations.bulk_destroy');
 		Route::resource('quotations', QuotationController::class);

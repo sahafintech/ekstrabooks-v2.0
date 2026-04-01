@@ -26,7 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import DateTimePicker from "@/Components/DateTimePicker";
 
@@ -144,9 +144,18 @@ const QuotationStatusBadge = ({ expired_date }) => {
     1: { label: "Expired", className: "text-red-600" },
   };
 
+  const parsedExpirationDate = parseDateObject(expired_date);
+  const expirationDate = parsedExpirationDate ? new Date(parsedExpirationDate) : null;
+
+  if (expirationDate) {
+    expirationDate.setHours(23, 59, 59, 999);
+  }
+
+  const isActive = expirationDate ? expirationDate >= new Date() : false;
+
   return (
-    <span className={statusMap[expired_date > new Date() ? 0 : 1].className}>
-      {statusMap[expired_date > new Date() ? 0 : 1].label}
+    <span className={statusMap[isActive ? 0 : 1].className}>
+      {statusMap[isActive ? 0 : 1].label}
     </span>
   );
 };

@@ -22,7 +22,7 @@ class QuotationItem extends Model {
      * @var array
      */
     protected $fillable = [
-        'quotation_id', 'product_id', 'product_name', 'description', 'quantity', 'unit_cost', 'sub_total',
+        'quotation_id', 'product_id', 'product_name', 'description', 'sum_insured', 'quantity', 'unit_cost', 'sub_total', 'benefits', 'family_size',
     ];
 
     public function product(){
@@ -46,6 +46,14 @@ class QuotationItem extends Model {
 
         return Attribute::make(
             get:fn(string $value) => number_format($value, $decimal_place, '.', ''),
+        );
+    }
+
+    protected function sumInsured(): Attribute {
+        $decimal_place = get_business_option('decimal_places', 2);
+
+        return Attribute::make(
+            get: fn(string|null $value) => $value !== null ? number_format($value, $decimal_place, '.', '') : null,
         );
     }
 

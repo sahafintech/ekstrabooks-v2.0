@@ -43,7 +43,11 @@
                     <p><span class="font-medium">Quotation Date:</span> {{ $quotation->quotation_date }}</p>
                     <p><span class="font-medium">Valid Until:</span> {{ $quotation->expired_date }}</p>
                     @if($quotation->po_so_number)
-                    <p><span class="font-medium">PO/SO Number:</span> {{ $quotation->po_so_number }}</p>
+                    <p><span class="font-medium">{{ $quotation->is_deffered ? 'Quotation Number' : 'Order Number' }}:</span> {{ $quotation->po_so_number }}</p>
+                    @endif
+                    <p><span class="font-medium">Quotation Type:</span> {{ $quotation->is_deffered ? 'Deferred' : 'Normal' }}</p>
+                    @if($quotation->is_deffered && $quotation->invoice_category)
+                    <p><span class="font-medium">Deferred Category:</span> {{ strtoupper($quotation->invoice_category) }}</p>
                     @endif
                     @if($quotation->expired_date && Carbon\Carbon::createFromFormat(get_date_format(), $quotation->expired_date)->isPast())
                     <div class="mt-2">
@@ -91,8 +95,17 @@
                     <tr class="border-b border-gray-200">
                         <th class="text-left py-3 font-medium">Item</th>
                         <th class="text-left py-3 font-medium">Description</th>
-                        <th class="text-right py-3 font-medium">Quantity</th>
-                        <th class="text-right py-3 font-medium">Unit Price</th>
+                        @if($quotation->is_deffered)
+                        <th class="text-left py-3 font-medium">Benefit</th>
+                        @endif
+                        @if($quotation->is_deffered && $quotation->invoice_category === 'other')
+                        <th class="text-right py-3 font-medium">Sum Insured</th>
+                        @endif
+                        @if($quotation->is_deffered && $quotation->invoice_category === 'medical')
+                        <th class="text-left py-3 font-medium">Family Size</th>
+                        @endif
+                        <th class="text-right py-3 font-medium">{{ $quotation->is_deffered && $quotation->invoice_category === 'medical' ? 'Members' : 'Quantity' }}</th>
+                        <th class="text-right py-3 font-medium">{{ $quotation->is_deffered ? 'Rate' : 'Unit Price' }}</th>
                         <th class="text-right py-3 font-medium">Total</th>
                     </tr>
                 </thead>
@@ -101,6 +114,15 @@
                     <tr class="border-b border-gray-100">
                         <td class="py-3 font-medium">{{ $item->product_name }}</td>
                         <td class="py-3">{{ $item->description }}</td>
+                        @if($quotation->is_deffered)
+                        <td class="py-3">{{ $item->benefits }}</td>
+                        @endif
+                        @if($quotation->is_deffered && $quotation->invoice_category === 'other')
+                        <td class="py-3 text-right">{{ formatCurrency($item->sum_insured) }}</td>
+                        @endif
+                        @if($quotation->is_deffered && $quotation->invoice_category === 'medical')
+                        <td class="py-3">{{ $item->family_size }}</td>
+                        @endif
                         <td class="py-3 text-right">{{ $item->quantity }}</td>
                         <td class="py-3 text-right">{{ formatCurrency($item->unit_cost) }}</td>
                         <td class="py-3 text-right">

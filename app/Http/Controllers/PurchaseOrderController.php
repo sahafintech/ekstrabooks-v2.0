@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Imports\PurchaseOrderImport;
 use App\Models\Account;
 use App\Models\Attachment;
 use App\Models\AuditLog;
@@ -228,6 +229,419 @@ class PurchaseOrderController extends Controller
 			'inventory' => $inventory,
 			'base_currency' => $request->activeBusiness->currency,
 		]);
+	}
+
+	/**
+	 * Show the purchase order import page.
+	 */
+	public function import()
+	{
+		Gate::authorize('purchase_orders.csv.import');
+
+		return Inertia::render('Backend/User/PurchaseOrder/Import');
+	}
+
+	/**
+	 * Handle purchase order import file upload and return headers for mapping.
+	 */
+	public function uploadImportFile(Request $request)
+	{
+		Gate::authorize('purchase_orders.csv.import');
+
+		if ($request->isMethod('get')) {
+			return redirect()->route('purchase_orders.import.page');
+		}
+
+		$request->validate([
+			'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
+		]);
+
+		try {
+			$sessionId = session()->getId();
+			$tempDir = storage_path("app/imports/temp/{$sessionId}");
+
+			if (!is_dir($tempDir)) {
+				mkdir($tempDir, 0755, true);
+			}
+
+			$fileName = uniqid() . '_' . $request->file('file')->getClientOriginalName();
+			$fullPath = $tempDir . '/' . $fileName;
+
+			$request->file('file')->move($tempDir, $fileName);
+
+			if (!file_exists($fullPath)) {
+				throw new \Exception('Failed to store uploaded file');
+			}
+
+			$relativePath = "imports/temp/{$sessionId}/{$fileName}";
+
+			$spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+			$worksheet = $spreadsheet->getActiveSheet();
+			$headers = [];
+
+			foreach ($worksheet->getRowIterator(1, 1) as $row) {
+				$cellIterator = $row->getCellIterator();
+				$cellIterator->setIterateOnlyExistingCells(false);
+
+				foreach ($cellIterator as $cell) {
+					$value = $cell->getValue();
+					if ($value) {
+						$headers[] = (string) $value;
+					}
+				}
+			}
+
+			session()->put('purchase_order_import_file_path', $relativePath);
+			session()->put('purchase_order_import_full_path', $fullPath);
+			session()->put('purchase_order_import_file_name', $request->file('file')->getClientOriginalName());
+			session()->put('purchase_order_import_headers', $headers);
+			session()->save();
+
+			return Inertia::render('Backend/User/PurchaseOrder/Import', [
+				'previewData' => [
+					'headers' => $headers,
+				],
+			]);
+		} catch (\Exception $e) {
+			return back()->with('error', 'Failed to process file: ' . $e->getMessage());
+		}
+	}
+
+	/**
+	 * Preview purchase order import data with validation.
+	 */
+	public function previewImport(Request $request)
+	{
+		Gate::authorize('purchase_orders.csv.import');
+
+		if ($request->isMethod('get')) {
+			return redirect()->route('purchase_orders.import.page');
+		}
+
+		$mappings = $request->input('mappings', []);
+		$fullPath = session('purchase_order_import_full_path');
+		$headers = session('purchase_order_import_headers', []);
+
+		if (!$fullPath || !file_exists($fullPath)) {
+			return back()->with('error', 'Import session expired or file not found. Please upload your file again.');
+		}
+
+		try {
+			$spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+			$worksheet = $spreadsheet->getActiveSheet();
+
+			$previewRecords = [];
+			$validCount = 0;
+			$errorCount = 0;
+			$warningCount = 0;
+			$totalRows = 0;
+			$uniqueOrderGroups = [];
+			$productLookupCache = [];
+			$vendorLookupCache = [];
+			$accountLookupCache = [];
+			$taxLookupCache = [];
+			$currencyLookupCache = [];
+
+			$resolveIsInventory = static function ($value): array {
+				if ($value === null) {
+					return ['value' => 1, 'valid' => true];
+				}
+
+				$normalized = trim((string) $value);
+				if ($normalized === '') {
+					return ['value' => 1, 'valid' => true];
+				}
+
+				$normalizedLower = strtolower($normalized);
+				if ($normalized === '1' || $normalizedLower === 'true') {
+					return ['value' => 1, 'valid' => true];
+				}
+
+				if ($normalized === '0' || $normalizedLower === 'false') {
+					return ['value' => 0, 'valid' => true];
+				}
+
+				return ['value' => null, 'valid' => false];
+			};
+
+			$parseDate = static function ($date): ?string {
+				if ($date === null || $date === '') {
+					return null;
+				}
+
+				if (is_numeric($date)) {
+					try {
+						return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($date)->format('Y-m-d');
+					} catch (\Exception $e) {
+						return null;
+					}
+				}
+
+				$rawDate = trim((string) $date);
+				if ($rawDate === '') {
+					return null;
+				}
+
+				if (preg_match('/^\d{1,2}\/\d{1,2}\/\d{4}$/', $rawDate) === 1) {
+					try {
+						return Carbon::createFromFormat('d/m/Y', $rawDate)->format('Y-m-d');
+					} catch (\Exception $e) {
+					}
+				}
+
+				if (preg_match('/^\d{1,2}-\d{1,2}-\d{4}$/', $rawDate) === 1) {
+					try {
+						return Carbon::createFromFormat('d-m-Y', $rawDate)->format('Y-m-d');
+					} catch (\Exception $e) {
+					}
+				}
+
+				foreach (['Y-m-d', 'Y/m/d', 'm/d/Y', 'm-d-Y', 'n/j/Y', 'n-j-Y'] as $format) {
+					try {
+						return Carbon::createFromFormat($format, $rawDate)->format('Y-m-d');
+					} catch (\Exception $e) {
+					}
+				}
+
+				try {
+					return Carbon::parse($rawDate)->format('Y-m-d');
+				} catch (\Exception $e) {
+					return null;
+				}
+			};
+
+			$parseTaxNames = static function ($value): array {
+				if ($value === null) {
+					return [];
+				}
+
+				$raw = trim((string) $value);
+				if ($raw === '') {
+					return [];
+				}
+
+				$parts = preg_split('/[;,]/', $raw) ?: [];
+				$names = [];
+				foreach ($parts as $part) {
+					$name = trim((string) $part);
+					if ($name !== '') {
+						$names[] = $name;
+					}
+				}
+
+				return array_values(array_unique($names));
+			};
+
+			foreach ($worksheet->getRowIterator(2) as $row) {
+				$rowIndex = $row->getRowIndex();
+				$totalRows++;
+
+				$cellIterator = $row->getCellIterator();
+				$cellIterator->setIterateOnlyExistingCells(false);
+
+				$rowData = [];
+				$cellIndex = 0;
+
+				foreach ($cellIterator as $cell) {
+					if ($cellIndex < count($headers)) {
+						$header = $headers[$cellIndex];
+						$systemField = $mappings[$header] ?? null;
+
+						if ($systemField && $systemField !== 'skip') {
+							$rowData[$systemField] = $cell->getValue();
+						}
+					}
+					$cellIndex++;
+				}
+
+				$orderNumber = isset($rowData['order_number']) ? trim((string) $rowData['order_number']) : '';
+				$productName = isset($rowData['product_name']) ? trim((string) $rowData['product_name']) : '';
+
+				if ($orderNumber === '' && $productName === '') {
+					$totalRows--;
+					continue;
+				}
+
+				$rowData['order_number'] = $orderNumber !== '' ? $orderNumber : null;
+
+				if ($orderNumber !== '') {
+					$uniqueOrderGroups['order::' . strtolower($orderNumber)] = true;
+				} else {
+					$uniqueOrderGroups['row::' . $rowIndex] = true;
+				}
+
+				$errors = [];
+				$isInventoryResult = $resolveIsInventory($rowData['is_inventory'] ?? null);
+				$isInventory = $isInventoryResult['value'] ?? 1;
+
+				if (!$isInventoryResult['valid']) {
+					$errors[] = 'is_inventory must be 1 or 0';
+				}
+
+				$rowData['is_inventory'] = $isInventory;
+
+				if ($productName === '') {
+					$errors[] = 'Product name is required';
+				} elseif ($isInventory === 1) {
+					$productCacheKey = strtolower($productName);
+					if (!array_key_exists($productCacheKey, $productLookupCache)) {
+						$productLookupCache[$productCacheKey] = Product::where('name', 'like', '%' . $productName . '%')->first();
+					}
+
+					if (!$productLookupCache[$productCacheKey]) {
+						$errors[] = 'Product "' . $productName . '" not found';
+					}
+				}
+
+				$orderDate = $parseDate($rowData['order_date'] ?? null);
+				if ($orderDate === null) {
+					$errors[] = 'Order date is required';
+				} else {
+					$rowData['order_date'] = $orderDate;
+				}
+
+				if (empty($rowData['quantity']) || floatval($rowData['quantity']) <= 0) {
+					$errors[] = 'Quantity must be greater than 0';
+				}
+
+				if (!isset($rowData['unit_cost']) || $rowData['unit_cost'] === '' || floatval($rowData['unit_cost']) < 0) {
+					$errors[] = 'Unit cost is required and must be non-negative';
+				}
+
+				$expenseAccountName = isset($rowData['expense_account']) ? trim((string) $rowData['expense_account']) : '';
+				if ($isInventory === 0) {
+					if ($expenseAccountName === '') {
+						$errors[] = 'Expense account is required when is_inventory is 0';
+					} else {
+						$accountCacheKey = strtolower($expenseAccountName);
+						if (!array_key_exists($accountCacheKey, $accountLookupCache)) {
+							$accountLookupCache[$accountCacheKey] = Account::where('account_name', 'like', '%' . $expenseAccountName . '%')->first();
+						}
+
+						if (!$accountLookupCache[$accountCacheKey]) {
+							$errors[] = 'Expense account "' . $expenseAccountName . '" not found';
+						}
+					}
+				}
+
+				if (!empty($rowData['supplier_name'])) {
+					$supplierName = trim((string) $rowData['supplier_name']);
+					$vendorCacheKey = strtolower($supplierName);
+
+					if (!array_key_exists($vendorCacheKey, $vendorLookupCache)) {
+						$vendorLookupCache[$vendorCacheKey] = Vendor::where('name', 'like', '%' . $supplierName . '%')->first();
+					}
+
+					if (!$vendorLookupCache[$vendorCacheKey]) {
+						$warningCount++;
+					}
+				}
+
+				if (!empty($rowData['transaction_currency'])) {
+					$currencyName = trim((string) $rowData['transaction_currency']);
+					$currencyCacheKey = strtolower($currencyName);
+					if (!array_key_exists($currencyCacheKey, $currencyLookupCache)) {
+						$currencyLookupCache[$currencyCacheKey] = Currency::where('name', 'like', '%' . $currencyName . '%')->first();
+					}
+
+					if (!$currencyLookupCache[$currencyCacheKey]) {
+						$errors[] = 'Transaction currency "' . $currencyName . '" not found';
+					}
+				}
+
+				foreach ($parseTaxNames($rowData['tax'] ?? null) as $taxName) {
+					$taxCacheKey = strtolower($taxName);
+					if (!array_key_exists($taxCacheKey, $taxLookupCache)) {
+						$taxLookupCache[$taxCacheKey] = Tax::where('name', 'like', '%' . $taxName . '%')->first();
+					}
+
+					if (!$taxLookupCache[$taxCacheKey]) {
+						$errors[] = 'Tax "' . $taxName . '" not found';
+					}
+				}
+
+				$status = count($errors) > 0 ? 'error' : 'valid';
+				if ($status === 'error') {
+					$errorCount++;
+				} else {
+					$validCount++;
+				}
+
+				$previewRecords[] = [
+					'row' => $rowIndex,
+					'data' => $rowData,
+					'status' => $status,
+					'errors' => $errors,
+				];
+			}
+
+			session()->put('purchase_order_import_mappings', $mappings);
+			session()->save();
+
+			return Inertia::render('Backend/User/PurchaseOrder/Import', [
+				'previewData' => [
+					'headers' => $headers,
+					'total_rows' => $totalRows,
+					'unique_orders' => count($uniqueOrderGroups),
+					'preview_records' => $previewRecords,
+					'valid_count' => $validCount,
+					'error_count' => $errorCount,
+					'warning_count' => $warningCount,
+				],
+			]);
+		} catch (\Exception $e) {
+			return back()->with('error', 'Failed to preview import: ' . $e->getMessage());
+		}
+	}
+
+	/**
+	 * Execute the purchase order import.
+	 */
+	public function executeImport(Request $request)
+	{
+		Gate::authorize('purchase_orders.csv.import');
+
+		if ($request->isMethod('get')) {
+			return redirect()->route('purchase_orders.import.page');
+		}
+
+		$mappings = session('purchase_order_import_mappings', []);
+		$fullPath = session('purchase_order_import_full_path');
+
+		if (!$fullPath || !file_exists($fullPath)) {
+			return redirect()
+				->route('purchase_orders.index')
+				->with('error', 'Import session expired or file not found. Please start over.');
+		}
+
+		try {
+			Excel::import(new PurchaseOrderImport($mappings), $fullPath);
+
+			$audit = new AuditLog();
+			$audit->date_changed = date('Y-m-d H:i:s');
+			$audit->changed_by = auth()->user()->id;
+			$audit->event = 'Purchase Orders Imported - ' . session('purchase_order_import_file_name');
+			$audit->save();
+
+			if (file_exists($fullPath)) {
+				unlink($fullPath);
+			}
+			session()->forget([
+				'purchase_order_import_file_path',
+				'purchase_order_import_full_path',
+				'purchase_order_import_file_name',
+				'purchase_order_import_headers',
+				'purchase_order_import_mappings',
+			]);
+
+			return redirect()
+				->route('purchase_orders.index')
+				->with('success', 'Purchase orders imported successfully.');
+		} catch (\Exception $e) {
+			return redirect()
+				->route('purchase_orders.index')
+				->with('error', 'Import failed: ' . $e->getMessage());
+		}
 	}
 
 	/**
@@ -855,7 +1269,7 @@ class PurchaseOrderController extends Controller
 
 	public function import_purchase_orders(Request $request)
 	{
-		Gate::authorize('purchase_orders.import');
+		Gate::authorize('purchase_orders.csv.import');
 		$request->validate([
 			'orders_file' => 'required|mimes:xls,xlsx',
 		]);
@@ -868,7 +1282,7 @@ class PurchaseOrderController extends Controller
 		$audit->save();
 
 		try {
-			Excel::import(new PurchaseOrderImport, $request->file('orders_file'));
+			Excel::import(new PurchaseOrderImport(), $request->file('orders_file'));
 		} catch (\Exception $e) {
 			return back()->with('error', $e->getMessage());
 		}

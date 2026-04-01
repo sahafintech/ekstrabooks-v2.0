@@ -17,26 +17,26 @@ class Quotation extends Model {
     protected $table = 'quotations';
 
     public function items() {
-        return $this->hasMany(QuotationItem::class, 'quotation_id')->withoutGlobalScopes();
+        return $this->hasMany(QuotationItem::class, 'quotation_id')->withoutGlobalScope('business_id');
     }
 
     public function taxes() {
         return $this->hasMany(QuotationItemTax::class, "quotation_id")
-            ->withoutGlobalScopes()
+            ->withoutGlobalScope('business_id')
             ->selectRaw('quotation_item_taxes.*, sum(amount) as amount')
             ->groupBy('tax_id');
     }
 
     public function customer() {
-        return $this->belongsTo(Customer::class, 'customer_id')->withDefault()->withoutGlobalScopes();
+        return $this->belongsTo(Customer::class, 'customer_id')->withDefault()->withoutGlobalScope('business_id');
     }
 
     public function business() {
-        return $this->belongsTo(Business::class, 'business_id')->withDefault()->withoutGlobalScopes();
+        return $this->belongsTo(Business::class, 'business_id')->withDefault()->withoutGlobalScope('business_id');
     }
 
     public function invoice_template() {
-        return $this->belongsTo(InvoiceTemplate::class, 'template')->withDefault()->withoutGlobalScopes();
+        return $this->belongsTo(InvoiceTemplate::class, 'template')->withDefault()->withoutGlobalScope('business_id');
     }
 
     protected function subTotal(): Attribute {

@@ -20,6 +20,9 @@ return new class extends Migration
             $table->decimal('quantity', 10, 2);
             $table->decimal('unit_cost', 28, 8);
             $table->decimal('sub_total', 28, 8);
+            $table->text('benefits')->nullable();
+            $table->string('family_size')->nullable();
+            $table->decimal('sum_insured', 28, 8)->default(0);
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
             $table->bigInteger('created_user_id')->nullable();
