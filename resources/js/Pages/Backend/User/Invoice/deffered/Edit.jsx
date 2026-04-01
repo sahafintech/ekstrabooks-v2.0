@@ -9,7 +9,7 @@ import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import Attachment from "@/Components/ui/attachment";
 import { formatCurrency, parseDateObject } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -36,20 +36,24 @@ export default function Edit({
     invoice,
     theAttachments,
 }) {
-    const [invoiceItems, setInvoiceItems] = useState([
-        {
-            product_id: "",
-            product_name: "",
-            description: "",
-            quantity: 1,
-            unit_cost: 0,
-        },
-    ]);
+    const createEmptyInvoiceItem = () => ({
+        product_id: "",
+        product_name: "",
+        description: "",
+        quantity: 1,
+        unit_cost: 0,
+        sum_insured: 0,
+        benefits: "",
+        family_size: "",
+    });
+
+    const [invoiceItems, setInvoiceItems] = useState([createEmptyInvoiceItem()]);
 
     const [attachments, setAttachments] = useState([]);
 
     const [exchangeRate, setExchangeRate] = useState(1);
     const [baseCurrencyInfo, setBaseCurrencyInfo] = useState(null);
+    const [hasInitialized, setHasInitialized] = useState(false);
 
     // ------------------------------------------------
     // Keep Inertia form arrays in sync with our local state
@@ -71,7 +75,7 @@ export default function Edit({
     // ------------------------------------------------
 
 
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, post, processing, errors } = useForm({
         customer_id: invoice.customer_id,
         title: invoice.title,
         invoice_number: invoice.invoice_number,
@@ -103,8 +107,13 @@ export default function Edit({
         taxes: taxIds,
         deffered_total: 0,
         earnings: [],
+        _manuallyModified: false,
         _method: "PUT",
     });
+
+    const hasEarnedEarnings = data.earnings.some(
+        (earning) => Number(earning.status || 0) === 1
+    );
 
     const invoiceCategories = [
         { id: "1", option: "Medical Insurance Invoice", value: "medical" },
@@ -175,18 +184,13 @@ export default function Edit({
                 0
             ),
         }));
+        setHasInitialized(true);
     }, []);
 
     const addInvoiceItem = () => {
         setInvoiceItems([
             ...invoiceItems,
-            {
-                product_id: "",
-                product_name: "",
-                description: "",
-                quantity: 1,
-                unit_cost: 0,
-            },
+            createEmptyInvoiceItem(),
         ]);
         setData("product_id", [...data.product_id, ""]);
         setData("product_name", [...data.product_name, ""]);
@@ -201,38 +205,18 @@ export default function Edit({
     const removeInvoiceItem = (index) => {
         const updatedItems = invoiceItems.filter((_, i) => i !== index);
         setInvoiceItems(updatedItems);
-        setData(
-            "product_id",
-            updatedItems.map((item) => item.product_id)
-        );
-        setData(
-            "product_name",
-            updatedItems.map((item) => item.product_name)
-        );
-        setData(
-            "description",
-            updatedItems.map((item) => item.description)
-        );
-        setData(
-            "quantity",
-            updatedItems.map((item) => item.quantity)
-        );
-        setData(
-            "unit_cost",
-            updatedItems.map((item) => item.unit_cost)
-        );
-        setData(
-            "sum_insured",
-            updatedItems.map((item) => item.sum_insured)
-        );
-        setData(
-            "benefits",
-            updatedItems.map((item) => item.benefits)
-        );
-        setData(
-            "family_size",
-            updatedItems.map((item) => item.family_size)
-        );
+        setData((prevData) => ({
+            ...prevData,
+            _manuallyModified: true,
+            product_id: updatedItems.map((item) => item.product_id),
+            product_name: updatedItems.map((item) => item.product_name),
+            description: updatedItems.map((item) => item.description),
+            quantity: updatedItems.map((item) => item.quantity),
+            unit_cost: updatedItems.map((item) => item.unit_cost),
+            sum_insured: updatedItems.map((item) => item.sum_insured),
+            benefits: updatedItems.map((item) => item.benefits),
+            family_size: updatedItems.map((item) => item.family_size),
+        }));
     };
 
     const updateInvoiceItem = (index, field, value) => {
@@ -284,6 +268,10 @@ export default function Edit({
         const msPerDay = 24 * 60 * 60 * 1000;
         // inclusive days
         const totalDays = Math.floor((endDate - startDate) / msPerDay) + 1;
+
+        if (!Number.isFinite(totalDays) || totalDays <= 0) {
+            return { schedule: [], totalDays: 0, costPerDay: 0 };
+        }
 
         // convert subtotal → "cents" (or smallest unit)
         const factor = Math.pow(10, dp);
@@ -345,41 +333,34 @@ export default function Edit({
 
     // Calculate earnings whenever relevant fields change - but only if the user has modified values
     useEffect(() => {
-        // Don't recalculate on initial render or if the data is already loaded from database
-        // Only recalculate if user has changed something
+        if (!hasInitialized || !data._manuallyModified || hasEarnedEarnings) {
+            return;
+        }
+
         const subtotal = calculateSubtotal();
 
         if (data.deffered_start && data.deffered_end && subtotal > 0) {
-            // Skip calculation if this is the initial data from the database
-            // and the user hasn't modified any fields yet
-            const isUserModified = data._manuallyModified || false;
+            try {
+                const { schedule, totalDays, costPerDay } = calculateEarnings();
 
-            if (isUserModified || data.earnings.length === 0) {
-                try {
-                    const { schedule, totalDays, costPerDay } =
-                        calculateEarnings();
+                const safeCostPerDay = costPerDay ? costPerDay : 0;
+                const safeTotal = schedule.reduce((sum, e) => {
+                    const amount = e.transaction_amount ? e.transaction_amount : 0;
+                    return sum + amount;
+                }, 0);
 
-                    // Ensure values are valid and not NaN
-                    const safeCostPerDay = costPerDay ? costPerDay : 0;
-                    const safeTotal = schedule.reduce((sum, e) => {
-                        const amount = e.transaction_amount ? e.transaction_amount : 0;
-                        return sum + amount;
-                    }, 0);
-
-                    // Use functional updates to avoid stale closures and ensure atomic updates
-                    setData((prevData) => ({
-                        ...prevData,
-                        earnings: schedule,
-                        active_days: totalDays,
-                        cost_per_day: safeCostPerDay.toFixed(decimalPlace),
-                        deffered_total: safeTotal.toFixed(decimalPlace),
-                    }));
-                } catch (error) {
-                    console.error("Error calculating earnings:", error);
-                }
+                setData((prevData) => ({
+                    ...prevData,
+                    earnings: schedule,
+                    active_days: totalDays,
+                    cost_per_day: safeCostPerDay.toFixed(decimalPlace),
+                    deffered_total: safeTotal.toFixed(decimalPlace),
+                }));
+            } catch (error) {
+                console.error("Error calculating earnings:", error);
             }
         }
-    }, [data.deffered_start, data.deffered_end, invoiceItems]);
+    }, [hasInitialized, hasEarnedEarnings, data._manuallyModified, data.deffered_start, data.deffered_end, data.currency, exchangeRate, invoiceItems]);
 
     // build this once, outside of calculateTaxes
     const taxRateMap = new Map(taxes.map((t) => [t.id, Number(t.rate)]));
@@ -566,18 +547,7 @@ export default function Edit({
             onSuccess: () => {
                 toast.success("Invoice updated successfully");
                 reset();
-                setInvoiceItems([
-                    {
-                        product_id: "",
-                        product_name: "",
-                        description: "",
-                        quantity: 1,
-                        unit_cost: 0,
-                        sum_insured: 0,
-                        benefits: "",
-                        family_size: "",
-                    },
-                ]);
+                setInvoiceItems([createEmptyInvoiceItem()]);
                 setAttachments([]);
             },
         });
@@ -598,7 +568,8 @@ export default function Edit({
         const n = unearned.length;
         if (n === 0) return data.earnings; // nothing to update
 
-        const perPeriod = Math.floor((newUnearned * 100) / n) / 100; // round to 2 decimals
+        const factor = Math.pow(10, decimalPlace);
+        const perPeriod = Math.floor((newUnearned * factor) / n) / factor;
         let distributed = 0;
 
         const updatedUnearned = unearned.map((e, i) => {
@@ -628,11 +599,16 @@ export default function Edit({
 
     useEffect(() => {
         const subtotal = calculateSubtotal();
-        if (data.earnings && data.earnings.length > 0) {
+        if (
+            hasInitialized &&
+            data._manuallyModified &&
+            hasEarnedEarnings &&
+            data.earnings &&
+            data.earnings.length > 0
+        ) {
             recalculateUnearnedEarnings(subtotal);
         }
-        // ...other logic
-    }, [invoiceItems]);
+    }, [hasInitialized, hasEarnedEarnings, data._manuallyModified, invoiceItems]);
 
     return (
         <AuthenticatedLayout>
@@ -823,7 +799,11 @@ export default function Edit({
                                         }))}
                                         value={data.currency}
                                         onChange={(selectedValue) => {
-                                            setData("currency", selectedValue);
+                                            setData((prevData) => ({
+                                                ...prevData,
+                                                currency: selectedValue,
+                                                _manuallyModified: true,
+                                            }));
                                             handleCurrencyChange(selectedValue);
                                         }}
                                         placeholder="Select currency"
@@ -1034,15 +1014,25 @@ export default function Edit({
                                 <DateTimePicker
                                     value={data.deffered_start}
                                     onChange={(date) =>
-                                        setData("deffered_start", date)
+                                        setData((prevData) => ({
+                                            ...prevData,
+                                            deffered_start: date,
+                                            _manuallyModified: true,
+                                        }))
                                     }
                                     className="md:w-1/2 w-full"
                                     required
+                                    disabled={hasEarnedEarnings}
                                 />
                                 <InputError
                                     message={errors.deffered_start}
                                     className="text-sm"
                                 />
+                                {hasEarnedEarnings && (
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        Policy dates are locked once earnings have been recognized.
+                                    </p>
+                                )}
                             </div>
                         </div>
 
@@ -1057,10 +1047,15 @@ export default function Edit({
                                 <DateTimePicker
                                     value={data.deffered_end}
                                     onChange={(date) =>
-                                        setData("deffered_end", date)
+                                        setData((prevData) => ({
+                                            ...prevData,
+                                            deffered_end: date,
+                                            _manuallyModified: true,
+                                        }))
                                     }
                                     className="md:w-1/2 w-full"
                                     required
+                                    disabled={hasEarnedEarnings}
                                 />
                                 <InputError
                                     message={errors.deffered_end}
@@ -1383,16 +1378,9 @@ export default function Edit({
                                     type="button"
                                     variant="secondary"
                                     onClick={() => {
-                                        reset();
-                                        setInvoiceItems([
-                                            {
-                                                product_id: "",
-                                                product_name: "",
-                                                description: "",
-                                                quantity: 1,
-                                                unit_cost: 0,
-                                            },
-                                        ]);
+                                        window.location.assign(
+                                            route("deffered_invoices.edit", invoice.id)
+                                        );
                                     }}
                                 >
                                     Reset

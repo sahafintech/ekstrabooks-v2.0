@@ -242,52 +242,7 @@ class DefferedInvoiceController extends Controller
 
         DB::beginTransaction();
 
-        $default_accounts = ['Accounts Receivable', 'Sales Tax Payable', 'Sales Discount Allowed', 'Inventory', 'Unearned Revenue'];
-
-        // if these accounts are not exists then create it
-        foreach ($default_accounts as $account) {
-            if (!Account::where('account_name', $account)->where('business_id', $request->activeBusiness->id)->exists()) {
-                $account_obj = new Account();
-                if ($account == 'Accounts Receivable') {
-                    $account_obj->account_code = '1100';
-                } elseif ($account == 'Sales Tax Payable') {
-                    $account_obj->account_code = '2200';
-                } elseif ($account == 'Sales Discount Allowed') {
-                    $account_obj->account_code = '4009';
-                } elseif ($account == 'Inventory') {
-                    $account_obj->account_code = '1000';
-                } else if ($account == 'Unearned Revenue') {
-                    $account_obj->account_code = '2300';
-                }
-                $account_obj->account_name = $account;
-                if ($account == 'Accounts Receivable') {
-                    $account_obj->account_type = 'Other Current Asset';
-                } elseif ($account == 'Sales Tax Payable') {
-                    $account_obj->account_type = 'Current Liability';
-                } elseif ($account == 'Sales Discount Allowed') {
-                    $account_obj->account_type = 'Other Income';
-                } elseif ($account == 'Inventory') {
-                    $account_obj->account_type = 'Other Current Asset';
-                } else if ($account == 'Unearned Revenue') {
-                    $account_obj->account_type = 'Current Liability';
-                }
-                if ($account == 'Accounts Receivable') {
-                    $account_obj->dr_cr   = 'dr';
-                } elseif ($account == 'Sales Tax Payable') {
-                    $account_obj->dr_cr   = 'cr';
-                } elseif ($account == 'Sales Discount Allowed') {
-                    $account_obj->dr_cr   = 'dr';
-                } elseif ($account == 'Inventory') {
-                    $account_obj->dr_cr   = 'dr';
-                } else if ($account == 'Unearned Revenue') {
-                    $account_obj->dr_cr   = 'cr';
-                }
-                $account_obj->business_id = $request->activeBusiness->id;
-                $account_obj->user_id     = $request->activeBusiness->user->id;
-                $account_obj->opening_date   = now()->format('Y-m-d');
-                $account_obj->save();
-            }
-        }
+        $this->ensureDefaultAccounts($request);
 
         $summary = $this->calculateTotal($request);
 
@@ -340,20 +295,7 @@ class DefferedInvoiceController extends Controller
             }
         }
 
-        if ($request->earnings) {
-            foreach ($request->earnings as $earning) {
-                $defferedEarnings = new DefferedEarning();
-                $defferedEarnings->invoice_id = $invoice->id;
-                $defferedEarnings->start_date = Carbon::parse($earning['start_date'])->format('Y-m-d');
-                $defferedEarnings->end_date = Carbon::parse($earning['end_date'])->format('Y-m-d');
-                $defferedEarnings->days = $earning['number_of_days'];
-                $defferedEarnings->currency = $earning['currency'];
-                $defferedEarnings->exchange_rate = $earning['exchange_rate'];
-                $defferedEarnings->base_currency_amount = convert_currency($request->activeBusiness->currency, $request->currency, $earning['transaction_amount']);
-                $defferedEarnings->transaction_amount = $earning['transaction_amount'];
-                $defferedEarnings->save();
-            }
-        }
+        $this->syncPendingDefferedEarnings($request, $invoice);
 
         // if ($request->payments['date'][0] != null) {
         //     foreach ($request->payments['date'] as $key => $date) {
@@ -370,8 +312,8 @@ class DefferedInvoiceController extends Controller
             $invoiceItem = $invoice->items()->save(new InvoiceItem([
                 'invoice_id'   => $invoice->id,
                 'product_id'   => $request->product_id[$i],
-                'product_name' => Product::find($request->product_id[$i])->name,
-                'description'  => null,
+                'product_name' => $request->product_name[$i] ?? optional(Product::find($request->product_id[$i]))->name,
+                'description'  => $request->description[$i] ?? null,
                 'sum_insured'  => $request->sum_insured[$i] ?? null,
                 'benefits'     => $request->benefits[$i] ?? null,
                 'family_size'  => $request->family_size[$i] ?? null,
@@ -458,8 +400,6 @@ class DefferedInvoiceController extends Controller
         //Increment Invoice Number
         BusinessSetting::where('name', 'invoice_number')->increment('value');
 
-        DB::commit();
-
         $transaction              = new Transaction();
         $transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $invoice->invoice_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
         $transaction->account_id  = get_account('Unearned Revenue')->id;
@@ -512,7 +452,74 @@ class DefferedInvoiceController extends Controller
         $audit->event = 'Deffered Invoice Created: ' . $invoice->title;
         $audit->save();
 
+        DB::commit();
+
         return redirect()->route('deffered_invoices.show', $invoice->id)->with('success', _lang('Saved Successfully'));
+    }
+
+    private function ensureDefaultAccounts(Request $request): void
+    {
+        $defaultAccounts = ['Accounts Receivable', 'Sales Tax Payable', 'Sales Discount Allowed', 'Inventory', 'Unearned Revenue'];
+
+        foreach ($defaultAccounts as $account) {
+            if (Account::where('account_name', $account)->where('business_id', $request->activeBusiness->id)->exists()) {
+                continue;
+            }
+
+            $accountObj = new Account();
+
+            if ($account == 'Accounts Receivable') {
+                $accountObj->account_code = '1100';
+                $accountObj->account_type = 'Other Current Asset';
+                $accountObj->dr_cr = 'dr';
+            } elseif ($account == 'Sales Tax Payable') {
+                $accountObj->account_code = '2200';
+                $accountObj->account_type = 'Current Liability';
+                $accountObj->dr_cr = 'cr';
+            } elseif ($account == 'Sales Discount Allowed') {
+                $accountObj->account_code = '4009';
+                $accountObj->account_type = 'Other Income';
+                $accountObj->dr_cr = 'dr';
+            } elseif ($account == 'Inventory') {
+                $accountObj->account_code = '1000';
+                $accountObj->account_type = 'Other Current Asset';
+                $accountObj->dr_cr = 'dr';
+            } else {
+                $accountObj->account_code = '2300';
+                $accountObj->account_type = 'Current Liability';
+                $accountObj->dr_cr = 'cr';
+            }
+
+            $accountObj->account_name = $account;
+            $accountObj->business_id = $request->activeBusiness->id;
+            $accountObj->user_id = $request->activeBusiness->user->id;
+            $accountObj->opening_date = now()->format('Y-m-d');
+            $accountObj->save();
+        }
+    }
+
+    private function syncPendingDefferedEarnings(Request $request, Invoice $invoice): void
+    {
+        DefferedEarning::where('invoice_id', $invoice->id)
+            ->where('status', 0)
+            ->forceDelete();
+
+        foreach ($request->input('earnings', []) as $earning) {
+            if ((int) ($earning['status'] ?? 0) === 1) {
+                continue;
+            }
+
+            $defferedEarnings = new DefferedEarning();
+            $defferedEarnings->invoice_id = $invoice->id;
+            $defferedEarnings->start_date = Carbon::parse($earning['start_date'])->format('Y-m-d');
+            $defferedEarnings->end_date = Carbon::parse($earning['end_date'])->format('Y-m-d');
+            $defferedEarnings->days = $earning['number_of_days'];
+            $defferedEarnings->currency = $earning['currency'];
+            $defferedEarnings->exchange_rate = $earning['exchange_rate'];
+            $defferedEarnings->base_currency_amount = convert_currency($request->activeBusiness->currency, $request->currency, $earning['transaction_amount']);
+            $defferedEarnings->transaction_amount = $earning['transaction_amount'];
+            $defferedEarnings->save();
+        }
     }
 
     private function calculateTotal(Request $request)
@@ -1445,56 +1452,11 @@ class DefferedInvoiceController extends Controller
 			return redirect()->route('deffered_invoices.edit', $id)
 				->withErrors($validator)
 				->withInput();
-		}
+        }
 
         DB::beginTransaction();
 
-        $default_accounts = ['Accounts Receivable', 'Sales Tax Payable', 'Sales Discount Allowed', 'Inventory', 'Unearned Revenue'];
-
-        // if these accounts are not exists then create it
-        foreach ($default_accounts as $account) {
-            if (!Account::where('account_name', $account)->where('business_id', $request->activeBusiness->id)->exists()) {
-                $account_obj = new Account();
-                if ($account == 'Accounts Receivable') {
-                    $account_obj->account_code = '1100';
-                } elseif ($account == 'Sales Tax Payable') {
-                    $account_obj->account_code = '2200';
-                } elseif ($account == 'Sales Discount Allowed') {
-                    $account_obj->account_code = '4009';
-                } elseif ($account == 'Inventory') {
-                    $account_obj->account_code = '1000';
-                } else if ($account == 'Unearned Revenue') {
-                    $account_obj->account_code = '2300';
-                }
-                $account_obj->account_name = $account;
-                if ($account == 'Accounts Receivable') {
-                    $account_obj->account_type = 'Other Current Asset';
-                } elseif ($account == 'Sales Tax Payable') {
-                    $account_obj->account_type = 'Current Liability';
-                } elseif ($account == 'Sales Discount Allowed') {
-                    $account_obj->account_type = 'Other Income';
-                } elseif ($account == 'Inventory') {
-                    $account_obj->account_type = 'Other Current Asset';
-                } else if ($account == 'Unearned Revenue') {
-                    $account_obj->account_type = 'Current Liability';
-                }
-                if ($account == 'Accounts Receivable') {
-                    $account_obj->dr_cr   = 'dr';
-                } elseif ($account == 'Sales Tax Payable') {
-                    $account_obj->dr_cr   = 'cr';
-                } elseif ($account == 'Sales Discount Allowed') {
-                    $account_obj->dr_cr   = 'dr';
-                } elseif ($account == 'Inventory') {
-                    $account_obj->dr_cr   = 'dr';
-                } else if ($account == 'Unearned Revenue') {
-                    $account_obj->dr_cr   = 'cr';
-                }
-                $account_obj->business_id = $request->activeBusiness->id;
-                $account_obj->user_id     = $request->activeBusiness->user->id;
-                $account_obj->opening_date   = now()->format('Y-m-d');
-                $account_obj->save();
-            }
-        }
+        $this->ensureDefaultAccounts($request);
 
         $summary = $this->calculateTotal($request);
 
@@ -1511,7 +1473,6 @@ class DefferedInvoiceController extends Controller
         $invoice->currency        = $request['currency'];
         $invoice->converted_total = $request->input('converted_total');
         $invoice->exchange_rate   = Currency::where('name', $request->currency)->first()->exchange_rate;
-        $invoice->paid            = 0;
         $invoice->discount        = $summary['discountAmount'];
         $invoice->discount_type   = $request->input('discount_type');
         $invoice->discount_value  = $request->input('discount_value');
@@ -1519,7 +1480,6 @@ class DefferedInvoiceController extends Controller
         $invoice->template        = $request->input('template');
         $invoice->note            = $request->input('note');
         $invoice->footer          = $request->input('footer');
-        $invoice->short_code      = rand(100000, 9999999) . uniqid();
         // deffered invoice
         $invoice->invoice_category = $request->input('invoice_category');
         $invoice->is_deffered     = 1;
@@ -1561,19 +1521,7 @@ class DefferedInvoiceController extends Controller
             }
         }
 
-        if ($request->earnings) {
-            foreach ($request->earnings as $earning) {
-                $defferedEarning = DefferedEarning::where('invoice_id', $invoice->id)->where('start_date', Carbon::parse($earning['start_date'])->format('Y-m-d'))->where('end_date', Carbon::parse($earning['end_date'])->format('Y-m-d'))->where('status', 0)->first();
-
-                if ($defferedEarning) {
-                    $defferedEarning->currency = $earning['currency'];
-                    $defferedEarning->exchange_rate = $earning['exchange_rate'];
-                    $defferedEarning->base_currency_amount = convert_currency($request->activeBusiness->currency, $request->currency, $earning['transaction_amount']);
-                    $defferedEarning->transaction_amount = $earning['transaction_amount'];
-                    $defferedEarning->save();
-                }
-            }
-        }
+        $this->syncPendingDefferedEarnings($request, $invoice);
 
         // if (isset($request->payments) &&  isset($request->payments['date'])) {
         //     if ($request->payments['date'][0] != null) {
@@ -1687,8 +1635,8 @@ class DefferedInvoiceController extends Controller
             $invoiceItem = $invoice->items()->save(new InvoiceItem([
                 'invoice_id'   => $invoice->id,
                 'product_id'   => $request->product_id[$i],
-                'product_name' => Product::find($request->product_id[$i])->name,
-                'description'  => null,
+                'product_name' => $request->product_name[$i] ?? optional(Product::find($request->product_id[$i]))->name,
+                'description'  => $request->description[$i] ?? null,
                 'sum_insured'  => $request->sum_insured[$i] ?? null,
                 'benefits'     => $request->benefits[$i] ?? null,
                 'family_size'  => $request->family_size[$i] ?? null,
@@ -1774,21 +1722,32 @@ class DefferedInvoiceController extends Controller
             }
         }
 
-        //Increment Invoice Number
-        BusinessSetting::where('name', 'invoice_number')->increment('value');
-
-        $transaction = Transaction::where('ref_id', $invoice->id)->where('ref_type', 'd invoice')
-            ->where('account_id', get_account('Unearned Revenue')->id)
-            ->first();
+        $transaction = Transaction::firstOrNew([
+            'ref_id' => $invoice->id,
+            'ref_type' => 'd invoice',
+            'account_id' => get_account('Unearned Revenue')->id,
+        ]);
         $transaction->trans_date = Carbon::createFromFormat(get_date_format(), $invoice->invoice_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+        $transaction->dr_cr = 'cr';
+        $transaction->transaction_currency = $request->currency;
+        $transaction->currency_rate = $invoice->exchange_rate;
+        $transaction->description = _lang('Deffered Invoice Liability') . ' #' . $invoice->invoice_number;
+        $transaction->customer_id = $invoice->customer_id;
         $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $summary['subTotal']);
         $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['subTotal']));
         $transaction->save();
 
-        $transaction = Transaction::where('ref_id', $invoice->id)->where('ref_type', 'd invoice')
-            ->where('account_id', get_account('Accounts Receivable')->id)
-            ->first();
+        $transaction = Transaction::firstOrNew([
+            'ref_id' => $invoice->id,
+            'ref_type' => 'd invoice',
+            'account_id' => get_account('Accounts Receivable')->id,
+        ]);
         $transaction->trans_date = Carbon::createFromFormat(get_date_format(), $invoice->invoice_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+        $transaction->dr_cr = 'dr';
+        $transaction->transaction_currency = $request->currency;
+        $transaction->currency_rate = $invoice->exchange_rate;
+        $transaction->description = 'Deffered Invoice #' . $invoice->invoice_number;
+        $transaction->customer_id = $invoice->customer_id;
         $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']);
         $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
         $transaction->save();
@@ -1796,36 +1755,27 @@ class DefferedInvoiceController extends Controller
         if ($request->input('discount_value') == 0) {
             $transaction = Transaction::where('ref_id', $invoice->id)->where('ref_type', 'd invoice')
                 ->where('account_id', get_account('Sales Discount Allowed')->id)
-                ->first();
-            if ($transaction != null) {
-                $transaction->delete();
+                ->get();
+            foreach ($transaction as $discountTransaction) {
+                $discountTransaction->forceDelete();
             }
         }
 
         if ($request->input('discount_value') > 0) {
-            $transaction = Transaction::where('ref_id', $invoice->id)->where('ref_type', 'd invoice')
-                ->where('account_id', get_account('Sales Discount Allowed')->id)
-                ->first();
-            if ($transaction == null) {
-                $transaction              = new Transaction();
-                $transaction->trans_date  = Carbon::createFromFormat(get_date_format(), $invoice->invoice_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                $transaction->account_id  = get_account('Sales Discount Allowed')->id;
-                $transaction->dr_cr       = 'dr';
-                $transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
-                $transaction->transaction_currency    = $request->currency;
-                $transaction->currency_rate           = $invoice->exchange_rate;
-                $transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
-                $transaction->description = _lang('Differed Invoice Discount') . ' #' . $invoice->invoice_number;
-                $transaction->ref_id      = $invoice->id;
-                $transaction->ref_type    = 'd invoice';
-                $transaction->customer_id = $invoice->customer_id;
-                $transaction->save();
-            } else {
-                $transaction->trans_date = Carbon::createFromFormat(get_date_format(), $invoice->invoice_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
-                $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
-                $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
-                $transaction->save();
-            }
+            $transaction = Transaction::firstOrNew([
+                'ref_id' => $invoice->id,
+                'ref_type' => 'd invoice',
+                'account_id' => get_account('Sales Discount Allowed')->id,
+            ]);
+            $transaction->trans_date = Carbon::createFromFormat(get_date_format(), $invoice->invoice_date)->setTime($currentTime->hour, $currentTime->minute, $currentTime->second)->format('Y-m-d H:i:s');
+            $transaction->dr_cr = 'dr';
+            $transaction->transaction_amount = convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']);
+            $transaction->transaction_currency = $request->currency;
+            $transaction->currency_rate = $invoice->exchange_rate;
+            $transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
+            $transaction->description = _lang('Differed Invoice Discount') . ' #' . $invoice->invoice_number;
+            $transaction->customer_id = $invoice->customer_id;
+            $transaction->save();
         }
 
         // audit log

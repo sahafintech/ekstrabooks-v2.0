@@ -8,11 +8,32 @@ export default function Attachment({
     maxSize = 20,
     databaseAttachments = [],
 }) {
+    const resolveAttachmentName = (file) => {
+        if (typeof file === "string") {
+            return (
+                databaseAttachments.find((attachment) => attachment.path === file)
+                    ?.file_name || file.split("/").pop()
+            );
+        }
+
+        return file?.name || "Attachment";
+    };
+
+    const renderAttachmentSize = (file) => {
+        if (typeof file === "string" || typeof file?.size !== "number") {
+            return null;
+        }
+
+        return file.size >= 1024 * 1024
+            ? `${(file.size / (1024 * 1024)).toFixed(1)}MB`
+            : `${(file.size / 1024).toFixed(1)}KB`;
+    };
+
     return (
         <div className="w-full">
             <div className="font-semibold mb-2">Attachments</div>
             <div className="border rounded-md bg-white">
-                {files.length === 0 && files.length === 0 && (
+                {files.length === 0 && (
                     <div className="text-gray-400 text-sm p-4 text-center">
                         No attachments
                     </div>
@@ -24,17 +45,13 @@ export default function Attachment({
                     >
                         <span className="truncate flex-1 ml-2">
                             <span className="text-blue-700 hover:underline cursor-pointer text-sm font-medium">
-                                {databaseAttachments.find(
-                                    (attachment) => attachment.path === file
-                                )?.file_name || file.name}
+                                {resolveAttachmentName(file)}
                             </span>
-                            <span className="ml-2 text-xs text-gray-500">
-                                {file.size >= 1024 * 1024
-                                    ? `${(file.size / (1024 * 1024)).toFixed(
-                                          1
-                                      )}MB`
-                                    : `${(file.size / 1024).toFixed(1)}KB`}
-                            </span>
+                            {renderAttachmentSize(file) && (
+                                <span className="ml-2 text-xs text-gray-500">
+                                    {renderAttachmentSize(file)}
+                                </span>
+                            )}
                         </span>
                         <button
                             type="button"

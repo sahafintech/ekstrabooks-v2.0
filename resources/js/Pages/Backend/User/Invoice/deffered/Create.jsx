@@ -21,17 +21,22 @@ import {
 } from "@/Components/ui/table";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 import DateTimePicker from "@/Components/DateTimePicker";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import Attachment from "@/Components/ui/attachment";
 
 export default function Create({ customers = [], products = [], currencies = [], taxes = [], invoice_title, decimalPlace, familySizes = [], benefits = [], base_currency }) {
-    const [invoiceItems, setInvoiceItems] = useState([{
+    const createEmptyInvoiceItem = () => ({
         product_id: "",
         product_name: "",
         description: "",
         quantity: 1,
         unit_cost: 0,
-    }]);
+        sum_insured: 0,
+        benefits: "",
+        family_size: "",
+    });
+
+    const [invoiceItems, setInvoiceItems] = useState([createEmptyInvoiceItem()]);
 
     const [attachments, setAttachments] = useState([]);
 
@@ -99,13 +104,7 @@ export default function Create({ customers = [], products = [], currencies = [],
     ];
 
     const addInvoiceItem = () => {
-        setInvoiceItems([...invoiceItems, {
-            product_id: "",
-            product_name: "",
-            description: "",
-            quantity: 1,
-            unit_cost: 0,
-        }]);
+        setInvoiceItems([...invoiceItems, createEmptyInvoiceItem()]);
         setData("product_id", [...data.product_id, ""]);
         setData("product_name", [...data.product_name, ""]);
         setData("description", [...data.description, ""]);
@@ -170,6 +169,10 @@ export default function Create({ customers = [], products = [], currencies = [],
         const msPerDay = 24 * 60 * 60 * 1000;
         // inclusive days
         const totalDays = Math.floor((endDate - startDate) / msPerDay) + 1;
+
+        if (!Number.isFinite(totalDays) || totalDays <= 0) {
+            return { schedule: [], totalDays: 0, costPerDay: 0 };
+        }
 
         // convert subtotal → "cents" (or smallest unit)
         const factor = Math.pow(10, dp);
@@ -239,7 +242,7 @@ export default function Create({ customers = [], products = [], currencies = [],
             const slicedTotal = schedule.reduce((sum, e) => sum + e.transaction_amount, 0);
             setData('deffered_total', +slicedTotal.toFixed(decimalPlace));
         }
-    }, [data.deffered_start, data.deffered_end, invoiceItems]);
+    }, [data.deffered_start, data.deffered_end, data.currency, exchangeRate, invoiceItems]);
 
     // build this once, outside of calculateTaxes
     const taxRateMap = new Map(taxes.map(t => [t.id, Number(t.rate)]));
@@ -393,31 +396,13 @@ export default function Create({ customers = [], products = [], currencies = [],
             // attachments are synced via syncFormArrays
         };
 
-        // Log the data being sent to help debug
-        console.log("Submitting form with data:", formData);
-        console.log("Current attachments state:", attachments);
-        console.log("Form data.attachments:", data.attachments);
-
-        // Post the form data directly instead of using setData first
         post(route("deffered_invoices.store"), formData, {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success("Invoice created successfully");
                 reset();
-                setInvoiceItems([{
-                    product_id: "",
-                    product_name: "",
-                    description: "",
-                    quantity: 1,
-                    unit_cost: 0,
-                    sum_insured: 0,
-                    benefits: "",
-                    family_size: "",
-                }]);
-                setAttachments([{
-                    file_name: "",
-                    file: null
-                }]);
+                setInvoiceItems([createEmptyInvoiceItem()]);
+                setAttachments([]);
             },
         });
     };
@@ -551,7 +536,6 @@ export default function Create({ customers = [], products = [], currencies = [],
                                         }))}
                                         value={data.currency}
                                         onChange={(selectedValue) => {
-                                            console.log("Currency selected:", selectedValue);
                                             setData("currency", selectedValue);
                                             handleCurrencyChange(selectedValue);
                                         }}
@@ -916,13 +900,7 @@ export default function Create({ customers = [], products = [], currencies = [],
                                     variant="secondary"
                                     onClick={() => {
                                         reset();
-                                        setInvoiceItems([{
-                                            product_id: "",
-                                            product_name: "",
-                                            description: "",
-                                            quantity: 1,
-                                            unit_cost: 0,
-                                        }]);
+                                        setInvoiceItems([createEmptyInvoiceItem()]);
                                         setAttachments([]);
                                     }}
                                 >
