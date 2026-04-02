@@ -154,6 +154,39 @@ const DeleteAllQuotationsModal = ({ show, onClose, onConfirm, processing, count 
   </Modal>
 );
 
+const ActionConfirmationModal = ({
+  show,
+  onClose,
+  onConfirm,
+  processing,
+  title,
+  confirmLabel,
+  confirmVariant = "default",
+}) => (
+  <Modal show={show} onClose={onClose}>
+    <form onSubmit={onConfirm}>
+      <h2 className="text-lg font-medium">{title}</h2>
+      <div className="mt-6 flex justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onClose}
+          className="mr-3"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant={confirmVariant}
+          disabled={processing}
+        >
+          {confirmLabel}
+        </Button>
+      </div>
+    </form>
+  </Modal>
+);
+
 const QuotationStatusBadge = ({ quotation }) => {
   const statusMap = {
     0: { label: "Active", className: "gap-1 text-blue-600 border-blue-600" },
@@ -251,7 +284,11 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [showConvertModal, setShowConvertModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
   const [quotationToDelete, setQuotationToDelete] = useState(null);
+  const [quotationToConvert, setQuotationToConvert] = useState(null);
+  const [quotationToReject, setQuotationToReject] = useState(null);
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
@@ -445,31 +482,53 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
     setShowDeleteModal(true);
   };
 
-  const handleConvertQuotation = (quotationId) => {
+  const handleConvertConfirm = (quotationId) => {
+    setQuotationToConvert(quotationId);
+    setShowConvertModal(true);
+  };
+
+  const handleRejectConfirm = (quotationId) => {
+    setQuotationToReject(quotationId);
+    setShowRejectModal(true);
+  };
+
+  const handleConvertQuotation = (e) => {
+    e.preventDefault();
+
+    if (!quotationToConvert) return;
+
     setProcessing(true);
 
     router.post(
-      route("quotations.convert_to_invoice", quotationId),
+      route("quotations.convert_to_invoice", quotationToConvert),
       {},
       {
         preserveScroll: true,
+        onSuccess: () => {
+          setShowConvertModal(false);
+          setQuotationToConvert(null);
+        },
         onFinish: () => setProcessing(false),
       }
     );
   };
 
-  const handleRejectQuotation = (quotationId) => {
-    if (!window.confirm("Are you sure you want to reject this quotation?")) {
-      return;
-    }
+  const handleRejectQuotation = (e) => {
+    e.preventDefault();
+
+    if (!quotationToReject) return;
 
     setProcessing(true);
 
     router.post(
-      route("quotations.reject", quotationId),
+      route("quotations.reject", quotationToReject),
       {},
       {
         preserveScroll: true,
+        onSuccess: () => {
+          setShowRejectModal(false);
+          setQuotationToReject(null);
+        },
         onFinish: () => setProcessing(false),
       }
     );
@@ -744,12 +803,12 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
                                     {
                                       label: "Convert",
                                       icon: <FileDown className="h-4 w-4" />,
-                                      onClick: () => handleConvertQuotation(quotation.id),
+                                      onClick: () => handleConvertConfirm(quotation.id),
                                     },
                                     {
                                       label: "Reject",
                                       icon: <CircleOff className="h-4 w-4" />,
-                                      onClick: () => handleRejectQuotation(quotation.id),
+                                      onClick: () => handleRejectConfirm(quotation.id),
                                       destructive: true,
                                     },
                                   ]
@@ -845,6 +904,31 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
         onConfirm={handleDeleteAll}
         processing={processing}
         count={selectedQuotations.length}
+      />
+
+      <ActionConfirmationModal
+        show={showConvertModal}
+        onClose={() => {
+          setShowConvertModal(false);
+          setQuotationToConvert(null);
+        }}
+        onConfirm={handleConvertQuotation}
+        processing={processing}
+        title="Are you sure you want to convert this quotation?"
+        confirmLabel="Convert Quotation"
+      />
+
+      <ActionConfirmationModal
+        show={showRejectModal}
+        onClose={() => {
+          setShowRejectModal(false);
+          setQuotationToReject(null);
+        }}
+        onConfirm={handleRejectQuotation}
+        processing={processing}
+        title="Are you sure you want to reject this quotation?"
+        confirmLabel="Reject Quotation"
+        confirmVariant="destructive"
       />
 
       <ImportQuotationModal

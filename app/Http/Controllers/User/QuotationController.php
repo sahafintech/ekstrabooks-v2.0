@@ -404,7 +404,7 @@ class QuotationController extends Controller
     {
         Gate::authorize('quotations.view');
 
-        $quotation = quotation::with(['business', 'items', 'customer', 'taxes'])->find($id);
+        $quotation = quotation::with(['business.systemSettings', 'items', 'customer', 'taxes'])->find($id);
         $email_templates = EmailTemplate::whereIn('slug', ['NEW_QUOTATION_CREATED'])
             ->where('email_status', 1)->get();
         $decimalPlace = get_business_option('decimal_place', 2);
@@ -477,7 +477,7 @@ class QuotationController extends Controller
 
     public function show_public_quotation($short_code)
     {
-        $quotation = Quotation::withoutGlobalScopes()->with(['customer', 'business', 'items', 'taxes'])
+        $quotation = Quotation::withoutGlobalScopes()->with(['customer', 'business.systemSettings', 'items', 'taxes'])
             ->where('short_code', $short_code)
             ->first();
 

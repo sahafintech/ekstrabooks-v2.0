@@ -107,6 +107,30 @@ export default function Edit({
 
   const isDeferredQuotation = data.is_deffered === "1";
   const canManageItems = !isDeferredQuotation || data.invoice_category !== "";
+  const isMedicalDeferredQuotation = isDeferredQuotation && data.invoice_category === "medical";
+  const isOtherDeferredQuotation = isDeferredQuotation && data.invoice_category === "other";
+  const customerOptions = customers.map((customer) => ({
+    id: customer.id,
+    name: customer.name,
+  }));
+  const productOptions = products.map((product) => ({
+    id: product.id,
+    name: product.name,
+  }));
+  const familySizeOptions = familySizes.map((size) => ({
+    id: size.size,
+    name: size.size,
+  }));
+  const currencyOptions = currencies.map((currency) => ({
+    id: currency.name,
+    value: currency.name,
+    label: currency.name,
+    name: `${currency.name} - ${currency.description} (${currency.exchange_rate})`,
+  }));
+  const discountTypeOptions = [
+    { id: "0", name: "Percentage (%)" },
+    { id: "1", name: "Fixed Amount" },
+  ];
 
   const syncQuotationItems = (items) => {
     setData("product_id", items.map((item) => item.product_id));
@@ -139,6 +163,12 @@ export default function Edit({
 
     const parsedValue = parseFloat(value);
     return Number.isNaN(parsedValue) ? "" : parsedValue;
+  };
+
+  const autoResizeTextarea = (event, onChange) => {
+    onChange(event.target.value);
+    event.target.style.height = "auto";
+    event.target.style.height = `${event.target.scrollHeight}px`;
   };
 
   const addQuotationItem = () => {
@@ -365,10 +395,7 @@ export default function Edit({
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <div className="md:w-1/2 w-full">
                   <SearchableCombobox
-                    options={customers.map(customer => ({
-                      id: customer.id,
-                      name: customer.name
-                    }))}
+                    options={customerOptions}
                     value={data.customer_id}
                     onChange={(value) => setData("customer_id", value)}
                     placeholder="Select customer"
@@ -485,10 +512,7 @@ export default function Edit({
                 <div className="md:w-1/2 w-full">
                   <SearchableCombobox
                     className="mt-1"
-                    options={currencies.map(currency => ({
-                      id: currency.name,
-                      name: `${currency.name} - ${currency.description} (${currency.exchange_rate})`
-                    }))}
+                    options={currencyOptions}
                     value={data.currency}
                     onChange={(selectedValue) => {
                       setData("currency", selectedValue);
@@ -518,44 +542,25 @@ export default function Edit({
               </div>
 
               {isDeferredQuotation && !data.invoice_category ? (
-                <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                <div className="border rounded-lg p-4 bg-gray-50 text-sm text-muted-foreground">
                   Select a deferred quotation category first to unlock the matching insurance item fields.
                 </div>
               ) : (
                 quotationItems.map((item, index) => (
                   <div key={index} className="border rounded-lg p-4 space-y-4 bg-gray-50">
-                    <div
-                      className={`grid grid-cols-1 gap-2 ${
-                        isDeferredQuotation ? "md:grid-cols-2 lg:grid-cols-4" : "md:grid-cols-3"
-                      }`}
-                    >
+                    <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
                       <div>
                         <Label>Product *</Label>
                         <SearchableCombobox
-                          options={products.map(product => ({
-                            id: product.id,
-                            name: product.name
-                          }))}
+                          options={productOptions}
                           value={item.product_id}
                           onChange={(value) => updateQuotationItem(index, "product_id", value)}
                           placeholder="Select product"
                         />
                       </div>
 
-                      {isDeferredQuotation && (
-                        <div>
-                          <Label>Benefits</Label>
-                          <Textarea
-                            value={item.benefits}
-                            onChange={(e) => updateQuotationItem(index, "benefits", e.target.value)}
-                            rows={1}
-                            className="min-h-[40px] resize-y"
-                          />
-                        </div>
-                      )}
-
                       <div>
-                        <Label>{data.invoice_category === "medical" ? "Members *" : "Quantity *"}</Label>
+                        <Label>{isMedicalDeferredQuotation ? "Members *" : "Quantity *"}</Label>
                         <Input
                           type="number"
                           step="0.01"
@@ -564,76 +569,36 @@ export default function Edit({
                         />
                       </div>
 
-                      {isDeferredQuotation && data.invoice_category === "medical" && (
-                        <div>
-                          <Label>Family Size *</Label>
-                          <SearchableCombobox
-                            options={familySizes.map(size => ({
-                              id: size.size,
-                              name: size.size
-                            }))}
-                            value={item.family_size}
-                            onChange={(value) => updateQuotationItem(index, "family_size", value)}
-                            placeholder="Select family size"
-                          />
-                        </div>
-                      )}
+                      <div>
+                        <Label>{isDeferredQuotation ? "Rate *" : "Unit Cost *"}</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={item.unit_cost}
+                          onChange={(e) => updateQuotationItem(index, "unit_cost", parseNumericValue(e.target.value))}
+                        />
+                      </div>
 
-                      {isDeferredQuotation && data.invoice_category === "other" && (
-                        <div>
-                          <Label>Sum Insured</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={item.sum_insured}
-                            onChange={(e) => updateQuotationItem(index, "sum_insured", parseNumericValue(e.target.value))}
-                          />
-                        </div>
-                      )}
-
-                      {!isDeferredQuotation && (
-                        <div>
-                          <Label>Unit Cost *</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={item.unit_cost}
-                            onChange={(e) => updateQuotationItem(index, "unit_cost", parseNumericValue(e.target.value))}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
-                      <div className={isDeferredQuotation ? "md:col-span-4" : "md:col-span-6"}>
+                      <div>
                         <Label>Description</Label>
                         <Textarea
                           value={item.description}
-                          onChange={(e) => updateQuotationItem(index, "description", e.target.value)}
+                          onChange={(e) =>
+                            autoResizeTextarea(e, (value) => updateQuotationItem(index, "description", value))
+                          }
+                          className="min-h-[30px] resize-none overflow-hidden"
                           rows={1}
                         />
                       </div>
 
-                      {isDeferredQuotation && (
-                        <div className="md:col-span-3">
-                          <Label>Rate *</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={item.unit_cost}
-                            onChange={(e) => updateQuotationItem(index, "unit_cost", parseNumericValue(e.target.value))}
-                          />
-                        </div>
-                      )}
-
-                      <div className={isDeferredQuotation ? "md:col-span-3" : "md:col-span-4"}>
+                      <div>
                         <Label>Subtotal</Label>
-                        <div className="p-2 bg-white rounded mt-2 text-right">
+                        <div className="p-2 bg-white rounded text-right">
                           {((Number(item.quantity) || 0) * (Number(item.unit_cost) || 0)).toFixed(2)}
                         </div>
                       </div>
 
-                      <div className="md:col-span-2 flex items-center justify-end">
+                      <div className="md:col-span-1 flex items-center justify-end">
                         {quotationItems.length > 1 && (
                           <Button
                             type="button"
@@ -647,6 +612,46 @@ export default function Edit({
                         )}
                       </div>
                     </div>
+
+                    {isDeferredQuotation && (
+                      <div className={`grid grid-cols-1 gap-2 ${isMedicalDeferredQuotation || isOtherDeferredQuotation ? "md:grid-cols-2" : ""}`}>
+                        <div>
+                          <Label>Benefits</Label>
+                          <Textarea
+                            value={item.benefits}
+                            onChange={(e) =>
+                              autoResizeTextarea(e, (value) => updateQuotationItem(index, "benefits", value))
+                            }
+                            className="min-h-[30px] resize-none overflow-hidden"
+                            rows={1}
+                          />
+                        </div>
+
+                        {isMedicalDeferredQuotation && (
+                          <div>
+                            <Label>Family Size *</Label>
+                            <SearchableCombobox
+                              options={familySizeOptions}
+                              value={item.family_size}
+                              onChange={(value) => updateQuotationItem(index, "family_size", value)}
+                              placeholder="Select family size"
+                            />
+                          </div>
+                        )}
+
+                        {isOtherDeferredQuotation && (
+                          <div>
+                            <Label>Sum Insured</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={item.sum_insured}
+                              onChange={(e) => updateQuotationItem(index, "sum_insured", parseNumericValue(e.target.value))}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -661,9 +666,9 @@ export default function Edit({
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <div className="md:w-1/2 w-full">
                   <SearchableMultiSelectCombobox
-                    options={taxes?.map(tax => ({
+                    options={taxes?.map((tax) => ({
                       id: tax.id,
-                      name: `${tax.name} (${tax.rate}%)`
+                      name: `${tax.name} (${tax.rate}%)`,
                     }))}
                     value={data.taxes}
                     onChange={(values) => setData("taxes", values)}
@@ -681,10 +686,7 @@ export default function Edit({
               <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                 <div className="md:w-1/2 w-full">
                   <SearchableCombobox
-                    options={[
-                      { id: "0", name: "Percentage (%)" },
-                      { id: "1", name: "Fixed Amount" }
-                    ]}
+                    options={discountTypeOptions}
                     value={data.discount_type}
                     onChange={(value) => setData("discount_type", value)}
                     placeholder="Select discount type"

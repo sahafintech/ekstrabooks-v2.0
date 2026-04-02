@@ -1,219 +1,203 @@
 @extends('backend.user.pdf.layout')
 
+@php
+    $primaryColor = get_business_option('invoice_primary_color', '#6d0e47');
+    $textColor = get_business_option('invoice_text_color', '#ffffff');
+    $businessName = $quotation->business->business_name ?? $quotation->business->name ?? 'Business';
+    $businessEmail = $quotation->business->business_email ?? $quotation->business->email ?? '';
+    $quantityLabel = $quotation->is_deffered && $quotation->invoice_category === 'medical' ? 'Members' : 'Quantity';
+    $quoteToRows = [
+        ['label' => 'Quote To', 'value' => $quotation->customer->name ?? '-'],
+        ['label' => 'Quotation Type', 'value' => $quotation->is_deffered ? 'Deferred' : 'Normal'],
+        ['label' => $quotation->is_deffered ? 'Policy Number' : 'Order Number', 'value' => $quotation->po_so_number ?: '-'],
+    ];
+
+    if ($quotation->is_deffered && $quotation->invoice_category) {
+        $quoteToRows[] = ['label' => 'Category', 'value' => strtoupper($quotation->invoice_category)];
+    }
+
+    $quoteToRows[] = ['label' => 'Valid Until', 'value' => $quotation->expired_date ?: '-'];
+@endphp
+
 @push('styles')
 <style>
     @media print {
         body {
             margin: 0;
             padding: 0;
+            background: white;
         }
 
         @page {
-            size: A4;
-            margin: 10mm;
+            size: A4 landscape;
+            margin: 8mm;
         }
     }
 </style>
 @endpush
 
 @section('content')
-<div class="w-full max-w-4xl mx-auto bg-white">
-    <div class="p-6 sm:p-8">
-        <!-- Quotation Header -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
-            <div>
+<div class="w-full bg-white">
+    <div class="border-[10px] p-3" style="border-color: {{ $primaryColor }};">
+        <div class="mb-4 h-4" style="background-color: {{ $primaryColor }};"></div>
+
+        <div class="grid grid-cols-12 gap-6">
+            <div class="col-span-7">
                 @if($quotation->business->logo)
-                <div class="mb-3">
-                    <img
-                        src="{{ public_path('/uploads/media/' . $quotation->business->logo) }}"
-                        alt="Business Logo"
-                        class="max-h-32 object-contain" />
-                </div>
+                    <div class="mb-6 max-w-[260px]">
+                        <img
+                            src="{{ public_path('/uploads/media/' . $quotation->business->logo) }}"
+                            alt="Business Logo"
+                            class="max-h-24 object-contain"
+                        />
+                    </div>
                 @endif
-                <div class="mt-2 text-sm">
-                    <p>{{ $quotation->business->address }}</p>
-                    <p>{{ $quotation->business->business_email }}</p>
-                    <p>{{ $quotation->business->phone }}</p>
-                </div>
+
+                <table class="w-full text-sm">
+                    <tbody>
+                        @foreach($quoteToRows as $row)
+                            <tr>
+                                <td class="w-40 py-0.5 font-semibold text-slate-900">{{ $row['label'] }}:</td>
+                                <td class="py-0.5 text-slate-700">{{ $row['value'] }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
-            <div class="sm:text-right">
-                <h1 class="text-2xl font-bold">{{ $quotation->title }}</h1>
-                <div class="mt-2 text-sm">
-                    <p><span class="font-medium">Quotation #:</span> {{ $quotation->quotation_number }}</p>
-                    <p><span class="font-medium">Quotation Date:</span> {{ $quotation->quotation_date }}</p>
-                    <p><span class="font-medium">Valid Until:</span> {{ $quotation->expired_date }}</p>
-                    @if($quotation->po_so_number)
-                    <p><span class="font-medium">{{ $quotation->is_deffered ? 'Quotation Number' : 'Order Number' }}:</span> {{ $quotation->po_so_number }}</p>
-                    @endif
-                    <p><span class="font-medium">Quotation Type:</span> {{ $quotation->is_deffered ? 'Deferred' : 'Normal' }}</p>
-                    @if($quotation->is_deffered && $quotation->invoice_category)
-                    <p><span class="font-medium">Deferred Category:</span> {{ strtoupper($quotation->invoice_category) }}</p>
-                    @endif
-                    @if($quotation->expired_date && Carbon\Carbon::createFromFormat(get_date_format(), $quotation->expired_date)->isPast())
-                    <div class="mt-2">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
-                            Expired
-                        </span>
+
+            <div class="col-span-5">
+                <div class="border border-slate-900">
+                    <div class="border-b-2 px-4 py-2 text-center text-2xl font-bold uppercase" style="color: {{ $primaryColor }}; border-color: {{ $primaryColor }};">
+                        Quotation
                     </div>
-                    @elseif($quotation->expired_date && Carbon\Carbon::createFromFormat(get_date_format(), $quotation->expired_date)->isFuture())
-                    <div class="mt-2">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-                            Valid
-                        </span>
-                    </div>
-                    @endif
-                </div>
-                <div class="mt-4 sm:flex sm:justify-end">
-                    <!-- QR Code for public quotation link -->
-                    <div class="w-24 h-24 border-2 border-gray-300 border-dashed flex items-center justify-center text-xs text-gray-500">
-                        {!! QrCode::size(200)->generate(route('quotations.show_public_quotation', $quotation->short_code)) !!}
+                    <div class="px-4 py-2">
+                        <div class="flex items-start justify-between gap-4 py-0.5 text-sm">
+                            <span class="font-semibold text-slate-900">Quotation Date:</span>
+                            <span class="text-slate-700">{{ $quotation->quotation_date }}</span>
+                        </div>
+                        <div class="flex items-start justify-between gap-4 py-0.5 text-sm">
+                            <span class="font-semibold text-slate-900">Currency Type:</span>
+                            <span class="text-slate-700">{{ $quotation->currency }}</span>
+                        </div>
+                        <div class="flex items-start justify-between gap-4 py-0.5 text-sm">
+                            <span class="font-semibold text-slate-900">Quotation No:</span>
+                            <span class="text-slate-700">{{ $quotation->quotation_number }}</span>
+                        </div>
+                        <div class="flex items-start justify-between gap-4 py-0.5 text-sm">
+                            <span class="font-semibold text-slate-900">Quotation Validity:</span>
+                            <span class="text-slate-700">{{ $quotation->expired_date }}</span>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <hr class="my-6 border-gray-200">
-
-        <!-- Customer Information -->
-        <div class="mb-8">
-            <h3 class="font-medium text-lg mb-2">Quote To:</h3>
-            <div class="text-sm">
-                <p class="font-medium">{{ $quotation->customer->name ?? '' }}</p>
-                @if(isset($quotation->customer->company_name) && $quotation->customer->company_name)
-                <p>{{ $quotation->customer->company_name }}</p>
-                @endif
-                <p>{{ $quotation->customer->address ?? '' }}</p>
-                <p>{{ $quotation->customer->email ?? '' }}</p>
-                <p>{{ $quotation->customer->mobile ?? '' }}</p>
+        <div class="mt-5 border border-slate-900">
+            <div class="border-b border-slate-900 px-2 py-1 text-xs font-bold uppercase" style="background-color: {{ $primaryColor }}; color: {{ $textColor }}; letter-spacing: 0.12em;">
+                {{ $quotation->invoice_category ? strtoupper($quotation->invoice_category) . ' Quote' : 'Quotation Items' }}
             </div>
-        </div>
 
-        <!-- Quotation Items -->
-        <div class="mb-8">
-            <table class="w-full border-collapse">
+            <table class="w-full border-collapse text-xs">
                 <thead>
-                    <tr class="border-b border-gray-200">
-                        <th class="text-left py-3 font-medium">Item</th>
-                        <th class="text-left py-3 font-medium">Description</th>
+                    <tr>
+                        <th class="border border-slate-900 px-2 py-1 text-left" style="background-color: {{ $primaryColor }}; color: {{ $textColor }};">Coverage</th>
+                        <th class="border border-slate-900 px-2 py-1 text-left" style="background-color: {{ $primaryColor }}; color: {{ $textColor }};">Item</th>
+                        <th class="border border-slate-900 px-2 py-1 text-left" style="background-color: {{ $primaryColor }}; color: {{ $textColor }};">Description</th>
                         @if($quotation->is_deffered)
-                        <th class="text-left py-3 font-medium">Benefit</th>
-                        @endif
-                        @if($quotation->is_deffered && $quotation->invoice_category === 'other')
-                        <th class="text-right py-3 font-medium">Sum Insured</th>
+                            <th class="border border-slate-900 px-2 py-1 text-left" style="background-color: {{ $primaryColor }}; color: {{ $textColor }};">Benefits</th>
                         @endif
                         @if($quotation->is_deffered && $quotation->invoice_category === 'medical')
-                        <th class="text-left py-3 font-medium">Family Size</th>
+                            <th class="border border-slate-900 px-2 py-1 text-left" style="background-color: {{ $primaryColor }}; color: {{ $textColor }};">Family Size</th>
                         @endif
-                        <th class="text-right py-3 font-medium">{{ $quotation->is_deffered && $quotation->invoice_category === 'medical' ? 'Members' : 'Quantity' }}</th>
-                        <th class="text-right py-3 font-medium">{{ $quotation->is_deffered ? 'Rate' : 'Unit Price' }}</th>
-                        <th class="text-right py-3 font-medium">Total</th>
+                        @if($quotation->is_deffered && $quotation->invoice_category === 'other')
+                            <th class="border border-slate-900 px-2 py-1 text-right" style="background-color: {{ $primaryColor }}; color: {{ $textColor }};">Sum Insured</th>
+                        @endif
+                        <th class="border border-slate-900 px-2 py-1 text-right" style="background-color: {{ $primaryColor }}; color: {{ $textColor }};">{{ $quantityLabel }}</th>
+                        <th class="border border-slate-900 px-2 py-1 text-right" style="background-color: {{ $primaryColor }}; color: {{ $textColor }};">{{ $quotation->is_deffered ? 'Rate' : 'Unit Cost' }}</th>
+                        <th class="border border-slate-900 px-2 py-1 text-right" style="background-color: {{ $primaryColor }}; color: {{ $textColor }};">Premium</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach($quotation->items as $item)
-                    <tr class="border-b border-gray-100">
-                        <td class="py-3 font-medium">{{ $item->product_name }}</td>
-                        <td class="py-3">{{ $item->description }}</td>
-                        @if($quotation->is_deffered)
-                        <td class="py-3">{{ $item->benefits }}</td>
-                        @endif
-                        @if($quotation->is_deffered && $quotation->invoice_category === 'other')
-                        <td class="py-3 text-right">{{ formatCurrency($item->sum_insured) }}</td>
-                        @endif
-                        @if($quotation->is_deffered && $quotation->invoice_category === 'medical')
-                        <td class="py-3">{{ $item->family_size }}</td>
-                        @endif
-                        <td class="py-3 text-right">{{ $item->quantity }}</td>
-                        <td class="py-3 text-right">{{ formatCurrency($item->unit_cost) }}</td>
-                        <td class="py-3 text-right">
-                            {{ formatCurrency($item->quantity * $item->unit_cost) }}
-                        </td>
-                    </tr>
+                        <tr>
+                            <td class="border border-slate-900 px-2 py-2 align-top">{{ $item->product_name }}</td>
+                            <td class="border border-slate-900 px-2 py-2 align-top">{{ $item->product_name }}</td>
+                            <td class="border border-slate-900 px-2 py-2 align-top">{{ $item->description }}</td>
+                            @if($quotation->is_deffered)
+                                <td class="border border-slate-900 px-2 py-2 align-top">{{ $item->benefits }}</td>
+                            @endif
+                            @if($quotation->is_deffered && $quotation->invoice_category === 'medical')
+                                <td class="border border-slate-900 px-2 py-2 align-top">{{ $item->family_size }}</td>
+                            @endif
+                            @if($quotation->is_deffered && $quotation->invoice_category === 'other')
+                                <td class="border border-slate-900 px-2 py-2 text-right align-top">{{ formatCurrency($item->sum_insured) }}</td>
+                            @endif
+                            <td class="border border-slate-900 px-2 py-2 text-right align-top">{{ $item->quantity }}</td>
+                            <td class="border border-slate-900 px-2 py-2 text-right align-top">{{ formatCurrency($item->unit_cost) }}</td>
+                            <td class="border border-slate-900 px-2 py-2 text-right align-top">{{ formatCurrency($item->quantity * $item->unit_cost) }}</td>
+                        </tr>
                     @endforeach
                 </tbody>
             </table>
         </div>
 
-        <!-- Quotation Summary -->
-        <div class="flex justify-end">
-            <div class="w-full md:w-1/2 lg:w-1/3 space-y-2">
-                <div class="flex justify-between py-2 border-t border-gray-200">
-                    <span class="font-medium">Subtotal:</span>
-                    <span>{{ formatCurrency($quotation->sub_total) }}</span>
+        <div class="mt-5 grid grid-cols-12 gap-0 border border-slate-900">
+            <div class="col-span-4 border-r border-slate-900">
+                <div class="px-2 py-1 text-xs font-bold uppercase" style="background-color: {{ $primaryColor }}; color: {{ $textColor }}; letter-spacing: 0.12em;">
+                    Coverage Summary
                 </div>
+                <div class="min-h-[150px] p-3 text-sm leading-6 text-slate-800">
+                    {{ $quotation->note ?: 'No additional coverage summary provided.' }}
+                </div>
+            </div>
 
-                <!-- Tax details -->
-                @foreach($quotation->taxes as $tax)
-                <div class="flex justify-between py-2">
-                    <span>{{ $tax->name }}:</span>
-                    <span>{{ formatCurrency($tax->amount) }}</span>
+            <div class="col-span-4 border-r border-slate-900">
+                <div class="px-2 py-1 text-xs font-bold uppercase" style="background-color: {{ $primaryColor }}; color: {{ $textColor }}; letter-spacing: 0.12em;">
+                    Exclusions and Remarks
                 </div>
-                @endforeach
+                <div class="min-h-[150px] p-3 text-sm leading-6 text-slate-800">
+                    {{ $quotation->footer ?: 'No additional exclusions or remarks provided.' }}
+                </div>
+            </div>
 
-                <!-- Discount -->
-                @if($quotation->discount > 0)
-                <div class="flex justify-between py-2">
-                    <span>Discount:</span>
-                    <span>-{{ formatCurrency($quotation->discount) }}</span>
+            <div class="col-span-4">
+                <div class="px-2 py-1 text-xs font-bold uppercase" style="background-color: {{ $primaryColor }}; color: {{ $textColor }}; letter-spacing: 0.12em;">
+                    Premium Summary
                 </div>
-                @endif
-
-                <!-- Total -->
-                <div class="flex justify-between py-3 border-t border-b border-gray-200 font-bold text-lg">
-                    <span>Total:</span>
-                    <span>{{ formatCurrency($quotation->grand_total) }}</span>
-                </div>
-
-                <!-- Base currency equivalent if different currency -->
-                @if($quotation->currency !== $quotation->business->currency)
-                <div class="flex justify-between py-2 text-gray-500 text-sm">
-                    <span>Exchange Rate:</span>
-                    <span>
-                        1 {{ $quotation->business->currency }} = {{ formatCurrency($quotation->exchange_rate) }}
-                    </span>
-                </div>
-                @endif
-
-                <!-- Base currency equivalent total -->
-                @if($quotation->currency !== $quotation->business->currency)
-                <div class="flex justify-between py-2 text-sm text-gray-600">
-                    <span>Equivalent to:</span>
-                    <span>
-                        {{ formatCurrency($quotation->converted_total) }}
-                    </span>
-                </div>
-                @endif
+                <table class="w-full border-collapse text-sm">
+                    <tbody>
+                        <tr>
+                            <td class="border-b border-slate-900 px-3 py-2 font-semibold">Sub-Total</td>
+                            <td class="border-b border-slate-900 px-3 py-2 text-right">{{ formatCurrency($quotation->sub_total) }}</td>
+                        </tr>
+                        @foreach($quotation->taxes as $tax)
+                            <tr>
+                                <td class="border-b border-slate-900 px-3 py-2 font-semibold">{{ $tax->name }}</td>
+                                <td class="border-b border-slate-900 px-3 py-2 text-right">{{ formatCurrency($tax->amount) }}</td>
+                            </tr>
+                        @endforeach
+                        @if($quotation->discount > 0)
+                            <tr>
+                                <td class="border-b border-slate-900 px-3 py-2 font-semibold">Discount</td>
+                                <td class="border-b border-slate-900 px-3 py-2 text-right">-{{ formatCurrency($quotation->discount) }}</td>
+                            </tr>
+                        @endif
+                        <tr>
+                            <td class="px-3 py-2 font-bold uppercase">Total Premium</td>
+                            <td class="px-3 py-2 text-right font-bold">{{ formatCurrency($quotation->grand_total) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 
-        <!-- Notes & Terms -->
-        @if($quotation->note || $quotation->footer)
-        <div class="mt-8 space-y-4">
-            @if($quotation->note)
-            <div>
-                <h3 class="font-medium mb-1">Notes:</h3>
-                <p class="text-sm">{{ $quotation->note }}</p>
-            </div>
-            @endif
-
-            @if($quotation->footer)
-            <div>
-                <h3 class="font-medium mb-1">Terms & Conditions:</h3>
-                <p class="text-sm">{{ $quotation->footer }}</p>
-            </div>
-            @endif
+        <div class="border-x border-b border-slate-900 px-4 py-3 text-center text-sm text-slate-800">
+            We trust you will find our quotation competitive and await your placement instructions.
         </div>
-        @endif
 
-        <!-- Validity Notice -->
-        @if($quotation->expired_date)
-        <div class="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p class="text-sm text-yellow-800">
-                <strong>Valid Until:</strong> {{ $quotation->expired_date }}.
-                This quotation is valid for the period specified above.
-            </p>
+        <div class="mt-4 px-4 py-4 text-center text-sm font-semibold" style="background-color: {{ $primaryColor }}; color: {{ $textColor }};">
+            {{ collect([$quotation->business->phone ?? null, $businessEmail, $quotation->business->website ?? null])->filter()->join(' | ') }}
         </div>
-        @endif
     </div>
 </div>
 @endsection
