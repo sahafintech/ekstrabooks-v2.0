@@ -77,11 +77,11 @@ class Invoice extends Model {
     }
 
     public function createdBy() {
-        return $this->belongsTo(User::class, 'created_by')->withDefault()->withoutGlobalScopes();
+        return $this->belongsTo(User::class, 'created_user_id')->withDefault()->withoutGlobalScopes();
     }
 
     public function updatedBy() {
-        return $this->belongsTo(User::class, 'updated_by')->withDefault()->withoutGlobalScopes();
+        return $this->belongsTo(User::class, 'updated_user_id')->withDefault()->withoutGlobalScopes();
     }
 
     protected function subTotal(): Attribute {

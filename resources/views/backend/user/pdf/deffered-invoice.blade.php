@@ -1,211 +1,303 @@
 @extends('backend.user.pdf.layout')
 
+@php
+    $primaryColor = get_business_option('invoice_primary_color', '#6d0e47');
+    $textColor = get_business_option('invoice_text_color', '#ffffff');
+    $businessName = $invoice->business->business_name ?? $invoice->business->name ?? 'Business';
+    $businessEmail = $invoice->business->business_email ?? $invoice->business->email ?? '';
+    $businessPhone = $invoice->business->phone ?? $invoice->business->mobile ?? '';
+    $businessWebsite = $invoice->business->website ?? '';
+    $preparedBy = optional($invoice->createdBy)->name ?? $businessName;
+    $quantityLabel = $invoice->invoice_category === 'medical' ? 'Members' : 'Quantity';
+    $policyPeriod = collect([$invoice->deffered_start, $invoice->deffered_end])->filter()->join(' - ');
+    $items = $invoice->items ?? collect();
+    $bankAccounts = collect($invoice->business->bank_accounts ?? []);
+    $fillerRowCount = max(0, 10 - count($items));
+    $paidAmount = (float) ($invoice->paid ?? 0);
+    $outstandingAmount = max(0, (float) $invoice->grand_total - $paidAmount);
+@endphp
+
 @push('styles')
 <style>
-    @media print {
-        body {
-            margin: 0;
-            padding: 0;
-        }
+    html,
+    body {
+        margin: 0;
+        padding: 0;
+        background: white;
+    }
 
-        @page {
-            size: A4;
-            margin: 10mm;
-        }
+    @page {
+        size: A4 portrait;
+        margin: 0;
     }
 </style>
 @endpush
 
 @section('content')
-<div class="w-full max-w-4xl mx-auto bg-white">
-    <div class="p-6 sm:p-8">
-        <!-- Invoice Header -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
-            <div>
+<div class="m-0 w-full bg-white">
+    <div class="border-[10px] p-3" style="border-color: {{ $primaryColor }};">
+        <div class="mb-4 h-4" style="background-color: {{ $primaryColor }};"></div>
+
+        <div class="mb-4 flex items-start justify-between gap-4">
+            <div class="max-w-[260px]">
                 @if($invoice->business->logo)
-                <div class="mb-3">
                     <img
                         src="{{ public_path('/uploads/media/' . $invoice->business->logo) }}"
                         alt="Business Logo"
-                        class="max-h-32 object-contain" />
-                </div>
-                @endif
-                <div class="mt-2 text-sm">
-                    <p>{{ $invoice->business->address }}</p>
-                    <p>{{ $invoice->business->business_email }}</p>
-                    <p>{{ $invoice->business->phone }}</p>
-                </div>
-            </div>
-            <div class="sm:text-right">
-                <h1 class="text-2xl font-bold">{{ $invoice->title }}</h1>
-                <div class="mt-2 text-sm">
-                    <p><span class="font-medium">Invoice #:</span> {{ $invoice->invoice_number }}</p>
-                    @if($invoice->order_number)
-                    <p><span class="font-medium">Policy Number:</span> {{ $invoice->order_number }}</p>
-                    @endif
-                    <p><span class="font-medium">Invoice Date:</span> {{ $invoice->invoice_date }}</p>
-                    <p><span class="font-medium">Due Date:</span> {{ $invoice->due_date }}</p>
-                    @if($invoice->paid > 0)
-                    <div class="mt-2">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-                            Paid: {{ formatCurrency($invoice->paid) }}
-                        </span>
+                        class="max-h-24 object-contain"
+                    />
+                @else
+                    <div class="text-3xl font-bold uppercase" style="color: {{ $primaryColor }};">
+                        {{ $businessName }}
                     </div>
+                @endif
+            </div>
+        </div>
+
+        <div class="grid grid-cols-12 gap-0 border border-slate-900 text-sm">
+            <div class="col-span-7 border-r border-slate-900 px-3 py-3">
+                <div class="space-y-1.5">
+                    <div>
+                        <span class="font-semibold uppercase">Invoice To:</span>
+                        {{ $invoice->customer->name ?? '-' }}
+                    </div>
+                    <div>
+                        <span class="font-semibold uppercase">Policy No:</span>
+                        {{ $invoice->order_number ?: '-' }}
+                    </div>
+                    @if($policyPeriod)
+                        <div>
+                            <span class="font-semibold uppercase">Policy Period:</span>
+                            {{ $policyPeriod }}
+                        </div>
+                    @endif
+                    @if($invoice->invoice_category)
+                        <div>
+                            <span class="font-semibold uppercase">Insurance Class:</span>
+                            {{ strtoupper($invoice->invoice_category) }}
+                        </div>
                     @endif
                 </div>
-                <div class="mt-4 sm:flex sm:justify-end">
-                    <!-- QR Code -->
-                    <div class="w-24 h-24 border-2 border-gray-300 border-dashed flex items-center justify-center text-xs text-gray-500">
-                        {!! QrCode::size(200)->generate(route('deffered_invoices.show_public_deffered_invoice', $invoice->short_code)) !!}
+            </div>
+
+            <div class="col-span-5 px-3 py-3">
+                <div class="space-y-1.5">
+                    <div class="flex justify-between gap-4">
+                        <span class="font-semibold uppercase">Invoice Number:</span>
+                        <span>{{ $invoice->invoice_number ?: '-' }}</span>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <span class="font-semibold uppercase">Invoice Date:</span>
+                        <span>{{ $invoice->invoice_date ?: '-' }}</span>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <span class="font-semibold uppercase">Due Date:</span>
+                        <span>{{ $invoice->due_date ?: '-' }}</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Bank Details -->
-        @if($invoice->business->bank_accounts && count($invoice->business->bank_accounts) > 0)
-        <div class="mb-6">
-            <h3 class="font-medium text-lg mb-2">Bank Details:</h3>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                @foreach($invoice->business->bank_accounts as $bank)
-                <div class="text-sm bg-gray-100 p-2 rounded-md">
-                    <p>Bank Name: <strong>{{ $bank->bank_name }}</strong></p>
-                    <p>Account Number: <strong>{{ $bank->account_number }}</strong></p>
-                    <p>Account Name: <strong>{{ $bank->account_name }}</strong></p>
-                </div>
-                @endforeach
-            </div>
-        </div>
-        @endif
-
-        <hr class="my-6 border-gray-200">
-
-        <!-- Customer Information -->
-        <div class="mb-8">
-            <h3 class="font-medium text-lg mb-2">Bill To:</h3>
-            <div class="text-sm">
-                <p class="font-medium">{{ $invoice->customer->name ?? '' }}</p>
-                @if(isset($invoice->customer->company_name) && $invoice->customer->company_name)
-                <p>{{ $invoice->customer->company_name }}</p>
-                @endif
-                <p>{{ $invoice->customer->address ?? '' }}</p>
-                <p>{{ $invoice->customer->email ?? '' }}</p>
-                <p>{{ $invoice->customer->mobile ?? '' }}</p>
-            </div>
+        <div
+            class="mt-4 px-2 py-1 text-center text-2xl font-bold uppercase leading-none"
+            style="background-color: {{ $primaryColor }}; color: {{ $textColor }}; letter-spacing: 0.12em;"
+        >
+            Invoice
         </div>
 
-        <!-- Invoice Items -->
-        <div class="mb-8">
-            <table class="w-full border-collapse">
+        <div class="border-x border-b border-slate-900">
+            <table class="w-full border-collapse text-xs">
                 <thead>
-                    <tr class="border-b border-gray-200">
-                        <th class="text-left py-3 font-medium">Item</th>
-                        <th class="text-left py-3 font-medium">Benefit</th>
-                        @if($invoice->invoice_category == 'other')
-                        <th class="text-right py-3 font-medium">Sum Insured</th>
-                        @endif
-                        @if($invoice->invoice_category === 'medical')
-                        <th class="text-left py-3 font-medium">Family Size</th>
-                        @endif
-                        <th class="text-right py-3 font-medium">
-                            {{ $invoice->invoice_category === 'medical' ? 'Members' : 'Quantity' }}
-                        </th>
-                        <th class="text-right py-3 font-medium">Unit Cost</th>
-                        <th class="text-right py-3 font-medium">Total</th>
+                    <tr>
+                        <th class="border border-slate-900 px-2 py-1 text-left" style="background-color: {{ $primaryColor }}; color: {{ $textColor }};">Class</th>
+                        <th class="border border-slate-900 px-2 py-1 text-left" style="background-color: {{ $primaryColor }}; color: {{ $textColor }};">Description</th>
+                        <th class="border border-slate-900 px-2 py-1 text-right" style="background-color: {{ $primaryColor }}; color: {{ $textColor }};">{{ $quantityLabel }}</th>
+                        <th class="border border-slate-900 px-2 py-1 text-right" style="background-color: {{ $primaryColor }}; color: {{ $textColor }};">Rate</th>
+                        <th class="border border-slate-900 px-2 py-1 text-right" style="background-color: {{ $primaryColor }}; color: {{ $textColor }};">Amount</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach($invoice->items as $item)
-                    <tr class="border-b border-gray-100">
-                        <td class="py-3 font-medium">{{ $item->product_name }}</td>
-                        <td class="py-3">{{ $item->benefits ?? '' }}</td>
-                        @if($invoice->invoice_category == 'other')
-                        <td class="py-3 text-right">{{ formatCurrency($item->sum_insured ?? 0) }}</td>
-                        @endif
-                        @if($invoice->invoice_category === 'medical')
-                        <td class="py-3">{{ $item->family_size ?? '' }}</td>
-                        @endif
-                        <td class="py-3 text-right">{{ $item->quantity }}</td>
-                        <td class="py-3 text-right">{{ formatCurrency($item->unit_cost) }}</td>
-                        <td class="py-3 text-right">
-                            {{ formatCurrency($item->quantity * $item->unit_cost) }}
-                        </td>
-                    </tr>
+                    @foreach($items as $item)
+                        <tr>
+                            <td class="border border-slate-900 px-2 py-2 align-top">
+                                {{ $item->product_name ?: '-' }}
+                            </td>
+                            <td class="border border-slate-900 px-2 py-2 align-top">
+                                <div class="font-medium text-slate-900">
+                                    {{ $item->description ?: '-' }}
+                                </div>
+                                <div class="mt-1 space-y-0.5 text-[11px] text-slate-700">
+                                    @if($item->benefits)
+                                        <div>Benefits: {{ $item->benefits }}</div>
+                                    @endif
+                                    @if($invoice->invoice_category === 'medical' && $item->family_size)
+                                        <div>Family Size: {{ $item->family_size }}</div>
+                                    @endif
+                                    @if($invoice->invoice_category === 'other' && (float) $item->sum_insured > 0)
+                                        <div>Sum Insured: {{ formatCurrency($item->sum_insured) }}</div>
+                                    @endif
+                                </div>
+                            </td>
+                            <td class="border border-slate-900 px-2 py-2 text-right align-top">
+                                {{ $item->quantity }}
+                            </td>
+                            <td class="border border-slate-900 px-2 py-2 text-right align-top">
+                                {{ formatCurrency($item->unit_cost) }}
+                            </td>
+                            <td class="border border-slate-900 px-2 py-2 text-right align-top">
+                                {{ formatCurrency($item->quantity * $item->unit_cost) }}
+                            </td>
+                        </tr>
                     @endforeach
+
+                    @for($i = 0; $i < $fillerRowCount; $i++)
+                        <tr class="h-8">
+                            <td class="border border-slate-900 px-2 py-2"></td>
+                            <td class="border border-slate-900 px-2 py-2"></td>
+                            <td class="border border-slate-900 px-2 py-2"></td>
+                            <td class="border border-slate-900 px-2 py-2"></td>
+                            <td class="border border-slate-900 px-2 py-2"></td>
+                        </tr>
+                    @endfor
                 </tbody>
             </table>
         </div>
 
-        <!-- Invoice Summary -->
-        <div class="flex justify-end">
-            <div class="w-full md:w-1/2 lg:w-1/3 space-y-2">
-                <div class="flex justify-between py-2 border-t border-gray-200">
-                    <span class="font-medium">Subtotal:</span>
-                    <span>{{ formatCurrency($invoice->sub_total) }}</span>
+        <div class="grid grid-cols-12 gap-0 border border-slate-900 border-t-0">
+            <div class="col-span-7 border-r border-slate-900">
+                <div class="px-2 py-1 text-xs font-bold uppercase" style="background-color: {{ $primaryColor }}; color: {{ $textColor }}; letter-spacing: 0.12em;">
+                    Bank Details
                 </div>
 
-                <!-- Tax details -->
-                @foreach($invoice->taxes as $tax)
-                <div class="flex justify-between py-2">
-                    <span>{{ $tax->name }}:</span>
-                    <span>{{ formatCurrency($tax->amount) }}</span>
-                </div>
-                @endforeach
+                <table class="w-full border-collapse text-xs">
+                    <tbody>
+                        @if($bankAccounts->count() > 0)
+                            @foreach($bankAccounts as $bank)
+                                <tr>
+                                    <td class="w-40 border-b border-slate-900 px-2 py-2 font-semibold align-top">
+                                        {{ $bank->bank_name }}
+                                    </td>
+                                    <td class="border-b border-slate-900 px-2 py-2 align-top">
+                                        <div>{{ $bank->account_number ?: '-' }}</div>
+                                        @if($bank->account_name)
+                                            <div class="text-[11px] text-slate-600">{{ $bank->account_name }}</div>
+                                        @endif
+                                        @if($bank->swift_code)
+                                            <div class="text-[11px] text-slate-600">Swift: {{ $bank->swift_code }}</div>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        @else
+                            <tr>
+                                <td colspan="2" class="px-2 py-4 text-center text-slate-500">
+                                    No bank details available.
+                                </td>
+                            </tr>
+                        @endif
+                    </tbody>
+                </table>
 
-                <!-- Discount -->
-                @if($invoice->discount > 0)
-                <div class="flex justify-between py-2">
-                    <span>Discount:</span>
-                    <span>-{{ formatCurrency($invoice->discount) }}</span>
-                </div>
+                @if($invoice->note || $invoice->footer)
+                    <div class="border-t border-slate-900 text-xs">
+                        @if($invoice->note)
+                            <div class="px-3 py-2">
+                                <span class="font-semibold uppercase">Notes:</span>
+                                {{ $invoice->note }}
+                            </div>
+                        @endif
+                        @if($invoice->footer)
+                            <div class="px-3 py-2 {{ $invoice->note ? 'border-t border-slate-900' : '' }}">
+                                <span class="font-semibold uppercase">Terms:</span>
+                                {{ $invoice->footer }}
+                            </div>
+                        @endif
+                    </div>
                 @endif
+            </div>
 
-                <!-- Total -->
-                <div class="flex justify-between py-3 border-t border-b border-gray-200 font-bold text-lg">
-                    <span>Total:</span>
-                    <span>{{ formatCurrency($invoice->grand_total) }}</span>
+            <div class="col-span-5">
+                <div class="px-2 py-1 text-xs font-bold uppercase" style="background-color: {{ $primaryColor }}; color: {{ $textColor }}; letter-spacing: 0.12em;">
+                    Invoice Summary
                 </div>
 
-                <!-- Base currency equivalent if different currency -->
+                <table class="w-full border-collapse text-sm">
+                    <tbody>
+                        <tr>
+                            <td class="border-b border-slate-900 px-3 py-2 font-semibold">Subtotal</td>
+                            <td class="border-b border-slate-900 px-3 py-2 text-right">{{ formatCurrency($invoice->sub_total) }}</td>
+                        </tr>
+
+                        @foreach($invoice->taxes as $tax)
+                            <tr>
+                                <td class="border-b border-slate-900 px-3 py-2 font-semibold">{{ $tax->name }}</td>
+                                <td class="border-b border-slate-900 px-3 py-2 text-right">{{ formatCurrency($tax->amount) }}</td>
+                            </tr>
+                        @endforeach
+
+                        @if($invoice->discount > 0)
+                            <tr>
+                                <td class="border-b border-slate-900 px-3 py-2 font-semibold">Discount</td>
+                                <td class="border-b border-slate-900 px-3 py-2 text-right">-{{ formatCurrency($invoice->discount) }}</td>
+                            </tr>
+                        @endif
+
+                        <tr>
+                            <td class="border-b border-slate-900 px-3 py-2 font-semibold">Total Invoice Amount</td>
+                            <td class="border-b border-slate-900 px-3 py-2 text-right">{{ formatCurrency($invoice->grand_total) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="border-b border-slate-900 px-3 py-2 font-semibold">Credit Applied</td>
+                            <td class="border-b border-slate-900 px-3 py-2 text-right">{{ formatCurrency($paidAmount) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="px-3 py-2 font-bold uppercase">Net Amount</td>
+                            <td class="px-3 py-2 text-right font-bold">{{ formatCurrency($outstandingAmount) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
                 @if($invoice->currency !== $invoice->business->currency)
-                <div class="flex justify-between py-2 text-gray-500 text-sm">
-                    <span>Exchange Rate:</span>
-                    <span>
-                        1 {{ $invoice->business->currency }} = {{ formatCurrency($invoice->exchange_rate) }}
-                    </span>
-                </div>
-                @endif
-
-                <!-- Base currency equivalent total -->
-                @if($invoice->currency !== $invoice->business->currency)
-                <div class="flex justify-between py-2 text-sm text-gray-600">
-                    <span>Equivalent to:</span>
-                    <span>
-                        {{ formatCurrency($invoice->converted_total) }}
-                    </span>
-                </div>
+                    <div class="border-t border-slate-900 px-3 py-2 text-[11px] text-slate-700">
+                        <div>Exchange Rate: 1 {{ $invoice->business->currency }} = {{ formatCurrency($invoice->exchange_rate) }}</div>
+                        <div>Equivalent Total: {{ formatCurrency($invoice->converted_total) }}</div>
+                    </div>
                 @endif
             </div>
         </div>
 
-        <!-- Notes & Terms -->
-        @if($invoice->note || $invoice->footer)
-        <div class="mt-8 space-y-4">
-            @if($invoice->note)
-            <div>
-                <h3 class="font-medium mb-1">Notes:</h3>
-                <p class="text-sm">{{ $invoice->note }}</p>
+        <div class="grid grid-cols-12 gap-0 border-x border-b border-slate-900">
+            <div class="col-span-7 px-4 py-6 text-sm">
+                <div class="font-semibold">Prepared By: {{ $preparedBy }}</div>
+                <div class="mt-3 font-semibold">Signature:</div>
+                <div class="mt-6 w-40 border-b border-slate-900"></div>
             </div>
-            @endif
 
-            @if($invoice->footer)
-            <div>
-                <h3 class="font-medium mb-1">Terms & Conditions:</h3>
-                <p class="text-sm">{{ $invoice->footer }}</p>
+            <div class="col-span-5 px-4 py-6 text-xs text-slate-700">
+                @if($invoice->invoice_category)
+                    <div class="mb-1">
+                        <span class="font-semibold uppercase">Category:</span>
+                        {{ strtoupper($invoice->invoice_category) }}
+                    </div>
+                @endif
+                @if($policyPeriod)
+                    <div class="mb-1">
+                        <span class="font-semibold uppercase">Policy Period:</span>
+                        {{ $policyPeriod }}
+                    </div>
+                @endif
+                @if($invoice->currency)
+                    <div>
+                        <span class="font-semibold uppercase">Currency:</span>
+                        {{ $invoice->currency }}
+                    </div>
+                @endif
             </div>
-            @endif
         </div>
-        @endif
+
+        <div class="mt-4 px-4 py-4 text-center text-sm font-semibold" style="background-color: {{ $primaryColor }}; color: {{ $textColor }};">
+            {{ collect([$businessPhone, $businessEmail, $businessWebsite])->filter()->join(' | ') }}
+        </div>
     </div>
 </div>
 @endsection

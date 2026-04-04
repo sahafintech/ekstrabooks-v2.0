@@ -1860,11 +1860,13 @@ class DefferedInvoiceController extends Controller
     {
         $invoice = Invoice::with([
             'business',
+            'business.systemSettings',
             'business.bank_accounts',
             'items',
             'deffered_earnings',
             'customer',
-            'taxes'
+            'taxes',
+            'createdBy',
         ])->find($id);
 
         $attachments = Attachment::where('ref_id', $id)
@@ -1886,7 +1888,15 @@ class DefferedInvoiceController extends Controller
 
     public function pdf($id)
     {
-        $invoice = Invoice::with(['business', 'business.bank_accounts', 'items', 'taxes', 'customer'])->find($id);
+        $invoice = Invoice::with([
+            'business',
+            'business.systemSettings',
+            'business.bank_accounts',
+            'items',
+            'taxes',
+            'customer',
+            'createdBy',
+        ])->find($id);
         return pdf()
         ->view('backend.user.pdf.deffered-invoice', compact('invoice'))
         ->name('deffered-invoice-' . $invoice->invoice_number . '.pdf')

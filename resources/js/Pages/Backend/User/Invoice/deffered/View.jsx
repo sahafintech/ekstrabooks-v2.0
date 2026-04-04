@@ -1,6 +1,6 @@
-import { Link, router, useForm, usePage } from "@inertiajs/react";
+import { Link, useForm, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
-import { SidebarInset, SidebarSeparator } from "@/Components/ui/sidebar";
+import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import { Toaster } from "@/Components/ui/toaster";
@@ -39,7 +39,6 @@ import { Label } from "@/Components/ui/label";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import InputError from "@/Components/InputError";
 import RichTextEditor from "@/Components/RichTextEditor";
-import { QRCodeSVG } from "qrcode.react";
 
 const printStyles = `
 @media print {
@@ -69,24 +68,28 @@ const printStyles = `
       }
 
       @page {
-          size: auto;
-          margin: 10mm;
+          size: A4 portrait;
+          margin: 8mm;
       }
 
       body {
           margin: 0;
           padding: 0;
+          background: white;
       }
   }
 `;
 
-
-
+const sectionTitleStyle = (primaryColor, textColor) => ({
+    backgroundColor: primaryColor,
+    color: textColor,
+    letterSpacing: "0.12em",
+});
 export default function View({
     invoice,
-    attachments,
-    decimalPlace,
-    email_templates,
+    attachments = [],
+    decimalPlaces,
+    email_templates = [],
 }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
@@ -123,6 +126,42 @@ export default function View({
             });
         }
     }, [flash, toast]);
+
+    const getBusinessSettingValue = (name, fallback) =>
+        invoice?.business?.system_settings?.find((setting) => setting.name === name)?.value ||
+        fallback;
+
+    const primaryColor = getBusinessSettingValue("invoice_primary_color", "#6d0e47");
+    const textColor = getBusinessSettingValue("invoice_text_color", "#ffffff");
+    const businessName =
+        invoice?.business?.business_name || invoice?.business?.name || "Business";
+    const businessEmail =
+        invoice?.business?.business_email || invoice?.business?.email || "";
+    const businessPhone = invoice?.business?.phone || invoice?.business?.mobile || "";
+    const businessWebsite = invoice?.business?.website || "";
+    const quantityLabel =
+        invoice?.invoice_category === "medical" ? "Members" : "Quantity";
+    const preparedBy = invoice?.created_by?.name || businessName;
+    const items = invoice?.items || [];
+    const bankAccounts = invoice?.business?.bank_accounts || [];
+    const fillerRows = Array.from({
+        length: Math.max(0, 10 - items.length),
+    });
+    const paidAmount = Number(invoice?.paid || 0);
+    const outstandingAmount = Math.max(
+        0,
+        Number(invoice?.grand_total || 0) - paidAmount
+    );
+    const policyPeriod = [invoice?.deffered_start, invoice?.deffered_end]
+        .filter(Boolean)
+        .join(" - ");
+
+    const formatMoney = (amount, currency = invoice?.currency) =>
+        formatCurrency({
+            amount,
+            currency,
+            decimalPlaces,
+        });
 
     const handlePrint = () => {
         setIsLoading((prev) => ({ ...prev, print: true }));
@@ -496,333 +535,423 @@ export default function View({
                         </div>
                     </Modal>
 
-                    <div id="printable-area" className="lg:w-[210mm] min-h-[297mm] mx-auto rounded-md border p-4">
-                        <div className="p-6 sm:p-8">
-                            {/* Invoice Header */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
-                                <div>
-                                    {invoice.business.logo && (
-                                        <div className="mb-3">
+                    <div className="overflow-x-auto pb-4">
+                        <div
+                            id="printable-area"
+                            className="mx-auto min-h-[297mm] w-[210mm] max-w-full bg-white"
+                        >
+                            <div className="border-[10px] p-3" style={{ borderColor: primaryColor }}>
+                                <div className="mb-4 h-4" style={{ backgroundColor: primaryColor }} />
+
+                                <div className="mb-4 flex items-start justify-between gap-4">
+                                    <div className="max-w-[260px]">
+                                        {invoice?.business?.logo ? (
                                             <img
                                                 src={`/uploads/media/${invoice.business.logo}`}
                                                 alt="Business Logo"
-                                                className="max-h-32 object-contain"
+                                                className="max-h-24 object-contain"
                                             />
-                                        </div>
-                                    )}
-                                    <h2 className="text-2xl font-bold text-primary">
-                                        {invoice.business.business_name}
-                                    </h2>
-                                    <div className="mt-2 text-sm">
-                                        <p>{invoice.business.address}</p>
-                                        <p>{invoice.business.business_email}</p>
-                                        <p>{invoice.business.phone}</p>
-                                    </div>
-                                </div>
-                                <div className="sm:text-right">
-                                    <h1 className="text-2xl font-bold">
-                                        {invoice.title}
-                                    </h1>
-                                    <div className="mt-2 text-sm">
-                                        <p>
-                                            <span className="font-medium">
-                                                Invoice #:
-                                            </span>{" "}
-                                            {invoice.invoice_number}
-                                        </p>
-                                        {invoice.order_number && (
-                                            <p>
-                                                <span className="font-medium">
-                                                    Policy Number:
-                                                </span>{" "}
-                                                {invoice.order_number}
-                                            </p>
+                                        ) : (
+                                            <div
+                                                className="text-3xl font-bold uppercase"
+                                                style={{ color: primaryColor }}
+                                            >
+                                                {businessName}
+                                            </div>
                                         )}
-                                        <p>
-                                            <span className="font-medium">
-                                                Invoice Date:
-                                            </span>{" "}
-                                            {invoice.invoice_date}
-                                        </p>
-                                        <p>
-                                            <span className="font-medium">
-                                                Due Date:
-                                            </span>{" "}
-                                            {invoice.due_date}
-                                        </p>
                                     </div>
-                                    </div>
-                            </div>
-                            <div className="mt-4 grid grid-cols-2 sm:grid-cols-2 gap-4">
-                                {/* bank details */}
-                                <div>
-                                    <h3 className="font-medium text-lg mb-2">
-                                        Bank Details:
-                                    </h3>
-                                    {invoice.business.bank_accounts.map((bank) => (
-                                        <div key={bank.id} className="text-sm bg-gray-100 p-2 rounded-md m-1">
-                                            <p>Bank Name: <strong>{bank.bank_name}</strong></p>
-                                            <p>Account Number: <strong>{bank.account_number}</strong></p>
-                                            <p>Account Name: <strong>{bank.account_name}</strong></p>
-                                            <p>Swift Code: <strong>{bank.swift_code}</strong></p>
+                                </div>
+
+                                <div className="grid grid-cols-12 gap-0 border border-slate-900 text-sm">
+                                    <div className="col-span-7 border-r border-slate-900 px-3 py-3">
+                                        <div className="space-y-1.5">
+                                            <div>
+                                                <span className="font-semibold uppercase">
+                                                    Invoice To:
+                                                </span>{" "}
+                                                {invoice?.customer?.name || "-"}
+                                            </div>
+                                            <div>
+                                                <span className="font-semibold uppercase">
+                                                    Policy No:
+                                                </span>{" "}
+                                                {invoice?.order_number || "-"}
+                                            </div>
+                                            {policyPeriod && (
+                                                <div>
+                                                    <span className="font-semibold uppercase">
+                                                        Policy Period:
+                                                    </span>{" "}
+                                                    {policyPeriod}
+                                                </div>
+                                            )}
+                                            {invoice?.invoice_category && (
+                                                <div>
+                                                    <span className="font-semibold uppercase">
+                                                        Insurance Class:
+                                                    </span>{" "}
+                                                    {invoice.invoice_category.toUpperCase()}
+                                                </div>
+                                            )}
                                         </div>
-                                    ))}
-                                </div>
-                                <div className="flex justify-end">
-                                    <QRCodeSVG
-                                    value={route(
-                                        "deffered_invoices.show_public_deffered_invoice",
-                                        invoice.short_code
-                                    )}
-                                    size={100}
-                                    level="H"
-                                    includeMargin={true}
-                                        margin={10}
-                                        className="print:block"
-                                    />
-                                </div>
-                            </div>
+                                    </div>
 
-                            <SidebarSeparator className="my-6" />
-
-                            {/* Customer Information */}
-                            <div className="mb-8">
-                                <h3 className="font-medium text-lg mb-2">
-                                    Bill To:
-                                </h3>
-                                <div className="text-sm">
-                                    <p className="font-medium">
-                                        {invoice.customer?.name}
-                                    </p>
-                                    {invoice.customer?.company_name && (
-                                        <p>{invoice.customer?.company_name}</p>
-                                    )}
-                                    <p>{invoice.customer?.address}</p>
-                                    <p>{invoice.customer?.email}</p>
-                                    <p>{invoice.customer?.mobile}</p>
+                                    <div className="col-span-5 px-3 py-3">
+                                        <div className="space-y-1.5">
+                                            <div className="flex justify-between gap-4">
+                                                <span className="font-semibold uppercase">
+                                                    Invoice Number:
+                                                </span>
+                                                <span>{invoice?.invoice_number || "-"}</span>
+                                            </div>
+                                            <div className="flex justify-between gap-4">
+                                                <span className="font-semibold uppercase">
+                                                    Invoice Date:
+                                                </span>
+                                                <span>{invoice?.invoice_date || "-"}</span>
+                                            </div>
+                                            <div className="flex justify-between gap-4">
+                                                <span className="font-semibold uppercase">
+                                                    Due Date:
+                                                </span>
+                                                <span>{invoice?.due_date || "-"}</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
 
-                            {/* Invoice Items */}
-                            <div className="mb-8">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Item</TableHead>
-                                            <TableHead>Benefit</TableHead>
-                                            {invoice.invoice_category ==
-                                                "other" && (
-                                                <TableHead className="text-right">
-                                                    Sum Insured
-                                                </TableHead>
-                                            )}
-                                            {invoice.invoice_category ===
-                                                "medical" && (
-                                                <TableHead>
-                                                    Family Size
-                                                </TableHead>
-                                            )}
-                                            {invoice.invoice_category ===
-                                            "medical" ? (
-                                                <TableHead className="text-right">
-                                                    Members
-                                                </TableHead>
-                                            ) : (
-                                                <TableHead className="text-right">
-                                                    Quantity
-                                                </TableHead>
-                                            )}
-                                            <TableHead className="text-right">
-                                                Unit Cost
-                                            </TableHead>
-                                            <TableHead className="text-right">
-                                                Total
-                                            </TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {invoice.items.map((item, index) => (
-                                            <TableRow key={index}>
-                                                <TableCell className="font-medium">
-                                                    {item.product_name}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {item.benefits}
-                                                </TableCell>
-                                                {invoice.invoice_category ==
-                                                    "other" && (
-                                                    <TableCell className="text-right">
-                                                        {formatCurrency(
-                                                            item.sum_insured,
-                                                            invoice.currency,
-                                                            decimalPlace
+                                <div
+                                    className="mt-4 px-2 py-1 text-center text-2xl font-bold uppercase leading-none"
+                                    style={sectionTitleStyle(primaryColor, textColor)}
+                                >
+                                    Invoice
+                                </div>
+
+                                <div className="border-x border-b border-slate-900">
+                                    <table className="w-full border-collapse text-xs">
+                                        <thead>
+                                            <tr>
+                                                <th
+                                                    className="border border-slate-900 px-2 py-1 text-left"
+                                                    style={sectionTitleStyle(primaryColor, textColor)}
+                                                >
+                                                    Class
+                                                </th>
+                                                <th
+                                                    className="border border-slate-900 px-2 py-1 text-left"
+                                                    style={sectionTitleStyle(primaryColor, textColor)}
+                                                >
+                                                    Description
+                                                </th>
+                                                <th
+                                                    className="border border-slate-900 px-2 py-1 text-right"
+                                                    style={sectionTitleStyle(primaryColor, textColor)}
+                                                >
+                                                    {quantityLabel}
+                                                </th>
+                                                <th
+                                                    className="border border-slate-900 px-2 py-1 text-right"
+                                                    style={sectionTitleStyle(primaryColor, textColor)}
+                                                >
+                                                    Rate
+                                                </th>
+                                                <th
+                                                    className="border border-slate-900 px-2 py-1 text-right"
+                                                    style={sectionTitleStyle(primaryColor, textColor)}
+                                                >
+                                                    Amount
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {items.map((item, index) => (
+                                                <tr key={index}>
+                                                    <td className="border border-slate-900 px-2 py-2 align-top">
+                                                        {item.product_name || "-"}
+                                                    </td>
+                                                    <td className="border border-slate-900 px-2 py-2 align-top">
+                                                        <div className="font-medium text-slate-900">
+                                                            {item.description || "-"}
+                                                        </div>
+                                                        <div className="mt-1 space-y-0.5 text-[11px] text-slate-700">
+                                                            {item.benefits && (
+                                                                <div>
+                                                                    Benefits: {item.benefits}
+                                                                </div>
+                                                            )}
+                                                            {invoice?.invoice_category === "medical" &&
+                                                                item.family_size && (
+                                                                    <div>
+                                                                        Family Size: {item.family_size}
+                                                                    </div>
+                                                                )}
+                                                            {invoice?.invoice_category === "other" &&
+                                                                Number(item.sum_insured) > 0 && (
+                                                                    <div>
+                                                                        Sum Insured: {formatMoney(item.sum_insured)}
+                                                                    </div>
+                                                                )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="border border-slate-900 px-2 py-2 text-right align-top">
+                                                        {item.quantity}
+                                                    </td>
+                                                    <td className="border border-slate-900 px-2 py-2 text-right align-top">
+                                                        {formatMoney(item.unit_cost)}
+                                                    </td>
+                                                    <td className="border border-slate-900 px-2 py-2 text-right align-top">
+                                                        {formatMoney(
+                                                            Number(item.quantity || 0) *
+                                                                Number(item.unit_cost || 0)
                                                         )}
-                                                    </TableCell>
-                                                )}
-                                                {invoice.invoice_category ===
-                                                    "medical" && (
-                                                    <TableCell>
-                                                        {item.family_size}
-                                                    </TableCell>
-                                                )}
-                                                <TableCell className="text-right">
-                                                    {item.quantity}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    {formatCurrency(
-                                                        item.unit_cost,
-                                                        invoice.currency,
-                                                        decimalPlace
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    {formatCurrency(
-                                                        item.quantity *
-                                                            item.unit_cost,
-                                                        invoice.currency,
-                                                        decimalPlace
-                                                    )}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
 
-                            {/* Invoice Summary */}
-                            <div className="flex justify-end">
-                                <div className="w-full md:w-1/2 lg:w-1/3 space-y-2">
-                                    <div className="flex justify-between py-2 border-t">
-                                        <span className="font-medium">
-                                            Subtotal:
-                                        </span>
-                                        <span>
-                                            {formatCurrency(
-                                                invoice.sub_total,
-                                                invoice.business.currency,
-                                                decimalPlace
-                                            )}
-                                        </span>
-                                    </div>
+                                            {fillerRows.map((_, index) => (
+                                                <tr key={`filler-${index}`} className="h-8">
+                                                    <td className="border border-slate-900 px-2 py-2" />
+                                                    <td className="border border-slate-900 px-2 py-2" />
+                                                    <td className="border border-slate-900 px-2 py-2" />
+                                                    <td className="border border-slate-900 px-2 py-2" />
+                                                    <td className="border border-slate-900 px-2 py-2" />
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
 
-                                    {/* Tax details */}
-                                    {invoice.taxes.map((tax, index) => (
+                                <div className="grid grid-cols-12 gap-0 border border-slate-900 border-t-0">
+                                    <div className="col-span-7 border-r border-slate-900">
                                         <div
-                                            key={index}
-                                            className="flex justify-between py-2"
+                                            className="px-2 py-1 text-xs font-bold uppercase"
+                                            style={sectionTitleStyle(primaryColor, textColor)}
                                         >
-                                            <span>{tax.name}:</span>
-                                            <span>
-                                                {formatCurrency(
-                                                    tax.amount,
-                                                    invoice.currency,
-                                                    decimalPlace
-                                                )}
-                                            </span>
+                                            Bank Details
                                         </div>
-                                    ))}
 
-                                    {/* Discount */}
-                                    {invoice.discount > 0 && (
-                                        <div className="flex justify-between py-2">
-                                            <span>Discount</span>
-                                            <span>
-                                                -
-                                                {formatCurrency(
-                                                    invoice.discount,
-                                                    invoice.business.currency,
-                                                    decimalPlace
+                                        <table className="w-full border-collapse text-xs">
+                                            <tbody>
+                                                {bankAccounts.length > 0 ? (
+                                                    bankAccounts.map((bank) => (
+                                                        <tr key={bank.id}>
+                                                            <td className="w-40 border-b border-slate-900 px-2 py-2 font-semibold align-top">
+                                                                {bank.bank_name}
+                                                            </td>
+                                                            <td className="border-b border-slate-900 px-2 py-2 align-top">
+                                                                <div>{bank.account_number || "-"}</div>
+                                                                {bank.account_name && (
+                                                                    <div className="text-[11px] text-slate-600">
+                                                                        {bank.account_name}
+                                                                    </div>
+                                                                )}
+                                                                {bank.swift_code && (
+                                                                    <div className="text-[11px] text-slate-600">
+                                                                        Swift: {bank.swift_code}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                ) : (
+                                                    <tr>
+                                                        <td
+                                                            colSpan={2}
+                                                            className="px-2 py-4 text-center text-slate-500"
+                                                        >
+                                                            No bank details available.
+                                                        </td>
+                                                    </tr>
                                                 )}
-                                            </span>
-                                        </div>
-                                    )}
+                                            </tbody>
+                                        </table>
 
-                                    {/* Total */}
-                                    <div className="flex justify-between py-3 border-t border-b font-bold text-lg">
-                                        <span>Total:</span>
-                                        <span>
-                                            {formatCurrency(
-                                                invoice.grand_total,
-                                                invoice.business.currency,
-                                                decimalPlace
-                                            )}
-                                        </span>
+                                        {(invoice?.note || invoice?.footer) && (
+                                            <div className="border-t border-slate-900 text-xs">
+                                                {invoice?.note && (
+                                                    <div className="px-3 py-2">
+                                                        <span className="font-semibold uppercase">
+                                                            Notes:
+                                                        </span>{" "}
+                                                        {invoice.note}
+                                                    </div>
+                                                )}
+                                                {invoice?.footer && (
+                                                    <div
+                                                        className={`px-3 py-2 ${
+                                                            invoice.note
+                                                                ? "border-t border-slate-900"
+                                                                : ""
+                                                        }`}
+                                                    >
+                                                        <span className="font-semibold uppercase">
+                                                            Terms:
+                                                        </span>{" "}
+                                                        {invoice.footer}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
 
-                                    {/* Base currency equivalent if different currency */}
-                                    {invoice.currency !==
-                                        invoice.business.currency && (
-                                        <div className="flex justify-between py-2 text-gray-500 text-sm">
-                                            <span>Exchange Rate:</span>
-                                            <span>
-                                                1 {invoice.business.currency} ={" "}
-                                                {formatCurrency(
-                                                    invoice.exchange_rate,
-                                                    invoice.currency,
-                                                    decimalPlace
-                                                )}
-                                            </span>
+                                    <div className="col-span-5">
+                                        <div
+                                            className="px-2 py-1 text-xs font-bold uppercase"
+                                            style={sectionTitleStyle(primaryColor, textColor)}
+                                        >
+                                            Invoice Summary
                                         </div>
-                                    )}
 
-                                    {/* Base currency equivalent total */}
-                                    {invoice.currency !==
-                                        invoice.business.currency && (
-                                        <div className="flex justify-between py-2 text-sm text-gray-600">
-                                            <span>Equivalent to:</span>
-                                            <span>
-                                                {formatCurrency(
-                                                    invoice.converted_total,
-                                                    invoice.currency,
-                                                    decimalPlace
+                                        <table className="w-full border-collapse text-sm">
+                                            <tbody>
+                                                <tr>
+                                                    <td className="border-b border-slate-900 px-3 py-2 font-semibold">
+                                                        Subtotal
+                                                    </td>
+                                                    <td className="border-b border-slate-900 px-3 py-2 text-right">
+                                                        {formatMoney(invoice?.sub_total)}
+                                                    </td>
+                                                </tr>
+
+                                                {(invoice?.taxes || []).map((tax, index) => (
+                                                    <tr key={index}>
+                                                        <td className="border-b border-slate-900 px-3 py-2 font-semibold">
+                                                            {tax.name}
+                                                        </td>
+                                                        <td className="border-b border-slate-900 px-3 py-2 text-right">
+                                                            {formatMoney(tax.amount)}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+
+                                                {Number(invoice?.discount) > 0 && (
+                                                    <tr>
+                                                        <td className="border-b border-slate-900 px-3 py-2 font-semibold">
+                                                            Discount
+                                                        </td>
+                                                        <td className="border-b border-slate-900 px-3 py-2 text-right">
+                                                            -{formatMoney(invoice.discount)}
+                                                        </td>
+                                                    </tr>
                                                 )}
-                                            </span>
+
+                                                <tr>
+                                                    <td className="border-b border-slate-900 px-3 py-2 font-semibold">
+                                                        Total Invoice Amount
+                                                    </td>
+                                                    <td className="border-b border-slate-900 px-3 py-2 text-right">
+                                                        {formatMoney(invoice?.grand_total)}
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="border-b border-slate-900 px-3 py-2 font-semibold">
+                                                        Credit Applied
+                                                    </td>
+                                                    <td className="border-b border-slate-900 px-3 py-2 text-right">
+                                                        {formatMoney(paidAmount)}
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="px-3 py-2 font-bold uppercase">
+                                                        Net Amount
+                                                    </td>
+                                                    <td className="px-3 py-2 text-right font-bold">
+                                                        {formatMoney(outstandingAmount)}
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+
+                                        {invoice?.currency !== invoice?.business?.currency && (
+                                            <div className="border-t border-slate-900 px-3 py-2 text-[11px] text-slate-700">
+                                                <div>
+                                                    Exchange Rate: 1 {invoice.business.currency} ={" "}
+                                                    {formatMoney(
+                                                        invoice.exchange_rate,
+                                                        invoice.currency
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    Equivalent Total:{" "}
+                                                    {formatMoney(
+                                                        invoice.converted_total,
+                                                        invoice.currency
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-12 gap-0 border-x border-b border-slate-900">
+                                    <div className="col-span-7 px-4 py-6 text-sm">
+                                        <div className="font-semibold">
+                                            Prepared By: {preparedBy}
                                         </div>
-                                    )}
+                                        <div className="mt-3 font-semibold">Signature:</div>
+                                        <div className="mt-6 w-40 border-b border-slate-900" />
+                                    </div>
+
+                                    <div className="col-span-5 px-4 py-6 text-xs text-slate-700">
+                                        {invoice?.invoice_category && (
+                                            <div className="mb-1">
+                                                <span className="font-semibold uppercase">
+                                                    Category:
+                                                </span>{" "}
+                                                {invoice.invoice_category.toUpperCase()}
+                                            </div>
+                                        )}
+                                        {policyPeriod && (
+                                            <div className="mb-1">
+                                                <span className="font-semibold uppercase">
+                                                    Policy Period:
+                                                </span>{" "}
+                                                {policyPeriod}
+                                            </div>
+                                        )}
+                                        {invoice?.currency && (
+                                            <div>
+                                                <span className="font-semibold uppercase">
+                                                    Currency:
+                                                </span>{" "}
+                                                {invoice.currency}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div
+                                    className="mt-4 px-4 py-4 text-center text-sm font-semibold"
+                                    style={{
+                                        backgroundColor: primaryColor,
+                                        color: textColor,
+                                    }}
+                                >
+                                    {[businessPhone, businessEmail, businessWebsite]
+                                        .filter(Boolean)
+                                        .join(" | ")}
                                 </div>
                             </div>
+                        </div>
+                    </div>
 
-                            {/* Notes & Terms */}
-                            {(invoice.note || invoice.footer) && (
-                                <div className="mt-8 space-y-4">
-                                    {invoice.note && (
-                                        <div>
-                                            <h3 className="font-medium mb-1">
-                                                Notes:
-                                            </h3>
-                                            <p className="text-sm">
-                                                {invoice.note}
-                                            </p>
-                                        </div>
-                                    )}
-
-                                    {invoice.footer && (
-                                        <div>
-                                            <h3 className="font-medium mb-1">
-                                                Terms & Conditions:
-                                            </h3>
-                                            <p className="text-sm">
-                                                {invoice.footer}
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Deferred Earnings Schedule - hidden when printing */}
-                            <div className="mt-8 print:hidden">
-                                <h3 className="font-medium mb-4">Deferred Earnings Schedule</h3>
+                    <div className="print:hidden">
+                        <div className="border bg-white p-4">
+                            <h3 className="mb-4 font-medium">
+                                Deferred Earnings Schedule
+                            </h3>
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Earning Start Date</TableHead>
                                             <TableHead>Earning End Date</TableHead>
                                             <TableHead>No Of Days</TableHead>
-                                            <TableHead>Earning recognized</TableHead>
+                                            <TableHead>Earning Recognized</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {invoice.deffered_earnings && invoice.deffered_earnings.length > 0 ? (
+                                        {invoice.deffered_earnings &&
+                                        invoice.deffered_earnings.length > 0 ? (
                                             <>
                                                 {invoice.deffered_earnings.map((earning, idx) => (
                                                     <TableRow
@@ -833,9 +962,11 @@ export default function View({
                                                         <TableCell>{earning.end_date}</TableCell>
                                                         <TableCell>{earning.days}</TableCell>
                                                         <TableCell className="text-right">
-                                                            {formatCurrency(earning.transaction_amount, invoice.currency, decimalPlace)}
+                                                            {formatMoney(earning.transaction_amount)}
                                                             {earning.status === 1 && (
-                                                                <span className="ml-2 text-xs text-green-600">(Earned)</span>
+                                                                <span className="ml-2 text-xs text-green-600">
+                                                                    (Earned)
+                                                                </span>
                                                             )}
                                                         </TableCell>
                                                     </TableRow>
@@ -844,10 +975,15 @@ export default function View({
                                                     <TableCell className="font-bold">TOTAL:</TableCell>
                                                     <TableCell colSpan={2}></TableCell>
                                                     <TableCell className="text-right font-bold">
-                                                        {formatCurrency(
-                                                            invoice.deffered_earnings.reduce((sum, e) => sum + (parseFloat(e.transaction_amount) || 0), 0),
-                                                            invoice.currency,
-                                                            decimalPlace
+                                                        {formatMoney(
+                                                            invoice.deffered_earnings.reduce(
+                                                                (sum, earning) =>
+                                                                    sum +
+                                                                    (parseFloat(
+                                                                        earning.transaction_amount
+                                                                    ) || 0),
+                                                                0
+                                                            )
                                                         )}
                                                     </TableCell>
                                                 </TableRow>
@@ -861,7 +997,6 @@ export default function View({
                                         )}
                                     </TableBody>
                                 </Table>
-                            </div>
                         </div>
                     </div>
                 </div>
