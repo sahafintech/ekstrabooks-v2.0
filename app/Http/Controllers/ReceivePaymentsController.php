@@ -95,9 +95,25 @@ class ReceivePaymentsController extends Controller
         ]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
         Gate::authorize('receive_payments.create');
+
+        $defaultCustomerId = $request->get('customer_id');
+        $defaultInvoiceId = $request->get('invoice_id');
+
+        if ($defaultInvoiceId) {
+            $invoice = Invoice::query()
+                ->select('id', 'customer_id')
+                ->find($defaultInvoiceId);
+
+            if ($invoice) {
+                $defaultInvoiceId = $invoice->id;
+                $defaultCustomerId = $defaultCustomerId ?: $invoice->customer_id;
+            } else {
+                $defaultInvoiceId = null;
+            }
+        }
 
         $customers = Customer::all();
         $accounts = Account::where(function ($query) {
@@ -110,6 +126,8 @@ class ReceivePaymentsController extends Controller
             'customers' => $customers,
             'accounts' => $accounts,
             'methods' => $methods,
+            'defaultCustomerId' => $defaultCustomerId,
+            'defaultInvoiceId' => $defaultInvoiceId,
         ]);
     }
 

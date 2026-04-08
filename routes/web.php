@@ -936,7 +936,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::get('pos/currency', [ReceiptController::class, 'pos_currency'])->name('receipts.pos_currency');
 		Route::get('pos/tax', [ReceiptController::class, 'pos_tax'])->name('receipts.pos_tax');
 		Route::get('pos/products/category/{id}', [ReceiptController::class, 'pos_products_category'])->name('receipts.pos.category');
-		Route::get('customer/get_deffered_invoices/{id}', [DefferedInvoiceController::class, 'get_invoices']);
+		Route::get('customer/get_deffered_invoices/{id}', [DefferedInvoiceController::class, 'get_invoices'])->name('customer.get_deffered_invoices');
 		Route::get('quotations/{id}/get_quotation_link', [QuotationController::class, 'get_quotation_link'])->name('quotations.get_quotation_link');
 		Route::get('/get-subcategories/{main_category_id}', [MainCategoryController::class, 'getSubCategories'])->name('get.subcategories');
 	});

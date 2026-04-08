@@ -677,9 +677,22 @@ export default function List({ invoices = [], meta = {}, filters = {}, customers
                         <TableCell>
                           <InvoiceStatusBadge status={invoice.status} />
                         </TableCell>
-                        <TableCell className="text-right">
+                          <TableCell className="text-right">
                           <TableActions
                             actions={[
+                              ...(
+                                Number(invoice.grand_total) > Number(invoice.paid) &&
+                                [1, 3].includes(Number(invoice.status))
+                                  ? [{
+                                      label: "Receive Payment",
+                                      icon: <DollarSign className="h-4 w-4" />,
+                                      href: route("receive_payments.create", {
+                                        customer_id: invoice.customer_id ?? invoice.customer?.id,
+                                        invoice_id: invoice.id,
+                                      }),
+                                    }]
+                                  : []
+                              ),
                               {
                                 label: "View",
                                 icon: <Eye className="h-4 w-4" />,

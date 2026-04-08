@@ -1406,9 +1406,11 @@ export default function List({
                                                 <TableCell className="text-right">
                                                     <TableActions
                                                         actions={[
-                                                            ...(Number(bill.grand_total) > Number(bill.paid)
+                                                            ...(Number(bill.grand_total) > Number(bill.paid) &&
+                                                                [0, 1].includes(Number(bill.status)) &&
+                                                                Number(bill.approval_status) === 1
                                                                 ? [{
-                                                                      label: "Make Payment",
+                                                                      label: "Pay Purchase",
                                                                       icon: (
                                                                           <DollarSign className="h-4 w-4" />
                                                                       ),

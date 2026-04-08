@@ -1,32 +1,29 @@
+import { useEffect, useState } from "react";
 import { useForm } from "@inertiajs/react";
-import { Label } from "@/Components/ui/label";
+import axios from "axios";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset, SidebarSeparator } from "@/Components/ui/sidebar";
 import PageHeader from "@/Components/PageHeader";
+import { Label } from "@/Components/ui/label";
 import { Input } from "@/Components/ui/input";
 import InputError from "@/Components/InputError";
 import { Button } from "@/Components/ui/button";
-import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
-import { formatCurrency } from "@/lib/utils";
-import { useState, useEffect } from "react";
-import axios from "axios";
-// Ensure all necessary table components are imported
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/Components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/Components/ui/table";
 import { Checkbox } from "@/Components/ui/checkbox";
 import DateTimePicker from "@/Components/DateTimePicker";
-import Attachment from "@/Components/ui/attachment";
+import { formatCurrency } from "@/lib/utils";
+import { toast } from "sonner";
 
 export default function Create({
     customers = [],
-    accounts,
-    methods,
+    accounts = [],
+    methods = [],
     defaultCustomerId = "",
     defaultInvoiceId = null,
 }) {
-    const [invoices, setInvoices] = useState([]);
-    const [selectedInvoices, setSelectedInvoices] = useState([]);
-    const [attachments, setAttachments] = useState([]);
+    const [standingPayments, setStandingPayments] = useState([]);
+    const [selectedPayments, setSelectedPayments] = useState([]);
     const [hasAppliedInitialSelection, setHasAppliedInitialSelection] = useState(false);
 
     const { data, setData, post, processing, errors, reset } = useForm({
@@ -35,115 +32,132 @@ export default function Create({
         account_id: "",
         method: "",
         reference: "",
-        attachments: attachments,
-        // This field will store only the selected invoices and their amounts
+        payments: [],
         invoices: [],
+        amount: {},
     });
 
     useEffect(() => {
-        setData("attachments", attachments);
-    }, [attachments, setData]);
-
-    // Fetch invoices when a customer is selected
-    useEffect(() => {
         if (data.customer_id) {
-            axios.get(route("customer.get_invoices", data.customer_id))
-                .then(response => {
-                    const fetchedInvoices = response.data.invoices.map(invoice => ({
-                        ...invoice,
-                        amount: invoice.grand_total - invoice.paid,
-                    }));
+            axios.get(route("customer.get_deffered_invoices", data.customer_id))
+                .then((response) => {
+                    const fetchedPayments = (response.data?.invoices || []).flatMap((invoice) =>
+                        (invoice.deffered_payments || [])
+                            .filter((payment) => {
+                                const dueAmount = Number(payment.amount) - Number(payment.paid);
+                                return dueAmount > 0 && [0, 1].includes(Number(payment.status));
+                            })
+                            .map((payment) => ({
+                                id: payment.id,
+                                invoice_id: invoice.id,
+                                invoice_number: invoice.invoice_number,
+                                order_number: invoice.order_number,
+                                payment_date: payment.date,
+                                due_date: payment.due_date,
+                                amount: Number(payment.amount) - Number(payment.paid),
+                                due_amount: Number(payment.amount) - Number(payment.paid),
+                                scheduled_amount: Number(payment.amount),
+                                paid_amount: Number(payment.paid),
+                            }))
+                    );
 
-                    setInvoices(fetchedInvoices);
+                    setStandingPayments(fetchedPayments);
 
                     if (!hasAppliedInitialSelection && defaultInvoiceId) {
-                        const initialInvoice = fetchedInvoices.find(
-                            (invoice) => Number(invoice.id) === Number(defaultInvoiceId)
-                        );
+                        const initialPayments = fetchedPayments
+                            .filter((payment) => Number(payment.invoice_id) === Number(defaultInvoiceId))
+                            .map((payment) => payment.id);
 
-                        setSelectedInvoices(initialInvoice ? [initialInvoice.id] : []);
+                        setSelectedPayments(initialPayments);
                         setHasAppliedInitialSelection(true);
                     } else {
-                        setSelectedInvoices([]);
+                        setSelectedPayments([]);
                     }
                 })
-                .catch(error => {
-                    console.error("Fetching invoices Error:", error);
+                .catch((error) => {
+                    console.error("Fetching deferred invoices error:", error);
                 });
         } else {
-            setInvoices([]);
-            setSelectedInvoices([]);
+            setStandingPayments([]);
+            setSelectedPayments([]);
         }
     }, [data.customer_id, defaultInvoiceId]);
 
-    // Update form's invoices field whenever selectedInvoices or invoice amounts change
     useEffect(() => {
-        const selectedInvoiceData = invoices
-            .filter(invoice => selectedInvoices.includes(invoice.id))
-            .map(invoice => ({
-                invoice_id: invoice.id,
-                // Use the current invoice amount (or calculate a default)
-                amount: invoice.amount !== undefined ? invoice.amount : (invoice.grand_total - invoice.paid),
-            }));
-        setData("invoices", selectedInvoiceData);
-    }, [invoices, selectedInvoices, setData]);
+        const selectedRows = standingPayments.filter((payment) =>
+            selectedPayments.includes(payment.id)
+        );
 
-    // Determine if all invoices are selected
-    const isAllSelected = invoices.length > 0 && selectedInvoices.length === invoices.length;
+        setData("payments", selectedRows.map((payment) => payment.id));
+        setData("invoices", selectedRows.map((payment) => payment.invoice_id));
+        setData(
+            "amount",
+            selectedRows.reduce((carry, payment) => {
+                carry[payment.id] = payment.amount;
+                return carry;
+            }, {})
+        );
+    }, [setData, standingPayments, selectedPayments]);
 
-    // Toggle selection for all invoices by using the new checked state
+    const isAllSelected =
+        standingPayments.length > 0 && selectedPayments.length === standingPayments.length;
+
     const toggleSelectAll = (checked) => {
         if (checked) {
-            setSelectedInvoices(invoices.map(invoice => invoice.id));
+            setSelectedPayments(standingPayments.map((payment) => payment.id));
         } else {
-            setSelectedInvoices([]);
+            setSelectedPayments([]);
         }
     };
 
-    // Toggle selection for a single invoice based on the new checked state provided by the Checkbox
-    const toggleSelectInvoice = (id, checked) => {
+    const toggleSelectPayment = (paymentId, checked) => {
         if (checked) {
-            setSelectedInvoices(prev => [...prev, id]);
+            setSelectedPayments((prev) => [...prev, paymentId]);
         } else {
-            setSelectedInvoices(prev => prev.filter(selectedId => selectedId !== id));
+            setSelectedPayments((prev) => prev.filter((id) => id !== paymentId));
         }
     };
 
-    // Update the amount for a given invoice in the invoices array; ensure numeric conversion if needed.
-    const handleAmountChange = (id, value) => {
-        const updatedInvoices = invoices.map(invoice => {
-            if (invoice.id === id) {
-                return { ...invoice, amount: Number(value) };
-            }
-            return invoice;
-        });
-        setInvoices(updatedInvoices);
+    const handleAmountChange = (paymentId, value) => {
+        setStandingPayments((prev) =>
+            prev.map((payment) =>
+                payment.id === paymentId
+                    ? { ...payment, amount: Number(value) }
+                    : payment
+            )
+        );
     };
 
-    // Submit handler; only submits selected invoices with their amounts
     const submit = (e) => {
         e.preventDefault();
 
-        // The form data now already includes the correct invoices field based on the selected invoices and updated amounts.
-        post(route("receive_payments.store"), data, {
+        post(route("deffered_receive_payments.store"), data, {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success("Invoice created successfully");
+                toast.success("Deferred payment created successfully");
                 reset();
-                setInvoices([]);
-                setSelectedInvoices([]);
+                setStandingPayments([]);
+                setSelectedPayments([]);
             },
         });
     };
 
+    const totalAmount = selectedPayments.reduce((total, paymentId) => {
+        const payment = standingPayments.find((item) => item.id === paymentId);
+        return total + (payment ? Number(payment.amount) : 0);
+    }, 0);
+
     return (
         <AuthenticatedLayout>
             <SidebarInset>
-                <PageHeader page="Receive Payments" subpage="Create New" url="receive_payments.index" />
+                <PageHeader
+                    page="Deferred Receive Payments"
+                    subpage="Create New"
+                    url="deffered_invoices.index"
+                />
 
                 <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
                     <form onSubmit={submit}>
-                        {/* Customer Selection */}
                         <div className="grid grid-cols-12 mt-2">
                             <Label htmlFor="customer_id" className="md:col-span-2 col-span-12">
                                 Customer *
@@ -151,9 +165,9 @@ export default function Create({
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                 <div className="md:w-1/2 w-full">
                                     <SearchableCombobox
-                                        options={customers.map(customer => ({
+                                        options={customers.map((customer) => ({
                                             id: customer.id,
-                                            name: customer.name
+                                            name: customer.name,
                                         }))}
                                         value={data.customer_id}
                                         onChange={(value) => setData("customer_id", value)}
@@ -164,7 +178,6 @@ export default function Create({
                             </div>
                         </div>
 
-                        {/* Payment Date Picker */}
                         <div className="grid grid-cols-12 mt-2">
                             <Label htmlFor="trans_date" className="md:col-span-2 col-span-12">
                                 Payment Date *
@@ -180,7 +193,6 @@ export default function Create({
                             </div>
                         </div>
 
-                        {/* Payment Account */}
                         <div className="grid grid-cols-12 mt-2">
                             <Label htmlFor="account_id" className="md:col-span-2 col-span-12">
                                 Payment Account *
@@ -188,9 +200,9 @@ export default function Create({
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                 <div className="md:w-1/2 w-full">
                                     <SearchableCombobox
-                                        options={accounts.map(account => ({
+                                        options={accounts.map((account) => ({
                                             id: account.id,
-                                            name: account.account_name
+                                            name: account.account_name,
                                         }))}
                                         value={data.account_id}
                                         onChange={(value) => setData("account_id", value)}
@@ -201,17 +213,16 @@ export default function Create({
                             </div>
                         </div>
 
-                        {/* Payment Method */}
                         <div className="grid grid-cols-12 mt-2">
                             <Label htmlFor="method" className="md:col-span-2 col-span-12">
-                                Payment Method
+                                Payment Method *
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                 <div className="md:w-1/2 w-full">
                                     <SearchableCombobox
-                                        options={methods.map(method => ({
+                                        options={methods.map((method) => ({
                                             id: method.name,
-                                            name: method.name
+                                            name: method.name,
                                         }))}
                                         value={data.method}
                                         onChange={(value) => setData("method", value)}
@@ -222,7 +233,6 @@ export default function Create({
                             </div>
                         </div>
 
-                        {/* Reference */}
                         <div className="grid grid-cols-12 mt-2">
                             <Label htmlFor="reference" className="md:col-span-2 col-span-12">
                                 Reference
@@ -241,29 +251,21 @@ export default function Create({
                             </div>
                         </div>
 
-                        {/* Total Amount */}
                         <div className="grid grid-cols-12 mt-2">
                             <Label htmlFor="amount" className="md:col-span-2 col-span-12">
                                 Total Amount
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                 <div className="md:w-1/2 w-full">
-                                    <span>
-                                        {formatCurrency(selectedInvoices.reduce((total, invoiceId) => {
-                                            const inv = invoices.find(inv => inv.id === invoiceId);
-                                            // Use the current amount or the default due amount if not modified
-                                            return total + (inv ? (inv.amount !== undefined ? inv.amount : (inv.grand_total - inv.paid)) : 0);
-                                        }, 0))}
-                                    </span>
+                                    <span>{formatCurrency({ amount: totalAmount })}</span>
                                 </div>
                             </div>
                         </div>
 
                         <SidebarSeparator className="my-4" />
 
-                        {/* Invoices Table */}
                         <div className="space-y-4">
-                            <h3 className="text-lg font-medium">Standing Invoices</h3>
+                            <h3 className="text-lg font-medium">Standing Payments</h3>
 
                             <Table>
                                 <TableHeader>
@@ -271,63 +273,63 @@ export default function Create({
                                         <TableHead className="w-[50px]">
                                             <Checkbox
                                                 checked={isAllSelected}
-                                                onCheckedChange={(checked) => toggleSelectAll(checked)}
+                                                onCheckedChange={toggleSelectAll}
                                             />
                                         </TableHead>
                                         <TableHead>Description</TableHead>
                                         <TableHead>Due Date</TableHead>
-                                        <TableHead>Grand Total</TableHead>
+                                        <TableHead>Scheduled Amount</TableHead>
                                         <TableHead>Due Amount</TableHead>
                                         <TableHead>Amount</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {invoices.map((invoice) => (
-                                        <TableRow key={invoice.id}>
-                                            <TableCell>
-                                                <Checkbox
-                                                    checked={selectedInvoices.includes(invoice.id)}
-                                                    onCheckedChange={(checked) => toggleSelectInvoice(invoice.id, checked)}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                {`Credit Invoice ${invoice.invoice_number} (${invoice.invoice_date})`}
-                                            </TableCell>
-                                            <TableCell>{invoice.due_date}</TableCell>
-                                            <TableCell>{invoice.grand_total}</TableCell>
-                                            <TableCell>{invoice.grand_total - invoice.paid}</TableCell>
-                                            <TableCell>
-                                                <Input
-                                                    type="number"
-                                                    value={invoice.amount !== undefined ? invoice.amount : (invoice.grand_total - invoice.paid)}
-                                                    onChange={(e) =>
-                                                        handleAmountChange(invoice.id, e.target.value)
-                                                    }
-                                                    className="w-full"
-                                                />
+                                    {standingPayments.length > 0 ? (
+                                        standingPayments.map((payment) => (
+                                            <TableRow key={payment.id}>
+                                                <TableCell>
+                                                    <Checkbox
+                                                        checked={selectedPayments.includes(payment.id)}
+                                                        onCheckedChange={(checked) =>
+                                                            toggleSelectPayment(payment.id, checked)
+                                                        }
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    {`Deferred Payment #${payment.id} - Policy ${payment.order_number || payment.invoice_number}`}
+                                                </TableCell>
+                                                <TableCell>{payment.due_date}</TableCell>
+                                                <TableCell>
+                                                    {formatCurrency({ amount: payment.scheduled_amount })}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {formatCurrency({ amount: payment.due_amount })}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        step="any"
+                                                        value={payment.amount}
+                                                        onChange={(e) =>
+                                                            handleAmountChange(payment.id, e.target.value)
+                                                        }
+                                                        className="w-full"
+                                                    />
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={6} className="h-24 text-center">
+                                                No outstanding deferred payments found.
                                             </TableCell>
                                         </TableRow>
-                                    ))}
+                                    )}
                                 </TableBody>
                             </Table>
                         </div>
 
-                        <div className="grid grid-cols-12 mt-2">
-                            <Label htmlFor="attachments" className="md:col-span-2 col-span-12">
-                                Attachments
-                            </Label>
-                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2 space-y-2 md:w-1/2 w-full">
-                                <Attachment
-                                    files={attachments}
-                                    onAdd={files => setAttachments(prev => [...prev, ...files])}
-                                    onRemove={idx => setAttachments(prev => prev.filter((_, i) => i !== idx))}
-                                    maxSize={20}
-                                />
-                                <InputError message={errors.attachments} className="text-sm" />
-                            </div>
-                        </div>
-
-                        {/* Submit Button */}
                         <Button type="submit" disabled={processing} className="mt-5">
                             Create Payment
                         </Button>

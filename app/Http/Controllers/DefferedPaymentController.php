@@ -2,19 +2,61 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Account;
 use App\Models\AuditLog;
+use App\Models\Customer;
 use App\Models\DefferedPayment;
 use App\Models\DefferedReceivePayment;
 use App\Models\Invoice;
 use App\Models\ReceivePayment;
 use App\Models\Transaction;
+use App\Models\TransactionMethod;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Inertia\Inertia;
 
 class DefferedPaymentController extends Controller
 {
+    public function create(Request $request)
+    {
+        $defaultCustomerId = $request->get('customer_id');
+        $defaultInvoiceId = $request->get('invoice_id');
+
+        if ($defaultInvoiceId) {
+            $invoice = Invoice::query()
+                ->select('id', 'customer_id')
+                ->where('is_deffered', 1)
+                ->find($defaultInvoiceId);
+
+            if ($invoice) {
+                $defaultInvoiceId = $invoice->id;
+                $defaultCustomerId = $defaultCustomerId ?: $invoice->customer_id;
+            } else {
+                $defaultInvoiceId = null;
+            }
+        }
+
+        $customers = Customer::all();
+        $accounts = Account::where(function ($query) use ($request) {
+            $query->where('account_type', 'Bank')
+                ->orWhere('account_type', 'Cash');
+        })->where(function ($query) use ($request) {
+            $query->where('business_id', '=', $request->activeBusiness->id)
+                ->orWhere('business_id', '=', null);
+        })->get();
+        $methods = TransactionMethod::all();
+
+        return Inertia::render('Backend/User/DefferedReceivePayment/Create', [
+            'customers' => $customers,
+            'accounts' => $accounts,
+            'methods' => $methods,
+            'defaultCustomerId' => $defaultCustomerId,
+            'defaultInvoiceId' => $defaultInvoiceId,
+        ]);
+    }
+
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [

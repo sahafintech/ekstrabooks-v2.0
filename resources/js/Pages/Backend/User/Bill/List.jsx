@@ -1406,6 +1406,26 @@ export default function List({
                                                 <TableCell className="text-right">
                                                     <TableActions
                                                         actions={[
+                                                            ...(
+                                                                Number(bill.grand_total) > Number(bill.paid) &&
+                                                                [0, 1].includes(Number(bill.status)) &&
+                                                                Number(bill.approval_status) === 1
+                                                                    ? [{
+                                                                          label: "Pay Purchase",
+                                                                          icon: (
+                                                                              <DollarSign className="h-4 w-4" />
+                                                                          ),
+                                                                          href: route(
+                                                                              "bill_payments.create",
+                                                                              {
+                                                                                  context: "normal",
+                                                                                  vendor_id: bill.vendor_id,
+                                                                                  purchase_id: bill.id,
+                                                                              }
+                                                                          ),
+                                                                      }]
+                                                                    : []
+                                                            ),
                                                             {
                                                                 label: "View",
                                                                 icon: (
