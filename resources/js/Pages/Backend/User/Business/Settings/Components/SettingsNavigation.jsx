@@ -8,6 +8,7 @@ const tabs = [
     { id: "invoice", label: "Invoice", icon: "📄" },
     { id: "cash_invoice", label: "Cash Invoice", icon: "💵" },
     { id: "bill_invoice", label: "Bill", icon: "📑" },
+    { id: "hospital_purchase", label: "Hospital Purchase", icon: "🏥" },
     { id: "sales_return", label: "Sales Return", icon: "🔄" },
     { id: "purchase_return", label: "Purchase Return", icon: "⬅️" },
     { id: "pos_settings", label: "POS Settings", icon: "🖥️" },

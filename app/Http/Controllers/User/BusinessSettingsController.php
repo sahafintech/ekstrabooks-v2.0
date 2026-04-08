@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use App\Models\Approvals;
+use App\Models\HospitalPurchase;
 use App\Models\Purchase;
 use App\Models\Payroll;
 use App\Models\Journal;
@@ -88,6 +89,7 @@ class BusinessSettingsController extends Controller
         $salesReturnColumn = json_decode(get_setting($business->systemSettings, 'sales_return-column', null, $id));
         $purchaseReturnColumn = json_decode(get_setting($business->systemSettings, 'purchase_return-column', null, $id));
         $purchaseColumn = json_decode(get_setting($business->systemSettings, 'purchase_column', null, $id));
+        $hospitalPurchaseColumn = json_decode(get_setting($business->systemSettings, 'hospital_purchase_column', null, $id));
 
         $taxes = Tax::all();
         $currencies = Currency::all();
@@ -106,6 +108,7 @@ class BusinessSettingsController extends Controller
             'salesReturnColumn' => $salesReturnColumn,
             'purchaseReturnColumn' => $purchaseReturnColumn,
             'purchaseColumn' => $purchaseColumn,
+            'hospitalPurchaseColumn' => $hospitalPurchaseColumn,
             'currencies' => $currencies,
             'taxes' => $taxes
         ];
@@ -122,6 +125,8 @@ class BusinessSettingsController extends Controller
                 return Inertia::render('Backend/User/Business/Settings/CashInvoice', $data);
             case 'bill_invoice':
                 return Inertia::render('Backend/User/Business/Settings/Bill', $data);
+            case 'hospital_purchase':
+                return Inertia::render('Backend/User/Business/Settings/HospitalPurchase', $data);
             case 'sales_return':
                 return Inertia::render('Backend/User/Business/Settings/SalesReturn', $data);
             case 'purchase_return':
@@ -301,6 +306,34 @@ class BusinessSettingsController extends Controller
         $audit->date_changed = date('Y-m-d H:i:s');
         $audit->changed_by = auth()->user()->id;
         $audit->event = 'Updated Purchase Settings for ' . $request->purchase_title;
+        $audit->save();
+
+        return back()->with('success', _lang('Saved Successfully'));
+    }
+
+    public function store_hospital_purchase_settings(Request $request, $businessId)
+    {
+        Gate::authorize('business.settings');
+        $validator = Validator::make($request->all(), [
+            'hospital_purchase_title' => 'required',
+            'hospital_purchase_number' => 'required|integer',
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+
+        $settingsData = $request->except($this->ignoreRequests);
+
+        foreach ($settingsData as $key => $value) {
+            $value = is_array($value) ? json_encode($value) : $value;
+            update_business_option($key, $value, $businessId);
+        }
+
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Updated Hospital Purchase Settings for ' . $request->hospital_purchase_title;
         $audit->save();
 
         return back()->with('success', _lang('Saved Successfully'));
@@ -659,6 +692,7 @@ class BusinessSettingsController extends Controller
         Gate::authorize('business.settings');
         $validator = Validator::make($request->all(), [
             'purchase_approval_required_count' => 'required|integer|min:0|max:10',
+            'hospital_purchase_approval_required_count' => 'required|integer|min:0|max:10',
             'payroll_approval_required_count' => 'required|integer|min:0|max:10',
             'journal_approval_required_count' => 'required|integer|min:0|max:10',
         ]);
@@ -676,6 +710,7 @@ class BusinessSettingsController extends Controller
 
         // Sync approval records for pending items with new approvers
         $this->syncPurchaseApprovalRecords($request->purchase_approval_users ?? [], $businessId);
+        $this->syncHospitalPurchaseApprovalRecords($request->hospital_purchase_approval_users ?? [], $businessId);
         $this->syncPayrollApprovalRecords($request->payroll_approval_users ?? [], $businessId);
         $this->syncJournalApprovalRecords($request->journal_approval_users ?? [], $businessId);
 
@@ -694,6 +729,7 @@ class BusinessSettingsController extends Controller
         Gate::authorize('business.settings');
         $validator = Validator::make($request->all(), [
             'purchase_checker_required_count' => 'required|integer|min:0|max:10',
+            'hospital_purchase_checker_required_count' => 'required|integer|min:0|max:10',
         ]);
 
         if ($validator->fails()) {
@@ -709,6 +745,7 @@ class BusinessSettingsController extends Controller
 
         // Sync checker records for pending items with new checkers
         $this->syncPurchaseCheckerRecords($request->purchase_checker_users ?? [], $businessId);
+        $this->syncHospitalPurchaseCheckerRecords($request->hospital_purchase_checker_users ?? [], $businessId);
 
         // audit log
         $audit = new AuditLog();
@@ -740,6 +777,10 @@ class BusinessSettingsController extends Controller
         // Get all pending purchases (checker_status = 0 and approval_status = 0) for this business - both cash and bill invoices
         $pendingPurchases = Purchase::where('business_id', $businessId)
             ->where('checker_status', 0)
+            ->where(function ($query) {
+                $query->where('hospital_purchase', 0)
+                    ->orWhereNull('hospital_purchase');
+            })
             ->get();
 
         foreach ($pendingPurchases as $purchase) {
@@ -793,6 +834,10 @@ class BusinessSettingsController extends Controller
         // Get all pending purchases (approval_status = 0) for this business - both cash and bill invoices
         $pendingPurchases = Purchase::where('business_id', $businessId)
             ->where('approval_status', 0)
+            ->where(function ($query) {
+                $query->where('hospital_purchase', 0)
+                    ->orWhereNull('hospital_purchase');
+            })
             ->get();
 
         foreach ($pendingPurchases as $purchase) {
@@ -922,6 +967,90 @@ class BusinessSettingsController extends Controller
                 ->where('ref_name', 'journal')
                 ->where('status', 0) // Only remove pending approvals
                 ->whereNotIn('action_user', $validUserIds)
+                ->delete();
+        }
+    }
+
+    /**
+     * Sync approval records for all pending hospital purchases with the configured approvers.
+     */
+    private function syncHospitalPurchaseApprovalRecords(array $approverUserIds, $businessId): void
+    {
+        $validUserIds = User::whereIn('id', $approverUserIds)->pluck('id')->toArray();
+
+        $pendingPurchases = HospitalPurchase::where('business_id', $businessId)
+            ->where('approval_status', 0)
+            ->get();
+
+        foreach ($pendingPurchases as $purchase) {
+            foreach ($validUserIds as $userId) {
+                $existingApproval = Approvals::where('ref_id', $purchase->id)
+                    ->where('ref_name', 'purchase')
+                    ->where('checker_type', 'approval')
+                    ->where('action_user', $userId)
+                    ->first();
+
+                if (!$existingApproval) {
+                    Approvals::create([
+                        'ref_id' => $purchase->id,
+                        'ref_name' => 'purchase',
+                        'checker_type' => 'approval',
+                        'action_user' => $userId,
+                        'status' => 0,
+                    ]);
+                }
+            }
+
+            Approvals::where('ref_id', $purchase->id)
+                ->where('ref_name', 'purchase')
+                ->where('checker_type', 'approval')
+                ->where('status', 0)
+                ->when(
+                    !empty($validUserIds),
+                    fn ($query) => $query->whereNotIn('action_user', $validUserIds)
+                )
+                ->delete();
+        }
+    }
+
+    /**
+     * Sync checker records for all pending hospital purchases with the configured checkers.
+     */
+    private function syncHospitalPurchaseCheckerRecords(array $checkerUserIds, $businessId): void
+    {
+        $validUserIds = User::whereIn('id', $checkerUserIds)->pluck('id')->toArray();
+
+        $pendingPurchases = HospitalPurchase::where('business_id', $businessId)
+            ->where('checker_status', 0)
+            ->get();
+
+        foreach ($pendingPurchases as $purchase) {
+            foreach ($validUserIds as $userId) {
+                $existingChecker = Approvals::where('ref_id', $purchase->id)
+                    ->where('ref_name', 'purchase')
+                    ->where('checker_type', 'checker')
+                    ->where('action_user', $userId)
+                    ->first();
+
+                if (!$existingChecker) {
+                    Approvals::create([
+                        'ref_id' => $purchase->id,
+                        'ref_name' => 'purchase',
+                        'checker_type' => 'checker',
+                        'action_user' => $userId,
+                        'status' => 0,
+                    ]);
+                }
+            }
+
+            Approvals::where('ref_id', $purchase->id)
+                ->where('ref_name', 'purchase')
+                ->where('checker_type', 'checker')
+                ->where('status', 0)
+                ->when(
+                    !empty($validUserIds),
+                    fn ($query) => $query->whereNotIn('action_user', $validUserIds)
+                )
                 ->delete();
         }
     }

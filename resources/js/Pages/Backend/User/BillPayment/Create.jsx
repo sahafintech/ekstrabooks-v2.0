@@ -17,13 +17,21 @@ import DateTimePicker from "@/Components/DateTimePicker";
 import { formatCurrency } from "@/lib/utils";
 import Attachment from "@/Components/ui/attachment";
 
-export default function Create({ vendors = [], accounts, methods }) {
+export default function Create({
+    vendors = [],
+    accounts,
+    methods,
+    paymentContext = "all",
+    defaultVendorId = "",
+    defaultPurchaseId = null,
+}) {
     const [invoices, setInvoices] = useState([]);
     const [selectedInvoices, setSelectedInvoices] = useState([]);
     const [attachments, setAttachments] = useState([]);
+    const [hasAppliedInitialSelection, setHasAppliedInitialSelection] = useState(false);
 
     const { data, setData, post, processing, errors, reset } = useForm({
-        vendor_id: "",
+        vendor_id: defaultVendorId ?? "",
         trans_date: new Date(),
         account_id: "",
         method: "",
@@ -40,16 +48,35 @@ export default function Create({ vendors = [], accounts, methods }) {
     // Fetch invoices when a supplier is selected
     useEffect(() => {
         if (data.vendor_id) {
-            axios.get(route("vendor.get_bills", data.vendor_id))
+            axios.get(route("vendor.get_bills", data.vendor_id), {
+                params: {
+                    context: paymentContext,
+                },
+            })
                 .then(response => {
-                    // Optionally, initialize the amount field for each invoice
-                    const fetchedInvoices = response.data.purchases.map(invoice => ({
+                    const purchases = Array.isArray(response.data?.purchases)
+                        ? response.data.purchases
+                        : [];
+
+                    const fetchedInvoices = purchases.map(invoice => ({
                         ...invoice,
-                        // Initialize amount with the remaining due: grand_total - paid.
-                        amount: invoice.grand_total - invoice.paid,
+                        amount: Number(invoice.grand_total) - Number(invoice.paid),
                     }));
+
                     setInvoices(fetchedInvoices);
-                    setSelectedInvoices([]); // Reset selections when supplier changes
+
+                    if (!hasAppliedInitialSelection && defaultPurchaseId) {
+                        const initialInvoice = fetchedInvoices.find(
+                            (invoice) =>
+                                Number(invoice.id) === Number(defaultPurchaseId) &&
+                                invoice.approval_status === 1
+                        );
+
+                        setSelectedInvoices(initialInvoice ? [initialInvoice.id] : []);
+                        setHasAppliedInitialSelection(true);
+                    } else {
+                        setSelectedInvoices([]);
+                    }
                 })
                 .catch(error => {
                     console.error("Fetching invoices Error:", error);
@@ -58,7 +85,7 @@ export default function Create({ vendors = [], accounts, methods }) {
             setInvoices([]);
             setSelectedInvoices([]);
         }
-    }, [data.vendor_id]);
+    }, [data.vendor_id, paymentContext, defaultPurchaseId]);
 
     // Update form's invoices field whenever selectedInvoices or invoice amounts change
     useEffect(() => {
@@ -248,7 +275,13 @@ export default function Create({ vendors = [], accounts, methods }) {
 
                         {/* Invoices Table */}
                         <div className="space-y-4">
-                            <h3 className="text-lg font-medium">Standing Bills</h3>
+                            <h3 className="text-lg font-medium">
+                                {paymentContext === "hospital"
+                                    ? "Standing Hospital Purchases"
+                                    : paymentContext === "normal"
+                                        ? "Standing Bills"
+                                        : "Standing Credit Purchases"}
+                            </h3>
 
                             <Table>
                                 <TableHeader>
@@ -277,7 +310,9 @@ export default function Create({ vendors = [], accounts, methods }) {
                                                 />
                                             </TableCell>
                                             <TableCell>
-                                                {`Bill Invoice ${invoice.bill_no} (${invoice.purchase_date})`}
+                                                {(paymentContext === "hospital" || Number(invoice.hospital_purchase) === 1)
+                                                    ? `Hospital Purchase ${invoice.bill_no} (${invoice.purchase_date})`
+                                                    : `Bill Invoice ${invoice.bill_no} (${invoice.purchase_date})`}
                                             </TableCell>
                                             <TableCell>{invoice.due_date}</TableCell>
                                             <TableCell>{invoice.grand_total}</TableCell>

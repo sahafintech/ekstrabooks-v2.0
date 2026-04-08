@@ -62,6 +62,7 @@ export function UserSidebar({ ...props }) {
     const purchaseOrdersBase = "/user/purchase_orders";
     const cashPurchasesBase = "/user/cash_purchases";
     const billInvoicesBase = "/user/bill_invoices";
+    const hospitalPurchasesBase = "/user/hospital_purchases";
     const billPaymentsBase = "/user/bill_payments";
     const purchaseReturnsBase = "/user/purchase_returns";
 
@@ -249,6 +250,13 @@ export function UserSidebar({ ...props }) {
                 title: "Credit Purchase",
                 url: route("bill_invoices.index"),
                 isActive: url.startsWith(billInvoicesBase),
+            });
+        }
+        if (hasPermission("hospital_purchases.view")) {
+            items.push({
+                title: "Hospital Purchase",
+                url: route("hospital_purchases.index"),
+                isActive: url.startsWith(hospitalPurchasesBase),
             });
         }
         if (hasPermission("bill_payments.view")) {

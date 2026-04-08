@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\User;
+namespace App\Http\Controllers;
 
 use App\Exports\BillInvoiceExport;
 use App\Http\Controllers\Controller;
@@ -14,14 +14,14 @@ use App\Models\BusinessSetting;
 use App\Models\CostCode;
 use App\Models\Currency;
 use App\Models\EmailTemplate;
+use App\Models\HospitalPurchase as Purchase;
+use App\Models\HospitalPurchasePayment as PurchasePayment;
+use App\Models\HospitalPurchaseItem as PurchaseItem;
+use App\Models\HospitalPurchaseItemTax as PurchaseItemTax;
 use App\Models\PendingTransaction;
 use App\Models\Product;
 use App\Models\Project;
 use App\Models\ProjectBudget;
-use App\Models\Purchase;
-use App\Models\PurchaseItem;
-use App\Models\PurchaseItemTax;
-use App\Models\PurchasePayment;
 use App\Models\Tax;
 use App\Models\Transaction;
 use App\Models\Vendor;
@@ -29,7 +29,6 @@ use App\Models\User;
 use App\Notifications\SendBillInvoice;
 use App\Notifications\SendPurchaseApprovalRequest;
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -39,8 +38,10 @@ use Maatwebsite\Excel\Facades\Excel;
 use function Spatie\LaravelPdf\Support\pdf;
 use Validator;
 
-class PurchaseController extends Controller
+class HospitalPurchaseController extends Controller
 {
+	private const HOSPITAL_PURCHASE_SETTING_PREFIX = 'hospital_purchase_';
+	private const PURCHASE_SETTING_PREFIX = 'purchase_';
 
 	/**
 	 * Create a new controller instance.
@@ -49,12 +50,33 @@ class PurchaseController extends Controller
 	 */
 	public function __construct() {}
 
-	private function excludeHospitalPurchases(Builder $query): Builder
+	private function getHospitalPurchaseSetting(string $suffix, $default = '')
 	{
-		return $query->where(function (Builder $builder) {
-			$builder->where('hospital_purchase', 0)
-				->orWhereNull('hospital_purchase');
-		});
+		return get_business_option(
+			self::HOSPITAL_PURCHASE_SETTING_PREFIX . $suffix,
+			get_business_option(self::PURCHASE_SETTING_PREFIX . $suffix, $default)
+		);
+	}
+
+	private function getHospitalPurchaseUserIds(string $suffix): array
+	{
+		$userIds = json_decode($this->getHospitalPurchaseSetting($suffix, '[]'), true);
+
+		return is_array($userIds) ? $userIds : [];
+	}
+
+	private function incrementHospitalPurchaseNumber(?int $businessId = null): void
+	{
+		$businessId = $businessId ?? request()->activeBusiness->id ?? null;
+		$currentNumber = (int) $this->getHospitalPurchaseSetting('number', 1000);
+
+		if ($businessId !== null) {
+			update_business_option(
+				self::HOSPITAL_PURCHASE_SETTING_PREFIX . 'number',
+				(string) ($currentNumber + 1),
+				$businessId
+			);
+		}
 	}
 
 	/**
@@ -75,7 +97,7 @@ class PurchaseController extends Controller
 		$approvalStatus = $request->get('approval_status', '');
 		$status = $request->get('status', '');
 
-		$query = $this->excludeHospitalPurchases(Purchase::query())
+		$query = Purchase::query()
 			->where('cash', 0);
 
 		// Handle sorting
@@ -134,8 +156,7 @@ class PurchaseController extends Controller
 		$vendors = Vendor::all();
 
 		// Check if there are configured approval users for this business
-		$purchaseApprovalUsersJson = get_business_option('purchase_approval_users', '[]');
-		$approvalUsersArray = json_decode($purchaseApprovalUsersJson, true);
+		$approvalUsersArray = $this->getHospitalPurchaseUserIds('approval_users');
 		$hasConfiguredApprovers = is_array($approvalUsersArray) && count($approvalUsersArray) > 0;
 
 		$approvers = [];
@@ -151,11 +172,10 @@ class PurchaseController extends Controller
 			->first();
 
 		// Check if there are configured checker users for this business
-		$purchaseCheckerUsersJson = get_business_option('purchase_checker_users', '[]');
-		$checkerUsersArray = json_decode($purchaseCheckerUsersJson, true);
+		$checkerUsersArray = $this->getHospitalPurchaseUserIds('checker_users');
 		$hasConfiguredCheckers = is_array($checkerUsersArray) && count($checkerUsersArray) > 0;
 
-		return Inertia::render('Backend/User/Bill/List', [
+		return Inertia::render('Backend/User/HospitalPurchase/List', [
 			'bills' => $bills->items(),
 			'meta' => [
 				'current_page' => $bills->currentPage(),
@@ -173,7 +193,7 @@ class PurchaseController extends Controller
 			],
 			'vendors' => $vendors,
 			'summary' => $summary,
-			'trashed_bills' => $this->excludeHospitalPurchases(Purchase::onlyTrashed())->where('cash', 0)->count(),
+			'trashed_bills' => Purchase::onlyTrashed()->where('cash', 0)->count(),
 			'hasConfiguredApprovers' => $hasConfiguredApprovers,
 			'hasConfiguredCheckers' => $hasConfiguredCheckers,
 			'currentUserId' => auth()->id(),
@@ -196,7 +216,7 @@ class PurchaseController extends Controller
 		$approvalStatus = $request->get('approval_status', '');
 		$status = $request->get('status', '');
 
-		$query = $this->excludeHospitalPurchases(Purchase::onlyTrashed())
+		$query = Purchase::onlyTrashed()
 			->where('cash', 0);
 
 		// Handle sorting
@@ -254,7 +274,7 @@ class PurchaseController extends Controller
 		$bills = $query->with('vendor', 'business')->paginate($perPage)->withQueryString();
 		$vendors = Vendor::all();
 
-		return Inertia::render('Backend/User/Bill/Trash', [
+		return Inertia::render('Backend/User/HospitalPurchase/Trash', [
 			'bills' => $bills->items(),
 			'meta' => [
 				'current_page' => $bills->currentPage(),
@@ -293,9 +313,12 @@ class PurchaseController extends Controller
 			->get();
 		$taxes = Tax::orderBy('id', 'desc')
 			->get();
-		$accounts = Account::orderBy('id', 'desc')
+		$accounts = Account::where('business_id', $request->activeBusiness->id)
+			->whereIn('account_type', Purchase::ALLOWED_ACCOUNT_TYPES)
+			->orderBy('id', 'desc')
 			->get();
-		$purchase_title = get_business_option('purchase_title', 'Bill Invoice');
+		$purchase_title = $this->getHospitalPurchaseSetting('title', 'Hospital Purchase');
+		$purchase_footer = $this->getHospitalPurchaseSetting('footer', '');
 		$inventory = Account::where('account_name', 'Inventory')->first();
 		$projects = Project::orderBy('id', 'desc')
 			->with('tasks')
@@ -303,13 +326,14 @@ class PurchaseController extends Controller
 		$cost_codes = CostCode::orderBy('id', 'desc')
 			->get();
 
-		return Inertia::render('Backend/User/Bill/Create', [
+		return Inertia::render('Backend/User/HospitalPurchase/Create', [
 			'vendors' => $vendors,
 			'products' => $products,
 			'currencies' => $currencies,
 			'taxes' => $taxes,
 			'accounts' => $accounts,
 			'purchase_title' => $purchase_title,
+			'purchase_footer' => $purchase_footer,
 			'inventory' => $inventory,
 			'base_currency' => get_business_option('currency'),
 			'projects' => $projects,
@@ -339,7 +363,7 @@ class PurchaseController extends Controller
 		]);
 
 		if ($validator->fails()) {
-			return redirect()->route('bill_invoices.create')
+			return redirect()->route('hospital_purchases.create')
 				->withErrors($validator)
 				->withInput();
 		}
@@ -357,6 +381,14 @@ class PurchaseController extends Controller
 		// if account_id is null or empty then return with error
 		if (in_array(null, $request->account_id) || in_array('', $request->account_id)) {
 			return redirect()->back()->withInput()->with('error', _lang('Account is required for each item'));
+		}
+
+		if ($this->hasHospitalProductItems($request)) {
+			return redirect()->back()->withInput()->with('error', _lang('Hospital purchases only support account lines'));
+		}
+
+		if (!$this->hasOnlyHospitalAccounts($request)) {
+			return redirect()->back()->withInput()->with('error', _lang('Only Cost of Sale accounts can be used for hospital purchases'));
 		}
 
 		$default_accounts = ['Accounts Payable', 'Purchase Tax Payable', 'Purchase Discount Allowed', 'Inventory'];
@@ -424,7 +456,7 @@ class PurchaseController extends Controller
 		$purchase = new Purchase();
 		$purchase->vendor_id = $request->input('vendor_id');
 		$purchase->title = $request->input('title');
-		$purchase->bill_no = get_business_option('purchase_number');
+		$purchase->bill_no = $this->getHospitalPurchaseSetting('number', 1000);
 		$purchase->po_so_number = $request->input('po_so_number');
 		$purchase->purchase_date = Carbon::parse($request->input('purchase_date'))->format('Y-m-d');
 		$purchase->due_date = Carbon::parse($request->input('due_date'))->format('Y-m-d');
@@ -447,7 +479,6 @@ class PurchaseController extends Controller
 		$purchase->created_by = auth()->user()->id;
 		$purchase->approved_by = null;
 		$purchase->short_code = rand(100000, 9999999) . uniqid();
-		$purchase->hospital_purchase = 0;
 
 		$purchase->save();
 
@@ -520,7 +551,7 @@ class PurchaseController extends Controller
 							$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseItem->sub_total / $purchase->exchange_rate) / 100) * $tax->rate);
 							$transaction->description = _lang('Bill Invoice Tax') . ' #' . $purchase->bill_no;
 							$transaction->ref_id      = $purchase->id;
-							$transaction->ref_type    = 'bill invoice tax';
+							$transaction->ref_type    = Purchase::TAX_TRANSACTION_REF_TYPE;
 							$transaction->tax_id      = $tax->id;
 							$transaction->project_id = $purchaseItem->project_id;
 							$transaction->project_task_id = $purchaseItem->project_task_id;
@@ -537,7 +568,7 @@ class PurchaseController extends Controller
 							$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseItem->sub_total / $purchase->exchange_rate) / 100) * $tax->rate);
 							$transaction->description = _lang('Bill Invoice Tax') . ' #' . $purchase->bill_no;
 							$transaction->ref_id      = $purchase->id;
-							$transaction->ref_type    = 'bill invoice tax';
+							$transaction->ref_type    = Purchase::TAX_TRANSACTION_REF_TYPE;
 							$transaction->tax_id      = $tax->id;
 							$transaction->project_id = $purchaseItem->project_id;
 							$transaction->project_task_id = $purchaseItem->project_task_id;
@@ -556,7 +587,7 @@ class PurchaseController extends Controller
 							$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseItem->sub_total / $purchase->exchange_rate) / 100) * $tax->rate);
 							$transaction->description = _lang('Bill Invoice Tax') . ' #' . $purchase->bill_no;
 							$transaction->ref_id      = $purchase->id;
-							$transaction->ref_type    = 'bill invoice tax';
+							$transaction->ref_type    = Purchase::TAX_TRANSACTION_REF_TYPE;
 							$transaction->tax_id      = $tax->id;
 							$transaction->project_id = $purchaseItem->project_id;
 							$transaction->project_task_id = $purchaseItem->project_task_id;
@@ -573,7 +604,7 @@ class PurchaseController extends Controller
 							$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseItem->sub_total / $purchase->exchange_rate) / 100) * $tax->rate);
 							$transaction->description = _lang('Bill Invoice Tax') . ' #' . $purchase->bill_no;
 							$transaction->ref_id      = $purchase->id;
-							$transaction->ref_type    = 'bill invoice tax';
+							$transaction->ref_type    = Purchase::TAX_TRANSACTION_REF_TYPE;
 							$transaction->tax_id      = $tax->id;
 							$transaction->project_id = $purchaseItem->project_id;
 							$transaction->project_task_id = $purchaseItem->project_task_id;
@@ -595,7 +626,7 @@ class PurchaseController extends Controller
 					$transaction->transaction_currency    = $request->currency;
 					$transaction->currency_rate = $purchase->exchange_rate;
 					$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, ($purchaseItem->sub_total / $purchase->exchange_rate) + $purchaseItem->taxes->sum('amount')));
-					$transaction->ref_type    = 'bill invoice';
+					$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 					$transaction->vendor_id   = $purchase->vendor_id;
 					$transaction->ref_id      = $purchase->id;
 					$transaction->description = 'Bill Invoice #' . $purchase->bill_no;
@@ -612,7 +643,7 @@ class PurchaseController extends Controller
 					$transaction->transaction_currency    = $request->currency;
 					$transaction->currency_rate = $purchase->exchange_rate;
 					$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $purchaseItem->sub_total / $purchase->exchange_rate));
-					$transaction->ref_type    = 'bill invoice';
+					$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 					$transaction->vendor_id   = $purchase->vendor_id;
 					$transaction->ref_id      = $purchase->id;
 					$transaction->description = 'Bill Invoice #' . $purchase->bill_no;
@@ -631,7 +662,7 @@ class PurchaseController extends Controller
 					$transaction->transaction_currency    = $request->currency;
 					$transaction->currency_rate = $purchase->exchange_rate;
 					$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, ($purchaseItem->sub_total / $purchase->exchange_rate) + $purchaseItem->taxes->sum('amount')));
-					$transaction->ref_type    = 'bill invoice';
+					$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 					$transaction->vendor_id   = $purchase->vendor_id;
 					$transaction->ref_id      = $purchase->id;
 					$transaction->description = 'Bill Invoice #' . $purchase->bill_no;
@@ -648,7 +679,7 @@ class PurchaseController extends Controller
 					$transaction->transaction_currency    = $request->currency;
 					$transaction->currency_rate = $purchase->exchange_rate;
 					$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $purchaseItem->sub_total / $purchase->exchange_rate));
-					$transaction->ref_type    = 'bill invoice';
+					$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 					$transaction->vendor_id   = $purchase->vendor_id;
 					$transaction->ref_id      = $purchase->id;
 					$transaction->description = 'Bill Invoice #' . $purchase->bill_no;
@@ -667,7 +698,7 @@ class PurchaseController extends Controller
 		}
 
 		//Increment Bill Number
-		BusinessSetting::where('name', 'purchase_number')->increment('value');
+		$this->incrementHospitalPurchaseNumber($request->activeBusiness->id);
 
 		DB::commit();
 
@@ -681,7 +712,7 @@ class PurchaseController extends Controller
 				$transaction->transaction_currency    = $request->currency;
 				$transaction->currency_rate = $purchase->exchange_rate;
 				$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal'] - $summary['taxAmount']));
-				$transaction->ref_type    = 'bill invoice';
+				$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Bill Invoice Payable #' . $purchase->bill_no;
@@ -698,7 +729,7 @@ class PurchaseController extends Controller
 				$transaction->transaction_currency    = $request->currency;
 				$transaction->currency_rate = $purchase->exchange_rate;
 				$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
-				$transaction->ref_type    = 'bill invoice';
+				$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Bill Invoice Payable #' . $purchase->bill_no;
@@ -717,7 +748,7 @@ class PurchaseController extends Controller
 				$transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
 				$transaction->description = _lang('Bill Invoice Discount') . ' #' . $purchase->bill_no;
 				$transaction->ref_id      = $purchase->id;
-				$transaction->ref_type    = 'bill invoice';
+				$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
@@ -732,7 +763,7 @@ class PurchaseController extends Controller
 				$transaction->transaction_currency    = $request->currency;
 				$transaction->currency_rate = $purchase->exchange_rate;
 				$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal'] - $summary['taxAmount']));
-				$transaction->ref_type    = 'bill invoice';
+				$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Bill Invoice Payable #' . $purchase->bill_no;
@@ -747,7 +778,7 @@ class PurchaseController extends Controller
 				$transaction->transaction_currency    = $request->currency;
 				$transaction->currency_rate = $purchase->exchange_rate;
 				$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
-				$transaction->ref_type    = 'bill invoice';
+				$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Bill Invoice Payable #' . $purchase->bill_no;
@@ -766,7 +797,7 @@ class PurchaseController extends Controller
 				$transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
 				$transaction->description = _lang('Bill Invoice Discount') . ' #' . $purchase->bill_no;
 				$transaction->ref_id      = $purchase->id;
-				$transaction->ref_type    = 'bill invoice';
+				$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
@@ -781,19 +812,18 @@ class PurchaseController extends Controller
 		$audit->save();
 
 
-		return redirect()->route('bill_invoices.show', $purchase->id)->with('success', _lang('Updated Successfully'));
+		return redirect()->route('hospital_purchases.show', $purchase->id)->with('success', _lang('Updated Successfully'));
 	}
 
 	/** Duplicate Invoice */
 	public function duplicate($id)
 	{
 		DB::beginTransaction();
-		$purchase = $this->excludeHospitalPurchases(Purchase::query())->find($id);
+		$purchase = Purchase::find($id);
 		$newPurchase = $purchase->replicate();
 		$newPurchase->status = 0;
 		$newPurchase->paid = 0;
 		$newPurchase->short_code = rand(100000, 9999999) . uniqid();
-		$newPurchase->hospital_purchase = 0;
 		$newPurchase->save();
 
 		foreach ($purchase->items as $purchaseItem) {
@@ -818,7 +848,7 @@ class PurchaseController extends Controller
 
 		DB::commit();
 
-		return redirect()->route('bill_invoices.edit', $newPurchase->id);
+		return redirect()->route('hospital_purchases.edit', $newPurchase->id);
 	}
 
 	public function pay_bill(Request $request)
@@ -852,7 +882,7 @@ class PurchaseController extends Controller
 			for ($i = 0; $i < count($request->invoices); $i++) {
 				DB::beginTransaction();
 
-				$purchase = $this->excludeHospitalPurchases(Purchase::query())->find($request->invoices[$i]);
+				$purchase = Purchase::find($request->invoices[$i]);
 				$account = Account::find($request->account_id);
 
 				$refAmount = convert_currency($account->currency, $request->activeBusiness->currency, $request->amount[$request->invoices[$i]]);
@@ -875,7 +905,7 @@ class PurchaseController extends Controller
 				$transaction->description = 'Bill Invoice Payment' . ' #' . $request->invoices[$i];
 				$transaction->attachment  = $attachment;
 				$transaction->ref_id      = $request->invoices[$i];
-				$transaction->ref_type    = 'bill invoice';
+				$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->vendor_id = $request->vendor_id;
 
@@ -893,7 +923,7 @@ class PurchaseController extends Controller
 				$transaction->description = 'Bill Invoice Payment' . ' #' . $request->invoices[$i];
 				$transaction->attachment  = $attachment;
 				$transaction->ref_id      = $request->invoices[$i];
-				$transaction->ref_type    = 'bill invoice';
+				$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 				$transaction->vendor_id   = $purchase->vendor_id;
 
 				$transaction->save();
@@ -920,7 +950,7 @@ class PurchaseController extends Controller
 	 */
 	public function destroy($id)
 	{
-		$purchase = $this->excludeHospitalPurchases(Purchase::query())->find($id);
+		$purchase = Purchase::find($id);
 
 		// audit log
 		$audit = new AuditLog();
@@ -984,13 +1014,13 @@ class PurchaseController extends Controller
 		}
 
 		$purchase->delete();
-		return redirect()->route('bill_invoices.index')->with('success', _lang('Deleted Successfully'));
+		return redirect()->route('hospital_purchases.index')->with('success', _lang('Deleted Successfully'));
 	}
 
 	public function bulk_destroy(Request $request)
 	{
 		foreach ($request->ids as $id) {
-			$purchase = $this->excludeHospitalPurchases(Purchase::query())->find($id);
+			$purchase = Purchase::find($id);
 
 			// audit log
 			$audit = new AuditLog();
@@ -1056,12 +1086,12 @@ class PurchaseController extends Controller
 			$purchase->delete();
 		}
 
-		return redirect()->route('bill_invoices.index')->with('success', _lang('Deleted Successfully'));
+		return redirect()->route('hospital_purchases.index')->with('success', _lang('Deleted Successfully'));
 	}
 
 	public function permanent_destroy($id)
 	{
-		$purchase = $this->excludeHospitalPurchases(Purchase::onlyTrashed())->find($id);
+		$purchase = Purchase::onlyTrashed()->find($id);
 
 		// audit log
 		$audit = new AuditLog();
@@ -1118,13 +1148,13 @@ class PurchaseController extends Controller
 		}
 
 		$purchase->forceDelete();
-		return redirect()->route('bill_invoices.trash')->with('success', _lang('Permanently Deleted Successfully'));
+		return redirect()->route('hospital_purchases.trash')->with('success', _lang('Permanently Deleted Successfully'));
 	}
 
 	public function bulk_permanent_destroy(Request $request)
 	{
 		foreach ($request->ids as $id) {
-			$purchase = $this->excludeHospitalPurchases(Purchase::onlyTrashed())->find($id);
+			$purchase = Purchase::onlyTrashed()->find($id);
 
 			// audit log
 			$audit = new AuditLog();
@@ -1183,12 +1213,12 @@ class PurchaseController extends Controller
 			$purchase->forceDelete();
 		}
 
-		return redirect()->route('bill_invoices.trash')->with('success', _lang('Permanently Deleted Successfully'));
+		return redirect()->route('hospital_purchases.trash')->with('success', _lang('Permanently Deleted Successfully'));
 	}
 
 	public function restore($id)
 	{
-		$purchase = $this->excludeHospitalPurchases(Purchase::onlyTrashed())->find($id);
+		$purchase = Purchase::onlyTrashed()->find($id);
 
 		// audit log
 		$audit = new AuditLog();
@@ -1252,13 +1282,13 @@ class PurchaseController extends Controller
 		}
 
 		$purchase->restore();
-		return redirect()->route('bill_invoices.trash')->with('success', _lang('Restored Successfully'));
+		return redirect()->route('hospital_purchases.trash')->with('success', _lang('Restored Successfully'));
 	}
 
 	public function bulk_restore(Request $request)
 	{
 		foreach ($request->ids as $id) {
-			$purchase = $this->excludeHospitalPurchases(Purchase::onlyTrashed())->find($id);
+			$purchase = Purchase::onlyTrashed()->find($id);
 
 			// audit log
 			$audit = new AuditLog();
@@ -1324,7 +1354,34 @@ class PurchaseController extends Controller
 			$purchase->restore();
 		}
 
-		return redirect()->route('bill_invoices.trash')->with('success', _lang('Restored Successfully'));
+		return redirect()->route('hospital_purchases.trash')->with('success', _lang('Restored Successfully'));
+	}
+
+	private function hasHospitalProductItems(Request $request): bool
+	{
+		return collect($request->input('product_id', []))
+			->filter(fn($productId) => filled($productId))
+			->isNotEmpty();
+	}
+
+	private function hasOnlyHospitalAccounts(Request $request): bool
+	{
+		$accountIds = collect($request->input('account_id', []))
+			->filter(fn($accountId) => filled($accountId))
+			->map(fn($accountId) => (int) $accountId)
+			->unique()
+			->values();
+
+		if ($accountIds->isEmpty()) {
+			return false;
+		}
+
+		$validHospitalAccountCount = Account::where('business_id', $request->activeBusiness->id)
+			->whereIn('id', $accountIds)
+			->whereIn('account_type', Purchase::ALLOWED_ACCOUNT_TYPES)
+			->count();
+
+		return $validHospitalAccountCount === $accountIds->count();
 	}
 
 	private function calculateTotal(Request $request)
@@ -1374,47 +1431,30 @@ class PurchaseController extends Controller
 
 	public function get_bills(Request $request)
 	{
-		$paymentContext = match ($request->get('context')) {
-			'hospital' => 'hospital',
-			'normal' => 'normal',
-			default => 'all',
-		};
-
 		return Vendor::where('id', $request->id)
-			->with(['purchases' => function ($query) use ($paymentContext) {
+			->with(['purchases' => function ($query) {
 				$query->whereIn('status', [0, 1])
 					->where('cash', 0)
+					->where('hospital_purchase', 1)
 					->where('order', 0);
-
-				if ($paymentContext === 'hospital') {
-					$query->where('hospital_purchase', 1);
-				} elseif ($paymentContext === 'normal') {
-					$query->where(function ($builder) {
-						$builder->where('hospital_purchase', 0)
-							->orWhereNull('hospital_purchase');
-					});
-				}
 			}])
 			->first();
 	}
 
 	public function show($id)
 	{
-		$bill = $this->excludeHospitalPurchases(
-			Purchase::with(['business', 'items.account', 'taxes', 'vendor', 'approvals.actionUser', 'checkers.actionUser'])
-		)->find($id);
+		$bill = Purchase::with(['business', 'items.account', 'taxes', 'vendor', 'approvals.actionUser', 'checkers.actionUser'])->find($id);
 		$attachments = Attachment::where('ref_type', 'bill invoice')->where('ref_id', $id)->get();
 		$email_templates = EmailTemplate::whereIn('slug', ['NEW_BILL_CREATED'])
 			->where('email_status', 1)
 			->get();
 
 		// Check if there are configured approval users for this business
-		$purchaseApprovalUsersJson = get_business_option('purchase_approval_users', '[]');
 		$approvalUsersCount = 0;
 		$hasConfiguredApprovers = false;
 		$configuredUserIds = [];
-		
-		$usersArray = json_decode($purchaseApprovalUsersJson, true);
+
+		$usersArray = $this->getHospitalPurchaseUserIds('approval_users');
 		if (is_array($usersArray) && count($usersArray) > 0) {
 			$approvalUsersCount = count($usersArray);
 			$hasConfiguredApprovers = true;
@@ -1422,12 +1462,11 @@ class PurchaseController extends Controller
 		}
 
 		// Check if there are configured checker users for this business
-		$purchaseCheckerUsersJson = get_business_option('purchase_checker_users', '[]');
 		$checkerUsersCount = 0;
 		$hasConfiguredCheckers = false;
 		$configuredCheckerUserIds = [];
-		
-		$checkerUsersArray = json_decode($purchaseCheckerUsersJson, true);
+
+		$checkerUsersArray = $this->getHospitalPurchaseUserIds('checker_users');
 		if (is_array($checkerUsersArray) && count($checkerUsersArray) > 0) {
 			$checkerUsersCount = count($checkerUsersArray);
 			$hasConfiguredCheckers = true;
@@ -1450,7 +1489,7 @@ class PurchaseController extends Controller
 			$bill->load('checkers.actionUser');
 		}
 
-		return Inertia::render('Backend/User/Bill/View', [
+		return Inertia::render('Backend/User/HospitalPurchase/View', [
 			'bill' => $bill,
 			'attachments' => $attachments,
 			'email_templates' => $email_templates,
@@ -1482,7 +1521,7 @@ class PurchaseController extends Controller
 		foreach ($validUserIds as $userId) {
 			if (!in_array($userId, $existingApproverIds)) {
 				$bill->approvals()->create([
-					'ref_name' => 'purchase',
+					'ref_name' => Purchase::APPROVAL_REF_NAME,
 					'checker_type' => 'approval',
 					'action_user' => $userId,
 					'status' => 0, // pending
@@ -1493,7 +1532,7 @@ class PurchaseController extends Controller
 		// Remove approvers who are no longer in the configured list
 		// Only remove if they haven't taken action yet (status = 0)
 		Approvals::where('ref_id', $bill->id)
-			->where('ref_name', 'purchase')
+			->where('ref_name', Purchase::APPROVAL_REF_NAME)
 			->where('checker_type', 'approval')
 			->where('status', 0) // Only remove pending approvals
 			->whereNotIn('action_user', $validUserIds)
@@ -1503,7 +1542,7 @@ class PurchaseController extends Controller
 	public function pdf($id)
 	{
 		Gate::authorize('bill_invoices.view');
-		$bill = $this->excludeHospitalPurchases(Purchase::with(['business', 'items', 'taxes', 'vendor']))->find($id);
+		$bill = Purchase::with(['business', 'items', 'taxes', 'vendor'])->find($id);
 		return pdf()
 		->view('backend.user.pdf.bill-invoice', compact('bill'))
 		->name('bill-invoice-' . $bill->bill_no . '.pdf')
@@ -1512,7 +1551,7 @@ class PurchaseController extends Controller
 
 	public function show_public_bill_invoice($short_code)
 	{
-		$bill   = $this->excludeHospitalPurchases(Purchase::withoutGlobalScopes()->with(['vendor', 'business', 'items', 'taxes']))
+		$bill   = Purchase::withoutGlobalScopes()->with(['vendor', 'business', 'items', 'taxes'])
 			->where('short_code', $short_code)
 			->first();
 
@@ -1520,7 +1559,7 @@ class PurchaseController extends Controller
 		// add activeBusiness object to request
 		$request->merge(['activeBusiness' => $bill->business]);
 
-		return Inertia::render('Backend/User/Bill/PublicView', [
+		return Inertia::render('Backend/User/HospitalPurchase/PublicView', [
 			'bill' => $bill,
 		]);
 	}
@@ -1528,14 +1567,16 @@ class PurchaseController extends Controller
 	public function edit($id)
 	{
 		Gate::authorize('bill_invoices.update');
-		$bill = $this->excludeHospitalPurchases(Purchase::with(['business', 'items', 'taxes', 'vendor']))->find($id);
+		$bill = Purchase::with(['business', 'items', 'taxes', 'vendor'])->find($id);
 
 		if (!has_permission('bill_invoices.bulk_approve') && !request()->isOwner && $bill->approval_status == 1) {
 			return back()->with('error', _lang('Permission denied'));
 		}
 
 		$theAttachments = Attachment::where('ref_id', $id)->where('ref_type', 'bill invoice')->get();
-		$accounts = Account::all();
+		$accounts = Account::where('business_id', $bill->business_id)
+			->whereIn('account_type', Purchase::ALLOWED_ACCOUNT_TYPES)
+			->get();
 		$currencies = Currency::all();
 		$vendors = Vendor::all();
 		$products = Product::all();
@@ -1551,7 +1592,7 @@ class PurchaseController extends Controller
 		$cost_codes = CostCode::orderBy('id', 'desc')
 			->get();
 
-		return Inertia::render('Backend/User/Bill/Edit', [
+		return Inertia::render('Backend/User/HospitalPurchase/Edit', [
 			'bill' => $bill,
 			'theAttachments' => $theAttachments,
 			'accounts' => $accounts,
@@ -1589,7 +1630,7 @@ class PurchaseController extends Controller
 		]);
 
 		if ($validator->fails()) {
-			return redirect()->route('bill_invoices.edit', $id)
+			return redirect()->route('hospital_purchases.edit', $id)
 				->withErrors($validator)
 				->withInput();
 		}
@@ -1607,6 +1648,14 @@ class PurchaseController extends Controller
 		// if account_id is null or empty then return with error
 		if (in_array(null, $request->account_id) || in_array('', $request->account_id)) {
 			return redirect()->back()->withInput()->with('error', _lang('Account is required for each item'));
+		}
+
+		if ($this->hasHospitalProductItems($request)) {
+			return redirect()->back()->withInput()->with('error', _lang('Hospital purchases only support account lines'));
+		}
+
+		if (!$this->hasOnlyHospitalAccounts($request)) {
+			return redirect()->back()->withInput()->with('error', _lang('Only Cost of Sale accounts can be used for hospital purchases'));
 		}
 
 		$default_accounts = ['Purchase Tax Payable', 'Purchase Discount Allowed', 'Inventory'];
@@ -1664,14 +1713,16 @@ class PurchaseController extends Controller
 		DB::beginTransaction();
 
 		$summary = $this->calculateTotal($request);
+		$assignedHospitalBillNumber = false;
 
-		$purchase = $this->excludeHospitalPurchases(Purchase::query())->where('id', $id)
+		$purchase = Purchase::where('id', $id)
 			->first();
 		$purchase->vendor_id = $request->input('vendor_id') ?? null;
 		$purchase->title = $request->input('title');
 		$purchase->po_so_number = $request->input('po_so_number');
 		if ($purchase->bill_no == null) {
-			$purchase->bill_no = get_business_option('purchase_number');
+			$purchase->bill_no = $this->getHospitalPurchaseSetting('number', 1000);
+			$assignedHospitalBillNumber = true;
 		}
 		$purchase->purchase_date = Carbon::parse($request->input('purchase_date'))->format('Y-m-d');
 		$purchase->due_date = Carbon::parse($request->input('due_date'))->format('Y-m-d');
@@ -1689,8 +1740,11 @@ class PurchaseController extends Controller
 		$purchase->withholding_tax = $request->input('withholding_tax') ?? 0;
 		$purchase->benificiary = $request->input('benificiary');
 		$purchase->footer = $request->input('footer');
-		$purchase->hospital_purchase = 0;
 		$purchase->save();
+
+		if ($assignedHospitalBillNumber) {
+			$this->incrementHospitalPurchaseNumber($request->activeBusiness->id);
+		}
 
 		// delete old attachments
 		$attachments = Attachment::where('ref_id', $purchase->id)->where('ref_type', 'bill invoice')->get(); // Get attachments from the database
@@ -1744,14 +1798,14 @@ class PurchaseController extends Controller
 			$purchase_item->delete();
 
 			// delete transaction
-			$transaction = Transaction::where('ref_id', $purchase->id)->whereIn('ref_type', ['bill invoice', 'bill invoice tax', 'bill invoice payment', 'bill invoice tax payment'])->get();
+			$transaction = Transaction::where('ref_id', $purchase->id)->whereIn('ref_type', [Purchase::TRANSACTION_REF_TYPE, Purchase::TAX_TRANSACTION_REF_TYPE, Purchase::PAYMENT_TRANSACTION_REF_TYPE, Purchase::PAYMENT_TAX_TRANSACTION_REF_TYPE])->get();
 
 			foreach ($transaction as $t) {
 				$t->forceDelete();
 			}
 
 			// delete pending transaction
-			$pending_transaction = PendingTransaction::where('ref_id', $purchase->id)->whereIn('ref_type', ['bill invoice', 'bill invoice tax', 'bill invoice payment', 'bill invoice tax payment'])->get();
+			$pending_transaction = PendingTransaction::where('ref_id', $purchase->id)->whereIn('ref_type', [Purchase::TRANSACTION_REF_TYPE, Purchase::TAX_TRANSACTION_REF_TYPE, Purchase::PAYMENT_TRANSACTION_REF_TYPE, Purchase::PAYMENT_TAX_TRANSACTION_REF_TYPE])->get();
 
 			foreach ($pending_transaction as $t) {
 				$t->forceDelete();
@@ -1807,7 +1861,7 @@ class PurchaseController extends Controller
 							$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseItem->sub_total / $purchase->exchange_rate) / 100) * $tax->rate);
 							$transaction->description = _lang('Bill Invoice Tax') . ' #' . $purchase->bill_no;
 							$transaction->ref_id      = $purchase->id;
-							$transaction->ref_type    = 'bill invoice tax';
+							$transaction->ref_type    = Purchase::TAX_TRANSACTION_REF_TYPE;
 							$transaction->tax_id      = $tax->id;
 							$transaction->project_id = $purchaseItem->project_id;
 							$transaction->project_task_id = $purchaseItem->project_task_id;
@@ -1824,7 +1878,7 @@ class PurchaseController extends Controller
 							$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseItem->sub_total / $purchase->exchange_rate) / 100) * $tax->rate);
 							$transaction->description = _lang('Bill Invoice Tax') . ' #' . $purchase->bill_no;
 							$transaction->ref_id      = $purchase->id;
-							$transaction->ref_type    = 'bill invoice tax';
+							$transaction->ref_type    = Purchase::TAX_TRANSACTION_REF_TYPE;
 							$transaction->tax_id      = $tax->id;
 							$transaction->project_id = $purchaseItem->project_id;
 							$transaction->project_task_id = $purchaseItem->project_task_id;
@@ -1843,7 +1897,7 @@ class PurchaseController extends Controller
 							$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseItem->sub_total / $purchase->exchange_rate) / 100) * $tax->rate);
 							$transaction->description = _lang('Bill Invoice Tax') . ' #' . $purchase->bill_no;
 							$transaction->ref_id      = $purchase->id;
-							$transaction->ref_type    = 'bill invoice tax';
+							$transaction->ref_type    = Purchase::TAX_TRANSACTION_REF_TYPE;
 							$transaction->tax_id      = $tax->id;
 							$transaction->project_id = $purchaseItem->project_id;
 							$transaction->project_task_id = $purchaseItem->project_task_id;
@@ -1860,7 +1914,7 @@ class PurchaseController extends Controller
 							$transaction->transaction_amount      = convert_currency($request->activeBusiness->currency, $request->currency, (($purchaseItem->sub_total / $purchase->exchange_rate) / 100) * $tax->rate);
 							$transaction->description = _lang('Bill Invoice Tax') . ' #' . $purchase->bill_no;
 							$transaction->ref_id      = $purchase->id;
-							$transaction->ref_type    = 'bill invoice tax';
+							$transaction->ref_type    = Purchase::TAX_TRANSACTION_REF_TYPE;
 							$transaction->tax_id      = $tax->id;
 							$transaction->project_id = $purchaseItem->project_id;
 							$transaction->project_task_id = $purchaseItem->project_task_id;
@@ -1881,7 +1935,7 @@ class PurchaseController extends Controller
 					$transaction->transaction_currency    = $request->currency;
 					$transaction->currency_rate = $purchase->exchange_rate;
 					$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, ($purchaseItem->sub_total / $purchase->exchange_rate) + $purchaseItem->taxes->sum('amount')));
-					$transaction->ref_type    = 'bill invoice';
+					$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 					$transaction->vendor_id   = $purchase->vendor_id;
 					$transaction->ref_id      = $purchase->id;
 					$transaction->description = 'Bill Invoice #' . $purchase->bill_no;
@@ -1898,7 +1952,7 @@ class PurchaseController extends Controller
 					$transaction->transaction_currency    = $request->currency;
 					$transaction->currency_rate = $purchase->exchange_rate;
 					$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $purchaseItem->sub_total / $purchase->exchange_rate));
-					$transaction->ref_type    = 'bill invoice';
+					$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 					$transaction->vendor_id   = $purchase->vendor_id;
 					$transaction->ref_id      = $purchase->id;
 					$transaction->description = 'Bill Invoice #' . $purchase->bill_no;
@@ -1917,7 +1971,7 @@ class PurchaseController extends Controller
 					$transaction->transaction_currency    = $request->currency;
 					$transaction->currency_rate = $purchase->exchange_rate;
 					$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, ($purchaseItem->sub_total / $purchase->exchange_rate) + $purchaseItem->taxes->sum('amount')));
-					$transaction->ref_type    = 'bill invoice';
+					$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 					$transaction->vendor_id   = $purchase->vendor_id;
 					$transaction->ref_id      = $purchase->id;
 					$transaction->description = 'Bill Invoice #' . $purchase->bill_no;
@@ -1934,7 +1988,7 @@ class PurchaseController extends Controller
 					$transaction->transaction_currency    = $request->currency;
 					$transaction->currency_rate = $purchase->exchange_rate;
 					$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $purchaseItem->sub_total / $purchase->exchange_rate));
-					$transaction->ref_type    = 'bill invoice';
+					$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 					$transaction->vendor_id   = $purchase->vendor_id;
 					$transaction->ref_id      = $purchase->id;
 					$transaction->description = 'Bill Invoice #' . $purchase->bill_no;
@@ -1964,7 +2018,7 @@ class PurchaseController extends Controller
 				$transaction->transaction_currency    = $request->currency;
 				$transaction->currency_rate = $purchase->exchange_rate;
 				$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal'] - $summary['taxAmount']));
-				$transaction->ref_type    = 'bill invoice';
+				$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Bill Invoice Payable #' . $purchase->bill_no;
@@ -1979,7 +2033,7 @@ class PurchaseController extends Controller
 				$transaction->transaction_currency    = $request->currency;
 				$transaction->currency_rate = $purchase->exchange_rate;
 				$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
-				$transaction->ref_type    = 'bill invoice';
+				$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Bill Invoice Payable #' . $purchase->bill_no;
@@ -1998,7 +2052,7 @@ class PurchaseController extends Controller
 				$transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
 				$transaction->description = _lang('Bill Invoice Discount') . ' #' . $purchase->bill_no;
 				$transaction->ref_id      = $purchase->id;
-				$transaction->ref_type    = 'bill invoice';
+				$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
@@ -2013,7 +2067,7 @@ class PurchaseController extends Controller
 				$transaction->transaction_currency    = $request->currency;
 				$transaction->currency_rate = $purchase->exchange_rate;
 				$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal'] - $summary['taxAmount']));
-				$transaction->ref_type    = 'bill invoice';
+				$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Bill Invoice Payable #' . $purchase->bill_no;
@@ -2028,7 +2082,7 @@ class PurchaseController extends Controller
 				$transaction->transaction_currency    = $request->currency;
 				$transaction->currency_rate = $purchase->exchange_rate;
 				$transaction->base_currency_amount = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['grandTotal']));
-				$transaction->ref_type    = 'bill invoice';
+				$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->ref_id      = $purchase->id;
 				$transaction->description = 'Bill Invoice Payable #' . $purchase->bill_no;
@@ -2047,7 +2101,7 @@ class PurchaseController extends Controller
 				$transaction->base_currency_amount    = convert_currency($request->currency, $request->activeBusiness->currency, convert_currency($request->activeBusiness->currency, $request->currency, $summary['discountAmount']));
 				$transaction->description = _lang('Bill Invoice Discount') . ' #' . $purchase->bill_no;
 				$transaction->ref_id      = $purchase->id;
-				$transaction->ref_type    = 'bill invoice';
+				$transaction->ref_type    = Purchase::TRANSACTION_REF_TYPE;
 				$transaction->vendor_id   = $purchase->vendor_id;
 				$transaction->project_id = $purchase->items->first()->project_id;
 				$transaction->save();
@@ -2061,7 +2115,7 @@ class PurchaseController extends Controller
 		$audit->event = 'Updated Bill Invoice ' . $purchase->bill_no;
 		$audit->save();
 
-		return redirect()->route('bill_invoices.show', $purchase->id)->with('success', _lang('Updated Successfully'));
+		return redirect()->route('hospital_purchases.show', $purchase->id)->with('success', _lang('Updated Successfully'));
 	}
 
 	public function send_email(Request $request, $id)
@@ -2085,7 +2139,7 @@ class PurchaseController extends Controller
 			'origin' => rtrim($request->getSchemeAndHttpHost(), '/'),
 		];
 
-		$purchase = $this->excludeHospitalPurchases(Purchase::query())->find($id);
+		$purchase = Purchase::find($id);
 		$vendor = $purchase->vendor;
 		$vendor->email = $request->email;
 
@@ -2123,7 +2177,7 @@ class PurchaseController extends Controller
 			'message' => ['required', 'string'],
 		]);
 
-		$bills = $this->excludeHospitalPurchases(Purchase::with(['vendor', 'business']))
+		$bills = Purchase::with(['vendor', 'business'])
 			->whereIn('id', $request->ids)
 			->where('cash', 0)
 			->get();
@@ -2172,7 +2226,7 @@ class PurchaseController extends Controller
 	{
 		Gate::authorize('bill_invoices.csv.import');
 
-		return Inertia::render('Backend/User/Bill/Import');
+		return Inertia::render('Backend/User/HospitalPurchase/Import');
 	}
 
 	/**
@@ -2183,7 +2237,7 @@ class PurchaseController extends Controller
 		Gate::authorize('bill_invoices.csv.import');
 
 		if ($request->isMethod('get')) {
-			return redirect()->route('bill_invoices.import.page');
+			return redirect()->route('hospital_purchases.import.page');
 		}
 
 		$request->validate([
@@ -2231,7 +2285,7 @@ class PurchaseController extends Controller
 			session()->put('bill_import_headers', $headers);
 			session()->save();
 
-			return Inertia::render('Backend/User/Bill/Import', [
+			return Inertia::render('Backend/User/HospitalPurchase/Import', [
 				'previewData' => [
 					'headers' => $headers,
 				],
@@ -2249,7 +2303,7 @@ class PurchaseController extends Controller
 		Gate::authorize('bill_invoices.csv.import');
 
 		if ($request->isMethod('get')) {
-			return redirect()->route('bill_invoices.import.page');
+			return redirect()->route('hospital_purchases.import.page');
 		}
 
 		$mappings = $request->input('mappings', []);
@@ -2469,7 +2523,7 @@ class PurchaseController extends Controller
 			session()->put('bill_import_mappings', $mappings);
 			session()->save();
 
-			return Inertia::render('Backend/User/Bill/Import', [
+			return Inertia::render('Backend/User/HospitalPurchase/Import', [
 				'previewData' => [
 					'headers' => $headers,
 					'total_rows' => $totalRows,
@@ -2493,7 +2547,7 @@ class PurchaseController extends Controller
 		Gate::authorize('bill_invoices.csv.import');
 
 		if ($request->isMethod('get')) {
-			return redirect()->route('bill_invoices.import.page');
+			return redirect()->route('hospital_purchases.import.page');
 		}
 
 		$mappings = session('bill_import_mappings', []);
@@ -2501,7 +2555,7 @@ class PurchaseController extends Controller
 
 		if (!$fullPath || !file_exists($fullPath)) {
 			return redirect()
-				->route('bill_invoices.index')
+				->route('hospital_purchases.index')
 				->with('error', 'Import session expired or file not found. Please start over.');
 		}
 
@@ -2526,11 +2580,11 @@ class PurchaseController extends Controller
 			]);
 
 			return redirect()
-				->route('bill_invoices.index')
+				->route('hospital_purchases.index')
 				->with('success', 'Bills imported successfully.');
 		} catch (\Exception $e) {
 			return redirect()
-				->route('bill_invoices.index')
+				->route('hospital_purchases.index')
 				->with('error', 'Import failed: ' . $e->getMessage());
 		}
 	}
@@ -2555,7 +2609,7 @@ class PurchaseController extends Controller
 			return back()->with('error', $e->getMessage());
 		}
 
-		return redirect()->route('bill_invoices.index')->with('success', _lang('Bills Imported'));
+		return redirect()->route('hospital_purchases.index')->with('success', _lang('Bills Imported'));
 	}
 
 	public function bill_invoices_filter(Request $request)
@@ -2564,7 +2618,7 @@ class PurchaseController extends Controller
 		$from =  explode('to', $request->date_range)[0] ?? '';
 		$to = explode('to', $request->date_range)[1] ?? '';
 
-		$query = $this->excludeHospitalPurchases(Purchase::select('purchases.*'))
+		$query = Purchase::select('purchases.*')
 			->with('vendor');
 
 		if ($request->vendor_id != '') {
@@ -2608,21 +2662,20 @@ class PurchaseController extends Controller
 		$currentUserId = auth()->id();
 
 		// Check if there are any configured approval users for this business
-		$approvalUsersJson = get_business_option('purchase_approval_users', '[]');
-		$configuredUserIds = json_decode($approvalUsersJson, true);
+		$configuredUserIds = $this->getHospitalPurchaseUserIds('approval_users');
 		$hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
 
 		if (!$hasConfiguredApprovers) {
-			return redirect()->route('bill_invoices.index')->with('error', _lang('No approvers are configured. Please configure approvers in business settings first.'));
+			return redirect()->route('hospital_purchases.index')->with('error', _lang('No approvers are configured. Please configure approvers in business settings first.'));
 		}
 
 		// Check if current user is in the configured approvers list
 		if (!in_array($currentUserId, $configuredUserIds)) {
-			return redirect()->route('bill_invoices.index')->with('error', _lang('You are not assigned as an approver for bills'));
+			return redirect()->route('hospital_purchases.index')->with('error', _lang('You are not assigned as an approver for bills'));
 		}
 
 		foreach ($request->ids as $id) {
-			$purchase = $this->excludeHospitalPurchases(Purchase::with('approvals'))->find($id);
+			$purchase = Purchase::with('approvals')->find($id);
 			
 			if (!$purchase) {
 				continue;
@@ -2665,7 +2718,7 @@ class PurchaseController extends Controller
 			$audit->save();
 		}
 
-		return redirect()->route('bill_invoices.index')->with('success', _lang('Approved Successfully'));
+		return redirect()->route('hospital_purchases.index')->with('success', _lang('Approved Successfully'));
 	}
 
 	public function bulk_reject(Request $request)
@@ -2674,22 +2727,20 @@ class PurchaseController extends Controller
 		$currentUserId = auth()->id();
 
 		// Get configured approvers and checkers
-		$approvalUsersJson = get_business_option('purchase_approval_users', '[]');
-		$approverUserIds = json_decode($approvalUsersJson, true);
+		$approverUserIds = $this->getHospitalPurchaseUserIds('approval_users');
 		$isApprover = is_array($approverUserIds) && in_array($currentUserId, $approverUserIds);
 
-		$checkerUsersJson = get_business_option('purchase_checker_users', '[]');
-		$checkerUserIds = json_decode($checkerUsersJson, true);
+		$checkerUserIds = $this->getHospitalPurchaseUserIds('checker_users');
 		$isChecker = is_array($checkerUserIds) && in_array($currentUserId, $checkerUserIds);
 
 		if (!$isApprover && !$isChecker) {
-			return redirect()->route('bill_invoices.index')->with('error', _lang('You are not assigned as an approver or checker for bills'));
+			return redirect()->route('hospital_purchases.index')->with('error', _lang('You are not assigned as an approver or checker for bills'));
 		}
 
 		$rejectedCount = 0;
 
 		foreach ($request->ids as $id) {
-			$purchase = $this->excludeHospitalPurchases(Purchase::with(['approvals', 'checkers']))->find($id);
+			$purchase = Purchase::with(['approvals', 'checkers'])->find($id);
 			
 			if (!$purchase) {
 				continue;
@@ -2831,9 +2882,9 @@ class PurchaseController extends Controller
 		}
 
 		if ($rejectedCount > 0) {
-			return redirect()->route('bill_invoices.index')->with('success', _lang('Rejected Successfully') . ' (' . $rejectedCount . ')');
+			return redirect()->route('hospital_purchases.index')->with('success', _lang('Rejected Successfully') . ' (' . $rejectedCount . ')');
 		} else {
-			return redirect()->route('bill_invoices.index')->with('error', _lang('No bills were rejected. They may already be rejected or you do not have the appropriate role.'));
+			return redirect()->route('hospital_purchases.index')->with('error', _lang('No bills were rejected. They may already be rejected or you do not have the appropriate role.'));
 		}
 	}
 
@@ -2847,7 +2898,7 @@ public function approve(Request $request, $id)
 		'comment' => ['nullable', 'string', 'max:1000'],
 	]);
 
-	$purchase = $this->excludeHospitalPurchases(Purchase::with('approvals'))->find($id);
+	$purchase = Purchase::with('approvals')->find($id);
 
 	if (!$purchase) {
 		return back()->with('error', _lang('Bill not found'));
@@ -2856,8 +2907,7 @@ public function approve(Request $request, $id)
 	$currentUserId = auth()->id();
 
 	// Check if there are any configured approval users for this business
-	$approvalUsersJson = get_business_option('purchase_approval_users', '[]');
-	$configuredUserIds = json_decode($approvalUsersJson, true);
+	$configuredUserIds = $this->getHospitalPurchaseUserIds('approval_users');
 	$hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
 
 	// If no approvers configured, tell user to configure them first
@@ -2912,7 +2962,7 @@ public function reject(Request $request, $id)
 		'comment.required' => _lang('Comment is required when rejecting'),
 	]);
 
-	$purchase = $this->excludeHospitalPurchases(Purchase::with(['approvals', 'checkers']))->find($id);
+	$purchase = Purchase::with(['approvals', 'checkers'])->find($id);
 
 	if (!$purchase) {
 		return back()->with('error', _lang('Bill not found'));
@@ -2926,8 +2976,7 @@ public function reject(Request $request, $id)
 	
 	if ($purchase->approval_status == 1) {
 		// Bill is in Approved state - reject as approver
-		$approvalUsersJson = get_business_option('purchase_approval_users', '[]');
-		$configuredUserIds = json_decode($approvalUsersJson, true);
+		$configuredUserIds = $this->getHospitalPurchaseUserIds('approval_users');
 		$hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
 
 		if (!$hasConfiguredApprovers) {
@@ -2974,8 +3023,7 @@ public function reject(Request $request, $id)
 
 	} elseif ($purchase->checker_status == 1) {
 		// Bill is in Verified state - reject as checker
-		$checkerUsersJson = get_business_option('purchase_checker_users', '[]');
-		$configuredUserIds = json_decode($checkerUsersJson, true);
+		$configuredUserIds = $this->getHospitalPurchaseUserIds('checker_users');
 		$hasConfiguredCheckers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
 
 		if (!$hasConfiguredCheckers) {
@@ -3020,12 +3068,10 @@ public function reject(Request $request, $id)
 
 	} elseif ($purchase->approval_status == 0) {
 		// Bill is in Pending state - mark it as Rejected
-		$approvalUsersJson = get_business_option('purchase_approval_users', '[]');
-		$approverUserIds = json_decode($approvalUsersJson, true);
+		$approverUserIds = $this->getHospitalPurchaseUserIds('approval_users');
 		$isApprover = is_array($approverUserIds) && in_array($currentUserId, $approverUserIds);
 
-		$checkerUsersJson = get_business_option('purchase_checker_users', '[]');
-		$checkerUserIds = json_decode($checkerUsersJson, true);
+		$checkerUserIds = $this->getHospitalPurchaseUserIds('checker_users');
 		$isChecker = is_array($checkerUserIds) && in_array($currentUserId, $checkerUserIds);
 
 		if ($isApprover) {
@@ -3106,7 +3152,7 @@ private function checkAndUpdateBillStatus(Purchase $purchase): void
 
 	// Get the required approval count from settings for the current business
 	// Default to 1 if not set (any single approver can approve the purchase)
-	$requiredApprovalCount = (int) get_business_option('purchase_approval_required_count', 1);
+	$requiredApprovalCount = (int) $this->getHospitalPurchaseSetting('approval_required_count', 1);
 
 	$totalApprovers = $approvals->count();
 	$approvedCount = $approvals->where('status', 1)->count();
@@ -3227,8 +3273,7 @@ private function moveBillTransactionsToPending(Purchase $purchase): void
  */
 private function createBillApprovalRecords(Purchase $purchase): void
 {
-	$purchaseApprovalUsersJson = get_business_option('purchase_approval_users', '[]');
-	$configuredUserIds = json_decode($purchaseApprovalUsersJson, true);
+	$configuredUserIds = $this->getHospitalPurchaseUserIds('approval_users');
 
 	if (!is_array($configuredUserIds) || empty($configuredUserIds)) {
 		return;
@@ -3244,7 +3289,7 @@ private function createBillApprovalRecords(Purchase $purchase): void
 	foreach ($validUserIds as $userId) {
 		// Check if approval record already exists for this user
 		$existingApproval = Approvals::where('ref_id', $purchase->id)
-			->where('ref_name', 'purchase')
+			->where('ref_name', Purchase::APPROVAL_REF_NAME)
 			->where('checker_type', 'approval')
 			->where('action_user', $userId)
 			->first();
@@ -3252,7 +3297,7 @@ private function createBillApprovalRecords(Purchase $purchase): void
 		if (!$existingApproval) {
 			Approvals::create([
 				'ref_id' => $purchase->id,
-				'ref_name' => 'purchase',
+				'ref_name' => Purchase::APPROVAL_REF_NAME,
 				'checker_type' => 'approval',
 				'action_user' => $userId,
 				'status' => 0, // pending
@@ -3266,8 +3311,7 @@ private function createBillApprovalRecords(Purchase $purchase): void
  */
 private function createBillCheckerRecords(Purchase $purchase): void
 {
-	$purchaseCheckerUsersJson = get_business_option('purchase_checker_users', '[]');
-	$configuredUserIds = json_decode($purchaseCheckerUsersJson, true);
+	$configuredUserIds = $this->getHospitalPurchaseUserIds('checker_users');
 
 	if (!is_array($configuredUserIds) || empty($configuredUserIds)) {
 		return;
@@ -3283,7 +3327,7 @@ private function createBillCheckerRecords(Purchase $purchase): void
 	foreach ($validUserIds as $userId) {
 		// Check if checker record already exists for this user
 		$existingChecker = Approvals::where('ref_id', $purchase->id)
-			->where('ref_name', 'purchase')
+			->where('ref_name', Purchase::APPROVAL_REF_NAME)
 			->where('checker_type', 'checker')
 			->where('action_user', $userId)
 			->first();
@@ -3291,7 +3335,7 @@ private function createBillCheckerRecords(Purchase $purchase): void
 		if (!$existingChecker) {
 			Approvals::create([
 				'ref_id' => $purchase->id,
-				'ref_name' => 'purchase',
+				'ref_name' => Purchase::APPROVAL_REF_NAME,
 				'checker_type' => 'checker',
 				'action_user' => $userId,
 				'status' => 0, // pending
@@ -3310,7 +3354,7 @@ public function verify(Request $request, $id)
 		'comment' => ['nullable', 'string', 'max:1000'],
 	]);
 
-	$purchase = $this->excludeHospitalPurchases(Purchase::with('checkers'))->find($id);
+	$purchase = Purchase::with('checkers')->find($id);
 
 	if (!$purchase) {
 		return back()->with('error', _lang('Bill not found'));
@@ -3319,8 +3363,7 @@ public function verify(Request $request, $id)
 	$currentUserId = auth()->id();
 
 	// Check if there are any configured checker users for this business
-	$checkerUsersJson = get_business_option('purchase_checker_users', '[]');
-	$configuredUserIds = json_decode($checkerUsersJson, true);
+	$configuredUserIds = $this->getHospitalPurchaseUserIds('checker_users');
 	$hasConfiguredCheckers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
 
 	// If no checkers configured, tell user to configure them first
@@ -3371,21 +3414,20 @@ public function bulk_verify(Request $request)
 	$currentUserId = auth()->id();
 
 	// Check if there are any configured checker users for this business
-	$checkerUsersJson = get_business_option('purchase_checker_users', '[]');
-	$configuredUserIds = json_decode($checkerUsersJson, true);
+	$configuredUserIds = $this->getHospitalPurchaseUserIds('checker_users');
 	$hasConfiguredCheckers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
 
 	if (!$hasConfiguredCheckers) {
-		return redirect()->route('bill_invoices.index')->with('error', _lang('No checkers are configured. Please configure checkers in business settings first.'));
+		return redirect()->route('hospital_purchases.index')->with('error', _lang('No checkers are configured. Please configure checkers in business settings first.'));
 	}
 
 	// Check if current user is in the configured checkers list
 	if (!in_array($currentUserId, $configuredUserIds)) {
-		return redirect()->route('bill_invoices.index')->with('error', _lang('You are not assigned as a checker for bills'));
+		return redirect()->route('hospital_purchases.index')->with('error', _lang('You are not assigned as a checker for bills'));
 	}
 
 	foreach ($request->ids as $id) {
-		$purchase = $this->excludeHospitalPurchases(Purchase::with('checkers'))->find($id);
+		$purchase = Purchase::with('checkers')->find($id);
 		
 		if (!$purchase) {
 			continue;
@@ -3428,7 +3470,7 @@ public function bulk_verify(Request $request)
 		$audit->save();
 	}
 
-	return redirect()->route('bill_invoices.index')->with('success', _lang('Verified Successfully'));
+	return redirect()->route('hospital_purchases.index')->with('success', _lang('Verified Successfully'));
 }
 
 /**
@@ -3449,7 +3491,7 @@ private function checkAndUpdateBillCheckerStatus(Purchase $purchase): void
 
 	// Get the required checker count from settings for the current business
 	// Default to 1 if not set (any single checker can verify the purchase)
-	$requiredCheckerCount = (int) get_business_option('purchase_checker_required_count', 1);
+	$requiredCheckerCount = (int) $this->getHospitalPurchaseSetting('checker_required_count', 1);
 
 	$totalCheckers = $checkers->count();
 	$verifiedCount = $checkers->where('status', 1)->count();
@@ -3526,7 +3568,7 @@ private function syncCheckerRecordsForBill(Purchase $purchase, array $configured
 	foreach ($validUserIds as $userId) {
 		// Check if checker record already exists for this user
 		$existingChecker = Approvals::where('ref_id', $purchase->id)
-			->where('ref_name', 'purchase')
+			->where('ref_name', Purchase::APPROVAL_REF_NAME)
 			->where('checker_type', 'checker')
 			->where('action_user', $userId)
 			->first();
@@ -3534,7 +3576,7 @@ private function syncCheckerRecordsForBill(Purchase $purchase, array $configured
 		if (!$existingChecker) {
 			Approvals::create([
 				'ref_id' => $purchase->id,
-				'ref_name' => 'purchase',
+				'ref_name' => Purchase::APPROVAL_REF_NAME,
 				'checker_type' => 'checker',
 				'action_user' => $userId,
 				'status' => 0, // pending
@@ -3545,10 +3587,11 @@ private function syncCheckerRecordsForBill(Purchase $purchase, array $configured
 	// Remove checker records for users no longer in the checkers list
 	// Only remove if they haven't taken action yet (status = 0)
 	Approvals::where('ref_id', $purchase->id)
-		->where('ref_name', 'purchase')
+		->where('ref_name', Purchase::APPROVAL_REF_NAME)
 		->where('checker_type', 'checker')
 		->where('status', 0)
 		->whereNotIn('action_user', $validUserIds)
 		->delete();
 }
 }
+

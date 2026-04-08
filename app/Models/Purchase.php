@@ -9,6 +9,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Purchase extends Model {
     use MultiTenant, SoftDeletes;
+    public const APPROVAL_REF_NAME = 'purchase';
+    public const TRANSACTION_REF_TYPE = 'bill invoice';
+    public const TAX_TRANSACTION_REF_TYPE = 'bill invoice tax';
+    public const PAYMENT_TRANSACTION_REF_TYPE = 'bill invoice payment';
+    public const PAYMENT_TAX_TRANSACTION_REF_TYPE = 'bill invoice tax payment';
+
     /**
      * The table associated with the model.
      *

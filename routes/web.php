@@ -44,6 +44,7 @@ use App\Http\Controllers\User\AwardController;
 use App\Http\Controllers\User\BusinessController;
 use App\Http\Controllers\User\BusinessSettingsController;
 use App\Http\Controllers\User\CashPurchaseController;
+use App\Http\Controllers\HospitalPurchaseController;
 use App\Http\Controllers\CostCodeController;
 use App\Http\Controllers\ProjectBudgetController;
 use App\Http\Controllers\ProjectSubcontractController;
@@ -260,6 +261,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('business/{id}/store_invoice_settings', [BusinessSettingsController::class, 'store_invoice_settings'])->name('business.store_invoice_settings');
 		Route::post('business/{id}/store_receipt_settings', [BusinessSettingsController::class, 'store_receipt_settings'])->name('business.store_receipt_settings');
 		Route::post('business/{id}/store_purchase_settings', [BusinessSettingsController::class, 'store_purchase_settings'])->name('business.store_purchase_settings');
+		Route::post('business/{id}/store_hospital_purchase_settings', [BusinessSettingsController::class, 'store_hospital_purchase_settings'])->name('business.store_hospital_purchase_settings');
 		Route::post('business/{id}/store_sales_return_settings', [BusinessSettingsController::class, 'store_sales_return_settings'])->name('business.store_sales_return_settings');
 		Route::post('business/{id}/store_purchase_return_settings', [BusinessSettingsController::class, 'store_purchase_return_settings'])->name('business.store_purchase_return_settings');
 		Route::post('business/{id}/store_currency_settings', [BusinessSettingsController::class, 'store_currency_settings'])->name('business.store_currency_settings');
@@ -556,6 +558,31 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('bill_invoices', PurchaseController::class);
 		Route::post('import_bills', [PurchaseController::class, 'import_bills'])->name('bill_invoices.import');
 		Route::post('bill_invoices/filter', [PurchaseController::class, 'bill_invoices_filter'])->name('bill_invoices.filter');
+
+		// hospital purchases
+		Route::get('hospital_purchases/trash', [HospitalPurchaseController::class, 'trash'])->name('hospital_purchases.trash');
+		Route::post('hospital_purchases/{id}/restore', [HospitalPurchaseController::class, 'restore'])->name('hospital_purchases.restore');
+		Route::post('hospital_purchases/bulk_restore', [HospitalPurchaseController::class, 'bulk_restore'])->name('hospital_purchases.bulk_restore');
+		Route::post('hospital_purchases/bulk_permanent_destroy', [HospitalPurchaseController::class, 'bulk_permanent_destroy'])->name('hospital_purchases.bulk_permanent_destroy');
+		Route::delete('hospital_purchases/{id}/permanent_destroy', [HospitalPurchaseController::class, 'permanent_destroy'])->name('hospital_purchases.permanent_destroy');
+		Route::get('hospital_purchases/import', [HospitalPurchaseController::class, 'import'])->name('hospital_purchases.import.page');
+		Route::match(['get', 'post'], 'hospital_purchases/import/upload', [HospitalPurchaseController::class, 'uploadImportFile'])->name('hospital_purchases.import.upload');
+		Route::match(['get', 'post'], 'hospital_purchases/import/preview', [HospitalPurchaseController::class, 'previewImport'])->name('hospital_purchases.import.preview');
+		Route::match(['get', 'post'], 'hospital_purchases/import/execute', [HospitalPurchaseController::class, 'executeImport'])->name('hospital_purchases.import.execute');
+		Route::resource('hospital_purchases', HospitalPurchaseController::class);
+		Route::post('import_hospital_purchases', [HospitalPurchaseController::class, 'import_bills'])->name('hospital_purchases.import');
+		Route::post('hospital_purchases/filter', [HospitalPurchaseController::class, 'bill_invoices_filter'])->name('hospital_purchases.filter');
+		Route::post('hospital_purchases/bulk_destroy', [HospitalPurchaseController::class, 'bulk_destroy'])->name('hospital_purchases.bulk_destroy');
+		Route::get('export_hospital_purchases', [HospitalPurchaseController::class, 'export_purchases'])->name('hospital_purchases.export');
+		Route::post('hospital_purchases/bulk_approve', [HospitalPurchaseController::class, 'bulk_approve'])->name('hospital_purchases.bulk_approve');
+		Route::post('hospital_purchases/bulk_reject', [HospitalPurchaseController::class, 'bulk_reject'])->name('hospital_purchases.bulk_reject');
+		Route::post('hospital_purchases/bulk_verify', [HospitalPurchaseController::class, 'bulk_verify'])->name('hospital_purchases.bulk_verify');
+		Route::post('hospital_purchases/bulk_email', [HospitalPurchaseController::class, 'bulk_email'])->name('hospital_purchases.bulk_email');
+		Route::post('hospital_purchases/{id}/send_email', [HospitalPurchaseController::class, 'send_email'])->name('hospital_purchases.send_email');
+		Route::get('hospital_purchases/{id}/pdf', [HospitalPurchaseController::class, 'pdf'])->name('hospital_purchases.pdf');
+		Route::post('hospital_purchases/{id}/approve', [HospitalPurchaseController::class, 'approve'])->name('hospital_purchases.approve');
+		Route::post('hospital_purchases/{id}/reject', [HospitalPurchaseController::class, 'reject'])->name('hospital_purchases.reject');
+		Route::post('hospital_purchases/{id}/verify', [HospitalPurchaseController::class, 'verify'])->name('hospital_purchases.verify');
 
 		//Bill Payments
 		Route::get('bill_payments/trash', [BillPaymentsController::class, 'trash'])->name('bill_payments.trash');
@@ -983,6 +1010,7 @@ Route::get('invoice/make_payment/{short_code}/{gateway}', [OnlinePaymentControll
 Route::get('invoice/payment_methods/{short_code}', [OnlinePaymentController::class, 'payment_methods'])->name('invoices.payment_methods');
 Route::get('invoice/{short_code}', [InvoiceController::class, 'show_public_invoice'])->name('invoices.show_public_invoice');
 Route::get('cash_purchase/{short_code}', [CashPurchaseController::class, 'show_public_cash_purchase'])->name('cash_purchases.show_public_cash_purchase');
+Route::get('hospital_purchase/{short_code}', [HospitalPurchaseController::class, 'show_public_bill_invoice'])->name('hospital_purchases.show_public_bill_invoice');
 Route::get('purchase_order/{short_code}', [PurchaseOrderController::class, 'show_public_purchase_order'])->name('purchase_orders.show_public_purchase_order');
 Route::get('quotation/{short_code}', [QuotationController::class, 'show_public_quotation'])->name('quotations.show_public_quotation');
 Route::get('bill_invoice/{short_code}', [PurchaseController::class, 'show_public_bill_invoice'])->name('bill_invoices.show_public_bill_invoice');

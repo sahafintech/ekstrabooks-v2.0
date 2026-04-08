@@ -25,7 +25,7 @@ class BillPaymentsController extends Controller
 {
     public function index(Request $request)
     {
-        $per_page = $request->get('per_page', 10);
+        $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
         $sorting = $request->get('sorting', []);
         $sortColumn = $sorting['column'] ?? 'id';
@@ -97,7 +97,7 @@ class BillPaymentsController extends Controller
 
     public function trash(Request $request)
     {
-        $per_page = $request->get('per_page', 10);
+        $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
         $sorting = $request->get('sorting', []);
         $sortColumn = $sorting['column'] ?? 'id';
@@ -166,8 +166,28 @@ class BillPaymentsController extends Controller
         ]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
+        $paymentContext = match ($request->get('context')) {
+            'hospital' => 'hospital',
+            'normal' => 'normal',
+            default => 'all',
+        };
+        $defaultVendorId = $request->get('vendor_id');
+        $defaultPurchaseId = $request->get('purchase_id');
+
+        if ($defaultPurchaseId) {
+            $purchase = Purchase::query()
+                ->select('id', 'vendor_id', 'hospital_purchase')
+                ->find($defaultPurchaseId);
+
+            if ($purchase) {
+                $defaultPurchaseId = $purchase->id;
+                $defaultVendorId = $defaultVendorId ?: $purchase->vendor_id;
+                $paymentContext = (int) $purchase->hospital_purchase === 1 ? 'hospital' : 'normal';
+            }
+        }
+
         $vendors = Vendor::all();
         $accounts = Account::where(function ($query) {
             $query->where('account_type', 'Bank')
@@ -179,6 +199,9 @@ class BillPaymentsController extends Controller
             'vendors' => $vendors,
             'accounts' => $accounts,
             'methods' => $methods,
+            'paymentContext' => $paymentContext,
+            'defaultVendorId' => $defaultVendorId,
+            'defaultPurchaseId' => $defaultPurchaseId,
         ]);
     }
 

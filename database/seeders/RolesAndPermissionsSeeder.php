@@ -298,6 +298,23 @@ final class RolesAndPermissionsSeeder extends Seeder
             'bill_invoices.csv.export',
 
             // =====================
+            // HOSPITAL PURCHASES
+            // =====================
+            'hospital_purchases.view',
+            'hospital_purchases.create',
+            'hospital_purchases.update',
+            'hospital_purchases.delete',
+            'hospital_purchases.restore',
+            'hospital_purchases.approve',
+            'hospital_purchases.verify',
+            'hospital_purchases.reject',
+            'hospital_purchases.duplicate',
+            'hospital_purchases.send_email',
+            'hospital_purchases.pdf',
+            'hospital_purchases.csv.import',
+            'hospital_purchases.csv.export',
+
+            // =====================
             // BILL PAYMENTS
             // =====================
             'bill_payments.view',
@@ -868,6 +885,20 @@ final class RolesAndPermissionsSeeder extends Seeder
             'bill_invoices.csv.import',
             'bill_invoices.csv.export',
 
+            // hospital purchases
+            'hospital_purchases.view',
+            'hospital_purchases.create',
+            'hospital_purchases.update',
+            'hospital_purchases.delete',
+            'hospital_purchases.restore',
+            'hospital_purchases.approve',
+            'hospital_purchases.verify',
+            'hospital_purchases.reject',
+            'hospital_purchases.send_email',
+            'hospital_purchases.pdf',
+            'hospital_purchases.csv.import',
+            'hospital_purchases.csv.export',
+
             // Bill Payments
             'bill_payments.view',
             'bill_payments.create',
@@ -1222,6 +1253,19 @@ final class RolesAndPermissionsSeeder extends Seeder
             'bill_invoices.csv.import',
             'bill_invoices.csv.export',
 
+            // Hospital Purchases
+            'hospital_purchases.view',
+            'hospital_purchases.create',
+            'hospital_purchases.update',
+            'hospital_purchases.approve',
+            'hospital_purchases.verify',
+            'hospital_purchases.reject',
+            'hospital_purchases.duplicate',
+            'hospital_purchases.send_email',
+            'hospital_purchases.pdf',
+            'hospital_purchases.csv.import',
+            'hospital_purchases.csv.export',
+
             // Bill Payments
             'bill_payments.view',
             'bill_payments.create',
@@ -1520,6 +1564,19 @@ final class RolesAndPermissionsSeeder extends Seeder
             'bill_invoices.pdf',
             'bill_invoices.csv.import',
             'bill_invoices.csv.export',
+
+            // Hospital Purchases
+            'hospital_purchases.view',
+            'hospital_purchases.create',
+            'hospital_purchases.update',
+            'hospital_purchases.approve',
+            'hospital_purchases.verify',
+            'hospital_purchases.reject',
+            'hospital_purchases.duplicate',
+            'hospital_purchases.send_email',
+            'hospital_purchases.pdf',
+            'hospital_purchases.csv.import',
+            'hospital_purchases.csv.export',
 
             // Bill Payments
             'bill_payments.view',

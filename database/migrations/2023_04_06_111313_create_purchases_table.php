@@ -46,6 +46,7 @@ return new class extends Migration {
             $table->bigInteger('approved_by')->nullable()->unsigned();
             $table->bigInteger('checked_by')->nullable()->unsigned();
             $table->string('benificiary')->nullable();
+            $table->tinyInteger('hospital_purchase')->default(0);
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
             $table->bigInteger('create_user_id')->nullable();
