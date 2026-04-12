@@ -54,7 +54,7 @@ import { useToast } from "@/hooks/use-toast";
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, parseDateObject } from "@/lib/utils";
 import DateTimePicker from "@/Components/DateTimePicker";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Badge } from "@/Components/ui/badge";
@@ -969,8 +969,58 @@ export default function List({
         );
     };
 
+    const formatDateForExport = (value) => {
+        if (!value) return null;
+
+        const parsedDate = value instanceof Date ? value : parseDateObject(value);
+        if (!parsedDate || Number.isNaN(parsedDate.getTime())) {
+            return null;
+        }
+
+        const year = parsedDate.getFullYear();
+        const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+        const day = String(parsedDate.getDate()).padStart(2, "0");
+
+        return `${year}-${month}-${day}`;
+    };
+
     const handleExport = () => {
-        window.location.href = route("hospital_purchases.export");
+        const params = new URLSearchParams();
+        const [fromDateValue, toDateValue] = Array.isArray(dateRange) ? dateRange : [];
+        const fromDate = formatDateForExport(fromDateValue);
+        const toDate = formatDateForExport(toDateValue);
+
+        if (search) {
+            params.set("search", search);
+        }
+
+        if (selectedVendor) {
+            params.set("vendor_id", selectedVendor);
+        }
+
+        if (selectedApprovalStatus !== "") {
+            params.set("approval_status", selectedApprovalStatus);
+        }
+
+        if (selectedBillStatus !== "") {
+            params.set("status", selectedBillStatus);
+        }
+
+        if (fromDate && toDate) {
+            params.set("date_range[0]", fromDate);
+            params.set("date_range[1]", toDate);
+        }
+
+        if (sorting?.column) {
+            params.set("sorting[column]", sorting.column);
+        }
+
+        if (sorting?.direction) {
+            params.set("sorting[direction]", sorting.direction);
+        }
+
+        const exportUrl = route("hospital_purchases.export");
+        window.location.href = params.toString() ? `${exportUrl}?${params.toString()}` : exportUrl;
     };
 
     const handleSort = (column) => {

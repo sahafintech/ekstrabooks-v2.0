@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Exports\BillInvoiceExport;
+use App\Exports\HospitalPurchaseExport;
 use App\Http\Controllers\Controller;
 use App\Imports\BillInvoiceImport;
 use App\Models\Account;
@@ -87,63 +87,10 @@ class HospitalPurchaseController extends Controller
 	public function index(Request $request)
 	{
 		Gate::authorize('bill_invoices.view');
-		$search = $request->get('search', '');
 		$perPage = $request->get('per_page', 50);
-		$sorting = $request->get('sorting', []);
-		$sortColumn = $sorting['column'] ?? 'id';
-		$sortDirection = $sorting['direction'] ?? 'desc';
-		$vendorId = $request->get('vendor_id', '');
-		$dateRange = $request->get('date_range', '');
-		$approvalStatus = $request->get('approval_status', '');
-		$status = $request->get('status', '');
-
-		$query = Purchase::query()
-			->where('cash', 0);
-
-		// Handle sorting
-		if ($sortColumn === 'vendor.name') {
-			$query->join('vendors', 'purchases.vendor_id', '=', 'vendors.id')
-				->orderBy('vendors.name', $sortDirection)
-				->select('purchases.*');
-		} else {
-			$query->orderBy('purchases.' . $sortColumn, $sortDirection);
-		}
-
-		// Apply filters
-		if ($search) {
-			$query->where(function ($q) use ($search) {
-				$q->where('purchases.bill_no', 'like', "%$search%")
-					->orWhere('purchases.title', 'like', "%$search%")
-					->orWhere('purchases.purchase_date', 'like', "%$search%")
-					->orWhere('purchases.due_date', 'like', "%$search%")
-					->orWhere('purchases.grand_total', 'like', "%$search%")
-					->orWhere('purchases.paid', 'like', "%$search%")
-					->orWhereHas('vendor', function ($q) use ($search) {
-						$q->where('name', 'like', "%$search%");
-					});
-			});
-		}
-
-		if ($vendorId) {
-			$query->where('vendor_id', $vendorId);
-		}
-
-		if ($dateRange) {
-			$query->whereDate('purchase_date', '>=', Carbon::parse($dateRange[0])->format('Y-m-d'))
-				->whereDate('purchase_date', '<=', Carbon::parse($dateRange[1])->format('Y-m-d'));
-		}
-
-		if ($approvalStatus !== null && $approvalStatus !== '') {
-			$query->where('approval_status', $approvalStatus);
-		}
-
-		if ($status !== null && $status !== '') {
-			$query->where('status', $status);
-		}
-
-		// Get summary data before pagination
-		$summaryQuery = clone $query;
-		$summaryData = $summaryQuery->get();
+		$sorting = $this->resolveHospitalPurchaseSorting($request);
+		$query = $this->buildHospitalPurchaseQuery($request, ['vendor', 'business']);
+		$summaryData = $this->buildHospitalPurchaseQuery($request)->get();
 		$summary = [
 			'total_bills' => $summaryData->count(),
 			'total_amount' => $summaryData->sum('grand_total'),
@@ -152,7 +99,9 @@ class HospitalPurchaseController extends Controller
 			'total_pending' => $summaryData->where('approval_status', 0)->count(),
 		];
 
-		$bills = $query->with('vendor', 'business')->paginate($perPage)->withQueryString();
+		$this->applyHospitalPurchaseSorting($query, $sorting);
+
+		$bills = $query->paginate($perPage)->withQueryString();
 		$vendors = Vendor::all();
 
 		// Check if there are configured approval users for this business
@@ -184,11 +133,11 @@ class HospitalPurchaseController extends Controller
 				'total' => $bills->total(),
 			],
 			'filters' => [
-				'search' => $search,
-				'vendor_id' => $vendorId,
-				'date_range' => $dateRange,
-				'approval_status' => $approvalStatus,
-				'status' => $status,
+				'search' => $request->get('search', ''),
+				'vendor_id' => $request->get('vendor_id', ''),
+				'date_range' => $request->get('date_range', ''),
+				'approval_status' => $request->get('approval_status', ''),
+				'status' => $request->get('status', ''),
 				'sorting' => $sorting,
 			],
 			'vendors' => $vendors,
@@ -206,63 +155,10 @@ class HospitalPurchaseController extends Controller
 	public function trash(Request $request)
 	{
 		Gate::authorize('bill_invoices.view');
-		$search = $request->get('search', '');
 		$perPage = $request->get('per_page', 50);
-		$sorting = $request->get('sorting', []);
-		$sortColumn = $sorting['column'] ?? 'id';
-		$sortDirection = $sorting['direction'] ?? 'desc';
-		$vendorId = $request->get('vendor_id', '');
-		$dateRange = $request->get('date_range', '');
-		$approvalStatus = $request->get('approval_status', '');
-		$status = $request->get('status', '');
-
-		$query = Purchase::onlyTrashed()
-			->where('cash', 0);
-
-		// Handle sorting
-		if ($sortColumn === 'vendor.name') {
-			$query->join('vendors', 'purchases.vendor_id', '=', 'vendors.id')
-				->orderBy('vendors.name', $sortDirection)
-				->select('purchases.*');
-		} else {
-			$query->orderBy('purchases.' . $sortColumn, $sortDirection);
-		}
-
-		// Apply filters
-		if ($search) {
-			$query->where(function ($q) use ($search) {
-				$q->where('purchases.bill_no', 'like', "%$search%")
-					->orWhere('purchases.title', 'like', "%$search%")
-					->orWhere('purchases.purchase_date', 'like', "%$search%")
-					->orWhere('purchases.due_date', 'like', "%$search%")
-					->orWhere('purchases.grand_total', 'like', "%$search%")
-					->orWhere('purchases.paid', 'like', "%$search%")
-					->orWhereHas('vendor', function ($q) use ($search) {
-						$q->where('name', 'like', "%$search%");
-					});
-			});
-		}
-
-		if ($vendorId) {
-			$query->where('vendor_id', $vendorId);
-		}
-
-		if ($dateRange) {
-			$query->whereDate('purchase_date', '>=', Carbon::parse($dateRange[0])->format('Y-m-d'))
-				->whereDate('purchase_date', '<=', Carbon::parse($dateRange[1])->format('Y-m-d'));
-		}
-
-		if ($approvalStatus !== null && $approvalStatus !== '') {
-			$query->where('approval_status', $approvalStatus);
-		}
-
-		if ($status !== null && $status !== '') {
-			$query->where('status', $status);
-		}
-
-		// Get summary data before pagination
-		$summaryQuery = clone $query;
-		$summaryData = $summaryQuery->get();
+		$sorting = $this->resolveHospitalPurchaseSorting($request);
+		$query = $this->buildHospitalPurchaseQuery($request, ['vendor', 'business'], true);
+		$summaryData = $this->buildHospitalPurchaseQuery($request, [], true)->get();
 		$summary = [
 			'total_bills' => $summaryData->count(),
 			'total_amount' => $summaryData->sum('grand_total'),
@@ -271,7 +167,9 @@ class HospitalPurchaseController extends Controller
 			'total_pending' => $summaryData->where('approval_status', 0)->count(),
 		];
 
-		$bills = $query->with('vendor', 'business')->paginate($perPage)->withQueryString();
+		$this->applyHospitalPurchaseSorting($query, $sorting);
+
+		$bills = $query->paginate($perPage)->withQueryString();
 		$vendors = Vendor::all();
 
 		return Inertia::render('Backend/User/HospitalPurchase/Trash', [
@@ -283,16 +181,110 @@ class HospitalPurchaseController extends Controller
 				'total' => $bills->total(),
 			],
 			'filters' => [
-				'search' => $search,
-				'vendor_id' => $vendorId,
-				'date_range' => $dateRange,
-				'approval_status' => $approvalStatus,
-				'status' => $status,
+				'search' => $request->get('search', ''),
+				'vendor_id' => $request->get('vendor_id', ''),
+				'date_range' => $request->get('date_range', ''),
+				'approval_status' => $request->get('approval_status', ''),
+				'status' => $request->get('status', ''),
 				'sorting' => $sorting,
 			],
 			'vendors' => $vendors,
 			'summary' => $summary,
 		]);
+	}
+
+	private function buildHospitalPurchaseQuery(Request $request, array $relations = [], bool $onlyTrashed = false)
+	{
+		$query = $onlyTrashed ? Purchase::onlyTrashed() : Purchase::query();
+		$query->where('cash', 0);
+
+		if (!empty($relations)) {
+			$query->with($relations);
+		}
+
+		$this->applyHospitalPurchaseFilters($query, $request);
+
+		return $query;
+	}
+
+	private function applyHospitalPurchaseFilters($query, Request $request): void
+	{
+		$search = trim((string) $request->input('search', ''));
+		if ($search !== '') {
+			$query->where(function ($q) use ($search) {
+				$q->where('purchases.bill_no', 'like', "%{$search}%")
+					->orWhere('purchases.title', 'like', "%{$search}%")
+					->orWhere('purchases.purchase_date', 'like', "%{$search}%")
+					->orWhere('purchases.due_date', 'like', "%{$search}%")
+					->orWhere('purchases.grand_total', 'like', "%{$search}%")
+					->orWhere('purchases.paid', 'like', "%{$search}%")
+					->orWhereHas('vendor', function ($vendorQuery) use ($search) {
+						$vendorQuery->where('name', 'like', "%{$search}%");
+					});
+			});
+		}
+
+		$vendorId = $request->input('vendor_id');
+		if ($vendorId !== null && $vendorId !== '') {
+			$query->where('vendor_id', $vendorId);
+		}
+
+		$dateRange = $request->input('date_range');
+		if (is_array($dateRange) && count($dateRange) >= 2 && $dateRange[0] && $dateRange[1]) {
+			$query->whereDate('purchase_date', '>=', Carbon::parse($dateRange[0])->format('Y-m-d'))
+				->whereDate('purchase_date', '<=', Carbon::parse($dateRange[1])->format('Y-m-d'));
+		}
+
+		$approvalStatus = $request->input('approval_status');
+		if ($approvalStatus !== null && $approvalStatus !== '') {
+			$query->where('approval_status', $approvalStatus);
+		}
+
+		$status = $request->input('status');
+		if ($status !== null && $status !== '') {
+			$query->where('status', $status);
+		}
+	}
+
+	private function resolveHospitalPurchaseSorting(Request $request): array
+	{
+		$sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
+		$allowedColumns = [
+			'id',
+			'bill_no',
+			'purchase_date',
+			'due_date',
+			'grand_total',
+			'paid',
+			'approval_status',
+			'status',
+			'vendor.name',
+		];
+
+		$sortColumn = $sorting['column'] ?? 'id';
+		if (!in_array($sortColumn, $allowedColumns, true)) {
+			$sortColumn = 'id';
+		}
+
+		$sortDirection = strtolower((string) ($sorting['direction'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
+
+		return [
+			'column' => $sortColumn,
+			'direction' => $sortDirection,
+		];
+	}
+
+	private function applyHospitalPurchaseSorting($query, array $sorting): void
+	{
+		if ($sorting['column'] === 'vendor.name') {
+			$query->join('vendors', 'purchases.vendor_id', '=', 'vendors.id')
+				->orderBy('vendors.name', $sorting['direction'])
+				->select('purchases.*');
+
+			return;
+		}
+
+		$query->orderBy('purchases.' . $sorting['column'], $sorting['direction']);
 	}
 
 	/**
@@ -2643,17 +2635,34 @@ class HospitalPurchaseController extends Controller
 		return view('backend.user.purchase.list', compact('purchases', 'status', 'vendor_id', 'date_range'));
 	}
 
-	public function export_purchases()
+	public function export_purchases(Request $request)
 	{
 		Gate::authorize('bill_invoices.csv.export');
-		// audit log
+
+		$sorting = $this->resolveHospitalPurchaseSorting($request);
+		$query = $this->buildHospitalPurchaseQuery($request, [
+			'vendor',
+			'business',
+			'taxes',
+			'items.product',
+			'items.account',
+			'items.taxes',
+		]);
+
+		$this->applyHospitalPurchaseSorting($query, $sorting);
+
+		$purchases = $query->get();
+
 		$audit = new AuditLog();
 		$audit->date_changed = date('Y-m-d H:i:s');
 		$audit->changed_by = auth()->user()->id;
-		$audit->event = 'Bill Invoices Exported';
+		$audit->event = 'Hospital Purchases Exported';
 		$audit->save();
 
-		return Excel::download(new BillInvoiceExport, 'purchases ' . now()->format('d m Y') . '.xlsx');
+		return Excel::download(
+			new HospitalPurchaseExport($purchases),
+			'hospital purchases ' . now()->format('d m Y') . '.xlsx'
+		);
 	}
 
 	public function bulk_approve(Request $request)
