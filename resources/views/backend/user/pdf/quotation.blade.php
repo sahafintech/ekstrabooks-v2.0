@@ -6,6 +6,8 @@
     $businessName = $quotation->business->business_name ?? $quotation->business->name ?? 'Business';
     $businessEmail = $quotation->business->business_email ?? $quotation->business->email ?? '';
     $quantityLabel = $quotation->is_deffered && $quotation->invoice_category === 'medical' ? 'Members' : 'Quantity';
+    $coverageSummary = $quotation->coverage_summary ?: $quotation->note;
+    $exclusionsRemarks = $quotation->exclusions_remarks ?: $quotation->footer;
     $quoteToRows = [
         ['label' => 'Quote To', 'value' => $quotation->customer->name ?? '-'],
         ['label' => 'Quotation Type', 'value' => $quotation->is_deffered ? 'Deferred' : 'Normal'],
@@ -146,8 +148,8 @@
                 <div class="px-2 py-1 text-xs font-bold uppercase" style="background-color: {{ $primaryColor }}; color: {{ $textColor }}; letter-spacing: 0.12em;">
                     Coverage Summary
                 </div>
-                <div class="min-h-[150px] p-3 text-sm leading-6 text-slate-800">
-                    {{ $quotation->note ?: 'No additional coverage summary provided.' }}
+                <div class="min-h-[150px] p-3 text-sm leading-6 text-slate-800" style="white-space: pre-line;">
+                    {{ $coverageSummary ?: 'No additional coverage summary provided.' }}
                 </div>
             </div>
 
@@ -155,8 +157,8 @@
                 <div class="px-2 py-1 text-xs font-bold uppercase" style="background-color: {{ $primaryColor }}; color: {{ $textColor }}; letter-spacing: 0.12em;">
                     Exclusions and Remarks
                 </div>
-                <div class="min-h-[150px] p-3 text-sm leading-6 text-slate-800">
-                    {{ $quotation->footer ?: 'No additional exclusions or remarks provided.' }}
+                <div class="min-h-[150px] p-3 text-sm leading-6 text-slate-800" style="white-space: pre-line;">
+                    {{ $exclusionsRemarks ?: 'No additional exclusions or remarks provided.' }}
                 </div>
             </div>
 

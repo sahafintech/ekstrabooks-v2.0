@@ -96,6 +96,8 @@ export default function View({ quotation, decimalPlace }) {
         quotation?.business?.business_name || quotation?.business?.name || "Business";
     const businessEmail =
         quotation?.business?.business_email || quotation?.business?.email || "";
+    const coverageSummary = quotation?.coverage_summary || quotation?.note || "";
+    const exclusionsRemarks = quotation?.exclusions_remarks || quotation?.footer || "";
 
     const formatMoney = (amount, currency = quotation?.currency) =>
         formatCurrency({
@@ -287,9 +289,6 @@ export default function View({ quotation, decimalPlace }) {
                                                 <th className="border border-slate-900 px-2 py-1 text-left" style={sectionTitleStyle(primaryColor, textColor)}>Coverage</th>
                                                 <th className="border border-slate-900 px-2 py-1 text-left" style={sectionTitleStyle(primaryColor, textColor)}>Item</th>
                                                 <th className="border border-slate-900 px-2 py-1 text-left" style={sectionTitleStyle(primaryColor, textColor)}>Description</th>
-                                                {isDeferredQuotation && (
-                                                    <th className="border border-slate-900 px-2 py-1 text-left" style={sectionTitleStyle(primaryColor, textColor)}>Benefits</th>
-                                                )}
                                                 {isDeferredQuotation && quotation?.invoice_category === "medical" && (
                                                     <th className="border border-slate-900 px-2 py-1 text-left" style={sectionTitleStyle(primaryColor, textColor)}>Family Size</th>
                                                 )}
@@ -307,9 +306,6 @@ export default function View({ quotation, decimalPlace }) {
                                                     <td className="border border-slate-900 px-2 py-2 align-top">{item.product_name}</td>
                                                     <td className="border border-slate-900 px-2 py-2 align-top">{item.product_name}</td>
                                                     <td className="border border-slate-900 px-2 py-2 align-top">{item.description}</td>
-                                                    {isDeferredQuotation && (
-                                                        <td className="border border-slate-900 px-2 py-2 align-top">{item.benefits}</td>
-                                                    )}
                                                     {isDeferredQuotation && quotation?.invoice_category === "medical" && (
                                                         <td className="border border-slate-900 px-2 py-2 align-top">{item.family_size}</td>
                                                     )}
@@ -330,8 +326,8 @@ export default function View({ quotation, decimalPlace }) {
                                         <div className="px-2 py-1 text-xs font-bold uppercase" style={sectionTitleStyle(primaryColor, textColor)}>
                                             Coverage Summary
                                         </div>
-                                        <div className="min-h-[150px] p-3 text-sm leading-6 text-slate-800">
-                                            {quotation?.note || "No additional coverage summary provided."}
+                                        <div className="min-h-[150px] whitespace-pre-line p-3 text-sm leading-6 text-slate-800">
+                                            {coverageSummary || "No additional coverage summary provided."}
                                         </div>
                                     </div>
 
@@ -339,8 +335,8 @@ export default function View({ quotation, decimalPlace }) {
                                         <div className="px-2 py-1 text-xs font-bold uppercase" style={sectionTitleStyle(primaryColor, textColor)}>
                                             Exclusions and Remarks
                                         </div>
-                                        <div className="min-h-[150px] p-3 text-sm leading-6 text-slate-800">
-                                            {quotation?.footer || "No additional exclusions or remarks provided."}
+                                        <div className="min-h-[150px] whitespace-pre-line p-3 text-sm leading-6 text-slate-800">
+                                            {exclusionsRemarks || "No additional exclusions or remarks provided."}
                                         </div>
                                     </div>
 

@@ -204,6 +204,8 @@ class QuotationController extends Controller
             'expired_date'     => 'required',
             'product_id'       => 'required',
             'currency'         => 'required',
+            'exclusions_remarks' => 'nullable|string',
+            'coverage_summary' => 'nullable|string',
             'is_deffered'      => 'nullable|in:0,1',
             'invoice_category' => 'nullable|required_if:is_deffered,1|in:medical,gpa,other',
         ], [
@@ -249,6 +251,8 @@ class QuotationController extends Controller
         $quotation->template         = $request->input('template') ?? 'default';
         $quotation->note             = $request->input('note');
         $quotation->footer           = $request->input('footer');
+        $quotation->exclusions_remarks = $request->input('exclusions_remarks');
+        $quotation->coverage_summary = $request->input('coverage_summary');
         $quotation->is_deffered      = $this->isDeferredQuotation($request);
         $quotation->invoice_category = $this->isDeferredQuotation($request) ? $request->input('invoice_category') : null;
         $quotation->short_code       = rand(100000, 9999999) . uniqid();
@@ -441,6 +445,8 @@ class QuotationController extends Controller
             'expired_date'     => 'required',
             'product_id'       => 'required',
             'currency'         => 'required',
+            'exclusions_remarks' => 'nullable|string',
+            'coverage_summary' => 'nullable|string',
             'is_deffered'      => 'nullable|in:0,1',
             'invoice_category' => 'nullable|required_if:is_deffered,1|in:medical,gpa,other',
         ], [
@@ -485,6 +491,8 @@ class QuotationController extends Controller
         $quotation->template         = $request->input('template') ?? 'default';
         $quotation->note             = $request->input('note');
         $quotation->footer           = $request->input('footer');
+        $quotation->exclusions_remarks = $request->input('exclusions_remarks');
+        $quotation->coverage_summary = $request->input('coverage_summary');
         $quotation->is_deffered      = $this->isDeferredQuotation($request);
         $quotation->invoice_category = $this->isDeferredQuotation($request) ? $request->input('invoice_category') : null;
 

@@ -21,7 +21,6 @@ const createEmptyQuotationItem = () => ({
     description: "",
     quantity: 1,
     unit_cost: 0,
-    benefits: "",
     family_size: "",
     sum_insured: "",
 });
@@ -66,6 +65,8 @@ export default function Create({
         template: "",
         note: "",
         footer: "",
+        exclusions_remarks: "",
+        coverage_summary: "",
         attachment: null,
         is_deffered: "0",
         invoice_category: "",
@@ -74,7 +75,6 @@ export default function Create({
         description: [],
         quantity: [],
         unit_cost: [],
-        benefits: [],
         family_size: [],
         sum_insured: [],
         taxes: [],
@@ -113,7 +113,6 @@ export default function Create({
         setData("description", items.map((item) => item.description));
         setData("quantity", items.map((item) => item.quantity));
         setData("unit_cost", items.map((item) => item.unit_cost));
-        setData("benefits", items.map((item) => item.benefits));
         setData("family_size", items.map((item) => item.family_size));
         setData("sum_insured", items.map((item) => item.sum_insured));
     };
@@ -121,7 +120,6 @@ export default function Create({
     const sanitizeDeferredItemFields = (items, deferred, category) =>
         items.map((item) => ({
             ...item,
-            benefits: deferred ? item.benefits ?? "" : "",
             family_size: deferred && category === "medical" ? item.family_size ?? "" : "",
             sum_insured: deferred && category === "other" ? item.sum_insured ?? "" : "",
         }));
@@ -342,7 +340,6 @@ export default function Create({
             description: quotationItems.map(item => item.description),
             quantity: quotationItems.map(item => item.quantity),
             unit_cost: quotationItems.map(item => item.unit_cost),
-            benefits: quotationItems.map(item => item.benefits),
             family_size: quotationItems.map(item => item.family_size),
             sum_insured: quotationItems.map(item => item.sum_insured),
         };
@@ -591,17 +588,6 @@ export default function Create({
 
                                         {isDeferredQuotation && (
                                             <div className={`grid grid-cols-1 gap-2 ${isMedicalDeferredQuotation || isOtherDeferredQuotation ? "md:grid-cols-2" : ""}`}>
-                                                <div>
-                                                    <Label>Benefits</Label>
-                                                    <Textarea
-                                                        value={item.benefits}
-                                                        onChange={(e) =>
-                                                            autoResizeTextarea(e, (value) => updateQuotationItem(index, "benefits", value))
-                                                        }
-                                                        className="min-h-[30px] resize-none overflow-hidden"
-                                                        rows={1}
-                                                    />
-                                                </div>
 
                                                 {isMedicalDeferredQuotation && (
                                                     <div>
@@ -634,6 +620,38 @@ export default function Create({
                         </div>
 
                         <SidebarSeparator className="my-4" />
+
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label htmlFor="coverage_summary" className="md:col-span-2 col-span-12">
+                                Coverage Summary
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                <Textarea
+                                    id="coverage_summary"
+                                    value={data.coverage_summary}
+                                    onChange={(e) => setData("coverage_summary", e.target.value)}
+                                    className="md:w-1/2 w-full"
+                                    rows={4}
+                                />
+                                <InputError message={errors.coverage_summary} className="text-sm" />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-12 mt-2">
+                            <Label htmlFor="exclusions_remarks" className="md:col-span-2 col-span-12">
+                                Exclusions and Remarks
+                            </Label>
+                            <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
+                                <Textarea
+                                    id="exclusions_remarks"
+                                    value={data.exclusions_remarks}
+                                    onChange={(e) => setData("exclusions_remarks", e.target.value)}
+                                    className="md:w-1/2 w-full"
+                                    rows={4}
+                                />
+                                <InputError message={errors.exclusions_remarks} className="text-sm" />
+                            </div>
+                        </div>
 
                         <div className="grid grid-cols-12 mt-2">
                             <Label htmlFor="taxes" className="md:col-span-2 col-span-12">

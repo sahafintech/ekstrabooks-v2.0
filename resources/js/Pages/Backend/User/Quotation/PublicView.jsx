@@ -25,6 +25,8 @@ export default function PublicView({ quotation }) {
     const contentRef = useRef(null);
     const isDeferredQuotation = Number(quotation?.is_deffered) === 1;
     const quantityLabel = isDeferredQuotation && quotation?.invoice_category === "medical" ? "Members" : "Quantity";
+    const coverageSummary = quotation?.coverage_summary || quotation?.note || "";
+    const exclusionsRemarks = quotation?.exclusions_remarks || quotation?.footer || "";
 
     useEffect(() => {
         if (flash && flash.success) {
@@ -220,7 +222,6 @@ export default function PublicView({ quotation }) {
                                     <TableRow>
                                         <TableHead>Item</TableHead>
                                         <TableHead>Description</TableHead>
-                                        {isDeferredQuotation && <TableHead>Benefit</TableHead>}
                                         {isDeferredQuotation && quotation.invoice_category === "other" && (
                                             <TableHead className="text-right">Sum Insured</TableHead>
                                         )}
@@ -247,9 +248,6 @@ export default function PublicView({ quotation }) {
                                             <TableCell>
                                                 {item.description}
                                             </TableCell>
-                                            {isDeferredQuotation && (
-                                                <TableCell>{item.benefits}</TableCell>
-                                            )}
                                             {isDeferredQuotation && quotation.invoice_category === "other" && (
                                                 <TableCell className="text-right">
                                                     {formatCurrency(item.sum_insured, quotation.currency)}
@@ -369,30 +367,26 @@ export default function PublicView({ quotation }) {
                             </div>
                         </div>
 
-                        {/* Notes & Terms */}
-                        {(quotation.note || quotation.footer) && (
-                            <div className="mt-8 space-y-4">
-                                {quotation.note && (
-                                    <div>
-                                        <h3 className="font-medium mb-1">
-                                            Notes:
-                                        </h3>
-                                        <p className="text-sm">
-                                            {quotation.note}
-                                        </p>
-                                    </div>
-                                )}
+                        {/* Coverage Summary & Exclusions */}
+                        {(coverageSummary || exclusionsRemarks) && (
+                            <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+                                <div>
+                                    <h3 className="mb-1 text-lg font-medium">
+                                        Coverage Summary
+                                    </h3>
+                                    <p className="whitespace-pre-line text-sm">
+                                        {coverageSummary || "No additional coverage summary provided."}
+                                    </p>
+                                </div>
 
-                                {quotation.footer && (
-                                    <div>
-                                        <h3 className="font-medium mb-1">
-                                            Terms & Conditions:
-                                        </h3>
-                                        <p className="text-sm">
-                                            {quotation.footer}
-                                        </p>
-                                    </div>
-                                )}
+                                <div>
+                                    <h3 className="mb-1 text-lg font-medium">
+                                        Exclusions and Remarks
+                                    </h3>
+                                    <p className="whitespace-pre-line text-sm">
+                                        {exclusionsRemarks || "No additional exclusions or remarks provided."}
+                                    </p>
+                                </div>
                             </div>
                         )}
                     </div>
