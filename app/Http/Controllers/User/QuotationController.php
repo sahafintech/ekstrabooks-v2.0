@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\User;
 
+use App\Exports\QuotationExport;
 use App\Http\Controllers\Controller;
 use App\Models\Account;
 use App\Models\AuditLog;
@@ -27,9 +28,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Inertia;
-use function Spatie\LaravelPdf\Support\pdf;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
+use Maatwebsite\Excel\Facades\Excel;
+use function Spatie\LaravelPdf\Support\pdf;
 
 class QuotationController extends Controller
 {
@@ -77,65 +79,8 @@ class QuotationController extends Controller
     {
         Gate::authorize('quotations.view');
 
-        $query = Quotation::with('customer');
-
-        // Apply search filter
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('quotation_number', 'like', "%{$search}%")
-                  ->orWhere('title', 'like', "%{$search}%")
-                  ->orWhereHas('customer', function($q) use ($search) {
-                      $q->where('name', 'like', "%{$search}%");
-                  });
-            });
-        }
-
-        // Filter by customer
-        if ($request->has('customer_id') && $request->customer_id !== '') {
-            $query->where('customer_id', $request->customer_id);
-        }
-
-        // Filter by date range
-        if ($request->has('date_range') && $request->date_range) {
-            $query->where(function($q) use ($request) {
-                $q->where('quotation_date', '>=', $request->date_range[0])
-                  ->where('quotation_date', '<=', $request->date_range[1]);
-            });
-        }
-
-        // Filter by status
-        if ($request->has('status') && $request->status !== '') {
-            $this->applyQuotationStatusFilter($query, (string) $request->status);
-        }
-
-        // Get summary statistics for all quotations matching filters
-        $allQuotations = Quotation::query();
-        
-        if ($request->has('search')) {
-            $allQuotations->where(function($q) use ($search) {
-                $q->where('quotation_number', 'like', "%{$search}%")
-                  ->orWhere('title', 'like', "%{$search}%")
-                  ->orWhereHas('customer', function($q) use ($search) {
-                      $q->where('name', 'like', "%{$search}%");
-                  });
-            });
-        }
-
-        if ($request->has('customer_id') && $request->customer_id !== '') {
-            $allQuotations->where('customer_id', $request->customer_id);
-        }
-
-        if ($request->has('date_range') && $request->date_range) {
-            $allQuotations->where('quotation_date', '>=', $request->date_range[0])
-                ->orWhere('quotation_date', '<=', $request->date_range[1]);
-        }
-
-        if ($request->has('status') && $request->status !== '') {
-            $this->applyQuotationStatusFilter($allQuotations, (string) $request->status);
-        }
-
-        $allQuotations = $allQuotations->get();
+        $query = $this->buildQuotationQuery($request, ['customer']);
+        $allQuotations = $this->buildQuotationQuery($request)->get();
 
         $summary = [
             'total_quotations' => $allQuotations->count(),
@@ -149,17 +94,8 @@ class QuotationController extends Controller
         ];
 
         // Handle sorting
-        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
-        $sortColumn = $sorting['column'];
-        $sortDirection = $sorting['direction'];
-
-        if ($sortColumn === 'customer.name') {
-            $query->join('customers', 'quotations.customer_id', '=', 'customers.id')
-                ->orderBy('customers.name', $sortDirection)
-                ->select('quotations.*');
-        } else {
-            $query->orderBy('quotations.' . $sortColumn, $sortDirection);
-        }
+        $sorting = $this->resolveQuotationSorting($request);
+        $this->applyQuotationSorting($query, $sorting);
 
         // Handle pagination
         $perPage = $request->get('per_page', 50);
@@ -191,50 +127,11 @@ class QuotationController extends Controller
     {
         Gate::authorize('quotations.view');
 
-        $query = Quotation::onlyTrashed()->with('customer');
-
-        // Apply search filter
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('quotation_number', 'like', "%{$search}%")
-                  ->orWhere('title', 'like', "%{$search}%")
-                  ->orWhereHas('customer', function($q) use ($search) {
-                      $q->where('name', 'like', "%{$search}%");
-                  });
-            });
-        }
-
-        // Filter by customer
-        if ($request->has('customer_id') && $request->customer_id !== '') {
-            $query->where('customer_id', $request->customer_id);
-        }
-
-        // Filter by date range
-        if ($request->has('date_range') && $request->date_range) {
-            $query->where(function($q) use ($request) {
-                $q->where('quotation_date', '>=', $request->date_range[0])
-                  ->where('quotation_date', '<=', $request->date_range[1]);
-            });
-        }
-
-        // Filter by status
-        if ($request->has('status') && $request->status !== '') {
-            $this->applyQuotationStatusFilter($query, (string) $request->status);
-        }
+        $query = $this->buildQuotationQuery($request, ['customer'], true);
 
         // Handle sorting
-        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
-        $sortColumn = $sorting['column'];
-        $sortDirection = $sorting['direction'];
-
-        if ($sortColumn === 'customer.name') {
-            $query->join('customers', 'quotations.customer_id', '=', 'customers.id')
-                ->orderBy('customers.name', $sortDirection)
-                ->select('quotations.*');
-        } else {
-            $query->orderBy('quotations.' . $sortColumn, $sortDirection);
-        }
+        $sorting = $this->resolveQuotationSorting($request);
+        $this->applyQuotationSorting($query, $sorting);
 
         // Handle pagination
         $perPage = $request->get('per_page', 50);
@@ -713,6 +610,34 @@ class QuotationController extends Controller
         }
     }
 
+    public function export(Request $request)
+    {
+        Gate::authorize('quotations.view');
+
+        $sorting = $this->resolveQuotationSorting($request);
+        $query = $this->buildQuotationQuery($request, [
+            'customer',
+            'taxes',
+            'items.product',
+            'items.taxes',
+        ]);
+
+        $this->applyQuotationSorting($query, $sorting);
+
+        $quotations = $query->get();
+
+        $audit = new AuditLog();
+        $audit->date_changed = date('Y-m-d H:i:s');
+        $audit->changed_by = auth()->user()->id;
+        $audit->event = 'Quotations Exported';
+        $audit->save();
+
+        return Excel::download(
+            new QuotationExport($quotations),
+            'quotations ' . now()->format('d m Y') . '.xlsx'
+        );
+    }
+
     public function reject($id)
     {
         Gate::authorize('quotations.update');
@@ -851,6 +776,89 @@ class QuotationController extends Controller
             $quotation->restore();
         }
         return redirect()->route('quotations.trash')->with('success', _lang('Restored Successfully'));
+    }
+
+    private function buildQuotationQuery(Request $request, array $relations = [], bool $onlyTrashed = false)
+    {
+        $query = $onlyTrashed ? Quotation::onlyTrashed() : Quotation::query();
+
+        if (!empty($relations)) {
+            $query->with($relations);
+        }
+
+        $this->applyQuotationFilters($query, $request);
+
+        return $query;
+    }
+
+    private function applyQuotationFilters($query, Request $request): void
+    {
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+
+            $query->where(function ($q) use ($search) {
+                $q->where('quotation_number', 'like', "%{$search}%")
+                    ->orWhere('title', 'like', "%{$search}%")
+                    ->orWhereHas('customer', function ($customerQuery) use ($search) {
+                        $customerQuery->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        if ($request->has('customer_id') && $request->customer_id !== '') {
+            $query->where('customer_id', $request->customer_id);
+        }
+
+        $dateRange = $request->input('date_range');
+        if (is_array($dateRange) && count($dateRange) >= 2 && $dateRange[0] && $dateRange[1]) {
+            $query->where(function ($q) use ($dateRange) {
+                $q->whereDate('quotation_date', '>=', $dateRange[0])
+                    ->whereDate('quotation_date', '<=', $dateRange[1]);
+            });
+        }
+
+        if ($request->has('status') && $request->status !== '') {
+            $this->applyQuotationStatusFilter($query, (string) $request->status);
+        }
+    }
+
+    private function resolveQuotationSorting(Request $request): array
+    {
+        $sorting = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
+        $allowedColumns = [
+            'id',
+            'quotation_number',
+            'is_deffered',
+            'quotation_date',
+            'expired_date',
+            'grand_total',
+            'customer.name',
+        ];
+
+        $sortColumn = $sorting['column'] ?? 'id';
+        if (!in_array($sortColumn, $allowedColumns, true)) {
+            $sortColumn = 'id';
+        }
+
+        $sortDirection = strtolower((string) ($sorting['direction'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
+
+        return [
+            'column' => $sortColumn,
+            'direction' => $sortDirection,
+        ];
+    }
+
+    private function applyQuotationSorting($query, array $sorting): void
+    {
+        if ($sorting['column'] === 'customer.name') {
+            $query->join('customers', 'quotations.customer_id', '=', 'customers.id')
+                ->orderBy('customers.name', $sorting['direction'])
+                ->select('quotations.*');
+
+            return;
+        }
+
+        $query->orderBy('quotations.' . $sorting['column'], $sorting['direction']);
     }
 
     private function applyQuotationStatusFilter($query, string $status): void

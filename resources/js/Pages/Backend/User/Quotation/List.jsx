@@ -618,8 +618,54 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
     return pages;
   };
 
+  const formatDateForExport = (value) => {
+    if (!value) return null;
+
+    const parsedDate = value instanceof Date ? value : parseDateObject(value);
+    if (!parsedDate || Number.isNaN(parsedDate.getTime())) {
+      return null;
+    }
+
+    const year = parsedDate.getFullYear();
+    const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+    const day = String(parsedDate.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  };
+
   const exportQuotations = () => {
-    router.get(route("quotations.export"));
+    const params = new URLSearchParams();
+    const [fromDateValue, toDateValue] = Array.isArray(dateRange) ? dateRange : [];
+    const fromDate = formatDateForExport(fromDateValue);
+    const toDate = formatDateForExport(toDateValue);
+
+    if (search) {
+      params.set("search", search);
+    }
+
+    if (selectedCustomer) {
+      params.set("customer_id", selectedCustomer);
+    }
+
+    if (selectedStatus !== "") {
+      params.set("status", selectedStatus);
+    }
+
+    if (fromDate && toDate) {
+      params.set("date_range[0]", fromDate);
+      params.set("date_range[1]", toDate);
+    }
+
+    if (sorting?.column) {
+      params.set("sorting[column]", sorting.column);
+    }
+
+    if (sorting?.direction) {
+      params.set("sorting[direction]", sorting.direction);
+    }
+
+    const exportUrl = route("quotations.export");
+    window.location.href = params.toString() ? `${exportUrl}?${params.toString()}` : exportUrl;
   };
 
   return (

@@ -530,6 +530,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::resource('deffered_receive_payments', DefferedPaymentController::class);
 
 		//Quotation
+		Route::get('quotations/export', [QuotationController::class, 'export'])->name('quotations.export');
 		Route::get('quotations/trash', [QuotationController::class, 'trash'])->name('quotations.trash');
 		Route::post('quotations/{id}/restore', [QuotationController::class, 'restore'])->name('quotations.restore');
 		Route::post('quotations/bulk_restore', [QuotationController::class, 'bulk_restore'])->name('quotations.bulk_restore');
