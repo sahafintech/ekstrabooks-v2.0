@@ -536,6 +536,10 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('quotations/bulk_restore', [QuotationController::class, 'bulk_restore'])->name('quotations.bulk_restore');
 		Route::post('quotations/bulk_permanent_destroy', [QuotationController::class, 'bulk_permanent_destroy'])->name('quotations.bulk_permanent_destroy');
 		Route::delete('quotations/{id}/permanent_destroy', [QuotationController::class, 'permanent_destroy'])->name('quotations.permanent_destroy');
+		Route::get('quotations/import', [QuotationController::class, 'import'])->name('quotations.import.page');
+		Route::match(['get', 'post'], 'quotations/import/upload', [QuotationController::class, 'uploadImportFile'])->name('quotations.import.upload');
+		Route::match(['get', 'post'], 'quotations/import/preview', [QuotationController::class, 'previewImport'])->name('quotations.import.preview');
+		Route::match(['get', 'post'], 'quotations/import/execute', [QuotationController::class, 'executeImport'])->name('quotations.import.execute');
 		Route::match(['get', 'post'], 'quotations/{id}/send_email', [QuotationController::class, 'send_email'])->name('quotations.send_email');
 		Route::get('quotations/{id}/pdf', [QuotationController::class, 'pdf'])->name('quotations.pdf');
 		Route::match(['get', 'post'], 'quotations/{id}/convert_to_invoice', [QuotationController::class, 'convert_to_invoice'])->name('quotations.convert_to_invoice');

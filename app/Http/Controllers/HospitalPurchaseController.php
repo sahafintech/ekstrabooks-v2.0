@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exports\HospitalPurchaseExport;
 use App\Http\Controllers\Controller;
-use App\Imports\BillInvoiceImport;
+use App\Imports\HospitalPurchaseImport;
 use App\Models\Account;
 use App\Models\Approvals;
 use App\Models\Attachment;
@@ -2271,10 +2271,10 @@ class HospitalPurchaseController extends Controller
 				}
 			}
 
-			session()->put('bill_import_file_path', $relativePath);
-			session()->put('bill_import_full_path', $fullPath);
-			session()->put('bill_import_file_name', $request->file('file')->getClientOriginalName());
-			session()->put('bill_import_headers', $headers);
+			session()->put('hospital_purchase_import_file_path', $relativePath);
+			session()->put('hospital_purchase_import_full_path', $fullPath);
+			session()->put('hospital_purchase_import_file_name', $request->file('file')->getClientOriginalName());
+			session()->put('hospital_purchase_import_headers', $headers);
 			session()->save();
 
 			return Inertia::render('Backend/User/HospitalPurchase/Import', [
@@ -2299,8 +2299,8 @@ class HospitalPurchaseController extends Controller
 		}
 
 		$mappings = $request->input('mappings', []);
-		$fullPath = session('bill_import_full_path');
-		$headers = session('bill_import_headers', []);
+		$fullPath = session('hospital_purchase_import_full_path');
+		$headers = session('hospital_purchase_import_headers', []);
 
 		if (!$fullPath || !file_exists($fullPath)) {
 			return back()->with('error', 'Import session expired or file not found. Please upload your file again.');
@@ -2315,211 +2315,216 @@ class HospitalPurchaseController extends Controller
 			$errorCount = 0;
 			$warningCount = 0;
 			$totalRows = 0;
-			$uniqueBillGroups = [];
-			$productLookupCache = [];
+			$groupedPurchases = [];
+			$autoGroupCounter = 0;
 			$vendorLookupCache = [];
 			$accountLookupCache = [];
 			$taxLookupCache = [];
 			$currencyLookupCache = [];
 
-			$resolveIsInventory = static function ($value): array {
-				if ($value === null) {
-					return ['value' => 1, 'valid' => true];
-				}
-
-				$normalized = trim((string) $value);
-				if ($normalized === '') {
-					return ['value' => 1, 'valid' => true];
-				}
-
-				$normalizedLower = strtolower($normalized);
-				if ($normalized === '1' || $normalizedLower === 'true') {
-					return ['value' => 1, 'valid' => true];
-				}
-
-				if ($normalized === '0' || $normalizedLower === 'false') {
-					return ['value' => 0, 'valid' => true];
-				}
-
-				return ['value' => null, 'valid' => false];
-			};
-
-			$parseTaxNames = static function ($value): array {
-				if ($value === null) {
-					return [];
-				}
-
-				$raw = trim((string) $value);
-				if ($raw === '') {
-					return [];
-				}
-
-				$parts = preg_split('/[;,]/', $raw) ?: [];
-				$names = [];
-				foreach ($parts as $part) {
-					$name = trim((string) $part);
-					if ($name !== '') {
-						$names[] = $name;
-					}
-				}
-
-				return array_values(array_unique($names));
-			};
-
 			foreach ($worksheet->getRowIterator(2) as $row) {
 				$rowIndex = $row->getRowIndex();
-				$totalRows++;
 
 				$cellIterator = $row->getCellIterator();
 				$cellIterator->setIterateOnlyExistingCells(false);
 
-				$rowData = [];
+				$rawRow = [];
 				$cellIndex = 0;
 
 				foreach ($cellIterator as $cell) {
 					if ($cellIndex < count($headers)) {
-						$header = $headers[$cellIndex];
-						$systemField = $mappings[$header] ?? null;
-
-						if ($systemField && $systemField !== 'skip') {
-							$rowData[$systemField] = $cell->getValue();
-						}
+						$rawRow[$headers[$cellIndex]] = $cell->getValue();
 					}
 					$cellIndex++;
 				}
 
-				$billNumber = isset($rowData['bill_number']) ? trim((string) $rowData['bill_number']) : '';
-				$productName = isset($rowData['product_name']) ? trim((string) $rowData['product_name']) : '';
+				$rowData = $this->mapHospitalPurchaseImportRow($rawRow, $mappings);
+				$billNumber = $this->normalizeHospitalPurchaseImportNumber($rowData['bill_number'] ?? null);
+				$productName = trim((string) ($rowData['product_name'] ?? ''));
 
-				if ($billNumber === '' && $productName === '') {
-					$totalRows--;
+				if ($billNumber === null && $productName === '') {
 					continue;
 				}
 
-				$rowData['bill_number'] = $billNumber !== '' ? $billNumber : null;
+				$totalRows++;
 
-				if ($billNumber !== '') {
-					$uniqueBillGroups['bill::' . strtolower($billNumber)] = true;
+				$groupKey = $billNumber !== null
+					? 'bill::' . strtolower($billNumber)
+					: 'auto::' . (++$autoGroupCounter);
+
+				if (!isset($groupedPurchases[$groupKey])) {
+					$groupedPurchases[$groupKey] = [
+						'bill_number' => $billNumber,
+						'header' => $rowData,
+						'rows' => [],
+					];
+				}
+
+				$groupedPurchases[$groupKey]['rows'][] = [
+					'row' => $rowIndex,
+					'data' => $rowData,
+				];
+			}
+
+			foreach ($groupedPurchases as $group) {
+				$header = $group['header'];
+				$groupErrors = [];
+
+				$invoiceDateRaw = $header['invoice_date'] ?? null;
+				$invoiceDate = null;
+				if (($invoiceDateRaw === null || trim((string) $invoiceDateRaw) === '') && $invoiceDateRaw !== 0) {
+					$groupErrors[] = 'Invoice date is required';
 				} else {
-					$uniqueBillGroups['row::' . $rowIndex] = true;
-				}
-
-				$errors = [];
-				$isInventoryResult = $resolveIsInventory($rowData['is_inventory'] ?? null);
-				$isInventory = $isInventoryResult['value'] ?? 1;
-
-				if (!$isInventoryResult['valid']) {
-					$errors[] = 'is_inventory must be 1 or 0';
-				}
-
-				$rowData['is_inventory'] = $isInventory;
-
-				if ($productName === '') {
-					$errors[] = 'Product name is required';
-				} elseif ($isInventory === 1) {
-					$productCacheKey = strtolower($productName);
-					if (!array_key_exists($productCacheKey, $productLookupCache)) {
-						$productLookupCache[$productCacheKey] = Product::where('name', 'like', '%' . $productName . '%')->first();
-					}
-
-					if (!$productLookupCache[$productCacheKey]) {
-						$errors[] = 'Product "' . $productName . '" not found';
+					$invoiceDate = $this->parseHospitalPurchaseImportDate($invoiceDateRaw);
+					if ($invoiceDate === null) {
+						$groupErrors[] = 'Invoice date is invalid';
 					}
 				}
 
-				if (empty($rowData['invoice_date'])) {
-					$errors[] = 'Invoice date is required';
-				}
-
-				if (empty($rowData['due_date'])) {
-					$errors[] = 'Due date is required';
-				}
-
-				if (empty($rowData['quantity']) || floatval($rowData['quantity']) <= 0) {
-					$errors[] = 'Quantity must be greater than 0';
-				}
-
-				if (!isset($rowData['unit_cost']) || $rowData['unit_cost'] === '' || floatval($rowData['unit_cost']) < 0) {
-					$errors[] = 'Unit cost is required and must be non-negative';
-				}
-
-				$expenseAccountName = isset($rowData['expense_account']) ? trim((string) $rowData['expense_account']) : '';
-				if ($isInventory === 0) {
-					if ($expenseAccountName === '') {
-						$errors[] = 'Expense account is required when is_inventory is 0';
-					} else {
-						$accountCacheKey = strtolower($expenseAccountName);
-						if (!array_key_exists($accountCacheKey, $accountLookupCache)) {
-							$accountLookupCache[$accountCacheKey] = Account::where('account_name', 'like', '%' . $expenseAccountName . '%')->first();
-						}
-
-						if (!$accountLookupCache[$accountCacheKey]) {
-							$errors[] = 'Expense account "' . $expenseAccountName . '" not found';
-						}
+				$dueDateRaw = $header['due_date'] ?? null;
+				$dueDate = null;
+				if (($dueDateRaw === null || trim((string) $dueDateRaw) === '') && $dueDateRaw !== 0) {
+					$groupErrors[] = 'Due date is required';
+				} else {
+					$dueDate = $this->parseHospitalPurchaseImportDate($dueDateRaw);
+					if ($dueDate === null) {
+						$groupErrors[] = 'Due date is invalid';
 					}
 				}
 
-				if (!empty($rowData['supplier_name'])) {
-					$supplierName = trim((string) $rowData['supplier_name']);
-					$vendorCacheKey = strtolower($supplierName);
+				if ($invoiceDate !== null && $dueDate !== null && Carbon::parse($dueDate)->lt(Carbon::parse($invoiceDate))) {
+					$groupErrors[] = 'Due date must be on or after the invoice date';
+				}
 
-					if (!array_key_exists($vendorCacheKey, $vendorLookupCache)) {
-						$vendorLookupCache[$vendorCacheKey] = Vendor::where('name', 'like', '%' . $supplierName . '%')->first();
+				if (!empty($header['supplier_name'])) {
+					$supplierName = trim((string) $header['supplier_name']);
+					$vendorKey = strtolower($supplierName);
+
+					if (!array_key_exists($vendorKey, $vendorLookupCache)) {
+						$vendorLookupCache[$vendorKey] = Vendor::where('name', 'like', '%' . $supplierName . '%')->first();
 					}
 
-					if (!$vendorLookupCache[$vendorCacheKey]) {
+					if (!$vendorLookupCache[$vendorKey]) {
 						$warningCount++;
 					}
 				}
 
-				if (!empty($rowData['transaction_currency'])) {
-					$currencyName = trim((string) $rowData['transaction_currency']);
-					$currencyCacheKey = strtolower($currencyName);
-					if (!array_key_exists($currencyCacheKey, $currencyLookupCache)) {
-						$currencyLookupCache[$currencyCacheKey] = Currency::where('name', 'like', '%' . $currencyName . '%')->first();
+				if (!empty($header['transaction_currency'])) {
+					$currencyName = trim((string) $header['transaction_currency']);
+					$currencyKey = strtolower($currencyName);
+
+					if (!array_key_exists($currencyKey, $currencyLookupCache)) {
+						$currencyLookupCache[$currencyKey] = Currency::where('name', $currencyName)->first();
 					}
 
-					if (!$currencyLookupCache[$currencyCacheKey]) {
-						$errors[] = 'Transaction currency "' . $currencyName . '" not found';
-					}
-				}
-
-				foreach ($parseTaxNames($rowData['tax'] ?? null) as $taxName) {
-					$taxCacheKey = strtolower($taxName);
-					if (!array_key_exists($taxCacheKey, $taxLookupCache)) {
-						$taxLookupCache[$taxCacheKey] = Tax::where('name', 'like', '%' . $taxName . '%')->first();
-					}
-
-					if (!$taxLookupCache[$taxCacheKey]) {
-						$errors[] = 'Tax "' . $taxName . '" not found';
+					if (!$currencyLookupCache[$currencyKey]) {
+						$groupErrors[] = 'Transaction currency "' . $currencyName . '" not found';
 					}
 				}
 
-				$status = count($errors) > 0 ? 'error' : 'valid';
-				if ($status === 'error') {
-					$errorCount++;
-				} else {
-					$validCount++;
+				if (
+					isset($header['exchange_rate']) &&
+					$header['exchange_rate'] !== null &&
+					trim((string) $header['exchange_rate']) !== '' &&
+					(!is_numeric($header['exchange_rate']) || (float) $header['exchange_rate'] <= 0)
+				) {
+					$groupErrors[] = 'Exchange rate must be greater than 0';
 				}
 
-				if ($status === 'error' && count($previewRecords) < 50) {
-					$previewRecords[] = [
-						'row' => $rowIndex,
-						'data' => $rowData,
-						'status' => $status,
-						'errors' => $errors,
-					];
+				if (
+					isset($header['discount_type']) &&
+					$header['discount_type'] !== null &&
+					trim((string) $header['discount_type']) !== '' &&
+					!in_array(trim((string) $header['discount_type']), ['0', '1'], true)
+				) {
+					$groupErrors[] = 'Discount type must be 0 or 1';
+				}
+
+				if (
+					isset($header['discount_value']) &&
+					$header['discount_value'] !== null &&
+					trim((string) $header['discount_value']) !== '' &&
+					(!is_numeric($header['discount_value']) || (float) $header['discount_value'] < 0)
+				) {
+					$groupErrors[] = 'Discount value must be a non-negative number';
+				}
+
+				foreach ($group['rows'] as $rowEntry) {
+					$rowData = $rowEntry['data'];
+					$rowErrors = $groupErrors;
+					$productName = trim((string) ($rowData['product_name'] ?? ''));
+
+					if ($productName === '') {
+						$rowErrors[] = 'Product name is required';
+					}
+
+					if (!isset($rowData['quantity']) || $rowData['quantity'] === '' || !is_numeric($rowData['quantity']) || (float) $rowData['quantity'] <= 0) {
+						$rowErrors[] = 'Quantity must be greater than 0';
+					}
+
+					if (!isset($rowData['unit_cost']) || $rowData['unit_cost'] === '' || !is_numeric($rowData['unit_cost']) || (float) $rowData['unit_cost'] < 0) {
+						$rowErrors[] = 'Unit cost is required and must be non-negative';
+					}
+
+					$expenseAccountName = trim((string) ($rowData['expense_account'] ?? ''));
+					if ($expenseAccountName === '') {
+						$rowErrors[] = 'Expense account is required';
+					} else {
+						$accountCacheKey = strtolower($expenseAccountName);
+						if (!array_key_exists($accountCacheKey, $accountLookupCache)) {
+							$accountLookupCache[$accountCacheKey] = Account::where('business_id', $request->activeBusiness->id)
+								->whereIn('account_type', Purchase::ALLOWED_ACCOUNT_TYPES)
+								->where('account_name', 'like', '%' . $expenseAccountName . '%')
+								->first();
+						}
+
+						if (!$accountLookupCache[$accountCacheKey]) {
+							$rowErrors[] = 'Expense account "' . $expenseAccountName . '" not found or is not allowed for hospital purchases';
+						}
+					}
+
+					foreach ($this->parseHospitalPurchaseImportTaxNames($rowData['tax'] ?? null) as $taxName) {
+						$taxCacheKey = strtolower($taxName);
+						if (!array_key_exists($taxCacheKey, $taxLookupCache)) {
+							$taxLookupCache[$taxCacheKey] = Tax::where('name', 'like', '%' . $taxName . '%')->first();
+						}
+
+						if (!$taxLookupCache[$taxCacheKey]) {
+							$rowErrors[] = 'Tax "' . $taxName . '" not found';
+						}
+					}
+
+					$rowErrors = array_values(array_unique($rowErrors));
+					$status = $rowErrors === [] ? 'valid' : 'error';
+
+					if ($status === 'error') {
+						$errorCount++;
+					} else {
+						$validCount++;
+					}
+
+					if ($status === 'error' && count($previewRecords) < 50) {
+						$previewRecords[] = [
+							'row' => $rowEntry['row'],
+							'data' => [
+								'bill_number' => $group['bill_number'],
+								'product_name' => $rowData['product_name'] ?? null,
+							],
+							'status' => $status,
+							'errors' => $rowErrors,
+						];
+					}
 				}
 			}
 
-			session()->put('bill_import_mappings', $mappings);
+			session()->put('hospital_purchase_import_mappings', $mappings);
 			session()->save();
 
 			return Inertia::render('Backend/User/HospitalPurchase/Import', [
 				'previewData' => [
 					'headers' => $headers,
 					'total_rows' => $totalRows,
-					'unique_bills' => count($uniqueBillGroups),
+					'unique_purchases' => count($groupedPurchases),
 					'preview_records' => $previewRecords,
 					'valid_count' => $validCount,
 					'error_count' => $errorCount,
@@ -2542,8 +2547,8 @@ class HospitalPurchaseController extends Controller
 			return redirect()->route('hospital_purchases.import.page');
 		}
 
-		$mappings = session('bill_import_mappings', []);
-		$fullPath = session('bill_import_full_path');
+		$mappings = session('hospital_purchase_import_mappings', []);
+		$fullPath = session('hospital_purchase_import_full_path');
 
 		if (!$fullPath || !file_exists($fullPath)) {
 			return redirect()
@@ -2552,32 +2557,174 @@ class HospitalPurchaseController extends Controller
 		}
 
 		try {
-			Excel::import(new BillInvoiceImport($mappings), $fullPath);
+			Excel::import(new HospitalPurchaseImport($mappings), $fullPath);
 
 			$audit = new AuditLog();
 			$audit->date_changed = date('Y-m-d H:i:s');
-			$audit->changed_by = auth()->user()->id;
-			$audit->event = 'Bill Invoices Imported - ' . session('bill_import_file_name');
+			$audit->changed_by = auth()->id();
+			$audit->event = 'Imported Hospital Purchases - ' . session('hospital_purchase_import_file_name');
 			$audit->save();
 
 			if (file_exists($fullPath)) {
 				unlink($fullPath);
 			}
 			session()->forget([
-				'bill_import_file_path',
-				'bill_import_full_path',
-				'bill_import_file_name',
-				'bill_import_headers',
-				'bill_import_mappings',
+				'hospital_purchase_import_file_path',
+				'hospital_purchase_import_full_path',
+				'hospital_purchase_import_file_name',
+				'hospital_purchase_import_headers',
+				'hospital_purchase_import_mappings',
 			]);
 
 			return redirect()
 				->route('hospital_purchases.index')
-				->with('success', 'Bills imported successfully.');
+				->with('success', 'Hospital purchases imported successfully.');
 		} catch (\Exception $e) {
 			return redirect()
 				->route('hospital_purchases.index')
 				->with('error', 'Import failed: ' . $e->getMessage());
+		}
+	}
+
+	private function mapHospitalPurchaseImportRow(array $row, array $mappings): array
+	{
+		$mappedData = [];
+
+		foreach ($row as $header => $value) {
+			if ($mappings !== []) {
+				$normalizedHeader = $this->normalizeHospitalPurchaseImportHeader((string) $header);
+
+				foreach ($mappings as $excelHeader => $systemField) {
+					if ($this->normalizeHospitalPurchaseImportHeader((string) $excelHeader) !== $normalizedHeader) {
+						continue;
+					}
+
+					$normalizedField = $this->normalizeHospitalPurchaseImportField((string) $systemField);
+					if ($normalizedField !== null && $normalizedField !== 'skip') {
+						$mappedData[$normalizedField] = $value;
+					}
+
+					continue 2;
+				}
+
+				continue;
+			}
+
+			$normalizedField = $this->normalizeHospitalPurchaseImportField((string) $header);
+			if ($normalizedField !== null && $normalizedField !== 'skip') {
+				$mappedData[$normalizedField] = $value;
+			}
+		}
+
+		return $mappedData;
+	}
+
+	private function normalizeHospitalPurchaseImportHeader(string $header): string
+	{
+		return trim((string) preg_replace('/_+/', '_', strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', trim($header)))));
+	}
+
+	private function normalizeHospitalPurchaseImportField(string $field): ?string
+	{
+		$normalized = $this->normalizeHospitalPurchaseImportHeader($field);
+
+		$aliases = [
+			'bill_no' => 'bill_number',
+			'purchase_number' => 'bill_number',
+			'purchase_date' => 'invoice_date',
+			'vendor_name' => 'supplier_name',
+			'vendor' => 'supplier_name',
+			'supplier' => 'supplier_name',
+			'currency' => 'transaction_currency',
+			'currency_code' => 'transaction_currency',
+			'po_so_number' => 'order_number',
+			'account_name' => 'expense_account',
+			'product' => 'product_name',
+			'item_description' => 'description',
+			'details' => 'description',
+			'unit_price' => 'unit_cost',
+			'price' => 'unit_cost',
+			'taxes' => 'tax',
+			'benificiary' => 'beneficiary',
+		];
+
+		return $aliases[$normalized] ?? $normalized;
+	}
+
+	private function normalizeHospitalPurchaseImportNumber($billNumber): ?string
+	{
+		if ($billNumber === null) {
+			return null;
+		}
+
+		$normalized = trim((string) $billNumber);
+		return $normalized === '' ? null : $normalized;
+	}
+
+	private function parseHospitalPurchaseImportTaxNames($value): array
+	{
+		if ($value === null) {
+			return [];
+		}
+
+		$raw = trim((string) $value);
+		if ($raw === '') {
+			return [];
+		}
+
+		$parts = preg_split('/[;,]/', $raw) ?: [];
+		$names = [];
+		foreach ($parts as $part) {
+			$name = trim((string) $part);
+			if ($name !== '') {
+				$names[] = $name;
+			}
+		}
+
+		return array_values(array_unique($names));
+	}
+
+	private function parseHospitalPurchaseImportDate($date): ?string
+	{
+		if ($date === null || trim((string) $date) === '') {
+			return null;
+		}
+
+		if (is_numeric($date)) {
+			try {
+				return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($date)->format('Y-m-d');
+			} catch (\Exception $e) {
+				return null;
+			}
+		}
+
+		$rawDate = trim((string) $date);
+
+		if (preg_match('/^\d{1,2}\/\d{1,2}\/\d{4}$/', $rawDate) === 1) {
+			try {
+				return Carbon::createFromFormat('d/m/Y', $rawDate)->format('Y-m-d');
+			} catch (\Exception $e) {
+			}
+		}
+
+		if (preg_match('/^\d{1,2}-\d{1,2}-\d{4}$/', $rawDate) === 1) {
+			try {
+				return Carbon::createFromFormat('d-m-Y', $rawDate)->format('Y-m-d');
+			} catch (\Exception $e) {
+			}
+		}
+
+		foreach (['Y-m-d', 'Y/m/d', 'm/d/Y', 'm-d-Y', 'n/j/Y', 'n-j-Y'] as $format) {
+			try {
+				return Carbon::createFromFormat($format, $rawDate)->format('Y-m-d');
+			} catch (\Exception $e) {
+			}
+		}
+
+		try {
+			return Carbon::parse($rawDate)->format('Y-m-d');
+		} catch (\Exception $e) {
+			return null;
 		}
 	}
 
@@ -2592,16 +2739,16 @@ class HospitalPurchaseController extends Controller
 		$audit = new AuditLog();
 		$audit->date_changed = date('Y-m-d H:i:s');
 		$audit->changed_by = auth()->user()->id;
-		$audit->event = 'Bill Invoices Imported ' . $request->file('bills_file')->getClientOriginalName();
+		$audit->event = 'Hospital Purchases Imported ' . $request->file('bills_file')->getClientOriginalName();
 		$audit->save();
 
 		try {
-			Excel::import(new BillInvoiceImport, $request->file('bills_file'));
+			Excel::import(new HospitalPurchaseImport, $request->file('bills_file'));
 		} catch (\Exception $e) {
 			return back()->with('error', $e->getMessage());
 		}
 
-		return redirect()->route('hospital_purchases.index')->with('success', _lang('Bills Imported'));
+		return redirect()->route('hospital_purchases.index')->with('success', _lang('Hospital Purchases Imported'));
 	}
 
 	public function bill_invoices_filter(Request $request)

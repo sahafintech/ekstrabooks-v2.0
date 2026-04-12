@@ -76,7 +76,7 @@ const ImportQuotationModal = ({ show, onClose, onSubmit, processing }) => (
             <label className="block font-medium text-sm text-gray-700">
               Quotations File
             </label>
-            <Link href="/uploads/media/default/sample_quotations.xlsx">
+            <Link href="/uploads/media/default/sample_quotations.csv">
               <Button variant="secondary" size="sm">
                 Use This Sample File
               </Button>
@@ -574,18 +574,8 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
 
   const handleImport = (e) => {
     e.preventDefault();
-    const formData = new FormData(e.target);
-    setProcessing(true);
-
-    router.post(route('quotations.import'), formData, {
-      onSuccess: () => {
-        setShowImportModal(false);
-        setProcessing(false);
-      },
-      onError: () => {
-        setProcessing(false);
-      }
-    });
+    setShowImportModal(false);
+    router.visit(route("quotations.import.page"));
   };
 
   const renderPageNumbers = () => {
@@ -695,9 +685,11 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setShowImportModal(true)}>
-                      <FileUp className="mr-2 h-4 w-4" /> Import
-                    </DropdownMenuItem>
+                    <Link href={route("quotations.import.page")}>
+                      <DropdownMenuItem>
+                        <FileUp className="mr-2 h-4 w-4" /> Import
+                      </DropdownMenuItem>
+                    </Link>
                     <DropdownMenuItem onClick={exportQuotations}>
                       <FileDown className="mr-2 h-4 w-4" /> Export
                     </DropdownMenuItem>

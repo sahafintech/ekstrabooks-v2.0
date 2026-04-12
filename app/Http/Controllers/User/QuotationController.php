@@ -4,6 +4,7 @@ namespace App\Http\Controllers\User;
 
 use App\Exports\QuotationExport;
 use App\Http\Controllers\Controller;
+use App\Imports\QuotationImport;
 use App\Models\Account;
 use App\Models\AuditLog;
 use App\Models\BusinessSetting;
@@ -1397,6 +1398,585 @@ class QuotationController extends Controller
         }
 
         return $invoice;
+    }
+
+    public function import()
+    {
+        Gate::authorize('quotations.create');
+
+        return Inertia::render('Backend/User/Quotation/Import');
+    }
+
+    public function uploadImportFile(Request $request)
+    {
+        Gate::authorize('quotations.create');
+
+        if ($request->isMethod('get')) {
+            return redirect()->route('quotations.import.page');
+        }
+
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
+        ]);
+
+        try {
+            $sessionId = session()->getId();
+            $tempDir = storage_path("app/imports/temp/{$sessionId}");
+
+            if (!is_dir($tempDir)) {
+                mkdir($tempDir, 0755, true);
+            }
+
+            $fileName = uniqid() . '_' . $request->file('file')->getClientOriginalName();
+            $fullPath = $tempDir . '/' . $fileName;
+            $request->file('file')->move($tempDir, $fileName);
+
+            if (!file_exists($fullPath)) {
+                throw new \Exception('Failed to store uploaded file');
+            }
+
+            $relativePath = "imports/temp/{$sessionId}/{$fileName}";
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+            $worksheet = $spreadsheet->getActiveSheet();
+            $headers = [];
+
+            foreach ($worksheet->getRowIterator(1, 1) as $row) {
+                $cellIterator = $row->getCellIterator();
+                $cellIterator->setIterateOnlyExistingCells(false);
+
+                foreach ($cellIterator as $cell) {
+                    $value = $cell->getValue();
+                    if ($value !== null && trim((string) $value) !== '') {
+                        $headers[] = (string) $value;
+                    }
+                }
+            }
+
+            session()->put('quotation_import_file_path', $relativePath);
+            session()->put('quotation_import_full_path', $fullPath);
+            session()->put('quotation_import_file_name', $request->file('file')->getClientOriginalName());
+            session()->put('quotation_import_headers', $headers);
+            session()->save();
+
+            return Inertia::render('Backend/User/Quotation/Import', [
+                'previewData' => [
+                    'headers' => $headers,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to process file: ' . $e->getMessage());
+        }
+    }
+
+    public function previewImport(Request $request)
+    {
+        Gate::authorize('quotations.create');
+
+        if ($request->isMethod('get')) {
+            return redirect()->route('quotations.import.page');
+        }
+
+        $mappings = $request->input('mappings', []);
+        $fullPath = session('quotation_import_full_path');
+        $headers = session('quotation_import_headers', []);
+
+        if (!$fullPath || !file_exists($fullPath)) {
+            return back()->with('error', 'Import session expired or file not found. Please upload your file again.');
+        }
+
+        try {
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($fullPath);
+            $worksheet = $spreadsheet->getActiveSheet();
+
+            $previewRecords = [];
+            $validCount = 0;
+            $errorCount = 0;
+            $totalRows = 0;
+            $groupedQuotations = [];
+            $autoGroupCounter = 0;
+
+            foreach ($worksheet->getRowIterator(2) as $row) {
+                $rowIndex = $row->getRowIndex();
+
+                $cellIterator = $row->getCellIterator();
+                $cellIterator->setIterateOnlyExistingCells(false);
+
+                $rawRow = [];
+                $cellIndex = 0;
+
+                foreach ($cellIterator as $cell) {
+                    if ($cellIndex < count($headers)) {
+                        $rawRow[$headers[$cellIndex]] = $cell->getValue();
+                    }
+                    $cellIndex++;
+                }
+
+                $rowData = $this->mapQuotationImportRow($rawRow, $mappings);
+                $quotationNumber = $this->normalizeQuotationImportNumber($rowData['quotation_number'] ?? null);
+                $productName = trim((string) ($rowData['product_name'] ?? ''));
+
+                if ($quotationNumber === null && $productName === '') {
+                    continue;
+                }
+
+                $totalRows++;
+
+                $groupKey = $quotationNumber !== null
+                    ? 'quotation::' . strtolower($quotationNumber)
+                    : 'auto::' . (++$autoGroupCounter);
+
+                if (!isset($groupedQuotations[$groupKey])) {
+                    $groupedQuotations[$groupKey] = [
+                        'quotation_number' => $quotationNumber,
+                        'header' => $rowData,
+                        'rows' => [],
+                    ];
+                }
+
+                $groupedQuotations[$groupKey]['rows'][] = [
+                    'row' => $rowIndex,
+                    'data' => $rowData,
+                ];
+            }
+
+            $customerLookupCache = [];
+            $currencyLookupCache = [];
+            $productLookupCache = [];
+            $taxLookupCache = [];
+            $familySizeLookupCache = [];
+
+            foreach ($groupedQuotations as $group) {
+                $header = $group['header'];
+                $groupErrors = [];
+
+                $quotationDateRaw = $header['quotation_date'] ?? null;
+                $quotationDate = null;
+                if (($quotationDateRaw === null || trim((string) $quotationDateRaw) === '') && $quotationDateRaw !== 0) {
+                    $groupErrors[] = 'Quotation date is required';
+                } else {
+                    $quotationDate = $this->parseQuotationImportDate($quotationDateRaw);
+                    if ($quotationDate === null) {
+                        $groupErrors[] = 'Quotation date is invalid';
+                    }
+                }
+
+                $expiredDateRaw = $header['expired_date'] ?? null;
+                $expiredDate = null;
+                if (($expiredDateRaw === null || trim((string) $expiredDateRaw) === '') && $expiredDateRaw !== 0) {
+                    $groupErrors[] = 'Expiry date is required';
+                } else {
+                    $expiredDate = $this->parseQuotationImportDate($expiredDateRaw);
+                    if ($expiredDate === null) {
+                        $groupErrors[] = 'Expiry date is invalid';
+                    }
+                }
+
+                if ($quotationDate !== null && $expiredDate !== null && Carbon::parse($expiredDate)->lt(Carbon::parse($quotationDate))) {
+                    $groupErrors[] = 'Expiry date must be on or after the quotation date';
+                }
+
+                $customerName = trim((string) ($header['customer_name'] ?? ''));
+                if ($customerName === '') {
+                    $groupErrors[] = 'Customer name is required';
+                } else {
+                    $customerKey = strtolower($customerName);
+                    if (!array_key_exists($customerKey, $customerLookupCache)) {
+                        $customerLookupCache[$customerKey] = Customer::where('name', 'like', '%' . $customerName . '%')->first();
+                    }
+
+                    if (!$customerLookupCache[$customerKey]) {
+                        $groupErrors[] = 'Customer "' . $customerName . '" not found';
+                    }
+                }
+
+                if (!empty($header['currency'])) {
+                    $currencyName = trim((string) $header['currency']);
+                    $currencyKey = strtolower($currencyName);
+                    if (!array_key_exists($currencyKey, $currencyLookupCache)) {
+                        $currencyLookupCache[$currencyKey] = Currency::where('name', $currencyName)->first();
+                    }
+
+                    if (!$currencyLookupCache[$currencyKey]) {
+                        $groupErrors[] = 'Currency "' . $currencyName . '" not found';
+                    }
+                }
+
+                if (
+                    isset($header['exchange_rate']) &&
+                    $header['exchange_rate'] !== null &&
+                    trim((string) $header['exchange_rate']) !== '' &&
+                    (!is_numeric($header['exchange_rate']) || (float) $header['exchange_rate'] <= 0)
+                ) {
+                    $groupErrors[] = 'Exchange rate must be greater than 0';
+                }
+
+                if (
+                    isset($header['discount_type']) &&
+                    $header['discount_type'] !== null &&
+                    trim((string) $header['discount_type']) !== '' &&
+                    !in_array(trim((string) $header['discount_type']), ['0', '1'], true)
+                ) {
+                    $groupErrors[] = 'Discount type must be 0 or 1';
+                }
+
+                if (
+                    isset($header['discount_value']) &&
+                    $header['discount_value'] !== null &&
+                    trim((string) $header['discount_value']) !== '' &&
+                    (!is_numeric($header['discount_value']) || (float) $header['discount_value'] < 0)
+                ) {
+                    $groupErrors[] = 'Discount value must be a non-negative number';
+                }
+
+                $deferredFlag = $this->parseQuotationImportDeferredFlag($header['is_deffered'] ?? null);
+                if (!$deferredFlag['valid']) {
+                    $groupErrors[] = 'Deferred flag must be 1, 0, true, false, yes, or no';
+                }
+
+                $isDeferred = $deferredFlag['value'];
+                $invoiceCategoryRaw = $header['invoice_category'] ?? null;
+                $invoiceCategory = $this->normalizeQuotationImportCategory($invoiceCategoryRaw);
+
+                if (
+                    $invoiceCategoryRaw !== null &&
+                    trim((string) $invoiceCategoryRaw) !== '' &&
+                    $invoiceCategory === null
+                ) {
+                    $groupErrors[] = 'Invoice category must be medical, gpa, or other';
+                }
+
+                if ($isDeferred && $invoiceCategory === null) {
+                    $groupErrors[] = 'Deferred quotations require an invoice category';
+                }
+
+                foreach ($group['rows'] as $rowEntry) {
+                    $rowData = $rowEntry['data'];
+                    $rowErrors = $groupErrors;
+                    $productName = trim((string) ($rowData['product_name'] ?? ''));
+
+                    if ($productName === '') {
+                        $rowErrors[] = 'Product name is required';
+                    } else {
+                        $productKey = strtolower($productName);
+                        if (!array_key_exists($productKey, $productLookupCache)) {
+                            $productLookupCache[$productKey] = Product::where('name', 'like', '%' . $productName . '%')->first();
+                        }
+
+                        if (!$productLookupCache[$productKey]) {
+                            $rowErrors[] = 'Product "' . $productName . '" not found';
+                        }
+                    }
+
+                    if (!isset($rowData['quantity']) || $rowData['quantity'] === '' || !is_numeric($rowData['quantity']) || (float) $rowData['quantity'] <= 0) {
+                        $rowErrors[] = 'Quantity must be greater than 0';
+                    }
+
+                    if (!isset($rowData['unit_cost']) || $rowData['unit_cost'] === '' || !is_numeric($rowData['unit_cost']) || (float) $rowData['unit_cost'] < 0) {
+                        $rowErrors[] = 'Unit cost is required and must be non-negative';
+                    }
+
+                    foreach ($this->parseQuotationImportTaxNames($rowData['tax'] ?? null) as $taxName) {
+                        $taxKey = strtolower($taxName);
+                        if (!array_key_exists($taxKey, $taxLookupCache)) {
+                            $taxLookupCache[$taxKey] = Tax::where('name', 'like', '%' . $taxName . '%')->first();
+                        }
+
+                        if (!$taxLookupCache[$taxKey]) {
+                            $rowErrors[] = 'Tax "' . $taxName . '" not found';
+                        }
+                    }
+
+                    if ($isDeferred && $invoiceCategory === 'medical') {
+                        $familySize = trim((string) ($rowData['family_size'] ?? ''));
+                        if ($familySize !== '') {
+                            $familySizeKey = strtolower($familySize);
+                            if (!array_key_exists($familySizeKey, $familySizeLookupCache)) {
+                                $familySizeLookupCache[$familySizeKey] = InsuranceFamilySize::where('size', 'like', '%' . $familySize . '%')->first();
+                            }
+
+                            if (!$familySizeLookupCache[$familySizeKey]) {
+                                $rowErrors[] = 'Family size "' . $familySize . '" not found';
+                            }
+                        }
+                    }
+
+                    if ($isDeferred && $invoiceCategory === 'other') {
+                        $sumInsured = $rowData['sum_insured'] ?? null;
+                        if (
+                            $sumInsured !== null &&
+                            trim((string) $sumInsured) !== '' &&
+                            (!is_numeric($sumInsured) || (float) $sumInsured < 0)
+                        ) {
+                            $rowErrors[] = 'Sum insured must be a non-negative number';
+                        }
+                    }
+
+                    $rowErrors = array_values(array_unique($rowErrors));
+                    $status = $rowErrors === [] ? 'valid' : 'error';
+
+                    if ($status === 'error') {
+                        $errorCount++;
+                    } else {
+                        $validCount++;
+                    }
+
+                    if ($status === 'error' && count($previewRecords) < 50) {
+                        $previewRecords[] = [
+                            'row' => $rowEntry['row'],
+                            'data' => [
+                                'quotation_number' => $group['quotation_number'],
+                                'product_name' => $rowData['product_name'] ?? null,
+                            ],
+                            'status' => $status,
+                            'errors' => $rowErrors,
+                        ];
+                    }
+                }
+            }
+
+            session()->put('quotation_import_mappings', $mappings);
+            session()->save();
+
+            return Inertia::render('Backend/User/Quotation/Import', [
+                'previewData' => [
+                    'headers' => $headers,
+                    'total_rows' => $totalRows,
+                    'unique_quotations' => count($groupedQuotations),
+                    'preview_records' => $previewRecords,
+                    'valid_count' => $validCount,
+                    'error_count' => $errorCount,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to preview import: ' . $e->getMessage());
+        }
+    }
+
+    public function executeImport(Request $request)
+    {
+        Gate::authorize('quotations.create');
+
+        if ($request->isMethod('get')) {
+            return redirect()->route('quotations.import.page');
+        }
+
+        $mappings = session('quotation_import_mappings', []);
+        $fullPath = session('quotation_import_full_path');
+
+        if (!$fullPath || !file_exists($fullPath)) {
+            return redirect()
+                ->route('quotations.index')
+                ->with('error', 'Import session expired or file not found. Please start over.');
+        }
+
+        try {
+            Excel::import(new QuotationImport($mappings), $fullPath);
+
+            $audit = new AuditLog();
+            $audit->date_changed = date('Y-m-d H:i:s');
+            $audit->changed_by = auth()->id();
+            $audit->event = 'Imported Quotations - ' . session('quotation_import_file_name');
+            $audit->save();
+
+            if (file_exists($fullPath)) {
+                unlink($fullPath);
+            }
+
+            session()->forget([
+                'quotation_import_file_path',
+                'quotation_import_full_path',
+                'quotation_import_file_name',
+                'quotation_import_headers',
+                'quotation_import_mappings',
+            ]);
+
+            return redirect()
+                ->route('quotations.index')
+                ->with('success', 'Quotations imported successfully.');
+        } catch (\Exception $e) {
+            return redirect()
+                ->route('quotations.index')
+                ->with('error', 'Import failed: ' . $e->getMessage());
+        }
+    }
+
+    private function mapQuotationImportRow(array $row, array $mappings): array
+    {
+        $mappedData = [];
+
+        foreach ($row as $header => $value) {
+            if ($mappings !== []) {
+                $normalizedHeader = $this->normalizeQuotationImportHeader((string) $header);
+
+                foreach ($mappings as $excelHeader => $systemField) {
+                    if ($this->normalizeQuotationImportHeader((string) $excelHeader) !== $normalizedHeader) {
+                        continue;
+                    }
+
+                    $normalizedField = $this->normalizeQuotationImportField((string) $systemField);
+                    if ($normalizedField !== null && $normalizedField !== 'skip') {
+                        $mappedData[$normalizedField] = $value;
+                    }
+
+                    continue 2;
+                }
+
+                continue;
+            }
+
+            $normalizedField = $this->normalizeQuotationImportField((string) $header);
+            if ($normalizedField !== null && $normalizedField !== 'skip') {
+                $mappedData[$normalizedField] = $value;
+            }
+        }
+
+        return $mappedData;
+    }
+
+    private function normalizeQuotationImportHeader(string $header): string
+    {
+        return trim((string) preg_replace('/_+/', '_', strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', trim($header)))));
+    }
+
+    private function normalizeQuotationImportField(string $field): ?string
+    {
+        $normalized = $this->normalizeQuotationImportHeader($field);
+
+        $aliases = [
+            'quotation_no' => 'quotation_number',
+            'quote_number' => 'quotation_number',
+            'quote_no' => 'quotation_number',
+            'customer' => 'customer_name',
+            'client_name' => 'customer_name',
+            'transaction_currency' => 'currency',
+            'currency_code' => 'currency',
+            'order_number' => 'po_so_number',
+            'expiry_date' => 'expired_date',
+            'quote_date' => 'quotation_date',
+            'deferred' => 'is_deffered',
+            'product' => 'product_name',
+            'item_description' => 'description',
+            'details' => 'description',
+            'unit_price' => 'unit_cost',
+            'price' => 'unit_cost',
+            'taxes' => 'tax',
+        ];
+
+        return $aliases[$normalized] ?? $normalized;
+    }
+
+    private function normalizeQuotationImportNumber($quotationNumber): ?string
+    {
+        if ($quotationNumber === null) {
+            return null;
+        }
+
+        $normalized = trim((string) $quotationNumber);
+        return $normalized === '' ? null : $normalized;
+    }
+
+    private function parseQuotationImportTaxNames($value): array
+    {
+        if ($value === null) {
+            return [];
+        }
+
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return [];
+        }
+
+        $parts = preg_split('/[;,]/', $raw) ?: [];
+        $names = [];
+
+        foreach ($parts as $part) {
+            $name = trim((string) $part);
+            if ($name !== '') {
+                $names[] = $name;
+            }
+        }
+
+        return array_values(array_unique($names));
+    }
+
+    private function parseQuotationImportDate($date): ?string
+    {
+        if ($date === null || trim((string) $date) === '') {
+            return null;
+        }
+
+        if (is_numeric($date)) {
+            try {
+                return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($date)->format('Y-m-d');
+            } catch (\Exception $e) {
+                return null;
+            }
+        }
+
+        $rawDate = trim((string) $date);
+
+        if (preg_match('/^\d{1,2}\/\d{1,2}\/\d{4}$/', $rawDate) === 1) {
+            try {
+                return Carbon::createFromFormat('d/m/Y', $rawDate)->format('Y-m-d');
+            } catch (\Exception $e) {
+            }
+        }
+
+        if (preg_match('/^\d{1,2}-\d{1,2}-\d{4}$/', $rawDate) === 1) {
+            try {
+                return Carbon::createFromFormat('d-m-Y', $rawDate)->format('Y-m-d');
+            } catch (\Exception $e) {
+            }
+        }
+
+        foreach (['Y-m-d', 'Y/m/d', 'm/d/Y', 'm-d-Y', 'n/j/Y', 'n-j-Y'] as $format) {
+            try {
+                return Carbon::createFromFormat($format, $rawDate)->format('Y-m-d');
+            } catch (\Exception $e) {
+            }
+        }
+
+        try {
+            return Carbon::parse($rawDate)->format('Y-m-d');
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    private function parseQuotationImportDeferredFlag($value): array
+    {
+        if ($value === null) {
+            return ['value' => false, 'valid' => true];
+        }
+
+        $normalized = strtolower(trim((string) $value));
+        if ($normalized === '') {
+            return ['value' => false, 'valid' => true];
+        }
+
+        if (in_array($normalized, ['1', 'true', 'yes'], true)) {
+            return ['value' => true, 'valid' => true];
+        }
+
+        if (in_array($normalized, ['0', 'false', 'no'], true)) {
+            return ['value' => false, 'valid' => true];
+        }
+
+        return ['value' => false, 'valid' => false];
+    }
+
+    private function normalizeQuotationImportCategory($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $normalized = strtolower(trim((string) $value));
+        if ($normalized === '') {
+            return null;
+        }
+
+        return in_array($normalized, ['medical', 'gpa', 'other'], true) ? $normalized : null;
     }
 
     private function calculateTotal(Request $request)

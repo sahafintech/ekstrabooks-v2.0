@@ -25,39 +25,37 @@ import {
 
 const SYSTEM_FIELDS = [
   {
-    value: "bill_number",
-    label: "Bill Number",
+    value: "quotation_number",
+    label: "Quotation Number",
     required: false,
-    description: "Rows with the same bill number become one hospital purchase with multiple items",
+    description: "Rows with the same quotation number become one quotation with multiple items",
   },
-  { value: "invoice_date", label: "Invoice Date", required: true },
-  { value: "due_date", label: "Due Date", required: true },
-  { value: "supplier_name", label: "Supplier Name", required: false },
-  { value: "title", label: "Hospital Purchase Title", required: false },
-  { value: "order_number", label: "Order Number", required: false },
-  { value: "transaction_currency", label: "Currency", required: false },
+  { value: "quotation_date", label: "Quotation Date", required: true },
+  { value: "expired_date", label: "Expiry Date", required: true },
+  { value: "customer_name", label: "Customer Name", required: true },
+  { value: "title", label: "Quotation Title", required: false },
+  { value: "po_so_number", label: "PO/SO Number", required: false },
+  { value: "currency", label: "Currency", required: false },
   { value: "exchange_rate", label: "Exchange Rate", required: false },
   { value: "discount_type", label: "Discount Type (0=%, 1=Fixed)", required: false },
   { value: "discount_value", label: "Discount Value", required: false },
   { value: "note", label: "Note", required: false },
   { value: "footer", label: "Footer", required: false },
-  { value: "beneficiary", label: "Beneficiary", required: false },
-  { value: "product_name", label: "Item Name", required: true },
+  { value: "product_name", label: "Product Name", required: true },
   { value: "description", label: "Item Description", required: false },
   { value: "quantity", label: "Quantity", required: true },
   { value: "unit_cost", label: "Unit Cost", required: true },
-  {
-    value: "expense_account",
-    label: "Expense Account",
-    required: true,
-    description: "Hospital purchases only support account lines, using Cost Of Sale accounts",
-  },
   {
     value: "tax",
     label: "Tax Name",
     required: false,
     description: "Optional. Use tax names from Tax Database. Supports comma or semicolon separated values.",
   },
+  { value: "is_deffered", label: "Deferred (1=Yes, 0=No)", required: false },
+  { value: "invoice_category", label: "Invoice Category", required: false },
+  { value: "benefits", label: "Benefits", required: false },
+  { value: "family_size", label: "Family Size", required: false },
+  { value: "sum_insured", label: "Sum Insured", required: false },
   { value: "skip", label: "Skip this column", required: false },
 ];
 
@@ -107,23 +105,26 @@ export default function Import() {
           score = 100;
         } else if (normalizedHeader === normalizedFieldLabel) {
           score = 90;
-        } else if ((normalizedHeader.includes("bill_number") || normalizedHeader.includes("bill_no")) && field.value === "bill_number") {
-          score = 95;
         } else if (
-          (normalizedHeader.includes("invoice") || normalizedHeader.includes("purchase")) &&
-          normalizedHeader.includes("date") &&
-          field.value === "invoice_date"
+          (normalizedHeader.includes("quotation_number") || normalizedHeader.includes("quote_number") || normalizedHeader.includes("quote_no")) &&
+          field.value === "quotation_number"
         ) {
           score = 95;
-        } else if (normalizedHeader.includes("due") && field.value === "due_date") {
+        } else if (normalizedHeader.includes("quotation") && normalizedHeader.includes("date") && field.value === "quotation_date") {
+          score = 95;
+        } else if (normalizedHeader.includes("expiry") && field.value === "expired_date") {
           score = 90;
-        } else if ((normalizedHeader.includes("supplier") || normalizedHeader.includes("vendor")) && field.value === "supplier_name") {
+        } else if (normalizedHeader.includes("expire") && field.value === "expired_date") {
+          score = 90;
+        } else if (normalizedHeader.includes("customer") && field.value === "customer_name") {
           score = 90;
         } else if (normalizedHeader.includes("title") && field.value === "title") {
           score = 85;
-        } else if (normalizedHeader.includes("order") && field.value === "order_number") {
+        } else if (normalizedHeader.includes("order") && field.value === "po_so_number") {
           score = 85;
-        } else if (normalizedHeader.includes("currency") && field.value === "transaction_currency") {
+        } else if (normalizedHeader.includes("po_so") && field.value === "po_so_number") {
+          score = 90;
+        } else if (normalizedHeader.includes("currency") && field.value === "currency") {
           score = 85;
         } else if (normalizedHeader.includes("exchange") && field.value === "exchange_rate") {
           score = 85;
@@ -135,11 +136,7 @@ export default function Import() {
           score = 85;
         } else if (normalizedHeader.includes("footer") && field.value === "footer") {
           score = 85;
-        } else if (normalizedHeader.includes("beneficiary") && field.value === "beneficiary") {
-          score = 85;
         } else if (normalizedHeader.includes("product") && field.value === "product_name") {
-          score = 85;
-        } else if (normalizedHeader.includes("item") && normalizedHeader.includes("name") && field.value === "product_name") {
           score = 85;
         } else if (normalizedHeader.includes("description") && field.value === "description") {
           score = 80;
@@ -147,11 +144,6 @@ export default function Import() {
           score = 80;
         } else if (normalizedHeader.includes("quantity") && field.value === "quantity") {
           score = 80;
-        } else if (
-          (normalizedHeader.includes("expense") || normalizedHeader.includes("account")) &&
-          field.value === "expense_account"
-        ) {
-          score = 90;
         } else if (normalizedHeader.includes("unit") && normalizedHeader.includes("cost") && field.value === "unit_cost") {
           score = 90;
         } else if (normalizedHeader.includes("unit") && normalizedHeader.includes("price") && field.value === "unit_cost") {
@@ -159,6 +151,16 @@ export default function Import() {
         } else if (normalizedHeader === "price" && field.value === "unit_cost") {
           score = 75;
         } else if (normalizedHeader.includes("tax") && field.value === "tax") {
+          score = 85;
+        } else if (normalizedHeader.includes("deferred") && field.value === "is_deffered") {
+          score = 90;
+        } else if (normalizedHeader.includes("category") && field.value === "invoice_category") {
+          score = 85;
+        } else if (normalizedHeader.includes("benefit") && field.value === "benefits") {
+          score = 85;
+        } else if (normalizedHeader.includes("family") && field.value === "family_size") {
+          score = 85;
+        } else if (normalizedHeader.includes("insured") && field.value === "sum_insured") {
           score = 85;
         } else if (normalizedFieldValue === normalizedHeader && normalizedHeader.length > 2) {
           score = 75;
@@ -222,7 +224,7 @@ export default function Import() {
     formData.append("file", selectedFile);
 
     setIsUploading(true);
-    router.post(route("hospital_purchases.import.upload"), formData, {
+    router.post(route("quotations.import.upload"), formData, {
       onSuccess: () => {
         setCurrentStep(1);
       },
@@ -249,7 +251,7 @@ export default function Import() {
   const handleGeneratePreview = useCallback(() => {
     setIsProcessing(true);
     router.post(
-      route("hospital_purchases.import.preview"),
+      route("quotations.import.preview"),
       { mappings: fieldMappings },
       {
         onSuccess: () => {
@@ -265,11 +267,11 @@ export default function Import() {
   const handleConfirmImport = useCallback(() => {
     setIsProcessing(true);
     router.post(
-      route("hospital_purchases.import.execute"),
+      route("quotations.import.execute"),
       { mappings: fieldMappings },
       {
         onSuccess: () => {
-          router.visit(route("hospital_purchases.index"));
+          router.visit(route("quotations.index"));
         },
         onFinish: () => {
           setIsProcessing(false);
@@ -279,7 +281,7 @@ export default function Import() {
   }, [fieldMappings]);
 
   const handleCancel = useCallback(() => {
-    router.visit(route("hospital_purchases.index"));
+    router.visit(route("quotations.index"));
   }, []);
 
   const handleBack = useCallback(() => {
@@ -288,19 +290,18 @@ export default function Import() {
     }
   }, [currentStep]);
 
-  const requiredMappings = ["invoice_date", "due_date", "product_name", "quantity", "unit_cost", "expense_account"];
+  const requiredMappings = ["quotation_date", "expired_date", "customer_name", "product_name", "quantity", "unit_cost"];
   const mappedValues = Object.values(fieldMappings);
   const isAllRequiredMapped = requiredMappings.every((field) => mappedValues.includes(field));
   const missingFields = SYSTEM_FIELDS.filter((field) => field.required && !mappedValues.includes(field.value));
   const steps = ["Upload File", "Map Fields", "Preview & Import"];
-  const uniquePurchases = previewData?.unique_purchases ?? previewData?.unique_bills;
 
   return (
     <AuthenticatedLayout>
-      <Head title="Import Hospital Purchases" />
+      <Head title="Import Quotations" />
       <SidebarInset>
         <div className="main-content">
-          <PageHeader page="Hospital Purchases" subpage="Import" url="hospital_purchases.index" />
+          <PageHeader page="Quotations" subpage="Import" url="quotations.index" />
 
           <div className="max-w-4xl mx-auto pb-8 px-4">
             <div className="flex items-center gap-2 mb-6 text-sm">
@@ -327,7 +328,7 @@ export default function Import() {
               <Card>
                 <CardHeader>
                   <CardTitle>Upload File</CardTitle>
-                  <CardDescription>Select an Excel or CSV file to import hospital purchases</CardDescription>
+                  <CardDescription>Select an Excel or CSV file to import quotations</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
                   <div>
@@ -389,12 +390,12 @@ export default function Import() {
                   <Alert className="border-blue-500/30 bg-blue-500/5">
                     <Info className="h-4 w-4 text-blue-600" />
                     <AlertDescription>
-                      <h4 className="font-medium mb-2 text-blue-700">Hospital Purchase Import</h4>
+                      <h4 className="font-medium mb-2 text-blue-700">Multi-item Quotation Import</h4>
                       <ul className="text-sm space-y-1 text-blue-600">
-                        <li>- Duplicate <strong>Bill Number</strong> values are grouped into one hospital purchase</li>
-                        <li>- Shared header values are taken from the first row in each grouped bill number</li>
-                        <li>- Every imported line is treated as an account line, not an inventory item</li>
-                        <li>- <strong>Expense Account</strong> must match an allowed Cost Of Sale account</li>
+                        <li>- Duplicate <strong>Quotation Number</strong> values are grouped into one quotation with multiple items</li>
+                        <li>- Shared quotation values are taken from the first row in each quotation group</li>
+                        <li>- Customer, product, currency, and tax values are matched by name</li>
+                        <li>- Deferred quotations can also include invoice category, benefits, family size, and sum insured data</li>
                       </ul>
                     </AlertDescription>
                   </Alert>
@@ -405,10 +406,10 @@ export default function Import() {
                       <h4 className="font-medium mb-2">Import Guidelines</h4>
                       <ul className="text-sm space-y-1">
                         <li>- First row should contain column headers</li>
-                        <li>- Required fields: Invoice Date, Due Date, Item Name, Quantity, Unit Cost, Expense Account</li>
-                        <li>- Supplier is optional and will be matched by name when provided</li>
+                        <li>- Required fields: Quotation Date, Expiry Date, Customer Name, Product Name, Quantity, Unit Cost</li>
+                        <li>- Deferred flag accepts 1, 0, true, false, yes, or no</li>
+                        <li>- Invoice category must be one of: medical, gpa, or other</li>
                         <li>- Optional <strong>Tax</strong> column should use tax names from Tax Database</li>
-                        <li>- Currency is optional and defaults to the active business currency when omitted</li>
                       </ul>
                     </AlertDescription>
                   </Alert>
@@ -416,9 +417,9 @@ export default function Import() {
                   <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div>
                       <p className="font-medium text-sm">Need a template?</p>
-                      <p className="text-sm text-muted-foreground">Download our sample Excel file</p>
+                      <p className="text-sm text-muted-foreground">Download our sample CSV file</p>
                     </div>
-                    <a href="/uploads/media/default/sample_bills.xlsx" download>
+                    <a href="/uploads/media/default/sample_quotations.csv" download>
                       <Button variant="outline" size="sm">
                         <Download className="size-4 mr-1.5" />
                         Download
@@ -452,7 +453,7 @@ export default function Import() {
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
                     <CardTitle>Map Columns</CardTitle>
-                    <CardDescription>Map your file columns to hospital purchase fields</CardDescription>
+                    <CardDescription>Map your file columns to quotation fields</CardDescription>
                   </div>
                   <Button type="button" variant="outline" size="sm" onClick={handleAutoMap}>
                     Auto-Map Fields
@@ -544,8 +545,8 @@ export default function Import() {
                     <p className="text-sm text-muted-foreground mt-1">Total Rows</p>
                   </Card>
                   <Card className="text-center p-4">
-                    <p className="text-3xl font-bold text-blue-600">{uniquePurchases || "-"}</p>
-                    <p className="text-sm text-muted-foreground mt-1">Unique Purchases</p>
+                    <p className="text-3xl font-bold text-blue-600">{previewData.unique_quotations || "-"}</p>
+                    <p className="text-sm text-muted-foreground mt-1">Unique Quotations</p>
                   </Card>
                   <Card className="text-center p-4">
                     <p className="text-3xl font-bold text-green-600">{previewData.valid_count}</p>
@@ -557,21 +558,12 @@ export default function Import() {
                   </Card>
                 </div>
 
-                {uniquePurchases && uniquePurchases < previewData.total_rows && (
+                {previewData.unique_quotations && previewData.unique_quotations < previewData.total_rows && (
                   <Alert className="border-blue-500/30 bg-blue-500/5">
                     <Info className="h-4 w-4 text-blue-600" />
                     <AlertDescription className="text-blue-600">
                       <span className="font-medium">{previewData.total_rows} rows</span> will be grouped into{" "}
-                      <span className="font-medium">{uniquePurchases} hospital purchases</span> based on their bill numbers.
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {previewData.warning_count > 0 && (
-                  <Alert className="border-yellow-500/30 bg-yellow-500/5">
-                    <AlertCircle className="h-4 w-4 text-yellow-600" />
-                    <AlertDescription className="text-yellow-700">
-                      {previewData.warning_count} supplier match warning{previewData.warning_count !== 1 ? "s" : ""} found. Those rows can still import without linking a supplier.
+                      <span className="font-medium">{previewData.unique_quotations} quotations</span> based on their quotation numbers.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -605,8 +597,8 @@ export default function Import() {
                           <TableRow>
                             <TableHead className="w-20">Row</TableHead>
                             <TableHead className="w-28">Status</TableHead>
-                            <TableHead>Bill No</TableHead>
-                            <TableHead>Item</TableHead>
+                            <TableHead>Quotation No</TableHead>
+                            <TableHead>Product</TableHead>
                             <TableHead>Issues</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -620,7 +612,7 @@ export default function Import() {
                                 </span>
                               </TableCell>
                               <TableCell className="text-muted-foreground">
-                                {record.data.bill_number || <span className="italic">-</span>}
+                                {record.data.quotation_number || <span className="italic">-</span>}
                               </TableCell>
                               <TableCell className="text-muted-foreground">
                                 {record.data.product_name || <span className="italic">-</span>}

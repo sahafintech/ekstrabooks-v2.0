@@ -1,0 +1,4 @@
+Quotation Number,Quotation Date,Expiry Date,Customer Name,Title,PO/SO Number,Currency,Exchange Rate,Discount Type,Discount Value,Product Name,Description,Quantity,Unit Cost,Tax,Deferred,Invoice Category,Benefits,Family Size,Sum Insured,Note,Footer
+QT-1001,2026-04-01,2026-04-30,Demo Customer,Quotation,PO-001,USD,1,0,0,Medical Cover,Annual medical cover,1,1200,VAT,1,medical,Outpatient and inpatient,Family of 4,0,Please review,Thank you
+QT-1001,2026-04-01,2026-04-30,Demo Customer,Quotation,PO-001,USD,1,0,0,GPA Cover,Group personal accident cover,1,300,VAT,1,medical,Personal accident,Family of 4,0,Please review,Thank you
+QT-1002,2026-04-05,2026-04-20,Demo Customer,Quotation,PO-002,USD,1,1,50,Standard Plan,Standard quotation line,2,500,,0,,,0,Subject to approval,Regards
