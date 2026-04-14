@@ -19,8 +19,8 @@ use App\Models\InsuranceBenefit;
 use App\Models\InsuranceFamilySize;
 use App\Models\Product;
 use App\Models\Quotation;
-use App\Models\quotationItem;
-use App\Models\quotationItemTax;
+use App\Models\QuotationItem;
+use App\Models\QuotationItemTax;
 use App\Models\Tax;
 use App\Models\Transaction;
 use App\Notifications\SendQuotation;
@@ -260,7 +260,7 @@ class QuotationController extends Controller
         $quotation->save();
 
         for ($i = 0; $i < count($request->product_id); $i++) {
-            $quotationItem = $quotation->items()->save(new quotationItem(
+            $quotationItem = $quotation->items()->save(new QuotationItem(
                 array_merge(
                     ['quotation_id' => $quotation->id],
                     $this->buildQuotationItemPayload($request, $i)
@@ -271,7 +271,7 @@ class QuotationController extends Controller
                 foreach ($request->taxes as $taxId) {
                     $tax = Tax::find($taxId);
 
-                    $quotationItem->taxes()->save(new quotationItemTax([
+                    $quotationItem->taxes()->save(new QuotationItemTax([
                         'quotation_id' => $quotation->id,
                         'tax_id'       => $taxId,
                         'name'         => $tax->name . ' ' . $tax->rate . ' %',
@@ -498,10 +498,10 @@ class QuotationController extends Controller
 
         $quotation->save();
 
-        quotationItemTax::where('quotation_id', $quotation->id)->delete();
+        QuotationItemTax::where('quotation_id', $quotation->id)->delete();
         $quotation->items()->delete();
         for ($i = 0; $i < count($request->product_id); $i++) {
-            $quotationItem = $quotation->items()->save(new quotationItem(
+            $quotationItem = $quotation->items()->save(new QuotationItem(
                 array_merge(
                     ['quotation_id' => $quotation->id],
                     $this->buildQuotationItemPayload($request, $i)
@@ -512,7 +512,7 @@ class QuotationController extends Controller
                 foreach ($request->taxes as $taxId) {
                     $tax = Tax::find($taxId);
 
-                    $quotationItem->taxes()->save(new quotationItemTax([
+                    $quotationItem->taxes()->save(new QuotationItemTax([
                         'quotation_id' => $quotation->id,
                         'tax_id'       => $taxId,
                         'name'         => $tax->name . ' ' . $tax->rate . ' %',
