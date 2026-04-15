@@ -9,14 +9,13 @@
         "php": "^8.2",
         "anhskohbo/no-captcha": "*",
         "barryvdh/laravel-dompdf": "*",
-        "biscolab/laravel-recaptcha": "*",
         "inertiajs/inertia-laravel": "^2.0",
         "intervention/image": "*",
         "jmrashed/zkteco": "^1.0",
-        "laravel/framework": "^11.31",
+        "laravel/framework": "^13.0",
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "*",
-        "laravel/tinker": "^2.9",
+        "laravel/tinker": "^3.0",
         "laravel/ui": "*",
         "league/flysystem-aws-s3-v3": "^3.0",
         "maatwebsite/excel": "*",
@@ -25,7 +24,6 @@
         "simplesoftwareio/simple-qrcode": "^4.2",
         "spatie/laravel-google-cloud-storage": "^2.0",
         "spatie/laravel-cookie-consent": "*",
-        "spatie/laravel-pdf": "^1.8",
         "spatie/laravel-permission": "^6.24",
         "stripe/stripe-php": "*",
         "tightenco/ziggy": "^2.0",
@@ -40,8 +38,8 @@
         "laravel/sail": "^1.26",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.1",
-        "pestphp/pest": "^3.7",
-        "pestphp/pest-plugin-laravel": "^3.1"
+        "pestphp/pest": "^4.0",
+        "pestphp/pest-plugin-laravel": "^4.1"
     },
     "autoload": {
         "psr-4": {

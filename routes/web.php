@@ -46,6 +46,7 @@ use App\Http\Controllers\User\BusinessSettingsController;
 use App\Http\Controllers\User\CashPurchaseController;
 use App\Http\Controllers\HospitalPurchaseController;
 use App\Http\Controllers\CostCodeController;
+use App\Http\Controllers\InventoryTransferController;
 use App\Http\Controllers\ProjectBudgetController;
 use App\Http\Controllers\ProjectSubcontractController;
 use App\Http\Controllers\ProjectSubcontractPaymentController;
