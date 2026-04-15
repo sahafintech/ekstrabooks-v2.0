@@ -25,6 +25,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import Modal from "@/Components/Modal";
 import { Input } from "@/Components/ui/input";
+import { QRCodeSVG } from "qrcode.react";
 
 const printStyles = `
   @media print {
@@ -232,15 +233,35 @@ export default function View({ quotation, decimalPlace }) {
 
                                 <div className="grid grid-cols-12 gap-6">
                                     <div className="col-span-7">
-                                        {quotation?.business?.logo && (
-                                            <div className="mb-6 max-w-[260px]">
-                                                <img
-                                                    src={`/uploads/media/${quotation.business.logo}`}
-                                                    alt="Business Logo"
-                                                    className="max-h-24 object-contain"
-                                                />
+                                        <div className="mb-6 flex items-start justify-between gap-4">
+                                            <div className="max-w-[260px]">
+                                                {quotation?.business?.logo ? (
+                                                    <img
+                                                        src={`/uploads/media/${quotation.business.logo}`}
+                                                        alt="Business Logo"
+                                                        className="max-h-24 object-contain"
+                                                    />
+                                                ) : (
+                                                    <div
+                                                        className="text-3xl font-bold uppercase"
+                                                        style={{ color: primaryColor }}
+                                                    >
+                                                        {businessName}
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
+                                            <QRCodeSVG
+                                                value={route(
+                                                    "quotations.show_public_quotation",
+                                                    quotation.short_code
+                                                )}
+                                                size={100}
+                                                level="H"
+                                                includeMargin={true}
+                                                margin={10}
+                                                className="shrink-0 print:block"
+                                            />
+                                        </div>
 
                                         <table className="w-full text-sm">
                                             <tbody>

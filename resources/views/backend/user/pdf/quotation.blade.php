@@ -45,15 +45,24 @@
 
         <div class="grid grid-cols-12 gap-6">
             <div class="col-span-7">
-                @if($quotation->business->logo)
-                    <div class="mb-6 max-w-[260px]">
-                        <img
-                            src="{{ public_path('/uploads/media/' . $quotation->business->logo) }}"
-                            alt="Business Logo"
-                            class="max-h-24 object-contain"
-                        />
+                <div class="mb-6 flex items-start justify-between gap-4">
+                    <div class="max-w-[260px]">
+                        @if($quotation->business->logo)
+                            <img
+                                src="{{ public_path('/uploads/media/' . $quotation->business->logo) }}"
+                                alt="Business Logo"
+                                class="max-h-24 object-contain"
+                            />
+                        @else
+                            <div class="text-3xl font-bold uppercase" style="color: {{ $primaryColor }};">
+                                {{ $businessName }}
+                            </div>
+                        @endif
                     </div>
-                @endif
+                    <div class="shrink-0">
+                        {!! QrCode::size(100)->errorCorrection('H')->margin(10)->generate(route('quotations.show_public_quotation', $quotation->short_code)) !!}
+                    </div>
+                </div>
 
                 <table class="w-full text-sm">
                     <tbody>
