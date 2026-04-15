@@ -10,8 +10,6 @@ trait MultiTenant
 
     public static function bootMultiTenant()
     {
-        $table = (new self())->getTable();
-
         if (auth()->check()) {
             $user  = auth()->user();
 
@@ -23,20 +21,22 @@ trait MultiTenant
             }
 
             static::saving(function ($model) use ($activeBusiness, $user) {
+                $table = $model->getTable();
+
                 if (request()->has('activeBusiness')) {
-                    if (Schema::hasColumn($model->table, 'business_id')) {
+                    if (Schema::hasColumn($table, 'business_id')) {
                         $model->business_id = $activeBusiness->id;
                     }
-                    if (Schema::hasColumn($model->table, 'user_id')) {
+                    if (Schema::hasColumn($table, 'user_id')) {
                         $model->user_id = $activeBusiness->user_id;
                     }
                 }
-                if (Schema::hasColumn($model->table, 'created_user_id')) {
+                if (Schema::hasColumn($table, 'created_user_id')) {
                     if (!$model->exists) {
                         $model->created_user_id = $user->id;
                     }
                 }
-                if (Schema::hasColumn($model->table, 'updated_user_id')) {
+                if (Schema::hasColumn($table, 'updated_user_id')) {
                     if ($model->exists) {
                         $model->updated_user_id = $user->id;
                     }
@@ -44,15 +44,17 @@ trait MultiTenant
             });
 
             static::updating(function ($model) use ($activeBusiness, $user) {
+                $table = $model->getTable();
+
                 if (request()->has('activeBusiness')) {
-                    if (Schema::hasColumn($model->table, 'business_id')) {
+                    if (Schema::hasColumn($table, 'business_id')) {
                         $model->business_id = $activeBusiness->id;
                     }
-                    if (Schema::hasColumn($model->table, 'user_id')) {
+                    if (Schema::hasColumn($table, 'user_id')) {
                         $model->user_id = $activeBusiness->user_id;
                     }
                 }
-                if (Schema::hasColumn($model->table, 'updated_user_id')) {
+                if (Schema::hasColumn($table, 'updated_user_id')) {
                     $model->updated_user_id = $user->id;
                 }
             });
@@ -76,7 +78,9 @@ trait MultiTenant
             //     }
             // });                   
 
-            static::addGlobalScope('business_id', function (Builder $builder) use ($activeBusiness, $table, $user) {
+            static::addGlobalScope('business_id', function (Builder $builder) use ($activeBusiness, $user) {
+                $table = $builder->getModel()->getTable();
+
                 if ($user->user_type != 'admin') {
                     if (request()->has('activeBusiness')) {
                         if (Schema::hasColumn($table, 'business_id')) {
