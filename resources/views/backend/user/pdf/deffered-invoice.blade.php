@@ -52,6 +52,9 @@
                     </div>
                 @endif
             </div>
+            <div class="shrink-0">
+                {!! QrCode::size(100)->errorCorrection('H')->margin(10)->generate(route('deffered_invoices.show_public_deffered_invoice', $invoice->short_code)) !!}
+            </div>
         </div>
 
         <div class="grid grid-cols-12 gap-0 border border-slate-900 text-sm">

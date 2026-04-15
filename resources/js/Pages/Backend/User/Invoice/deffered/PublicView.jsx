@@ -14,6 +14,7 @@ import {
     TableCell,
 } from "@/Components/ui/table";
 import { SidebarSeparator } from "@/Components/ui/sidebar";
+import { QRCodeSVG } from "qrcode.react";
 
 export default function PublicView({ invoice }) {
     const { flash = {} } = usePage().props;
@@ -134,18 +135,37 @@ export default function PublicView({ invoice }) {
                         {/* Invoice Header */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                             <div>
-                                {invoice.business.logo && (
-                                    <div className="mb-3">
-                                        <img
-                                            src={`/uploads/media/${invoice.business.logo}`}
-                                            alt="Business Logo"
-                                            className="max-h-32 object-contain"
-                                        />
+                                <div className="mb-3 flex items-start justify-between gap-4">
+                                    <div>
+                                        {invoice.business.logo ? (
+                                            <img
+                                                src={`/uploads/media/${invoice.business.logo}`}
+                                                alt="Business Logo"
+                                                className="max-h-32 object-contain"
+                                            />
+                                        ) : (
+                                            <h2 className="text-2xl font-bold text-primary">
+                                                {invoice.business.business_name}
+                                            </h2>
+                                        )}
                                     </div>
+                                    <QRCodeSVG
+                                        value={route(
+                                            "deffered_invoices.show_public_deffered_invoice",
+                                            invoice.short_code
+                                        )}
+                                        size={100}
+                                        level="H"
+                                        includeMargin={true}
+                                        margin={10}
+                                        className="shrink-0 print:block"
+                                    />
+                                </div>
+                                {invoice.business.logo && (
+                                    <h2 className="text-2xl font-bold text-primary">
+                                        {invoice.business.business_name}
+                                    </h2>
                                 )}
-                                <h2 className="text-2xl font-bold text-primary">
-                                    {invoice.business.business_name}
-                                </h2>
                                 <div className="mt-2 text-sm">
                                     <p>{invoice.business.address}</p>
                                     <p>{invoice.business.email}</p>

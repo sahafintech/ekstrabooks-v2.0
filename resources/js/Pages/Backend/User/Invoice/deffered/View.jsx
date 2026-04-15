@@ -39,6 +39,7 @@ import { Label } from "@/Components/ui/label";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import InputError from "@/Components/InputError";
 import RichTextEditor from "@/Components/RichTextEditor";
+import { QRCodeSVG } from "qrcode.react";
 
 const printStyles = `
 @media print {
@@ -560,6 +561,17 @@ export default function View({
                                             </div>
                                         )}
                                     </div>
+                                    <QRCodeSVG
+                                        value={route(
+                                            "deffered_invoices.show_public_deffered_invoice",
+                                            invoice.short_code
+                                        )}
+                                        size={100}
+                                        level="H"
+                                        includeMargin={true}
+                                        margin={10}
+                                        className="shrink-0 print:block"
+                                    />
                                 </div>
 
                                 <div className="grid grid-cols-12 gap-0 border border-slate-900 text-sm">
