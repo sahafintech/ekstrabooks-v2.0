@@ -74,12 +74,11 @@
                             @if($transaction->ref_type == 'receipt')
                             {{ $transaction->receipt->receipt_number }}
                             @elseif($transaction->ref_type == 'bill invoice')
-                            {{ $transaction->purchase->purchase_number }}
+                            {{ $transaction->purchase->bill_no }}
                             @elseif($transaction->ref_type == 'bill payment')
                             {{ $transaction->purchase->bill_no }}
                             @elseif($transaction->ref_type == 'journal')
                             {{ $transaction->journal->journal_number }}
-                            @else
                             @elseif($transaction->ref_type == 'cash purchase')
                             {{ $transaction->purchase->bill_no }}
                             @else
