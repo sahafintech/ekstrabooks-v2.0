@@ -84,11 +84,25 @@ class Invoice extends Model {
         return $this->belongsTo(User::class, 'updated_user_id')->withDefault()->withoutGlobalScopes();
     }
 
+    private function formatDecimalAttribute($value, int $decimal_place, $fallback = 0): string {
+        $number = $value;
+
+        if ($number === null || $number === '') {
+            $number = $fallback;
+        }
+
+        if ($number === null || $number === '' || ! is_numeric($number)) {
+            $number = 0;
+        }
+
+        return number_format((float) $number, $decimal_place, '.', '');
+    }
+
     protected function subTotal(): Attribute {
         $decimal_place = get_business_option('decimal_places', 2);
 
         return Attribute::make(
-            get:fn(string $value) => number_format($value, $decimal_place, '.', ''),
+            get:fn($value) => $this->formatDecimalAttribute($value, $decimal_place),
         );
     }
 
@@ -96,7 +110,7 @@ class Invoice extends Model {
         $decimal_place = get_business_option('decimal_places', 2);
 
         return Attribute::make(
-            get:fn(string $value) => number_format($value, $decimal_place, '.', ''),
+            get:fn($value) => $this->formatDecimalAttribute($value, $decimal_place),
         );
     }
 
@@ -104,7 +118,7 @@ class Invoice extends Model {
         $decimal_place = get_business_option('decimal_places', 2);
 
         return Attribute::make(
-            get:fn(string $value) => number_format($value, $decimal_place, '.', ''),
+            get:fn($value) => $this->formatDecimalAttribute($value, $decimal_place),
         );
     }
 
@@ -112,7 +126,7 @@ class Invoice extends Model {
         $decimal_place = get_business_option('decimal_places', 2);
 
         return Attribute::make(
-            get:fn(string $value) => number_format($value, $decimal_place, '.', ''),
+            get:fn($value) => $this->formatDecimalAttribute($value, $decimal_place, $this->getRawOriginal('grand_total')),
         );
     }
 
@@ -120,7 +134,7 @@ class Invoice extends Model {
         $decimal_place = get_business_option('decimal_places', 2);
 
         return Attribute::make(
-            get:fn(string $value) => number_format($value, $decimal_place, '.', ''),
+            get:fn($value) => $this->formatDecimalAttribute($value, $decimal_place),
         );
     }
 
