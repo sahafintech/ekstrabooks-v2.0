@@ -21,13 +21,13 @@ import {
     MessageCircle,
     Copy,
 } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { toast } from "sonner";
 import Modal from "@/Components/Modal";
 import { Input } from "@/Components/ui/input";
 import { QRCodeSVG } from "qrcode.react";
 
-const printStyles = `
+const buildPrintStyles = (isLandscape) => `
   @media print {
     body * {
       visibility: hidden;
@@ -55,7 +55,7 @@ const printStyles = `
     }
 
     @page {
-      size: A4 landscape;
+      size: A4 ${isLandscape ? "landscape" : "portrait"};
       margin: 8mm;
     }
 
@@ -73,6 +73,141 @@ const sectionTitleStyle = (primaryColor, textColor) => ({
     letterSpacing: "0.12em",
 });
 
+const MEDICAL_COVERAGE_SECTIONS = [
+    { key: "inpatient", label: "INPATIENT" },
+    { key: "outpatient", label: "OUTPATIENT" },
+    { key: "maternity", label: "MATERNITY" },
+    { key: "dental", label: "DENTAL" },
+    { key: "optical", label: "OPTICAL" },
+    { key: "telemedicine", label: "TELEMEDICINE" },
+];
+
+const MEDICAL_TABLE_COLUMN_WIDTHS = [
+    "5%",
+    "6%",
+    "8%",
+    ...Array(MEDICAL_COVERAGE_SECTIONS.length * 2).fill("6%"),
+    "9%",
+];
+
+const MEDICAL_TABLE_CLASS_NAME = "w-full table-fixed border-collapse text-[7px] leading-tight";
+const MEDICAL_TABLE_HEADER_CELL_CLASS_NAME =
+    "border border-slate-900 px-1 py-0.5 text-[7px] leading-tight";
+const MEDICAL_TABLE_BODY_CELL_CLASS_NAME =
+    "border border-slate-900 px-1 py-1 text-[7px] leading-tight";
+const MEDICAL_TABLE_NUMERIC_CELL_CLASS_NAME =
+    `${MEDICAL_TABLE_BODY_CELL_CLASS_NAME} text-right whitespace-nowrap`;
+
+const parseFamilySizeValue = (familySize) => {
+    if (!familySize) {
+        return null;
+    }
+
+    const normalizedFamilySize = String(familySize).trim().toUpperCase();
+    const memberFormatMatch = normalizedFamilySize.match(/^M\s*\+\s*(\d+(?:\.\d+)?)$/);
+
+    if (memberFormatMatch) {
+        return 1 + Number(memberFormatMatch[1]);
+    }
+
+    if (normalizedFamilySize === "M") {
+        return 1;
+    }
+
+    if (/^\d+(?:\.\d+)?$/.test(normalizedFamilySize)) {
+        return Number(normalizedFamilySize);
+    }
+
+    const combinedFamilySizeMatch = normalizedFamilySize.match(/^(\d+(?:\.\d+)?)\s*\+\s*(\d+(?:\.\d+)?)$/);
+
+    if (combinedFamilySizeMatch) {
+        return Number(combinedFamilySizeMatch[1]) + Number(combinedFamilySizeMatch[2]);
+    }
+
+    return null;
+};
+
+const calculateMembersAndFamilyValue = (members, familySize) => {
+    const familySizeValue = parseFamilySizeValue(familySize);
+
+    if (familySizeValue === null) {
+        return 0;
+    }
+
+    return (Number(members) || 0) * familySizeValue;
+};
+
+const getFamilySizeSortValue = (familySize) => {
+    const normalizedFamilySize = String(familySize || "").trim().toUpperCase();
+
+    if (normalizedFamilySize === "M") {
+        return 0;
+    }
+
+    const memberFormatMatch = normalizedFamilySize.match(/^M\s*\+\s*(\d+(?:\.\d+)?)$/);
+
+    if (memberFormatMatch) {
+        return Number(memberFormatMatch[1]);
+    }
+
+    return Number.MAX_SAFE_INTEGER;
+};
+
+const sortMedicalQuotationItems = (items = []) =>
+    [...items].sort((firstItem, secondItem) => {
+        const firstSortValue = getFamilySizeSortValue(firstItem.family_size);
+        const secondSortValue = getFamilySizeSortValue(secondItem.family_size);
+
+        if (firstSortValue !== secondSortValue) {
+            return firstSortValue - secondSortValue;
+        }
+
+        return String(firstItem.family_size || "").localeCompare(String(secondItem.family_size || ""));
+    });
+
+const buildMedicalSectionTotals = (items = []) =>
+    MEDICAL_COVERAGE_SECTIONS.reduce((totals, section) => {
+        totals[section.key] = items.reduce(
+            (sum, item) => sum + (Number(item?.[`${section.key}_total_contribution`]) || 0),
+            0
+        );
+
+        return totals;
+    }, {});
+
+const allocateAmountAcrossSections = (amount, sectionTotals, decimalPlaces) => {
+    const factor = 10 ** decimalPlaces;
+    const totalAmountUnits = Math.round((Number(amount) || 0) * factor);
+    const grandSectionTotal = MEDICAL_COVERAGE_SECTIONS.reduce(
+        (sum, section) => sum + (Number(sectionTotals[section.key]) || 0),
+        0
+    );
+
+    if (grandSectionTotal === 0) {
+        return MEDICAL_COVERAGE_SECTIONS.reduce((allocations, section) => {
+            allocations[section.key] = 0;
+            return allocations;
+        }, {});
+    }
+
+    let allocatedUnits = 0;
+
+    return MEDICAL_COVERAGE_SECTIONS.reduce((allocations, section, sectionIndex) => {
+        if (sectionIndex === MEDICAL_COVERAGE_SECTIONS.length - 1) {
+            allocations[section.key] = (totalAmountUnits - allocatedUnits) / factor;
+            return allocations;
+        }
+
+        const sectionUnits = Math.round(
+            totalAmountUnits * ((Number(sectionTotals[section.key]) || 0) / grandSectionTotal)
+        );
+
+        allocatedUnits += sectionUnits;
+        allocations[section.key] = sectionUnits / factor;
+        return allocations;
+    }, {});
+};
+
 export default function View({ quotation, decimalPlace }) {
     const [isLoading, setIsLoading] = useState({
         print: false,
@@ -82,8 +217,10 @@ export default function View({ quotation, decimalPlace }) {
     const [shareLink, setShareLink] = useState("");
 
     const isDeferredQuotation = Number(quotation?.is_deffered) === 1;
+    const isMedicalDeferredQuotation =
+        isDeferredQuotation && quotation?.invoice_category === "medical";
     const quantityLabel =
-        isDeferredQuotation && quotation?.invoice_category === "medical"
+        isMedicalDeferredQuotation
             ? "Members"
             : "Quantity";
 
@@ -106,6 +243,73 @@ export default function View({ quotation, decimalPlace }) {
             currency,
             decimalPlaces: decimalPlace,
         });
+
+    const formatOptionalMoney = (amount) =>
+        amount === null || amount === undefined || amount === ""
+            ? "-"
+            : formatMoney(amount);
+
+    const formatPlainNumber = (amount) =>
+        amount === null || amount === undefined || amount === ""
+            ? "-"
+            : new Intl.NumberFormat(undefined, {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: decimalPlace,
+            }).format(Number(amount) || 0);
+
+    const hasCoverageValue = (value) => value !== null && value !== undefined && value !== "";
+
+    const getMedicalCoverageConfigurationEntries = (item) =>
+        MEDICAL_COVERAGE_SECTIONS.map((section) => ({
+            ...section,
+            limitPerFamily: item?.[`${section.key}_limit_per_family`],
+            contributionPerFamily: item?.[`${section.key}_contribution_per_family`],
+            totalContribution: item?.[`${section.key}_total_contribution`],
+        })).filter(
+            (section) =>
+                hasCoverageValue(section.limitPerFamily) ||
+                hasCoverageValue(section.contributionPerFamily) ||
+                hasCoverageValue(section.totalContribution)
+        );
+
+    const medicalQuotationItems = isMedicalDeferredQuotation
+        ? sortMedicalQuotationItems(quotation?.items || [])
+        : [];
+    const medicalSectionTotals = isMedicalDeferredQuotation
+        ? buildMedicalSectionTotals(medicalQuotationItems)
+        : {};
+    const medicalTotalMembers = medicalQuotationItems.reduce(
+        (sum, item) => sum + (Number(item.quantity) || 0),
+        0
+    );
+    const medicalTotalMembersAndFamily = medicalQuotationItems.reduce(
+        (sum, item) => sum + calculateMembersAndFamilyValue(item.quantity, item.family_size),
+        0
+    );
+    const medicalTaxAllocations = (quotation?.taxes || []).map((tax) => ({
+        ...tax,
+        allocations: allocateAmountAcrossSections(tax.amount, medicalSectionTotals, decimalPlace),
+    }));
+    const medicalDiscountAllocations =
+        Number(quotation?.discount) > 0
+            ? allocateAmountAcrossSections(quotation.discount, medicalSectionTotals, decimalPlace)
+            : null;
+    const medicalGrossTotals = MEDICAL_COVERAGE_SECTIONS.reduce((totals, section) => {
+        const taxAllocationTotal = medicalTaxAllocations.reduce(
+            (sum, tax) => sum + (Number(tax.allocations?.[section.key]) || 0),
+            0
+        );
+        const discountAllocation = Number(medicalDiscountAllocations?.[section.key]) || 0;
+
+        totals[section.key] =
+            (Number(medicalSectionTotals[section.key]) || 0) + taxAllocationTotal - discountAllocation;
+
+        return totals;
+    }, {});
+    const getMedicalSectionLimit = (sectionKey) =>
+        medicalQuotationItems.find((item) => hasCoverageValue(item?.[`${sectionKey}_limit_per_family`]))?.[
+            `${sectionKey}_limit_per_family`
+        ];
 
     const handlePrint = () => {
         setIsLoading((prev) => ({ ...prev, print: true }));
@@ -180,7 +384,11 @@ export default function View({ quotation, decimalPlace }) {
     return (
         <AuthenticatedLayout>
             <SidebarInset>
-                <style dangerouslySetInnerHTML={{ __html: printStyles }} />
+                <style
+                    dangerouslySetInnerHTML={{
+                        __html: buildPrintStyles(isMedicalDeferredQuotation),
+                    }}
+                />
 
                 <div className="space-y-4">
                     <PageHeader
@@ -227,11 +435,19 @@ export default function View({ quotation, decimalPlace }) {
                     </div>
 
                     <div className="overflow-x-auto pb-4">
-                        <div id="printable-area" className="mx-auto min-h-[210mm] w-[297mm] max-w-full bg-white">
-                            <div className="border-[10px] p-3" style={{ borderColor: primaryColor }}>
+                        <div
+                            id="printable-area"
+                            className={`mx-auto max-w-full bg-white ${
+                                isMedicalDeferredQuotation ? "min-h-[190mm] w-[281mm]" : "min-h-[297mm] w-[210mm]"
+                            }`}
+                        >
+                            <div
+                                className={`${isMedicalDeferredQuotation ? "border-[8px] p-2" : "border-[10px] p-3"}`}
+                                style={{ borderColor: primaryColor }}
+                            >
                                 <div className="mb-4 h-4" style={{ backgroundColor: primaryColor }} />
 
-                                <div className="grid grid-cols-12 gap-6">
+                                <div className={`grid grid-cols-12 ${isMedicalDeferredQuotation ? "gap-4" : "gap-6"}`}>
                                     <div className="col-span-7">
                                         <div className="mb-6 flex items-start justify-between gap-4">
                                             <div className="max-w-[260px]">
@@ -304,42 +520,177 @@ export default function View({ quotation, decimalPlace }) {
                                             : "Quotation Items"}
                                     </div>
 
-                                    <table className="w-full border-collapse text-xs">
-                                        <thead>
-                                            <tr>
-                                                <th className="border border-slate-900 px-2 py-1 text-left" style={sectionTitleStyle(primaryColor, textColor)}>Coverage</th>
-                                                <th className="border border-slate-900 px-2 py-1 text-left" style={sectionTitleStyle(primaryColor, textColor)}>Item</th>
-                                                <th className="border border-slate-900 px-2 py-1 text-left" style={sectionTitleStyle(primaryColor, textColor)}>Description</th>
-                                                {isDeferredQuotation && quotation?.invoice_category === "medical" && (
-                                                    <th className="border border-slate-900 px-2 py-1 text-left" style={sectionTitleStyle(primaryColor, textColor)}>Family Size</th>
-                                                )}
-                                                {isDeferredQuotation && quotation?.invoice_category === "other" && (
-                                                    <th className="border border-slate-900 px-2 py-1 text-right" style={sectionTitleStyle(primaryColor, textColor)}>Sum Insured</th>
-                                                )}
-                                                <th className="border border-slate-900 px-2 py-1 text-right" style={sectionTitleStyle(primaryColor, textColor)}>{quantityLabel}</th>
-                                                <th className="border border-slate-900 px-2 py-1 text-right" style={sectionTitleStyle(primaryColor, textColor)}>{isDeferredQuotation ? "Rate" : "Unit Cost"}</th>
-                                                <th className="border border-slate-900 px-2 py-1 text-right" style={sectionTitleStyle(primaryColor, textColor)}>Premium</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {(quotation?.items || []).map((item, index) => (
-                                                <tr key={index}>
-                                                    <td className="border border-slate-900 px-2 py-2 align-top">{item.product_name}</td>
-                                                    <td className="border border-slate-900 px-2 py-2 align-top">{item.product_name}</td>
-                                                    <td className="border border-slate-900 px-2 py-2 align-top">{item.description}</td>
+                                    {isMedicalDeferredQuotation ? (
+                                        <div>
+                                            <table className={MEDICAL_TABLE_CLASS_NAME}>
+                                                <colgroup>
+                                                    {MEDICAL_TABLE_COLUMN_WIDTHS.map((width, index) => (
+                                                        <col key={`medical-column-${index}`} style={{ width }} />
+                                                    ))}
+                                                </colgroup>
+                                                <thead>
+                                                <tr>
+                                                    <th className={MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} colSpan={3}></th>
+                                                    {MEDICAL_COVERAGE_SECTIONS.map((section) => (
+                                                        <th
+                                                            key={section.key}
+                                                            className={`${MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} text-center font-bold uppercase`}
+                                                            colSpan={2}
+                                                            style={sectionTitleStyle(primaryColor, textColor)}
+                                                        >
+                                                            {section.label}
+                                                        </th>
+                                                    ))}
+                                                    <th
+                                                        className={`${MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} text-center font-bold uppercase`}
+                                                        style={sectionTitleStyle(primaryColor, textColor)}
+                                                    >
+                                                        Total
+                                                    </th>
+                                                </tr>
+                                                <tr className="bg-slate-50">
+                                                    <th className={MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} colSpan={3}></th>
+                                                    {MEDICAL_COVERAGE_SECTIONS.map((section) => (
+                                                        <th
+                                                            key={`${section.key}-limit`}
+                                                            className={`${MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} text-center font-semibold`}
+                                                            colSpan={2}
+                                                        >
+                                                            Limit: {formatPlainNumber(getMedicalSectionLimit(section.key))} / Family
+                                                        </th>
+                                                    ))}
+                                                    <th className={MEDICAL_TABLE_HEADER_CELL_CLASS_NAME}></th>
+                                                </tr>
+                                                <tr className="bg-slate-100 font-semibold uppercase">
+                                                    <th className={`${MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} text-left`}>
+                                                        Family Size
+                                                    </th>
+                                                    <th className={`${MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} text-right`}>
+                                                        Staff
+                                                    </th>
+                                                    <th className={`${MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} text-right`}>
+                                                        Staff + Family
+                                                    </th>
+                                                    {MEDICAL_COVERAGE_SECTIONS.map((section) => (
+                                                        <Fragment key={`${section.key}-subhead`}>
+                                                            <th className={`${MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} text-right`}>
+                                                                Contrib./Family
+                                                            </th>
+                                                            <th className={`${MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} text-right`}>
+                                                                Total Contrib.
+                                                            </th>
+                                                        </Fragment>
+                                                    ))}
+                                                    <th className={`${MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} text-right`}>
+                                                        Total
+                                                    </th>
+                                                </tr>
+                                                </thead>
+                                                <tbody>
+                                                {medicalQuotationItems.map((item, index) => (
+                                                    <tr key={index}>
+                                                        <td className={`${MEDICAL_TABLE_BODY_CELL_CLASS_NAME} font-semibold whitespace-nowrap`}>
+                                                            {item.family_size}
+                                                        </td>
+                                                        <td className={MEDICAL_TABLE_NUMERIC_CELL_CLASS_NAME}>
+                                                            {formatPlainNumber(item.quantity)}
+                                                        </td>
+                                                        <td className={MEDICAL_TABLE_NUMERIC_CELL_CLASS_NAME}>
+                                                            {formatPlainNumber(
+                                                                calculateMembersAndFamilyValue(
+                                                                    item.quantity,
+                                                                    item.family_size
+                                                                )
+                                                            )}
+                                                        </td>
+                                                        {MEDICAL_COVERAGE_SECTIONS.map((section) => (
+                                                            <Fragment key={`${item.id || index}-${section.key}`}>
+                                                                <td className={MEDICAL_TABLE_NUMERIC_CELL_CLASS_NAME}>
+                                                                    {formatPlainNumber(
+                                                                        item?.[
+                                                                            `${section.key}_contribution_per_family`
+                                                                        ]
+                                                                    )}
+                                                                </td>
+                                                                <td className={MEDICAL_TABLE_NUMERIC_CELL_CLASS_NAME}>
+                                                                    {formatPlainNumber(
+                                                                        item?.[`${section.key}_total_contribution`]
+                                                                    )}
+                                                                </td>
+                                                            </Fragment>
+                                                        ))}
+                                                        <td className={`${MEDICAL_TABLE_NUMERIC_CELL_CLASS_NAME} font-semibold`}>
+                                                            {formatPlainNumber(item.sub_total)}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    ) : (
+                                        <table className="w-full border-collapse text-xs">
+                                            <thead>
+                                                <tr>
+                                                    <th className="border border-slate-900 px-2 py-1 text-left" style={sectionTitleStyle(primaryColor, textColor)}>Coverage</th>
+                                                    <th className="border border-slate-900 px-2 py-1 text-left" style={sectionTitleStyle(primaryColor, textColor)}>Item</th>
+                                                    <th className="border border-slate-900 px-2 py-1 text-left" style={sectionTitleStyle(primaryColor, textColor)}>Description</th>
                                                     {isDeferredQuotation && quotation?.invoice_category === "medical" && (
-                                                        <td className="border border-slate-900 px-2 py-2 align-top">{item.family_size}</td>
+                                                        <th className="border border-slate-900 px-2 py-1 text-left" style={sectionTitleStyle(primaryColor, textColor)}>Coverage Configuration</th>
+                                                    )}
+                                                    {isDeferredQuotation && quotation?.invoice_category === "medical" && (
+                                                        <th className="border border-slate-900 px-2 py-1 text-left" style={sectionTitleStyle(primaryColor, textColor)}>Family Size</th>
                                                     )}
                                                     {isDeferredQuotation && quotation?.invoice_category === "other" && (
-                                                        <td className="border border-slate-900 px-2 py-2 text-right align-top">{formatMoney(item.sum_insured)}</td>
+                                                        <th className="border border-slate-900 px-2 py-1 text-right" style={sectionTitleStyle(primaryColor, textColor)}>Sum Insured</th>
                                                     )}
-                                                    <td className="border border-slate-900 px-2 py-2 text-right align-top">{item.quantity}</td>
-                                                    <td className="border border-slate-900 px-2 py-2 text-right align-top">{formatMoney(item.unit_cost)}</td>
-                                                    <td className="border border-slate-900 px-2 py-2 text-right align-top">{formatMoney(item.quantity * item.unit_cost)}</td>
+                                                    <th className="border border-slate-900 px-2 py-1 text-right" style={sectionTitleStyle(primaryColor, textColor)}>{quantityLabel}</th>
+                                                    <th className="border border-slate-900 px-2 py-1 text-right" style={sectionTitleStyle(primaryColor, textColor)}>{isDeferredQuotation ? "Rate" : "Unit Cost"}</th>
+                                                    <th className="border border-slate-900 px-2 py-1 text-right" style={sectionTitleStyle(primaryColor, textColor)}>Premium</th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                            </thead>
+                                            <tbody>
+                                                {(quotation?.items || []).map((item, index) => {
+                                                    const medicalCoverageConfiguration =
+                                                        isDeferredQuotation && quotation?.invoice_category === "medical"
+                                                            ? getMedicalCoverageConfigurationEntries(item)
+                                                            : [];
+
+                                                    return (
+                                                        <tr key={index}>
+                                                            <td className="border border-slate-900 px-2 py-2 align-top">{item.product_name}</td>
+                                                            <td className="border border-slate-900 px-2 py-2 align-top">{item.product_name}</td>
+                                                            <td className="border border-slate-900 px-2 py-2 align-top">{item.description}</td>
+                                                            {isDeferredQuotation && quotation?.invoice_category === "medical" && (
+                                                                <td className="border border-slate-900 px-2 py-2 align-top">
+                                                                    {medicalCoverageConfiguration.length > 0 ? (
+                                                                        <div className="space-y-1">
+                                                                            {medicalCoverageConfiguration.map((section) => (
+                                                                                <div key={section.key}>
+                                                                                    <span className="font-semibold">{section.label}:</span>{" "}
+                                                                                    Limit/Family {formatOptionalMoney(section.limitPerFamily)} | Contribution/Family {formatOptionalMoney(section.contributionPerFamily)} | Total {formatOptionalMoney(section.totalContribution)}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : (
+                                                                        "-"
+                                                                    )}
+                                                                </td>
+                                                            )}
+                                                            {isDeferredQuotation && quotation?.invoice_category === "medical" && (
+                                                                <td className="border border-slate-900 px-2 py-2 align-top">{item.family_size}</td>
+                                                            )}
+                                                            {isDeferredQuotation && quotation?.invoice_category === "other" && (
+                                                                <td className="border border-slate-900 px-2 py-2 text-right align-top">{formatMoney(item.sum_insured)}</td>
+                                                            )}
+                                                            <td className="border border-slate-900 px-2 py-2 text-right align-top">{item.quantity}</td>
+                                                            <td className="border border-slate-900 px-2 py-2 text-right align-top">{formatMoney(item.unit_cost)}</td>
+                                                            <td className="border border-slate-900 px-2 py-2 text-right align-top">{formatMoney(item.sub_total)}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    )}
                                 </div>
 
                                 <div className="mt-5 grid grid-cols-12 gap-0 border border-slate-900">

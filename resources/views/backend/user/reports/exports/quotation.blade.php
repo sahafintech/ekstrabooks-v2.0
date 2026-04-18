@@ -22,7 +22,7 @@
         <td style="background-color: lightgray; font-size: 12px">product_name</td>
         <td style="background-color: lightgray; font-size: 12px">description</td>
         <td style="background-color: lightgray; font-size: 12px">sum_insured</td>
-        <td style="background-color: lightgray; font-size: 12px">benefits</td>
+        <td style="background-color: lightgray; font-size: 12px">medical_coverage_configuration</td>
         <td style="background-color: lightgray; font-size: 12px">family_size</td>
         <td style="background-color: lightgray; font-size: 12px">quantity</td>
         <td style="background-color: lightgray; font-size: 12px">unit_cost</td>
@@ -68,6 +68,31 @@
                     $itemTaxTotal = $item->taxes->sum(function ($tax) {
                         return (float) ($tax->getRawOriginal('amount') ?: $tax->amount);
                     });
+
+                    $medicalCoverageConfiguration = collect([
+                        'Inpatient' => 'inpatient',
+                        'Maternity' => 'maternity',
+                        'Outpatient' => 'outpatient',
+                        'Dental' => 'dental',
+                        'Optical' => 'optical',
+                        'Telemedicine' => 'telemedicine',
+                    ])->map(function ($key, $label) use ($item) {
+                        $limit = $item->{"{$key}_limit_per_family"};
+                        $contribution = $item->{"{$key}_contribution_per_family"};
+                        $total = $item->{"{$key}_total_contribution"};
+
+                        if ($limit === null && $contribution === null && $total === null) {
+                            return null;
+                        }
+
+                        return sprintf(
+                            '%s: Limit/Family %s | Contribution/Family %s | Total %s',
+                            $label,
+                            $limit ?? '-',
+                            $contribution ?? '-',
+                            $total ?? '-'
+                        );
+                    })->filter()->implode('; ');
                 @endphp
                 <tr>
                     <td>{{ optional($quotation->customer)->name }}</td>
@@ -92,7 +117,7 @@
                     <td>{{ $item->product_name ?: optional($item->product)->name }}</td>
                     <td>{{ $item->description }}</td>
                     <td>{{ $item->getRawOriginal('sum_insured') ?: $item->sum_insured }}</td>
-                    <td>{{ $item->benefits }}</td>
+                    <td>{{ $medicalCoverageConfiguration }}</td>
                     <td>{{ $item->family_size }}</td>
                     <td>{{ $item->quantity }}</td>
                     <td>{{ $item->getRawOriginal('unit_cost') ?: $item->unit_cost }}</td>

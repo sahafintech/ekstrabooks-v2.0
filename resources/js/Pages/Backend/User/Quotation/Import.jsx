@@ -53,7 +53,6 @@ const SYSTEM_FIELDS = [
   },
   { value: "is_deffered", label: "Deferred (1=Yes, 0=No)", required: false },
   { value: "invoice_category", label: "Invoice Category", required: false },
-  { value: "benefits", label: "Benefits", required: false },
   { value: "family_size", label: "Family Size", required: false },
   { value: "sum_insured", label: "Sum Insured", required: false },
   { value: "skip", label: "Skip this column", required: false },
@@ -155,8 +154,6 @@ export default function Import() {
         } else if (normalizedHeader.includes("deferred") && field.value === "is_deffered") {
           score = 90;
         } else if (normalizedHeader.includes("category") && field.value === "invoice_category") {
-          score = 85;
-        } else if (normalizedHeader.includes("benefit") && field.value === "benefits") {
           score = 85;
         } else if (normalizedHeader.includes("family") && field.value === "family_size") {
           score = 85;
@@ -395,7 +392,8 @@ export default function Import() {
                         <li>- Duplicate <strong>Quotation Number</strong> values are grouped into one quotation with multiple items</li>
                         <li>- Shared quotation values are taken from the first row in each quotation group</li>
                         <li>- Customer, product, currency, and tax values are matched by name</li>
-                        <li>- Deferred quotations can also include invoice category, benefits, family size, and sum insured data</li>
+                        <li>- Deferred quotations can also include invoice category, family size, and sum insured data</li>
+                        <li>- Medical coverage configuration can be completed from the quotation edit screen after import</li>
                       </ul>
                     </AlertDescription>
                   </Alert>

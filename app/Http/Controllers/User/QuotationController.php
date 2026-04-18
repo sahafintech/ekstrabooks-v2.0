@@ -15,7 +15,6 @@ use App\Models\EmailTemplate;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\InvoiceItemTax;
-use App\Models\InsuranceBenefit;
 use App\Models\InsuranceFamilySize;
 use App\Models\Product;
 use App\Models\Quotation;
@@ -173,7 +172,6 @@ class QuotationController extends Controller
         $products = Product::all();
         $taxes = Tax::all();
         $familySizes = InsuranceFamilySize::all();
-        $benefits = InsuranceBenefit::all();
 
         return Inertia::render('Backend/User/Quotation/Create', [
             'customers' => $customers,
@@ -181,7 +179,6 @@ class QuotationController extends Controller
             'products' => $products,
             'taxes' => $taxes,
             'familySizes' => $familySizes,
-            'benefits' => $benefits,
             'quotation_title' => $quotation_title,
             'base_currency' => get_business_option('currency')
         ]);
@@ -410,7 +407,6 @@ class QuotationController extends Controller
         $products = Product::all();
         $taxes = Tax::all();
         $familySizes = InsuranceFamilySize::all();
-        $benefits = InsuranceBenefit::all();
 
         $decimalPlace = get_business_option('decimal_place', 2);
 
@@ -421,7 +417,6 @@ class QuotationController extends Controller
             'products' => $products,
             'taxes' => $taxes,
             'familySizes' => $familySizes,
-            'benefits' => $benefits,
             'decimalPlace' => $decimalPlace,
             'taxIds' => $taxIds
         ]);
@@ -955,20 +950,103 @@ class QuotationController extends Controller
     {
         $isDeferred = $this->isDeferredQuotation($request);
         $invoiceCategory = $isDeferred ? $request->input('invoice_category') : null;
+        $isMedicalDeferredQuotation = $isDeferred && $invoiceCategory === 'medical';
+        $lineRate = $this->calculateQuotationItemRate($request, $index);
+        $lineTotal = $this->calculateQuotationItemLineTotal($request, $index);
 
-        return [
+        return array_merge([
             'product_id'   => $request->product_id[$index],
             'product_name' => $request->product_name[$index],
             'description'  => $request->description[$index] ?? null,
             'quantity'     => $request->quantity[$index],
-            'unit_cost'    => $request->unit_cost[$index],
-            'sub_total'    => ($request->unit_cost[$index] * $request->quantity[$index]),
-            'benefits'     => $isDeferred ? ($request->benefits[$index] ?? null) : null,
+            'unit_cost'    => $lineRate,
+            'sub_total'    => $lineTotal,
             'family_size'  => $isDeferred && $invoiceCategory === 'medical' ? ($request->family_size[$index] ?? null) : null,
             'sum_insured'  => $isDeferred && $invoiceCategory === 'other'
                 ? (($request->input("sum_insured.$index") !== null && $request->input("sum_insured.$index") !== '') ? $request->input("sum_insured.$index") : 0)
                 : 0,
-        ];
+        ], $this->buildMedicalCoveragePayload($request, $index, $isMedicalDeferredQuotation));
+    }
+
+    private function buildMedicalCoveragePayload(Request $request, int $index, bool $isMedicalDeferredQuotation): array
+    {
+        $payload = [];
+
+        foreach ($this->medicalCoverageSections() as $section) {
+            $payload["{$section}_limit_per_family"] = $isMedicalDeferredQuotation
+                ? $this->normalizeCoverageConfigurationDecimal(
+                    $request->input("coverage_configuration.$index.$section.limit_per_family")
+                )
+                : null;
+            $payload["{$section}_contribution_per_family"] = $isMedicalDeferredQuotation
+                ? $this->normalizeCoverageConfigurationDecimal(
+                    $request->input("coverage_configuration.$index.$section.contribution_per_family")
+                )
+                : null;
+            $payload["{$section}_total_contribution"] = $isMedicalDeferredQuotation
+                ? $this->normalizeCoverageConfigurationDecimal(
+                    $request->input("coverage_configuration.$index.$section.total_contribution")
+                )
+                : null;
+        }
+
+        return $payload;
+    }
+
+    private function medicalCoverageSections(): array
+    {
+        return ['inpatient', 'maternity', 'outpatient', 'dental', 'optical', 'telemedicine'];
+    }
+
+    private function normalizeCoverageConfigurationDecimal($value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return is_numeric($value) ? (float) $value : null;
+    }
+
+    private function isMedicalDeferredQuotation(Request $request): bool
+    {
+        return $this->isDeferredQuotation($request) && $request->input('invoice_category') === 'medical';
+    }
+
+    private function calculateMedicalCoverageRate(Request $request, int $index): float
+    {
+        $rate = 0.0;
+
+        foreach ($this->medicalCoverageSections() as $section) {
+            $rate += (float) (
+                $this->normalizeCoverageConfigurationDecimal(
+                    $request->input("coverage_configuration.$index.$section.total_contribution")
+                ) ?? 0
+            );
+        }
+
+        return $rate;
+    }
+
+    private function calculateQuotationItemRate(Request $request, int $index): float
+    {
+        if ($this->isMedicalDeferredQuotation($request)) {
+            return $this->calculateMedicalCoverageRate($request, $index);
+        }
+
+        $unitCost = $request->input("unit_cost.$index");
+
+        return is_numeric($unitCost) ? (float) $unitCost : 0.0;
+    }
+
+    private function calculateQuotationItemLineTotal(Request $request, int $index): float
+    {
+        if ($this->isMedicalDeferredQuotation($request)) {
+            return $this->calculateMedicalCoverageRate($request, $index);
+        }
+
+        $quantity = $request->input("quantity.$index");
+
+        return (is_numeric($quantity) ? (float) $quantity : 0.0) * $this->calculateQuotationItemRate($request, $index);
     }
 
     private function buildDeferredEarningsSchedule(Quotation $quotation): array
@@ -1996,9 +2074,7 @@ class QuotationController extends Controller
 
         for ($i = 0; $i < count($request->product_id); $i++) {
             //Calculate Sub Total
-            $line_qnt       = $request->quantity[$i];
-            $line_unit_cost = $request->unit_cost[$i];
-            $line_total     = ($line_qnt * $line_unit_cost);
+            $line_total = $this->calculateQuotationItemLineTotal($request, $i);
 
             //Show Sub Total
             $subTotal = ($subTotal + $line_total);

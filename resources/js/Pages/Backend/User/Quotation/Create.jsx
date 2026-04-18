@@ -9,11 +9,109 @@ import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
-import { Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 import DateTimePicker from "@/Components/DateTimePicker";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/Components/ui/collapsible";
+
+const MEDICAL_COVERAGE_SECTIONS = [
+    { key: "inpatient", label: "Inpatient" },
+    { key: "maternity", label: "Maternity" },
+    { key: "outpatient", label: "Outpatient" },
+    { key: "dental", label: "Dental" },
+    { key: "optical", label: "Optical" },
+    { key: "telemedicine", label: "Telemedicine" },
+];
+
+const parseNumericValue = (value) => {
+    if (value === "" || value === null || value === undefined) {
+        return "";
+    }
+
+    const parsedValue = parseFloat(value);
+    return Number.isNaN(parsedValue) ? "" : parsedValue;
+};
+
+const createEmptyCoverageEntry = () => ({
+    limit_per_family: "",
+    contribution_per_family: "",
+    total_contribution: "",
+});
+
+const createEmptyCoverageConfiguration = () =>
+    MEDICAL_COVERAGE_SECTIONS.reduce((configuration, section) => {
+        configuration[section.key] = createEmptyCoverageEntry();
+        return configuration;
+    }, {});
+
+const calculateCoverageTotalContribution = (members, contributionPerFamily) => {
+    if (contributionPerFamily === "" || contributionPerFamily === null || contributionPerFamily === undefined) {
+        return "";
+    }
+
+    return (Number(members) || 0) * (Number(contributionPerFamily) || 0);
+};
+
+const normalizeMedicalCoverageConfiguration = (coverageConfiguration = {}, members = 0) =>
+    MEDICAL_COVERAGE_SECTIONS.reduce((configuration, section) => {
+        const sectionValues = coverageConfiguration?.[section.key] ?? {};
+        const contributionPerFamily = parseNumericValue(sectionValues.contribution_per_family);
+
+        configuration[section.key] = {
+            limit_per_family: parseNumericValue(sectionValues.limit_per_family),
+            contribution_per_family: contributionPerFamily,
+            total_contribution: calculateCoverageTotalContribution(members, contributionPerFamily),
+        };
+
+        return configuration;
+    }, {});
+
+const calculateMedicalCoverageRate = (coverageConfiguration = {}) =>
+    MEDICAL_COVERAGE_SECTIONS.reduce(
+        (sum, section) => sum + (Number(coverageConfiguration?.[section.key]?.total_contribution) || 0),
+        0
+    );
+
+const parseFamilySizeValue = (familySize) => {
+    if (!familySize) {
+        return null;
+    }
+
+    const normalizedFamilySize = String(familySize).trim().toUpperCase();
+    const memberFormatMatch = normalizedFamilySize.match(/^M\s*\+\s*(\d+(?:\.\d+)?)$/);
+
+    if (memberFormatMatch) {
+        return 1 + Number(memberFormatMatch[1]);
+    }
+
+    if (/^\d+(?:\.\d+)?$/.test(normalizedFamilySize)) {
+        return Number(normalizedFamilySize);
+    }
+
+    const combinedFamilySizeMatch = normalizedFamilySize.match(/^(\d+(?:\.\d+)?)\s*\+\s*(\d+(?:\.\d+)?)$/);
+
+    if (combinedFamilySizeMatch) {
+        return Number(combinedFamilySizeMatch[1]) + Number(combinedFamilySizeMatch[2]);
+    }
+
+    return null;
+};
+
+const calculateMembersAndFamilyValue = (members, familySize) => {
+    if (members === "" || members === null || members === undefined || !familySize) {
+        return "";
+    }
+
+    const familySizeValue = parseFamilySizeValue(familySize);
+
+    if (familySizeValue === null) {
+        return "";
+    }
+
+    return (Number(members) || 0) * familySizeValue;
+};
 
 const createEmptyQuotationItem = () => ({
     product_id: "",
@@ -23,6 +121,7 @@ const createEmptyQuotationItem = () => ({
     unit_cost: 0,
     family_size: "",
     sum_insured: "",
+    coverage_configuration: createEmptyCoverageConfiguration(),
 });
 
 const quotationTypeOptions = [
@@ -46,6 +145,7 @@ export default function Create({
     base_currency,
 }) {
     const [quotationItems, setQuotationItems] = useState([createEmptyQuotationItem()]);
+    const [openCoverageConfigurationIndex, setOpenCoverageConfigurationIndex] = useState(null);
 
     const [exchangeRate, setExchangeRate] = useState(1);
     const [baseCurrencyInfo, setBaseCurrencyInfo] = useState(null);
@@ -77,6 +177,7 @@ export default function Create({
         unit_cost: [],
         family_size: [],
         sum_insured: [],
+        coverage_configuration: [],
         taxes: [],
     });
 
@@ -84,6 +185,14 @@ export default function Create({
     const canManageItems = !isDeferredQuotation || data.invoice_category !== "";
     const isMedicalDeferredQuotation = isDeferredQuotation && data.invoice_category === "medical";
     const isOtherDeferredQuotation = isDeferredQuotation && data.invoice_category === "other";
+    const showFamilySizeField = isMedicalDeferredQuotation;
+    const showSumInsuredField = isOtherDeferredQuotation;
+    const quotationItemGridClassName =
+        showFamilySizeField
+            ? "grid grid-cols-1 md:grid-cols-8 gap-2 items-end"
+            : showSumInsuredField
+                ? "grid grid-cols-1 md:grid-cols-7 gap-2 items-end"
+                : "grid grid-cols-1 md:grid-cols-6 gap-2 items-end";
     const customerOptions = customers.map((customer) => ({
         id: customer.id,
         name: customer.name,
@@ -115,6 +224,7 @@ export default function Create({
         setData("unit_cost", items.map((item) => item.unit_cost));
         setData("family_size", items.map((item) => item.family_size));
         setData("sum_insured", items.map((item) => item.sum_insured));
+        setData("coverage_configuration", items.map((item) => item.coverage_configuration));
     };
 
     const sanitizeDeferredItemFields = (items, deferred, category) =>
@@ -122,21 +232,39 @@ export default function Create({
             ...item,
             family_size: deferred && category === "medical" ? item.family_size ?? "" : "",
             sum_insured: deferred && category === "other" ? item.sum_insured ?? "" : "",
+            coverage_configuration:
+                deferred && category === "medical"
+                    ? normalizeMedicalCoverageConfiguration(item.coverage_configuration, item.quantity)
+                    : createEmptyCoverageConfiguration(),
         }));
 
     const updateItems = (items) => {
-        setQuotationItems(items);
-        syncQuotationItems(items);
+        const normalizedItems = items.map((item) => ({
+            ...item,
+            coverage_configuration: normalizeMedicalCoverageConfiguration(
+                item.coverage_configuration,
+                item.quantity
+            ),
+        })).map((item) => ({
+            ...item,
+            unit_cost: isMedicalDeferredQuotation
+                ? calculateMedicalCoverageRate(item.coverage_configuration)
+                : item.unit_cost,
+        }));
+
+        setQuotationItems(normalizedItems);
+        syncQuotationItems(normalizedItems);
     };
 
-    const parseNumericValue = (value) => {
-        if (value === "" || value === null || value === undefined) {
-            return "";
-        }
+    const calculateItemRate = (item) =>
+        isMedicalDeferredQuotation
+            ? calculateMedicalCoverageRate(item.coverage_configuration)
+            : Number(item.unit_cost) || 0;
 
-        const parsedValue = parseFloat(value);
-        return Number.isNaN(parsedValue) ? "" : parsedValue;
-    };
+    const calculateItemSubtotal = (item) =>
+        isMedicalDeferredQuotation
+            ? calculateItemRate(item)
+            : (Number(item.quantity) || 0) * (Number(item.unit_cost) || 0);
 
     const autoResizeTextarea = (event, onChange) => {
         onChange(event.target.value);
@@ -144,12 +272,40 @@ export default function Create({
         event.target.style.height = `${event.target.scrollHeight}px`;
     };
 
+    useEffect(() => {
+        if (!isMedicalDeferredQuotation || quotationItems.length === 0) {
+            setOpenCoverageConfigurationIndex(null);
+            return;
+        }
+
+        setOpenCoverageConfigurationIndex((currentIndex) =>
+            currentIndex !== null && currentIndex < quotationItems.length ? currentIndex : 0
+        );
+    }, [isMedicalDeferredQuotation, quotationItems.length]);
+
     const addQuotationItem = () => {
-        updateItems([...quotationItems, createEmptyQuotationItem()]);
+        const updatedItems = [...quotationItems, createEmptyQuotationItem()];
+        updateItems(updatedItems);
+
+        if (isMedicalDeferredQuotation) {
+            setOpenCoverageConfigurationIndex(updatedItems.length - 1);
+        }
     };
 
     const removeQuotationItem = (index) => {
-        updateItems(quotationItems.filter((_, itemIndex) => itemIndex !== index));
+        const updatedItems = quotationItems.filter((_, itemIndex) => itemIndex !== index);
+        updateItems(updatedItems);
+        setOpenCoverageConfigurationIndex((currentIndex) => {
+            if (currentIndex === null) {
+                return null;
+            }
+
+            if (currentIndex === index) {
+                return updatedItems.length > 0 ? Math.max(0, index - 1) : null;
+            }
+
+            return currentIndex > index ? currentIndex - 1 : currentIndex;
+        });
     };
 
     const handleQuotationTypeChange = (value) => {
@@ -179,7 +335,9 @@ export default function Create({
             const product = products.find((productItem) => productItem.id === parseInt(value, 10));
             if (product) {
                 updatedItems[index].product_name = product.name;
-                updatedItems[index].unit_cost = product.selling_price;
+                if (!isMedicalDeferredQuotation) {
+                    updatedItems[index].unit_cost = product.selling_price;
+                }
 
                 if (!updatedItems[index].description) {
                     updatedItems[index].description = product.description || "";
@@ -190,9 +348,28 @@ export default function Create({
         updateItems(updatedItems);
     };
 
+    const updateCoverageConfiguration = (index, sectionKey, field, value) => {
+        const updatedItems = [...quotationItems];
+        const currentCoverageConfiguration =
+            updatedItems[index].coverage_configuration ?? createEmptyCoverageConfiguration();
+
+        updatedItems[index] = {
+            ...updatedItems[index],
+            coverage_configuration: {
+                ...currentCoverageConfiguration,
+                [sectionKey]: {
+                    ...(currentCoverageConfiguration[sectionKey] ?? createEmptyCoverageEntry()),
+                    [field]: value,
+                },
+            },
+        };
+
+        updateItems(updatedItems);
+    };
+
     const calculateSubtotal = () =>
         quotationItems.reduce(
-            (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unit_cost) || 0),
+            (sum, item) => sum + calculateItemSubtotal(item),
             0
         );
 
@@ -200,7 +377,7 @@ export default function Create({
 
     const calculateTaxes = () => {
         return quotationItems.reduce((sum, item) => {
-            const base = (Number(item.quantity) || 0) * (Number(item.unit_cost) || 0);
+            const base = calculateItemSubtotal(item);
 
             const itemTax = data.taxes.reduce((taxSum, taxIdStr) => {
                 // convert the incoming tax‐ID string to a Number
@@ -342,6 +519,7 @@ export default function Create({
             unit_cost: quotationItems.map(item => item.unit_cost),
             family_size: quotationItems.map(item => item.family_size),
             sum_insured: quotationItems.map(item => item.sum_insured),
+            coverage_configuration: quotationItems.map((item) => item.coverage_configuration),
         };
 
         post(route("quotations.store"), formData, {
@@ -521,7 +699,7 @@ export default function Create({
                             ) : (
                                 quotationItems.map((item, index) => (
                                     <div key={index} className="border rounded-lg p-4 space-y-4 bg-gray-50">
-                                        <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
+                                        <div className={quotationItemGridClassName}>
                                             <div>
                                                 <Label>Product *</Label>
                                                 <SearchableCombobox
@@ -542,15 +720,54 @@ export default function Create({
                                                 />
                                             </div>
 
+                                            {showFamilySizeField && (
+                                                <div>
+                                                    <Label>Family Size *</Label>
+                                                    <SearchableCombobox
+                                                        options={familySizeOptions}
+                                                        value={item.family_size}
+                                                        onChange={(value) => updateQuotationItem(index, "family_size", value)}
+                                                        placeholder="Select family size"
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {showFamilySizeField && (
+                                                <div>
+                                                    <Label>Members + Family</Label>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={calculateMembersAndFamilyValue(item.quantity, item.family_size)}
+                                                        disabled
+                                                        readOnly
+                                                    />
+                                                </div>
+                                            )}
+
                                             <div>
                                                 <Label>{isDeferredQuotation ? "Rate *" : "Unit Cost *"}</Label>
                                                 <Input
                                                     type="number"
                                                     step="0.01"
-                                                    value={item.unit_cost}
+                                                    value={calculateItemRate(item)}
                                                     onChange={(e) => updateQuotationItem(index, "unit_cost", parseNumericValue(e.target.value))}
+                                                    disabled={isMedicalDeferredQuotation}
+                                                    readOnly={isMedicalDeferredQuotation}
                                                 />
                                             </div>
+
+                                            {showSumInsuredField && (
+                                                <div>
+                                                    <Label>Sum Insured</Label>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={item.sum_insured}
+                                                        onChange={(e) => updateQuotationItem(index, "sum_insured", parseNumericValue(e.target.value))}
+                                                    />
+                                                </div>
+                                            )}
 
                                             <div>
                                                 <Label>Description</Label>
@@ -567,7 +784,7 @@ export default function Create({
                                             <div>
                                                 <Label>Subtotal</Label>
                                                 <div className="p-2 bg-white rounded text-right">
-                                                    {((Number(item.quantity) || 0) * (Number(item.unit_cost) || 0)).toFixed(2)}
+                                                    {calculateItemSubtotal(item).toFixed(2)}
                                                 </div>
                                             </div>
 
@@ -586,33 +803,100 @@ export default function Create({
                                             </div>
                                         </div>
 
-                                        {isDeferredQuotation && (
-                                            <div className={`grid grid-cols-1 gap-2 ${isMedicalDeferredQuotation || isOtherDeferredQuotation ? "md:grid-cols-2" : ""}`}>
+                                        {isMedicalDeferredQuotation && (
+                                            <Collapsible
+                                                open={openCoverageConfigurationIndex === index}
+                                                onOpenChange={(isOpen) =>
+                                                    setOpenCoverageConfigurationIndex(isOpen ? index : null)
+                                                }
+                                                className="rounded-lg border border-dashed border-slate-300 bg-white"
+                                            >
+                                                <CollapsibleTrigger asChild>
+                                                    <button
+                                                        type="button"
+                                                        className="group flex w-full items-center justify-between px-4 py-3 text-left"
+                                                    >
+                                                        <div>
+                                                            <div className="text-sm font-semibold text-slate-900">
+                                                                Coverage Configuration
+                                                            </div>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                Limit per family and contribution per family are editable, and total contribution updates from members.
+                                                            </p>
+                                                        </div>
+                                                        <ChevronDown className="h-4 w-4 text-slate-500 transition-transform group-data-[state=open]:rotate-180" />
+                                                    </button>
+                                                </CollapsibleTrigger>
 
-                                                {isMedicalDeferredQuotation && (
-                                                    <div>
-                                                        <Label>Family Size *</Label>
-                                                        <SearchableCombobox
-                                                            options={familySizeOptions}
-                                                            value={item.family_size}
-                                                            onChange={(value) => updateQuotationItem(index, "family_size", value)}
-                                                            placeholder="Select family size"
-                                                        />
-                                                    </div>
-                                                )}
+                                                <CollapsibleContent className="border-t border-slate-200 px-4 py-4">
+                                                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                                                        {MEDICAL_COVERAGE_SECTIONS.map((section) => {
+                                                            const coverageConfiguration =
+                                                                item.coverage_configuration?.[section.key] ??
+                                                                createEmptyCoverageEntry();
 
-                                                {isOtherDeferredQuotation && (
-                                                    <div>
-                                                        <Label>Sum Insured</Label>
-                                                        <Input
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={item.sum_insured}
-                                                            onChange={(e) => updateQuotationItem(index, "sum_insured", parseNumericValue(e.target.value))}
-                                                        />
+                                                            return (
+                                                                <div
+                                                                    key={section.key}
+                                                                    className="rounded-md border bg-slate-50 p-4"
+                                                                >
+                                                                    <h4 className="text-sm font-semibold text-slate-900">
+                                                                        {section.label}
+                                                                    </h4>
+
+                                                                    <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+                                                                        <div>
+                                                                            <Label>Limit Per Family</Label>
+                                                                            <Input
+                                                                                type="number"
+                                                                                step="0.01"
+                                                                                min="0"
+                                                                                value={coverageConfiguration.limit_per_family}
+                                                                                onChange={(e) =>
+                                                                                    updateCoverageConfiguration(
+                                                                                        index,
+                                                                                        section.key,
+                                                                                        "limit_per_family",
+                                                                                        parseNumericValue(e.target.value)
+                                                                                    )
+                                                                                }
+                                                                            />
+                                                                        </div>
+
+                                                                        <div>
+                                                                            <Label>Contribution Per Family</Label>
+                                                                            <Input
+                                                                                type="number"
+                                                                                step="0.01"
+                                                                                value={coverageConfiguration.contribution_per_family}
+                                                                                onChange={(e) =>
+                                                                                    updateCoverageConfiguration(
+                                                                                        index,
+                                                                                        section.key,
+                                                                                        "contribution_per_family",
+                                                                                        parseNumericValue(e.target.value)
+                                                                                    )
+                                                                                }
+                                                                            />
+                                                                        </div>
+
+                                                                        <div>
+                                                                            <Label>Auto-calculated Total Contribution</Label>
+                                                                            <Input
+                                                                                type="number"
+                                                                                step="0.01"
+                                                                                value={coverageConfiguration.total_contribution}
+                                                                                disabled
+                                                                                readOnly
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
                                                     </div>
-                                                )}
-                                            </div>
+                                                </CollapsibleContent>
+                                            </Collapsible>
                                         )}
                                     </div>
                                 ))
@@ -755,6 +1039,7 @@ export default function Create({
                                     onClick={() => {
                                         reset();
                                         setQuotationItems([createEmptyQuotationItem()]);
+                                        setOpenCoverageConfigurationIndex(null);
                                     }}
                                 >
                                     Reset

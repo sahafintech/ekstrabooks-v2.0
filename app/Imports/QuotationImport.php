@@ -193,7 +193,6 @@ class QuotationImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
                 'quantity' => $quantity,
                 'unit_cost' => $unitCost,
                 'sub_total' => $lineTotal,
-                'benefits' => $isDeferred ? trim((string) ($itemData['benefits'] ?? '')) : null,
                 'family_size' => $isDeferred && $invoiceCategory === 'medical' ? ($familySize !== '' ? $familySize : null) : null,
                 'sum_insured' => $sumInsured,
                 'item_taxes' => $itemTaxes,
@@ -251,7 +250,6 @@ class QuotationImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
                 'quantity' => $item['quantity'],
                 'unit_cost' => $item['unit_cost'],
                 'sub_total' => $item['sub_total'],
-                'benefits' => $item['benefits'],
                 'family_size' => $item['family_size'],
                 'sum_insured' => $item['sum_insured'],
             ]));

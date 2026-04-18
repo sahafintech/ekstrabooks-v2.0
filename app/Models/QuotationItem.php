@@ -22,7 +22,33 @@ class QuotationItem extends Model {
      * @var array
      */
     protected $fillable = [
-        'quotation_id', 'product_id', 'product_name', 'description', 'sum_insured', 'quantity', 'unit_cost', 'sub_total', 'benefits', 'family_size',
+        'quotation_id',
+        'product_id',
+        'product_name',
+        'description',
+        'sum_insured',
+        'quantity',
+        'unit_cost',
+        'sub_total',
+        'family_size',
+        'inpatient_limit_per_family',
+        'inpatient_contribution_per_family',
+        'inpatient_total_contribution',
+        'maternity_limit_per_family',
+        'maternity_contribution_per_family',
+        'maternity_total_contribution',
+        'outpatient_limit_per_family',
+        'outpatient_contribution_per_family',
+        'outpatient_total_contribution',
+        'dental_limit_per_family',
+        'dental_contribution_per_family',
+        'dental_total_contribution',
+        'optical_limit_per_family',
+        'optical_contribution_per_family',
+        'optical_total_contribution',
+        'telemedicine_limit_per_family',
+        'telemedicine_contribution_per_family',
+        'telemedicine_total_contribution',
     ];
 
     public function product(){

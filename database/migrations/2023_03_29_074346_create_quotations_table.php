@@ -34,6 +34,7 @@ return new class extends Migration
             $table->string('short_code')->nullable();
 
             // deffered quotation
+            // medical coverage configuration is stored per row in quotation_items
             $table->string('invoice_category')->nullable();
             $table->tinyInteger('is_deffered')->default(0);
             $table->tinyInteger('status')->default(0)->comment('0 = pending | 1 = accepted | 2 = rejected');
