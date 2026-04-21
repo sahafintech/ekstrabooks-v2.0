@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <title>{{ !isset($page_title) ? get_option('site_title', config('app.name')) : $page_title }}</title>
+    <link rel="icon" type="image/png" href="{{ asset('backend/images/ekstrabooks-favicon.png') }}">
+    <link rel="shortcut icon" type="image/png" href="{{ asset('backend/images/ekstrabooks-favicon.png') }}">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
