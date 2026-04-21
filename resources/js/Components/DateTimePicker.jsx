@@ -3,15 +3,7 @@ import Flatpickr from "react-flatpickr";
 import "flatpickr/dist/flatpickr.min.css";
 import { cn } from "@/lib/utils";
 import { usePage } from "@inertiajs/react";
-
-const inputClasses = `
-  flex h-9 w-full 
-  rounded-md border border-input px-3 py-1 text-base 
-  shadow-sm transition-colors file:border-0 file:bg-transparent 
-  file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground 
-  focus-visible:outline-none focus:border-none disabled:cursor-not-allowed 
-  disabled:opacity-50 md:text-sm focus:ring-primary
-`;
+import { Input } from "@/Components/ui/input";
 
 export default function DateTimePicker({
     value,
@@ -39,7 +31,7 @@ export default function DateTimePicker({
             <div className={cn("relative", className)}>
                 <Flatpickr
                     {...rest}
-                    className={cn(inputClasses)}
+                    className="cursor-pointer"
                     value={value}
                     options={{
                         enableTime,
@@ -78,6 +70,22 @@ export default function DateTimePicker({
                         }
                     }}
                     placeholder={isRange ? "pick a date range" : "pick a date"}
+                    render={(
+                        {
+                            defaultValue,
+                            value: _value,
+                            className: inputClassName,
+                            ...inputProps
+                        },
+                        ref
+                    ) => (
+                        <Input
+                            {...inputProps}
+                            ref={ref}
+                            defaultValue={defaultValue}
+                            className={cn("cursor-pointer", inputClassName)}
+                        />
+                    )}
                 />
             </div>
         </>

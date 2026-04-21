@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, router, usePage } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
+import { Badge } from "@/Components/ui/badge";
 import { Button } from "@/Components/ui/button";
 import { Checkbox } from "@/Components/ui/checkbox";
 import {
@@ -155,17 +156,18 @@ const DeleteAllInvoicesModal = ({ show, onClose, onConfirm, processing, count })
 
 const InvoiceStatusBadge = ({ status }) => {
   const statusMap = {
-    0: { label: "Draft", className: "text-gray-600 bg-gray-200 px-3 py-1 rounded text-sm" },
-    1: { label: "Active", className: "text-blue-600 bg-blue-200 px-3 py-1 rounded text-sm" },
-    2: { label: "Paid", className: "text-green-600 bg-green-200 px-3 py-1 rounded text-sm" },
-    3: { label: "Partially Paid", className: "text-yellow-600 bg-yellow-200 px-3 py-1 rounded text-sm" },
-    4: { label: "Canceled", className: "text-red-600 bg-red-200 px-3 py-1 rounded text-sm" }
+    0: { label: "Draft", className: "gap-1 text-gray-600 border-gray-400" },
+    1: { label: "Active", className: "gap-1 text-blue-600 border-blue-600" },
+    2: { label: "Paid", className: "gap-1 text-green-600 border-green-600" },
+    3: { label: "Partial Paid", className: "gap-1 text-yellow-600 border-yellow-600" },
+    4: { label: "Canceled", className: "gap-1 text-red-600 border-red-600" }
   };
+  const statusConfig = statusMap[status] || statusMap[0];
 
   return (
-    <span className={statusMap[status].className}>
-      {statusMap[status].label}
-    </span>
+    <Badge variant="outline" className={statusConfig.className}>
+      {statusConfig.label}
+    </Badge>
   );
 };
 

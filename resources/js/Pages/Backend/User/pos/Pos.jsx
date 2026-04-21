@@ -46,7 +46,6 @@ export default function POS({ products, categories, currencies, accounts, custom
     hold_pos_id: "",
     prescription_products_id: "",
     appointment: 0,
-    taxes: [],
     // Multiple payment accounts support
     payment_accounts: [],
   });

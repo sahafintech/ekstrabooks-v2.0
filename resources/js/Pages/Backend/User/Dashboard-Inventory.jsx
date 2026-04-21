@@ -208,11 +208,11 @@ export default function DashboardInventory({
     const chartConfig = {
         stockIn: {
             label: "Stock In",
-            color: "hsl(var(--chart-1))",
+            color: "var(--chart-1)",
         },
         stockOut: {
             label: "Stock Out",
-            color: "hsl(var(--chart-2))",
+            color: "var(--chart-2)",
         },
         healthy: {
             label: "Healthy Stock",

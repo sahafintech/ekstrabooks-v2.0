@@ -322,7 +322,6 @@ export default function Create({ vendors = [], products = [], currencies = [], t
       quantity: billItems.map(item => item.quantity).concat(
         billAccounts.map(account => account.quantity || 1)
       ),
-      unit_cost: billItems.map(item => item.unit_cost),
       account_id: [
         ...billItems.map(item => item.account_id || "Inventory"),
         ...billAccounts.map(account => account.account_id)

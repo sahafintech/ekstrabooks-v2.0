@@ -271,7 +271,6 @@ export default function Create({ vendors = [], products = [], currencies = [], t
       quantity: purchaseOrderItems.map(item => item.quantity).concat(
         purchaseOrderAccounts.map(account => account.quantity || 1)
       ),
-      unit_cost: purchaseOrderItems.map(item => item.unit_cost),
       account_id: [
         ...purchaseOrderItems.map(item => item.account_id),
         ...purchaseOrderAccounts.map(account => account.account_id)

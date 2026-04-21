@@ -2,11 +2,11 @@ import * as React from "react"
 import { Check, ChevronsUpDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/Components/ui/button"
+import { Input } from "@/Components/ui/input"
 import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
 } from "@/Components/ui/command"
@@ -71,12 +71,16 @@ export function SearchableCombobox({
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <Command shouldFilter={false} className="w-full">
-          <CommandInput 
-            placeholder={placeholder} 
-            value={searchValue}
-            onValueChange={setSearchValue}
-            className="w-full"
-          />
+          <div className="p-1 pb-0">
+            <Input
+              type="text"
+              placeholder={placeholder}
+              value={searchValue}
+              onChange={(event) => setSearchValue(event.target.value)}
+              className="h-8 rounded-lg border-input/30 bg-input/30 shadow-none"
+              autoComplete="off"
+            />
+          </div>
           <CommandList className="w-full max-h-[200px] overflow-y-auto">
             {filteredOptions.length === 0 ? (
               <CommandEmpty>{emptyMessage}</CommandEmpty>

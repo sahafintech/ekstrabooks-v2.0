@@ -1391,7 +1391,7 @@ export default function List({
                                                         </span>
                                                     )}
                                                 </TableCell>
-                                                <TableCell className="text-right">
+                                                <TableCell className="text-left">
                                                     <BillApprovalStatusBadge
                                                         status={
                                                             bill.approval_status

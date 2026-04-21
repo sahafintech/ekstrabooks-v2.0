@@ -146,11 +146,11 @@ export default function Dashboard({
     const chartConfig = {
         income: {
             label: "Income",
-            color: "hsl(var(--chart-1))",
+            color: "var(--chart-1)",
         },
         expense: {
             label: "Expense",
-            color: "hsl(var(--chart-2))",
+            color: "var(--chart-2)",
         },
     };
 
