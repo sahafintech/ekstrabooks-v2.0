@@ -289,8 +289,8 @@ class DefferedInvoiceImport implements ToCollection, WithHeadingRow, SkipsEmptyR
             $defferedEarning->currency = $currencyCode;
             $defferedEarning->exchange_rate = $exchangeRate;
             $defferedEarning->base_currency_amount = convert_currency(
-                request()->activeBusiness->currency,
                 $currencyCode,
+                request()->activeBusiness->currency,
                 $earning['transaction_amount']
             );
             $defferedEarning->transaction_amount = $earning['transaction_amount'];

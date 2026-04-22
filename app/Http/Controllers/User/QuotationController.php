@@ -1333,7 +1333,7 @@ class QuotationController extends Controller
             $defferedEarning->days = $earning['number_of_days'];
             $defferedEarning->currency = $earning['currency'];
             $defferedEarning->exchange_rate = $earning['exchange_rate'];
-            $defferedEarning->base_currency_amount = convert_currency($request->activeBusiness->currency, $invoice->currency, $earning['transaction_amount']);
+            $defferedEarning->base_currency_amount = convert_currency($invoice->currency, $request->activeBusiness->currency, $earning['transaction_amount']);
             $defferedEarning->transaction_amount = $earning['transaction_amount'];
             $defferedEarning->save();
         }

@@ -958,7 +958,7 @@ export default function View({
                                             <TableHead>Earning Start Date</TableHead>
                                             <TableHead>Earning End Date</TableHead>
                                             <TableHead>No Of Days</TableHead>
-                                            <TableHead>Earning Recognized</TableHead>
+                                            <TableHead className="text-right">Earning Recognized</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>

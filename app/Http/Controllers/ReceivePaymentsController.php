@@ -27,7 +27,7 @@ class ReceivePaymentsController extends Controller
     {
         Gate::authorize('receive_payments.view');
 
-        $per_page = $request->get('per_page', 10);
+        $per_page = $request->get('per_page', 50);
         $search = $request->get('search', '');
         $sorting = $request->get('sorting', []);
         $sortColumn = $sorting['column'] ?? 'id';

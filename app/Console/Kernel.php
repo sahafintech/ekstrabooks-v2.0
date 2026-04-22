@@ -24,7 +24,7 @@ class Kernel extends ConsoleKernel {
      */
     protected function schedule(Schedule $schedule) {
         $schedule->call(new \App\Cronjobs\RecurringInvoiceTask)->everyFifteenMinutes();
-        $schedule->call(new \App\Cronjobs\DefferedInvoiceTask)->everyMinute();
+        $schedule->call(new \App\Cronjobs\DefferedInvoiceTask)->name('deffered-invoice-task')->everyMinute()->withoutOverlapping(30);
         $schedule->call(new \App\Cronjobs\TrialEndedTask)->hourly();
         $schedule->call(new \App\Cronjobs\SubscriptionReminderTask)->hourlyAt(10);
         $schedule->call(new \App\Cronjobs\ResetQueueNumber)->dailyAt('00:00');

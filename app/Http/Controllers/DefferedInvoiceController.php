@@ -494,6 +494,8 @@ class DefferedInvoiceController extends Controller
             $accountObj->business_id = $request->activeBusiness->id;
             $accountObj->user_id = $request->activeBusiness->user->id;
             $accountObj->opening_date = now()->format('Y-m-d');
+            $accountObj->opening_balance = 0;
+            $accountObj->currency = $request->activeBusiness->currency;
             $accountObj->save();
         }
     }
@@ -509,15 +511,21 @@ class DefferedInvoiceController extends Controller
                 continue;
             }
 
+            $days = $earning['number_of_days'] ?? $earning['days'] ?? 0;
+            $currency = $earning['currency'] ?? $request->currency;
+            $exchangeRate = $earning['exchange_rate'] ?? $invoice->exchange_rate ?? 1;
+            $transactionAmount = $earning['transaction_amount'] ?? $earning['amount'] ?? 0;
+
             $defferedEarnings = new DefferedEarning();
             $defferedEarnings->invoice_id = $invoice->id;
             $defferedEarnings->start_date = Carbon::parse($earning['start_date'])->format('Y-m-d');
             $defferedEarnings->end_date = Carbon::parse($earning['end_date'])->format('Y-m-d');
-            $defferedEarnings->days = $earning['number_of_days'];
-            $defferedEarnings->currency = $earning['currency'];
-            $defferedEarnings->exchange_rate = $earning['exchange_rate'];
-            $defferedEarnings->base_currency_amount = convert_currency($request->activeBusiness->currency, $request->currency, $earning['transaction_amount']);
-            $defferedEarnings->transaction_amount = $earning['transaction_amount'];
+            $defferedEarnings->number_of_days = $days;
+            $defferedEarnings->days = $days;
+            $defferedEarnings->currency = $currency;
+            $defferedEarnings->exchange_rate = $exchangeRate;
+            $defferedEarnings->base_currency_amount = convert_currency($currency, $request->activeBusiness->currency, $transactionAmount);
+            $defferedEarnings->transaction_amount = $transactionAmount;
             $defferedEarnings->save();
         }
     }
