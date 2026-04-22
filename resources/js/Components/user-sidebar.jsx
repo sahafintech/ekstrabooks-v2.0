@@ -221,7 +221,7 @@ export function UserSidebar({ ...props }) {
     // Suppliers
     if (hasAnyPermission([
         "vendors.view", "purchase_orders.view", "cash_purchases.view",
-        "bill_invoices.view", "bill_payments.view", "purchase_returns.view"
+        "bill_invoices.view", "bill_payments.view", "purchase_returns.view", "hospital_purchases.view"
     ])) {
         const items = [];
         if (hasPermission("vendors.view")) {
