@@ -1623,9 +1623,6 @@ class ReportController extends Controller
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
-				->with(['transactions' => function ($query) use ($date2) {
-					$query->whereDate('trans_date', '<=', $date2);
-				}])
 				->withSum(['transactions as cr_amount' => function ($query) use ($date2) {
 					$query->where('dr_cr', 'cr')
 						->whereDate('trans_date', '<=', $date2);
@@ -1647,9 +1644,6 @@ class ReportController extends Controller
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
-				->with(['transactions' => function ($query) use ($date2) {
-					$query->whereDate('trans_date', '<=', $date2);
-				}])
 				->withSum(['transactions as cr_amount' => function ($query) use ($date2) {
 					$query->where('dr_cr', 'cr')
 						->whereDate('trans_date', '<=', $date2);
@@ -1670,9 +1664,6 @@ class ReportController extends Controller
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
-				->with(['transactions' => function ($query) use ($date2) {
-					$query->whereDate('trans_date', '<=', $date2);
-				}])
 				->withSum(['transactions as cr_amount' => function ($query) use ($date2) {
 					$query->where('dr_cr', 'cr')
 						->whereDate('trans_date', '<=', $date2);
@@ -1693,9 +1684,6 @@ class ReportController extends Controller
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
-				->with(['transactions' => function ($query) use ($date2) {
-					$query->whereDate('trans_date', '<=', $date2);
-				}])
 				->withSum(['transactions as cr_amount' => function ($query) use ($date2) {
 					$query->where('dr_cr', 'cr')
 						->whereDate('trans_date', '<=', $date2);
@@ -1716,9 +1704,6 @@ class ReportController extends Controller
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
-				->with(['transactions' => function ($query) use ($date2) {
-					$query->whereDate('trans_date', '<=', $date2);
-				}])
 				->withSum(['transactions as cr_amount' => function ($query) use ($date2) {
 					$query->where('dr_cr', 'cr')
 						->whereDate('trans_date', '<=', $date2);
@@ -1736,9 +1721,6 @@ class ReportController extends Controller
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
-				->with(['transactions' => function ($query) use ($date2) {
-					$query->whereDate('trans_date', '<=', $date2);
-				}])
 				->withSum(['transactions as cr_amount' => function ($query) use ($date2) {
 					$query->where('dr_cr', 'cr')
 						->whereDate('trans_date', '<=', $date2);
@@ -1753,9 +1735,6 @@ class ReportController extends Controller
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
-				->with(['transactions' => function ($query) use ($date2) {
-					$query->whereDate('trans_date', '<=', $date2);
-				}])
 				->withSum(['transactions as dr_amount' => function ($query) use ($date2) {
 					$query->where('dr_cr', 'dr')
 						->whereDate('trans_date', '<=', $date2);
@@ -1770,9 +1749,6 @@ class ReportController extends Controller
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
-				->with(['transactions' => function ($query) use ($date2) {
-					$query->whereDate('trans_date', '<=', $date2);
-				}])
 				->withSum(['transactions as dr_amount' => function ($query) use ($date2) {
 					$query->where('dr_cr', 'dr')
 						->whereDate('trans_date', '<=', $date2);
@@ -1787,9 +1763,6 @@ class ReportController extends Controller
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
-				->with(['transactions' => function ($query) use ($date2) {
-					$query->whereDate('trans_date', '<=', $date2);
-				}])
 				->withSum(['transactions as dr_amount' => function ($query) use ($date2) {
 					$query->where('dr_cr', 'dr')
 						->whereDate('trans_date', '<=', $date2);
@@ -1904,9 +1877,6 @@ class ReportController extends Controller
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
-				->with(['transactions' => function ($query) use ($date2) {
-					$query->whereDate('trans_date', '<=', $date2);
-				}])
 				->withSum(['transactions as cr_amount' => function ($query) use ($date2) {
 					$query->where('dr_cr', 'cr')
 						->whereDate('trans_date', '<=', $date2);
@@ -1928,9 +1898,6 @@ class ReportController extends Controller
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
-				->with(['transactions' => function ($query) use ($date2) {
-					$query->whereDate('trans_date', '<=', $date2);
-				}])
 				->withSum(['transactions as cr_amount' => function ($query) use ($date2) {
 					$query->where('dr_cr', 'cr')
 						->whereDate('trans_date', '<=', $date2);
@@ -1951,9 +1918,6 @@ class ReportController extends Controller
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
-				->with(['transactions' => function ($query) use ($date2) {
-					$query->whereDate('trans_date', '<=', $date2);
-				}])
 				->withSum(['transactions as cr_amount' => function ($query) use ($date2) {
 					$query->where('dr_cr', 'cr')
 						->whereDate('trans_date', '<=', $date2);
@@ -1974,9 +1938,6 @@ class ReportController extends Controller
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
-				->with(['transactions' => function ($query) use ($date2) {
-					$query->whereDate('trans_date', '<=', $date2);
-				}])
 				->withSum(['transactions as cr_amount' => function ($query) use ($date2) {
 					$query->where('dr_cr', 'cr')
 						->whereDate('trans_date', '<=', $date2);
@@ -1997,9 +1958,6 @@ class ReportController extends Controller
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
-				->with(['transactions' => function ($query) use ($date2) {
-					$query->whereDate('trans_date', '<=', $date2);
-				}])
 				->withSum(['transactions as cr_amount' => function ($query) use ($date2) {
 					$query->where('dr_cr', 'cr')
 						->whereDate('trans_date', '<=', $date2);
@@ -2017,9 +1975,6 @@ class ReportController extends Controller
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
-				->with(['transactions' => function ($query) use ($date2) {
-					$query->whereDate('trans_date', '<=', $date2);
-				}])
 				->withSum(['transactions as cr_amount' => function ($query) use ($date2) {
 					$query->where('dr_cr', 'cr')
 						->whereDate('trans_date', '<=', $date2);
@@ -2034,9 +1989,6 @@ class ReportController extends Controller
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
-				->with(['transactions' => function ($query) use ($date2) {
-					$query->whereDate('trans_date', '<=', $date2);
-				}])
 				->withSum(['transactions as dr_amount' => function ($query) use ($date2) {
 					$query->where('dr_cr', 'dr')
 						->whereDate('trans_date', '<=', $date2);
@@ -2051,9 +2003,6 @@ class ReportController extends Controller
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
-				->with(['transactions' => function ($query) use ($date2) {
-					$query->whereDate('trans_date', '<=', $date2);
-				}])
 				->withSum(['transactions as dr_amount' => function ($query) use ($date2) {
 					$query->where('dr_cr', 'dr')
 						->whereDate('trans_date', '<=', $date2);
@@ -2068,9 +2017,6 @@ class ReportController extends Controller
 				->whereHas('transactions', function ($query) use ($date2) {
 					$query->whereDate('trans_date', '<=', $date2);
 				})
-				->with(['transactions' => function ($query) use ($date2) {
-					$query->whereDate('trans_date', '<=', $date2);
-				}])
 				->withSum(['transactions as dr_amount' => function ($query) use ($date2) {
 					$query->where('dr_cr', 'dr')
 						->whereDate('trans_date', '<=', $date2);

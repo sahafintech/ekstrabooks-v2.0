@@ -56,7 +56,7 @@
             <td style="background-color: lightgray; font-size: 12px;">
                 <b>Total Asset</b>
             </td>
-            <td style="background-color: lightgray;">{{ $request()->activeBusiness->currency }}</td>
+            <td style="background-color: lightgray;">{{ request()->activeBusiness->currency }}</td>
             <td style="background-color: lightgray; font-size: 12px;">
                 <b>{{ $total_debit_asset - $total_credit_asset }}</b>
             </td>
@@ -78,7 +78,7 @@
             <td>{{ $account->account_name }}</td>
             <td>{{ request()->activeBusiness->currency }}</td>
             <td>
-                {{ $account->transactions->where('dr_cr', 'dr')->sum('base_currency_amount') - $account->transactions->where('dr_cr', 'cr')->sum('base_currency_amount') }}
+                {{ $account->dr_amount - $account->cr_amount }}
             </td>
         </tr>
         @endforeach
@@ -117,9 +117,9 @@
             <td>{{ request()->activeBusiness->currency }}</td>
             <td>
                 @if($account->account_name == 'Purchase Tax Payable')
-                {{ $account->transactions->where('dr_cr', 'dr')->sum('base_currency_amount') - $account->transactions->where('dr_cr', 'cr')->sum('base_currency_amount') }}
+                {{ $account->dr_amount - $account->cr_amount }}
                 @else
-                {{ $account->transactions->where('dr_cr', 'cr')->sum('base_currency_amount') - $account->transactions->where('dr_cr', 'dr')->sum('base_currency_amount') }}
+                {{ $account->cr_amount - $account->dr_amount }}
                 @endif
             </td>
         </tr>
@@ -160,7 +160,7 @@
             <td>{{ $account->account_name }}</td>
             <td>{{ request()->activeBusiness->currency }}</td>
             <td>
-                {{ $account->transactions->where('dr_cr', 'cr')->sum('base_currency_amount') - $account->transactions->where('dr_cr', 'dr')->sum('base_currency_amount') }}
+                {{ $account->cr_amount - $account->dr_amount }}
             </td>
         </tr>
         @endforeach
