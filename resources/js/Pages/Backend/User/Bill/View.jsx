@@ -738,30 +738,32 @@ export default function View({ bill, attachments, decimalPlace, email_templates,
 
                             {/* Invoice Items */}
                             <div className="mb-8">
-                                <Table>
+                                <Table className="table-fixed">
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="print:hidden">Account</TableHead>
-                                            <TableHead>Item</TableHead>
-                                            <TableHead>Description</TableHead>
-                                            <TableHead className="text-right">Quantity</TableHead>
-                                            <TableHead className="text-right">Unit Cost</TableHead>
-                                            <TableHead className="text-right">Total</TableHead>
+                                            <TableHead className="w-[18%] !whitespace-normal break-words print:hidden">Account</TableHead>
+                                            <TableHead className="w-[20%] !whitespace-normal break-words">Item</TableHead>
+                                            <TableHead className="w-[26%] !whitespace-normal break-words">Description</TableHead>
+                                            <TableHead className="w-[12%] text-right !whitespace-normal break-words">Quantity</TableHead>
+                                            <TableHead className="w-[12%] text-right !whitespace-normal break-words">Unit Cost</TableHead>
+                                            <TableHead className="w-[12%] text-right !whitespace-normal break-words">Total</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {bill.items.map((item, index) => (
                                             <TableRow key={index}>
-                                                <TableCell className="print:hidden">
+                                                <TableCell className="!whitespace-normal break-words print:hidden">
                                                     {item.account?.account_name ? (
-                                                        <Badge variant="outline" className="gap-1 text-green-600 border-green-600">{item.account.account_name}</Badge>
+                                                        <Badge variant="outline" className="!h-auto max-w-full justify-start gap-1 text-left leading-tight text-green-600 border-green-600 !whitespace-normal break-words">
+                                                            {item.account.account_name}
+                                                        </Badge>
                                                     ) : '-'}
                                                 </TableCell>
-                                                <TableCell className="font-medium">{item.product_name}</TableCell>
-                                                <TableCell>{item.description}</TableCell>
-                                                <TableCell className="text-right">{item.quantity}</TableCell>
-                                                <TableCell className="text-right">{formatCurrency(item.unit_cost, bill.currency, decimalPlace)}</TableCell>
-                                                <TableCell className="text-right">
+                                                <TableCell className="font-medium !whitespace-normal break-words">{item.product_name}</TableCell>
+                                                <TableCell className="!whitespace-normal break-words">{item.description}</TableCell>
+                                                <TableCell className="text-right !whitespace-normal break-words">{item.quantity}</TableCell>
+                                                <TableCell className="text-right !whitespace-normal break-words">{formatCurrency(item.unit_cost, bill.currency, decimalPlace)}</TableCell>
+                                                <TableCell className="text-right !whitespace-normal break-words">
                                                     {formatCurrency(item.quantity * item.unit_cost, bill.currency, decimalPlace)}
                                                 </TableCell>
                                             </TableRow>
