@@ -701,14 +701,15 @@ export default function View({purchase_order,attachments,email_templates}) {
 
                                     {/* Base currency equivalent total */}
                                     {purchase_order.currency !==
-                                        purchase_order.business.currency && (
+                                        purchase_order.business.currency &&
+                                        purchase_order.converted_total > 0 && (
                                         <div className="flex justify-between py-2 text-sm text-gray-600">
                                             <span>Equivalent to:</span>
                                             <span>
                                                 {formatCurrency({
                                                     amount: purchase_order.converted_total,
                                                     currency:
-                                                        purchase_order.currency,
+                                                        purchase_order.business.currency,
                                                 })}
                                             </span>
                                         </div>

@@ -450,6 +450,7 @@ export default function List({
 
         router.post(
             route("purchase_orders.convert_to_bill", purchaseOrderToDelete),
+            {},
             {
                 onSuccess: () => {
                     setShowConvertToBillModal(false);
@@ -888,9 +889,9 @@ export default function List({
                                                     {order.order_date}
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    {order.grand_total !== order.converted_total ? (
+                                                    {order.currency !== order.business.currency && order.converted_total > 0 ? (
                                                         <span>
-                                                            {formatCurrency({ amount: order.grand_total, currency: order.business.currency })} ({formatCurrency({ amount: order.converted_total, currency: order.currency })})
+                                                            {formatCurrency({ amount: order.grand_total, currency: order.currency })} ({formatCurrency({ amount: order.converted_total, currency: order.business.currency })})
                                                         </span>
                                                     ) : (
                                                         <span>

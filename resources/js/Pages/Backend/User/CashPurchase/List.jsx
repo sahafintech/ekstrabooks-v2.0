@@ -985,7 +985,7 @@ export default function List({ purchases = [], meta = {}, filters = {}, vendors 
                         <TableCell>{purchase.vendor ? purchase.vendor.name : "-"}</TableCell>
                         <TableCell>{purchase.purchase_date}</TableCell>
                         <TableCell className="text-right">
-                          {purchase.grand_total !== purchase.converted_total ? (
+                          {purchase.currency !== purchase.business.currency && Number(purchase.converted_total) > 0 && Number(purchase.grand_total) !== Number(purchase.converted_total) ? (
                             <span>
                               {formatCurrency({ amount: purchase.grand_total, currency: purchase.business.currency })} ({formatCurrency({ amount: purchase.converted_total, currency: purchase.currency })})
                             </span>

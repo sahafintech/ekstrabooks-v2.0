@@ -1365,7 +1365,7 @@ export default function List({
                                                     {bill.due_date}
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    {bill.grand_total !== bill.converted_total ? (
+                                                    {bill.currency !== bill.business.currency && Number(bill.converted_total) > 0 && Number(bill.grand_total) !== Number(bill.converted_total) ? (
                                                         <span>
                                                             {formatCurrency({ amount: bill.grand_total, currency: bill.business.currency })} ({formatCurrency({ amount: bill.converted_total, currency: bill.currency })})
                                                         </span>
@@ -1381,7 +1381,7 @@ export default function List({
                                                     })}
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    {bill.grand_total !== bill.converted_total ? (
+                                                    {bill.currency !== bill.business.currency && Number(bill.converted_total) > 0 && Number(bill.grand_total) !== Number(bill.converted_total) ? (
                                                         <span>
                                                             {formatCurrency({ amount: bill.grand_total - bill.paid, currency: bill.business.currency })} ({formatCurrency({ amount: bill.converted_total - bill.paid, currency: bill.currency })})
                                                         </span>

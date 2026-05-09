@@ -28,7 +28,7 @@ export default function Edit({ vendors = [], products = [], purchase_order, curr
   const [exchangeRate, setExchangeRate] = useState(1);
   const [baseCurrencyInfo, setBaseCurrencyInfo] = useState(null);
 
-  const { data, setData, post, processing, errors, reset } = useForm({
+  const { data, setData, post, processing, errors, reset, transform } = useForm({
     vendor_id: purchase_order.vendor_id,
     title: purchase_order.title,
     order_number: purchase_order.order_number,
@@ -106,22 +106,47 @@ export default function Edit({ vendors = [], products = [], purchase_order, curr
   }, []);
 
 
+  const buildLineItems = () => {
+    const productLines = purchaseOrderItems
+      .filter(item => item.product_id || item.product_name || item.description || Number(item.unit_cost) > 0)
+      .map(item => ({
+        product_id: item.product_id || null,
+        product_name: item.product_name || "",
+        description: item.description || "",
+        quantity: Number(item.quantity) || 0,
+        unit_cost: Number(item.unit_cost) || 0,
+        account_id: item.account_id || inventory?.id || "",
+      }));
+
+    const accountLines = purchaseOrderAccounts
+      .filter(account => account.account_id || account.product_name || account.description || Number(account.unit_cost) > 0)
+      .map(account => ({
+        product_id: null,
+        product_name: account.product_name || "",
+        description: account.description || "",
+        quantity: Number(account.quantity) || 0,
+        unit_cost: Number(account.unit_cost) || 0,
+        account_id: account.account_id || "",
+      }));
+
+    return [...productLines, ...accountLines];
+  };
+
   // ------------------------------------------------
   // Keep Inertia form arrays in sync with our two local lists
   const syncFormArrays = () => {
-    setData("product_id", purchaseOrderItems.map(i => i.product_id));
-    setData("product_name", purchaseOrderItems.map(i => i.product_name)
-      .concat(purchaseOrderAccounts.map(a => a.product_name || "")));
-    setData("account_id", purchaseOrderAccounts.map(a => a.account_id)
-      .concat(purchaseOrderItems.map(a => a.account_id || "")));
-    setData("description", purchaseOrderItems.map(i => i.description)
-      .concat(purchaseOrderAccounts.map(a => a.description || "")));
-    setData("quantity", purchaseOrderItems.map(i => i.quantity)
-      .concat(purchaseOrderAccounts.map(a => a.quantity || 1)));
-    setData("unit_cost", purchaseOrderItems.map(i => i.unit_cost)
-      .concat(purchaseOrderAccounts.map(a => a.unit_cost)));
+    const allLines = buildLineItems();
 
-    setData("attachments", attachments);
+    setData(current => ({
+      ...current,
+      product_id: allLines.map(line => line.product_id),
+      product_name: allLines.map(line => line.product_name),
+      account_id: allLines.map(line => line.account_id),
+      description: allLines.map(line => line.description),
+      quantity: allLines.map(line => line.quantity),
+      unit_cost: allLines.map(line => line.unit_cost),
+      attachments,
+    }));
   };
 
   useEffect(() => {
@@ -136,7 +161,7 @@ export default function Edit({ vendors = [], products = [], purchase_order, curr
       description: "",
       quantity: 1,
       unit_cost: 0,
-      account_id: inventory.id // Default account_id for product rows
+      account_id: inventory?.id || "" // Default account_id for product rows
     }]);
   };
 
@@ -169,7 +194,7 @@ export default function Edit({ vendors = [], products = [], purchase_order, curr
       if (product) {
         updatedItems[index].product_name = product.name;
         updatedItems[index].unit_cost = product.selling_price;
-        updatedItems[index].account_id = inventory.id;
+        updatedItems[index].account_id = inventory?.id || "";
 
         // Also update the description if it's empty
         if (!updatedItems[index].description) {
@@ -323,33 +348,34 @@ export default function Edit({ vendors = [], products = [], purchase_order, curr
       return;
     }
 
-    // Create a new data object with all the required fields
+    const allLines = buildLineItems();
+
+    if (allLines.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please add at least one item or account line",
+      });
+      return;
+    }
+
+    // Create a new data object with aligned line arrays
     const formData = {
       ...data,
       currency: selectedCurrency.name,
       exchange_rate: exchangeRate,
-      product_id: purchaseOrderItems.map(item => item.product_id),
-      product_name: purchaseOrderItems.map(item => item.product_name),
-      description: [
-        ...purchaseOrderItems.map(item => item.description || ""),
-        ...purchaseOrderAccounts.map(account => account.description || "")
-      ],
-      quantity: [
-        ...purchaseOrderItems.map(item => item.quantity || 1),
-        ...purchaseOrderAccounts.map(account => account.quantity || 1)
-      ],
-      unit_cost: [
-        ...purchaseOrderItems.map(item => item.unit_cost * item.quantity),
-        ...purchaseOrderAccounts.map(account => account.unit_cost)
-      ],
-      account_id: [
-        ...purchaseOrderItems.map(item => item.account_id || inventory.id),
-        ...purchaseOrderAccounts.map(account => account.account_id)
-      ]
+      converted_total: calculateTotal(),
+      product_id: allLines.map(line => line.product_id),
+      product_name: allLines.map(line => line.product_name),
+      description: allLines.map(line => line.description),
+      quantity: allLines.map(line => line.quantity),
+      unit_cost: allLines.map(line => line.unit_cost),
+      account_id: allLines.map(line => line.account_id),
+      attachments,
     }
 
-    // Post the form data directly instead of using setData first
-    post(route("purchase_orders.update", purchase_order.id), formData, {
+    transform(() => formData);
+    post(route("purchase_orders.update", purchase_order.id), {
       preserveScroll: true,
     });
   };
@@ -358,7 +384,7 @@ export default function Edit({ vendors = [], products = [], purchase_order, curr
     <AuthenticatedLayout>
       <Toaster />
       <SidebarInset>
-        <PageHeader page="Cash Purchases" subpage="Edit Cash Purchase" url="purchase_orders.index" />
+        <PageHeader page="Purchase Orders" subpage="Edit Purchase Order" url="purchase_orders.index" />
 
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           <form onSubmit={submit}>
@@ -503,7 +529,7 @@ export default function Edit({ vendors = [], products = [], purchase_order, curr
                         type="number"
                         step="0.01"
                         value={item.quantity}
-                        onChange={(e) => updatePurchaseOrderItem(index, "quantity", parseFloat(e.target.value))}
+                        onChange={(e) => updatePurchaseOrderItem(index, "quantity", e.target.value === '' ? '' : parseFloat(e.target.value))}
                       />
                     </div>
 
@@ -513,7 +539,7 @@ export default function Edit({ vendors = [], products = [], purchase_order, curr
                         type="number"
                         step="0.01"
                         value={item.unit_cost}
-                        onChange={(e) => updatePurchaseOrderItem(index, "unit_cost", parseFloat(e.target.value))}
+                        onChange={(e) => updatePurchaseOrderItem(index, "unit_cost", e.target.value === '' ? '' : parseFloat(e.target.value))}
                       />
                     </div>
 
@@ -535,7 +561,7 @@ export default function Edit({ vendors = [], products = [], purchase_order, curr
                     <div>
                       <Label>Subtotal</Label>
                       <div className="p-2 bg-white rounded text-right">
-                        {(item.quantity * item.unit_cost).toFixed(2)}
+                        {((Number(item.quantity) || 0) * (Number(item.unit_cost) || 0)).toFixed(2)}
                       </div>
                     </div>
 
@@ -601,7 +627,7 @@ export default function Edit({ vendors = [], products = [], purchase_order, curr
                         value={accountItem.quantity || 1}
                         onChange={(e) => {
                           const updatedAccounts = [...purchaseOrderAccounts];
-                          updatedAccounts[index].quantity = parseFloat(e.target.value);
+                          updatedAccounts[index].quantity = e.target.value === '' ? '' : parseFloat(e.target.value);
                           setPurchaseOrderAccounts(updatedAccounts);
                           setData("quantity", [
                             ...purchaseOrderItems.map(item => item.quantity),
@@ -620,7 +646,7 @@ export default function Edit({ vendors = [], products = [], purchase_order, curr
                         value={accountItem.unit_cost}
                         onChange={(e) => {
                           const updatedAccounts = [...purchaseOrderAccounts];
-                          updatedAccounts[index].unit_cost = parseFloat(e.target.value);
+                          updatedAccounts[index].unit_cost = e.target.value === '' ? '' : parseFloat(e.target.value);
                           setPurchaseOrderAccounts(updatedAccounts);
                           setData("unit_cost", updatedAccounts.map(account => account.unit_cost));
                         }}
@@ -650,7 +676,7 @@ export default function Edit({ vendors = [], products = [], purchase_order, curr
                     <div>
                       <Label>Subtotal</Label>
                       <div className="p-2 bg-white rounded mt-1 text-right">
-                        {(accountItem.quantity * accountItem.unit_cost).toFixed(2)}
+                        {((Number(accountItem.quantity) || 0) * (Number(accountItem.unit_cost) || 0)).toFixed(2)}
                       </div>
                     </div>
 

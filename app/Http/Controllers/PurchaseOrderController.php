@@ -657,10 +657,20 @@ class PurchaseOrderController extends Controller
 			'vendor_id' => 'required',
 			'title' => 'required',
 			'order_date' => 'required|date',
-			'product_name' => 'required',
+			'product_name' => 'required|array|min:1',
+			'product_name.*' => 'required',
+			'quantity' => 'required|array|min:1',
+			'quantity.*' => 'required|numeric|gt:0',
+			'unit_cost' => 'required|array|min:1',
+			'unit_cost.*' => 'required|numeric|min:0',
+			'account_id' => 'required|array|min:1',
+			'account_id.*' => 'required',
+			'taxes' => 'nullable|array',
+			'taxes.*' => 'nullable|exists:taxes,id',
 			'currency'  =>  'required',
 		], [
-			'product_id.required' => _lang('You must add at least one item'),
+			'product_name.required' => _lang('You must add at least one item'),
+			'product_name.min' => _lang('You must add at least one item'),
 		]);
 
 		if ($validator->fails()) {
@@ -740,6 +750,12 @@ class PurchaseOrderController extends Controller
 		DB::beginTransaction();
 
 		$summary = $this->calculateTotal($request);
+
+		// Ensure the purchase_order_number setting exists for this business
+		BusinessSetting::firstOrCreate(
+			['name' => 'purchase_order_number', 'business_id' => $request->activeBusiness->id],
+			['value' => 1001]
+		);
 
 		$purchase = new PurchaseOrder();
 		$purchase->vendor_id = $request->input('vendor_id');
@@ -907,9 +923,20 @@ class PurchaseOrderController extends Controller
 			'vendor_id' => 'required',
 			'title' => 'required',
 			'order_date' => 'required|date',
-			'product_id' => 'required',
+			'product_name' => 'required|array|min:1',
+			'product_name.*' => 'required',
+			'quantity' => 'required|array|min:1',
+			'quantity.*' => 'required|numeric|gt:0',
+			'unit_cost' => 'required|array|min:1',
+			'unit_cost.*' => 'required|numeric|min:0',
+			'account_id' => 'required|array|min:1',
+			'account_id.*' => 'required',
+			'taxes' => 'nullable|array',
+			'taxes.*' => 'nullable|exists:taxes,id',
+			'currency'  =>  'required',
 		], [
-			'product_id.required' => _lang('You must add at least one item'),
+			'product_name.required' => _lang('You must add at least one item'),
+			'product_name.min' => _lang('You must add at least one item'),
 		]);
 
 		if ($validator->fails()) {
@@ -1267,6 +1294,25 @@ class PurchaseOrderController extends Controller
 		);
 	}
 
+	private function getPurchaseOrderConvertedTotal(PurchaseOrder $purchaseOrder, Request $request): float
+	{
+		$convertedTotal = (float) $purchaseOrder->getRawOriginal('converted_total');
+
+		if ($convertedTotal > 0) {
+			return $convertedTotal;
+		}
+
+		$grandTotal = (float) $purchaseOrder->getRawOriginal('grand_total');
+		$exchangeRate = (float) $purchaseOrder->getRawOriginal('exchange_rate');
+		$baseCurrency = $request->activeBusiness->currency ?? $purchaseOrder->business?->currency;
+
+		if ($purchaseOrder->currency === $baseCurrency || $exchangeRate <= 0) {
+			return $grandTotal;
+		}
+
+		return $grandTotal * $exchangeRate;
+	}
+
 	public function import_purchase_orders(Request $request)
 	{
 		Gate::authorize('purchase_orders.csv.import');
@@ -1348,16 +1394,22 @@ class PurchaseOrderController extends Controller
 			$purchase_order->status = 1;
 			$purchase_order->save();
 
+			// Ensure the purchase_number setting exists for this business
+			BusinessSetting::firstOrCreate(
+				['name' => 'purchase_number', 'business_id' => $request->activeBusiness->id],
+				['value' => 1001]
+			);
+
 			$bill = new Purchase();
 			$bill->vendor_id = $purchase_order->vendor_id;
 			$bill->title = $purchase_order->title;
 			$bill->bill_no = get_business_option('purchase_number');
-			$bill->po_so_number = $purchase_order->po_so_number;
-			$bill->purchase_date = Carbon::createFromFormat(get_date_format(), $purchase_order->order_date)->format('Y-m-d');
-			$bill->due_date = Carbon::createFromFormat(get_date_format(), $purchase_order->order_date)->addDays(15)->format('Y-m-d');
+			$bill->po_so_number = $purchase_order->order_number;
+			$bill->purchase_date = Carbon::parse($purchase_order->getRawOriginal('order_date'))->format('Y-m-d');
+			$bill->due_date = Carbon::parse($purchase_order->getRawOriginal('order_date'))->addDays(15)->format('Y-m-d');
 			$bill->sub_total = $purchase_order->sub_total;
 			$bill->grand_total = $purchase_order->grand_total;
-			$bill->converted_total = $purchase_order->converted_total;
+			$bill->converted_total = $this->getPurchaseOrderConvertedTotal($purchase_order, $request);
 			$bill->exchange_rate = $purchase_order->exchange_rate;
 			$bill->currency = $purchase_order->currency;
 			$bill->paid = 0;
@@ -1387,19 +1439,19 @@ class PurchaseOrderController extends Controller
 			$currentTime = Carbon::now();
 
 			// Create transactions for each purchase item
-			foreach ($purchase_order->items as $purchaseItem) {
+			foreach ($purchase_order->items as $sourceItem) {
 				$purchaseItem = $bill->items()->save(new PurchaseItem([
 					'purchase_id' => $bill->id,
-					'product_id' => $purchaseItem->product_id,
-					'product_name' => $purchaseItem->product_name,
-					'description' => $purchaseItem->description,
-					'quantity' => $purchaseItem->quantity,
-					'unit_cost' => $purchaseItem->unit_cost,
-					'sub_total' => ($purchaseItem->unit_cost * $purchaseItem->quantity),
-					'account_id' => $purchaseItem->account_id,
-					'project_id' => $purchaseItem->project_id,
-					'project_task_id' => $purchaseItem->project_task_id,
-					'cost_code_id' => $purchaseItem->cost_code_id,
+					'product_id' => $sourceItem->product_id,
+					'product_name' => $sourceItem->product_name,
+					'description' => $sourceItem->description,
+					'quantity' => $sourceItem->quantity,
+					'unit_cost' => $sourceItem->unit_cost,
+					'sub_total' => ($sourceItem->unit_cost * $sourceItem->quantity),
+					'account_id' => $sourceItem->account_id,
+					'project_id' => null,
+					'project_task_id' => null,
+					'cost_code_id' => null,
 				]));
 	
 				if ($purchaseItem->project_id && $purchaseItem->project_task_id && $purchaseItem->cost_code_id) {
@@ -1776,16 +1828,22 @@ class PurchaseOrderController extends Controller
 		$purchase_order->status = 1;
 		$purchase_order->save();
 
+		// Ensure the purchase_number setting exists for this business
+		BusinessSetting::firstOrCreate(
+			['name' => 'purchase_number', 'business_id' => $request->activeBusiness->id],
+			['value' => 1001]
+		);
+
 		$cash_purchase = new Purchase();
 		$cash_purchase->vendor_id = $purchase_order->vendor_id;
 		$cash_purchase->title = $purchase_order->title;
 		$cash_purchase->bill_no = get_business_option('purchase_number');
-		$cash_purchase->po_so_number = $purchase_order->po_so_number;
-		$cash_purchase->purchase_date = Carbon::createFromFormat(get_date_format(), $purchase_order->order_date)->format('Y-m-d');
-		$cash_purchase->due_date = Carbon::createFromFormat(get_date_format(), $purchase_order->order_date)->format('Y-m-d');
+		$cash_purchase->po_so_number = $purchase_order->order_number;
+		$cash_purchase->purchase_date = Carbon::parse($purchase_order->getRawOriginal('order_date'))->format('Y-m-d');
+		$cash_purchase->due_date = Carbon::parse($purchase_order->getRawOriginal('order_date'))->format('Y-m-d');
 		$cash_purchase->sub_total = $purchase_order->sub_total;
 		$cash_purchase->grand_total = $purchase_order->grand_total;
-		$cash_purchase->converted_total = $purchase_order->converted_total;
+		$cash_purchase->converted_total = $this->getPurchaseOrderConvertedTotal($purchase_order, $request);
 		$cash_purchase->exchange_rate = $purchase_order->exchange_rate;
 		$cash_purchase->currency = $purchase_order->currency;
 		$cash_purchase->paid = 0;
@@ -1817,19 +1875,19 @@ class PurchaseOrderController extends Controller
 		$currentTime = Carbon::now();
 
 		// Create transactions for each purchase item
-		foreach ($purchase_order->items as $i => $purchaseItem) {
-			$cash_purchase->items()->save(new PurchaseItem([
+		foreach ($purchase_order->items as $i => $sourceItem) {
+			$purchaseItem = $cash_purchase->items()->save(new PurchaseItem([
 				'purchase_id' => $cash_purchase->id,
-				'product_id' => $purchaseItem->product_id,
-				'product_name' => $purchaseItem->product_name,
-				'description' => $purchaseItem->description,
-				'quantity' => $purchaseItem->quantity,
-				'unit_cost' => $purchaseItem->unit_cost,
-				'sub_total' => ($purchaseItem->unit_cost * $purchaseItem->quantity),
-				'account_id' => $purchaseItem->account_id,
-				'project_id' => $purchaseItem->project_id,
-				'project_task_id' => $purchaseItem->project_task_id,
-				'cost_code_id' => $purchaseItem->cost_code_id,
+				'product_id' => $sourceItem->product_id,
+				'product_name' => $sourceItem->product_name,
+				'description' => $sourceItem->description,
+				'quantity' => $sourceItem->quantity,
+				'unit_cost' => $sourceItem->unit_cost,
+				'sub_total' => ($sourceItem->unit_cost * $sourceItem->quantity),
+				'account_id' => $sourceItem->account_id,
+				'project_id' => null,
+				'project_task_id' => null,
+				'cost_code_id' => null,
 			]));
 
 			if ($purchaseItem->project_id && $purchaseItem->project_task_id && $purchaseItem->cost_code_id) {
@@ -2005,7 +2063,7 @@ class PurchaseOrderController extends Controller
 			}
 
 			// update stock
-			if ($purchaseItem->product->type == 'product' && $purchaseItem->product->stock_management == 1) {
+			if ($purchaseItem->product && $purchaseItem->product->type == 'product' && $purchaseItem->product->stock_management == 1) {
 				$purchaseItem->product->stock = $purchaseItem->product->stock + $purchaseItem->quantity;
 				$purchaseItem->product->save();
 			}
