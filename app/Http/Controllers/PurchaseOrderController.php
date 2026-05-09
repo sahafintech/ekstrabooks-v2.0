@@ -1019,6 +1019,18 @@ class PurchaseOrderController extends Controller
 
 		$purchase = PurchaseOrder::where('id', $id)
 			->first();
+
+		$assignedOrderNumber = false;
+		if ($purchase->order_number == null || trim((string) $purchase->order_number) === '') {
+			BusinessSetting::firstOrCreate(
+				['name' => 'purchase_order_number', 'business_id' => $request->activeBusiness->id],
+				['value' => 1001]
+			);
+
+			$purchase->order_number = get_business_option('purchase_order_number');
+			$assignedOrderNumber = true;
+		}
+
 		$purchase->vendor_id = $request->input('vendor_id');
 		$purchase->title = $request->input('title');
 		$purchase->order_date = Carbon::parse($request->input('order_date'))->format('Y-m-d');
@@ -1102,7 +1114,7 @@ class PurchaseOrderController extends Controller
 			}
 		}
 
-		if ($purchase->order_number == null) {
+		if ($assignedOrderNumber) {
 			//Increment Order Number
 			BusinessSetting::where('name', 'purchase_order_number')->increment('value');
 		}
