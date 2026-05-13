@@ -1475,13 +1475,14 @@ class PurchaseOrderController extends Controller
 					}
 				}
 	
-				if (isset($request->taxes)) {
-					foreach ($request->taxes as $taxId) {
-						$tax = Tax::find($taxId);
-	
+				if ($sourceItem->taxes->isNotEmpty()) {
+					foreach ($sourceItem->taxes as $sourceTax) {
+						$tax = Tax::find($sourceTax->tax_id);
+						if (!$tax) continue;
+
 						$purchaseItem->taxes()->save(new PurchaseItemTax([
 							'purchase_id' => $bill->id,
-							'tax_id' => $taxId,
+							'tax_id' => $sourceTax->tax_id,
 							'name' => $tax->name . ' ' . $tax->rate . ' %',
 							'amount' => ($purchaseItem->sub_total / 100) * $tax->rate,
 						]));
@@ -1912,13 +1913,14 @@ class PurchaseOrderController extends Controller
 			}
 
 
-			if (isset($purchaseItem->taxes)) {
-				foreach ($purchaseItem->taxes as $taxId) {
-					$tax = Tax::find($taxId);
+			if ($sourceItem->taxes->isNotEmpty()) {
+				foreach ($sourceItem->taxes as $sourceTax) {
+					$tax = Tax::find($sourceTax->tax_id);
+					if (!$tax) continue;
 
-					$cash_purchase->taxes()->save(new PurchaseItemTax([
+					$purchaseItem->taxes()->save(new PurchaseItemTax([
 						'purchase_id' => $cash_purchase->id,
-						'tax_id' => $taxId,
+						'tax_id' => $sourceTax->tax_id,
 						'name' => $tax->name . ' ' . $tax->rate . ' %',
 						'amount' => ($purchaseItem->sub_total / 100) * $tax->rate,
 					]));
