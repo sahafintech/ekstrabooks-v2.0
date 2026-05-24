@@ -87,6 +87,8 @@ use App\Http\Controllers\Website\WebsiteController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\RolesController;
 use App\Http\Controllers\PermissionsController;
+use App\Http\Controllers\PolicyCertificateController;
+use App\Http\Controllers\UnderwritingConfigurationController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -315,6 +317,37 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('import_customers', [CustomerController::class, 'import_customers'])->name('customers.import');
 		Route::post('customers/bulk_destroy', [CustomerController::class, 'bulk_destroy'])->name('customers.bulk_destroy');
 		Route::get('export_customers', [CustomerController::class, 'export_customers'])->name('customers.export');
+
+
+		// Underwriting Configuration
+		Route::get('underwriting_configuration', [UnderwritingConfigurationController::class, 'index'])->name('underwriting_configuration.index');
+		Route::post('underwriting_configuration', [UnderwritingConfigurationController::class, 'store'])->name('underwriting_configuration.store');
+		Route::get('underwriting_configuration/certificate_types/trash', [UnderwritingConfigurationController::class, 'certTypesTrash'])->name('underwriting_configuration.certificate_types.trash');
+		Route::post('underwriting_configuration/certificate_types/bulk_destroy', [UnderwritingConfigurationController::class, 'bulkDestroyCertificateType'])->name('underwriting_configuration.certificate_types.bulk_destroy');
+		Route::post('underwriting_configuration/certificate_types/bulk_restore', [UnderwritingConfigurationController::class, 'bulkRestoreCertificateType'])->name('underwriting_configuration.certificate_types.bulk_restore');
+		Route::post('underwriting_configuration/certificate_types/bulk_permanent_destroy', [UnderwritingConfigurationController::class, 'bulkPermanentDestroyCertificateType'])->name('underwriting_configuration.certificate_types.bulk_permanent_destroy');
+		Route::post('underwriting_configuration/certificate_types', [UnderwritingConfigurationController::class, 'storeCertificateType'])->name('underwriting_configuration.certificate_types.store');
+		Route::put('underwriting_configuration/certificate_types/{id}', [UnderwritingConfigurationController::class, 'updateCertificateType'])->name('underwriting_configuration.certificate_types.update');
+		Route::delete('underwriting_configuration/certificate_types/{id}', [UnderwritingConfigurationController::class, 'destroyCertificateType'])->name('underwriting_configuration.certificate_types.destroy');
+		Route::post('underwriting_configuration/certificate_types/{id}/restore', [UnderwritingConfigurationController::class, 'restoreCertificateType'])->name('underwriting_configuration.certificate_types.restore');
+		Route::delete('underwriting_configuration/certificate_types/{id}/permanent_destroy', [UnderwritingConfigurationController::class, 'permanentDestroyCertificateType'])->name('underwriting_configuration.certificate_types.permanent_destroy');
+
+		// Policies
+		Route::get('policy_certificates/trash', [PolicyCertificateController::class, 'trash'])->name('policies.trash');
+		Route::post('policy_certificates/{id}/restore', [PolicyCertificateController::class, 'restore'])->name('policies.restore');
+		Route::post('policy_certificates/bulk_restore', [PolicyCertificateController::class, 'bulk_restore'])->name('policies.bulk_restore');
+		Route::post('policy_certificates/bulk_permanent_destroy', [PolicyCertificateController::class, 'bulk_permanent_destroy'])->name('policies.bulk_permanent_destroy');
+		Route::delete('policy_certificates/{id}/permanent_destroy', [PolicyCertificateController::class, 'permanent_destroy'])->name('policies.permanent_destroy');
+		Route::post('policy_certificates/bulk_destroy', [PolicyCertificateController::class, 'bulk_destroy'])->name('policies.bulk_destroy');
+		Route::resource('policy_certificates', PolicyCertificateController::class);
+
+		// Underwriting Quotes
+		Route::get('underwriting_quotes/trash', [UnderwritingQuoteController::class, 'trash'])->name('underwriting_quotes.trash');
+		Route::post('underwriting_quotes/{id}/restore', [UnderwritingQuoteController::class, 'restore'])->name('underwriting_quotes.restore');
+		Route::post('underwriting_quotes/bulk_restore', [UnderwritingQuoteController::class, 'bulk_restore'])->name('underwriting_quotes.bulk_restore');
+		Route::post('underwriting_quotes/bulk_permanent_destroy', [UnderwritingQuoteController::class, 'bulk_permanent_destroy'])->name('underwriting_quotes.bulk_permanent_destroy');
+		Route::delete('underwriting_quotes/{id}/permanent_destroy', [UnderwritingQuoteController::class, 'permanent_destroy'])->name('underwriting_quotes.permanent_destroy');
+		Route::resource('underwriting_quotes', UnderwritingQuoteController::class);
 
 		//Vendors
 		Route::get('vendors/trash', [VendorController::class, 'trash'])->name('vendors.trash');
@@ -1027,6 +1060,7 @@ Route::get('deffered_invoice/{short_code}', [DefferedInvoiceController::class, '
 Route::get('receive_payment/{id}', [ReceivePaymentsController::class, 'show_public_receive_payment'])->name('receive_payments.show_public_receive_payment');
 Route::get('sales_return/{short_code}', [SalesReturnController::class, 'show_public_sales_return'])->name('sales_returns.show_public_sales_return');
 Route::get('project_subcontract/{short_code}', [ProjectSubcontractController::class, 'show_public_project_subcontract'])->name('project_subcontracts.show_public_project_subcontract');
+Route::get('policy_certificate/{short_code}', [PolicyCertificateController::class, 'show_public'])->name('policy_certificates.show_public');
 
 Route::get('dashboard/json_income_by_category', 'DashboardController@json_income_by_category')->middleware('auth');
 Route::get('dashboard/json_expense_by_category', 'DashboardController@json_expense_by_category')->middleware('auth');

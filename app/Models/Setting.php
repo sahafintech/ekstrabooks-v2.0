@@ -13,6 +13,8 @@ class Setting extends Model
      */
     protected $table = 'settings';
 
+    protected $fillable = ['name', 'value'];
+
     public function translation() {
         return $this->hasOne('App\Models\SettingTranslation', 'setting_id')
             ->where('locale', get_language())

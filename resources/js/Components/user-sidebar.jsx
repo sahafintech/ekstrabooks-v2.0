@@ -8,7 +8,8 @@ import {
     GroupIcon,
     ChartPieIcon,
     Building2Icon,
-    Building
+    Building,
+    LucideFileSearch,
 } from "lucide-react";
 
 import { usePage } from "@inertiajs/react";
@@ -76,6 +77,11 @@ export function UserSidebar({ ...props }) {
     const salesReturnsBase = "/user/sales_returns";
     const prescriptionsBase = "/user/prescriptions";
     const receivePaymentsBase = "/user/receive_payments";
+
+    // Underwriting
+    const policyCertificatesBase = "/user/policy_certificates";
+    const underwritingQuotesBase = "/user/underwriting_quotes";
+    const underWritingConfigurationBase = "/user/underwriting_configuration";
 
     // HR & Payroll
     const staffsBase = "/user/staffs";
@@ -361,6 +367,46 @@ export function UserSidebar({ ...props }) {
                 title: "Customers",
                 url: "#",
                 icon: Users,
+                isActive: items.some(i => i.isActive),
+                items,
+            });
+        }
+    }
+
+    // Underwriting
+    if (hasAnyPermission([
+        "policy_certificates.view"
+    ])) {
+        const items = [];
+        if (hasPermission("policy_certificates.view")) {
+            items.push({
+                title: "Policy Certificates",
+                url: route("policy_certificates.index"),
+                isActive: url.startsWith(policyCertificatesBase),
+            });
+        }
+
+        if (hasPermission("underwriting_quotes.view")) {
+            items.push({
+                title: "Underwriting Quotes",
+                url: route("underwriting_quotes.index"),
+                isActive: url.startsWith(underwritingQuotesBase),
+            });
+        }
+
+        if (hasPermission("underwriting_configuration.view")) {
+            items.push({
+                title: "Underwriting Configuration",
+                url: route("underwriting_configuration.index"),
+                isActive: url.startsWith(underWritingConfigurationBase),
+            });
+        }
+
+        if (items.length > 0) {
+            navOperationsItems.push({
+                title: "Underwriting",
+                url: "#",
+                icon: LucideFileSearch,
                 isActive: items.some(i => i.isActive),
                 items,
             });

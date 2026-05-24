@@ -81,6 +81,32 @@ final class RolesAndPermissionsSeeder extends Seeder
             'customers.csv.export',
 
             // =====================
+            // POLICIES
+            // =====================
+            'policy_certificates.view',
+            'policy_certificates.create',
+            'policy_certificates.update',
+            'policy_certificates.delete',
+            'policy_certificates.restore',
+            'policy_certificates.csv.import',
+            'policy_certificates.csv.export',
+
+            // =====================
+            // UNDERWRITING QUOTES
+            // =====================
+            'underwriting_quotes.view',
+            'underwriting_quotes.create',
+            'underwriting_quotes.update',
+            'underwriting_quotes.delete',
+            'underwriting_quotes.restore',
+
+            // =====================
+            // UNDERWRITING CONFIGURATION
+            // =====================
+            'underwriting_configuration.view',
+            'underwriting_configuration.update',
+
+            // =====================
             // VENDORS
             // =====================
             'vendors.view',
@@ -714,6 +740,26 @@ final class RolesAndPermissionsSeeder extends Seeder
             'customers.csv.import',
             'customers.csv.export',
 
+            // Policy Certificates
+            'policy_certificates.view',
+            'policy_certificates.create',
+            'policy_certificates.update',
+            'policy_certificates.delete',
+            'policy_certificates.restore',
+            'policy_certificates.csv.import',
+            'policy_certificates.csv.export',
+
+            // Underwriting Quotes
+            'underwriting_quotes.view',
+            'underwriting_quotes.create',
+            'underwriting_quotes.update',
+            'underwriting_quotes.delete',
+            'underwriting_quotes.restore',
+
+            // Underwriting Configuration
+            'underwriting_configuration.view',
+            'underwriting_configuration.update',
+
             // Vendors
             'vendors.view',
             'vendors.create',
@@ -1116,6 +1162,23 @@ final class RolesAndPermissionsSeeder extends Seeder
             'customers.update',
             'customers.csv.import',
             'customers.csv.export',
+
+            // Policy Certificates
+            'policy_certificates.view',
+            'policy_certificates.restore',
+            'policy_certificates.create',
+            'policy_certificates.update',
+            'policy_certificates.delete',
+
+            // underwriting quotes
+            'underwriting_quotes.view',
+            'underwriting_quotes.create',
+            'underwriting_quotes.update',
+            'underwriting_quotes.delete',
+
+            // Underwriting Configuration
+            'underwriting_configuration.view',
+            'underwriting_configuration.update',
 
             // Vendors
             'vendors.view',
