@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('policy_certificates', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('customer_id')->constrained('customer_id')->cascadeOnDelete();
+            $table->foreignId('customer_id')->constrained('customers')->cascadeOnDelete();
             $table->foreignId('certificate_type_id')->constrained('certificate_types')->cascadeOnDelete();
             $table->string('certificate_number')->unique()->nullable();
             $table->string('policy_number')->unique()->nullable();
