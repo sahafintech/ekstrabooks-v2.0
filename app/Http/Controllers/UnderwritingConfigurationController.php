@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CertificateType;
+use App\Models\CertificateTypeSection;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -17,6 +18,8 @@ class UnderwritingConfigurationController extends Controller
             'cert_number_increment',
             'policy_number_prefix',
             'policy_number_increment',
+            'invoice_primary_color',
+            'invoice_text_color',
         ])->pluck('value', 'name');
 
         $certSearch    = $request->get('cert_search', '');
@@ -90,13 +93,15 @@ class UnderwritingConfigurationController extends Controller
             'cert_number_increment' => 'required|integer|min:1',
             'policy_number_prefix'    => 'nullable|string|max:50',
             'policy_number_increment' => 'required|integer|min:1',
+            'invoice_primary_color' => 'nullable|string|max:7',
+            'invoice_text_color'    => 'nullable|string|max:7',
         ]);
 
         if ($validator->fails()) {
             return back()->withErrors($validator)->withInput();
         }
 
-        foreach (['cert_number_prefix', 'cert_number_increment', 'policy_number_prefix', 'policy_number_increment'] as $key) {
+        foreach (['cert_number_prefix', 'cert_number_increment', 'policy_number_prefix', 'policy_number_increment', 'invoice_primary_color', 'invoice_text_color'] as $key) {
             Setting::updateOrCreate(
                 ['name' => $key],
                 ['value' => $request->input($key) ?? '']
@@ -104,6 +109,61 @@ class UnderwritingConfigurationController extends Controller
         }
 
         return back()->with('success', _lang('Settings saved successfully'));
+    }
+
+    public function typeLayout($id)
+    {
+        $type = CertificateType::with('templateSections')->findOrFail($id);
+
+        $sections = $type->templateSections->map(function ($s) {
+            return [
+                'id'         => $s->id,
+                'title'      => $s->title,
+                'type'       => $s->type,
+                'sort_order' => $s->sort_order,
+                'fields'     => $s->fields_json  ?? [['label' => '', 'default_value' => '']],
+                'columns'    => $s->columns_json ?? [''],
+                'rows'       => $s->rows_json    ?? [['']],
+                'content'    => $s->content      ?? '',
+            ];
+        })->values();
+
+        return Inertia::render('Backend/User/UnderwritingConfiguration/CertificateTypeLayout', [
+            'certificateType' => ['id' => $type->id, 'name' => $type->name],
+            'sections'        => $sections,
+        ]);
+    }
+
+    public function saveTypeLayout(Request $request, $id)
+    {
+        $type = CertificateType::findOrFail($id);
+
+        $validator = Validator::make($request->all(), [
+            'sections'          => 'nullable|array',
+            'sections.*.title'  => 'required|string|max:255',
+            'sections.*.type'   => 'required|string|in:fields,table,text,note,terms,exclusions,signature',
+        ]);
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+
+        CertificateTypeSection::where('certificate_type_id', $id)->delete();
+
+        foreach ($request->input('sections', []) as $order => $s) {
+            CertificateTypeSection::create([
+                'certificate_type_id' => $type->id,
+                'title'               => $s['title'],
+                'type'                => $s['type'],
+                'sort_order'          => $order,
+                'fields_json'         => $s['fields']  ?? null,
+                'columns_json'        => $s['columns'] ?? null,
+                'rows_json'           => $s['rows']    ?? null,
+                'content'             => $s['content'] ?? null,
+            ]);
+        }
+
+        return back()->with('success', _lang('Layout saved successfully'));
     }
 
     public function storeCertificateType(Request $request)

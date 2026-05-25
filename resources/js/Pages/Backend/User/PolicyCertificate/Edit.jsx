@@ -9,7 +9,7 @@ import { Button } from "@/Components/ui/button";
 import { Textarea } from "@/Components/ui/textarea";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
-import { Plus, Trash2, GripVertical } from "lucide-react";
+import { Plus, Trash2, GripVertical, Lock } from "lucide-react";
 import InputError from "@/Components/InputError";
 import DateTimePicker from "@/Components/DateTimePicker";
 
@@ -26,10 +26,14 @@ const SECTION_TYPES = [
 const makeSection = (sortOrder) => ({
     title: "", type: "fields", sort_order: sortOrder,
     fields: [{ label: "", value: "" }], columns: [""], rows: [[""]], content: "",
+    _locked: false,
 });
 
 const parseDate = (str) => (str ? new Date(str + "T00:00:00") : null);
 const formatDate = (date) => (date ? date.toLocaleDateString("en-CA") : "");
+
+const stripMeta = (sections) =>
+    sections.map(({ _locked, ...s }) => s);
 
 export default function Edit({ certificate, certificateTypes = [], customers = [], initialSections = [] }) {
     const [basic, setBasic] = useState({
@@ -39,8 +43,11 @@ export default function Edit({ certificate, certificateTypes = [], customers = [
         policy_end_date:     parseDate(certificate.policy_end_date),
     });
 
+    // All sections loaded from the saved certificate are structure-locked
     const [sections, setSections] = useState(
-        initialSections.length > 0 ? initialSections : []
+        initialSections.length > 0
+            ? initialSections.map((s) => ({ ...s, _locked: true }))
+            : []
     );
     const [errors, setErrors] = useState({});
     const [processing, setProcessing] = useState(false);
@@ -154,7 +161,7 @@ export default function Edit({ certificate, certificateTypes = [], customers = [
                 certificate_type_id: basic.certificate_type_id,
                 policy_start_date:   formatDate(basic.policy_start_date),
                 policy_end_date:     formatDate(basic.policy_end_date),
-                sections,
+                sections:            stripMeta(sections),
             },
             {
                 preserveScroll: true,
@@ -278,163 +285,181 @@ export default function Edit({ certificate, certificateTypes = [], customers = [
                                 </Button>
                             </div>
 
-                            {sections.map((section, si) => (
-                                <div key={si} className="border rounded-lg bg-gray-50">
-                                    {/* Section header */}
-                                    <div className="flex items-center gap-3 p-4 border-b bg-white rounded-t-lg">
-                                        <GripVertical className="w-4 h-4 text-gray-400 shrink-0" />
-                                        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            <div>
-                                                <Label className="text-xs text-gray-500 mb-1 block">Section Title</Label>
-                                                <Input
-                                                    value={section.title}
-                                                    onChange={(e) => updateSection(si, "title", e.target.value)}
-                                                    placeholder="e.g. INSURED DETAILS"
-                                                />
-                                            </div>
-                                            <div>
-                                                <Label className="text-xs text-gray-500 mb-1 block">Section Type</Label>
-                                                <SearchableCombobox
-                                                    options={SECTION_TYPES}
-                                                    value={section.type}
-                                                    onChange={(v) => updateSection(si, "type", v)}
-                                                    placeholder="Select type"
-                                                />
-                                            </div>
-                                        </div>
-                                        <Button
-                                            type="button" variant="ghost" size="icon"
-                                            className="text-red-500 hover:text-red-700 shrink-0"
-                                            onClick={() => removeSection(si)}
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
-                                    </div>
-
-                                    {/* Section body */}
-                                    <div className="p-4">
-
-                                        {/* ── fields type ─────────────── */}
-                                        {section.type === "fields" && (
-                                            <div className="space-y-2">
-                                                {section.fields.map((field, fi) => (
-                                                    <div key={fi} className="flex items-center gap-2">
-                                                        <Input
-                                                            value={field.label}
-                                                            onChange={(e) => updateField(si, fi, "label", e.target.value)}
-                                                            placeholder="Label"
-                                                            className="w-1/3"
-                                                        />
-                                                        <Input
-                                                            value={field.value}
-                                                            onChange={(e) => updateField(si, fi, "value", e.target.value)}
-                                                            placeholder="Value"
-                                                            className="flex-1"
-                                                        />
-                                                        <Button
-                                                            type="button" variant="ghost" size="icon"
-                                                            className="text-red-500 hover:text-red-700 shrink-0"
-                                                            onClick={() => removeField(si, fi)}
-                                                            disabled={section.fields.length === 1}
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </Button>
-                                                    </div>
-                                                ))}
-                                                <Button type="button" variant="outline" size="sm" onClick={() => addField(si)}>
-                                                    <Plus className="w-3 h-3 mr-1" /> Add Field
-                                                </Button>
-                                            </div>
-                                        )}
-
-                                        {/* ── table type ──────────────── */}
-                                        {section.type === "table" && (
-                                            <div className="space-y-3">
+                            {sections.map((section, si) => {
+                                const locked = section._locked;
+                                return (
+                                    <div key={si} className={`border rounded-lg ${locked ? "bg-blue-50/40" : "bg-gray-50"}`}>
+                                        {/* Section header */}
+                                        <div className="flex items-center gap-3 p-4 border-b bg-white rounded-t-lg">
+                                            {locked
+                                                ? <Lock className="w-4 h-4 text-blue-400 shrink-0" title="Structure defined by template" />
+                                                : <GripVertical className="w-4 h-4 text-gray-400 shrink-0" />
+                                            }
+                                            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
                                                 <div>
-                                                    <Label className="text-xs text-gray-500 mb-2 block">Column Headers</Label>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {section.columns.map((col, ci) => (
-                                                            <div key={ci} className="flex items-center gap-1">
-                                                                <Input
-                                                                    value={col}
-                                                                    onChange={(e) => updateColumn(si, ci, e.target.value)}
-                                                                    placeholder={`Column ${ci + 1}`}
-                                                                    className="w-36"
-                                                                />
+                                                    <Label className="text-xs text-gray-500 mb-1 block">Section Title</Label>
+                                                    <Input
+                                                        value={section.title}
+                                                        disabled={locked}
+                                                        onChange={(e) => updateSection(si, "title", e.target.value)}
+                                                        placeholder="e.g. INSURED DETAILS"
+                                                        className=""
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label className="text-xs text-gray-500 mb-1 block">Section Type</Label>
+                                                    {locked
+                                                        ? <Input value={SECTION_TYPES.find((t) => t.id === section.type)?.name ?? section.type} disabled />
+                                                        : <SearchableCombobox options={SECTION_TYPES} value={section.type} onChange={(v) => updateSection(si, "type", v)} placeholder="Select type" />
+                                                    }
+                                                </div>
+                                            </div>
+                                            {!locked && (
+                                                <Button
+                                                    type="button" variant="ghost" size="icon"
+                                                    className="text-red-500 hover:text-red-700 shrink-0"
+                                                    onClick={() => removeSection(si)}
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                        </div>
+
+                                        {/* Section body */}
+                                        <div className="p-4">
+
+                                            {/* ── fields type ─────────────── */}
+                                            {section.type === "fields" && (
+                                                <div className="space-y-2">
+                                                    {section.fields.map((field, fi) => (
+                                                        <div key={fi} className="flex items-center gap-2">
+                                                            <Input
+                                                                value={field.label}
+                                                                disabled={locked}
+                                                                onChange={(e) => updateField(si, fi, "label", e.target.value)}
+                                                                placeholder="Label"
+                                                                className="w-1/3"
+                                                            />
+                                                            <Input
+                                                                value={field.value}
+                                                                onChange={(e) => updateField(si, fi, "value", e.target.value)}
+                                                                placeholder="Value"
+                                                                className="flex-1"
+                                                            />
+                                                            {!locked && (
                                                                 <Button
                                                                     type="button" variant="ghost" size="icon"
                                                                     className="text-red-500 hover:text-red-700 shrink-0"
-                                                                    onClick={() => removeColumn(si, ci)}
-                                                                    disabled={section.columns.length === 1}
+                                                                    onClick={() => removeField(si, fi)}
+                                                                    disabled={section.fields.length === 1}
                                                                 >
-                                                                    <Trash2 className="w-3 h-3" />
+                                                                    <Trash2 className="w-4 h-4" />
                                                                 </Button>
-                                                            </div>
-                                                        ))}
-                                                        <Button type="button" variant="outline" size="sm" onClick={() => addColumn(si)}>
-                                                            <Plus className="w-3 h-3 mr-1" /> Add Column
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                    {!locked && (
+                                                        <Button type="button" variant="outline" size="sm" onClick={() => addField(si)}>
+                                                            <Plus className="w-3 h-3 mr-1" /> Add Field
                                                         </Button>
-                                                    </div>
+                                                    )}
                                                 </div>
-                                                <div className="overflow-x-auto">
-                                                    <table className="w-full text-sm border-collapse">
-                                                        <thead>
-                                                            <tr className="bg-gray-100">
-                                                                {section.columns.map((col, ci) => (
-                                                                    <th key={ci} className="border px-2 py-1 text-left font-medium text-gray-600">
-                                                                        {col || `Column ${ci + 1}`}
-                                                                    </th>
-                                                                ))}
-                                                                <th className="border px-2 py-1 w-10" />
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {section.rows.map((row, ri) => (
-                                                                <tr key={ri}>
-                                                                    {row.map((cell, ci) => (
-                                                                        <td key={ci} className="border px-1 py-1">
-                                                                            <Input
-                                                                                value={cell}
-                                                                                onChange={(e) => updateCell(si, ri, ci, e.target.value)}
-                                                                                className="border-0 shadow-none focus-visible:ring-0 h-7 px-1"
-                                                                                placeholder="—"
-                                                                            />
-                                                                        </td>
-                                                                    ))}
-                                                                    <td className="border px-1 py-1 text-center">
+                                            )}
+
+                                            {/* ── table type ──────────────── */}
+                                            {section.type === "table" && (
+                                                <div className="space-y-3">
+                                                    <div>
+                                                        <Label className="text-xs text-gray-500 mb-2 block">Column Headers</Label>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {section.columns.map((col, ci) => (
+                                                                <div key={ci} className="flex items-center gap-1">
+                                                                    <Input
+                                                                        value={col}
+                                                                        disabled={locked}
+                                                                        onChange={(e) => updateColumn(si, ci, e.target.value)}
+                                                                        placeholder={`Column ${ci + 1}`}
+                                                                        className="w-36"
+                                                                    />
+                                                                    {!locked && (
                                                                         <Button
                                                                             type="button" variant="ghost" size="icon"
-                                                                            className="text-red-500 hover:text-red-700 h-7 w-7"
-                                                                            onClick={() => removeRow(si, ri)}
-                                                                            disabled={section.rows.length === 1}
+                                                                            className="text-red-500 hover:text-red-700 shrink-0"
+                                                                            onClick={() => removeColumn(si, ci)}
+                                                                            disabled={section.columns.length === 1}
                                                                         >
                                                                             <Trash2 className="w-3 h-3" />
                                                                         </Button>
-                                                                    </td>
-                                                                </tr>
+                                                                    )}
+                                                                </div>
                                                             ))}
-                                                        </tbody>
-                                                    </table>
+                                                            {!locked && (
+                                                                <Button type="button" variant="outline" size="sm" onClick={() => addColumn(si)}>
+                                                                    <Plus className="w-3 h-3 mr-1" /> Add Column
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="overflow-x-auto">
+                                                        <table className="w-full text-sm border-collapse">
+                                                            <thead>
+                                                                <tr className="bg-gray-100">
+                                                                    {section.columns.map((col, ci) => (
+                                                                        <th key={ci} className="border px-2 py-1 text-left font-medium text-gray-600">
+                                                                            {col || `Column ${ci + 1}`}
+                                                                        </th>
+                                                                    ))}
+                                                                    <th className="border px-2 py-1 w-10" />
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {section.rows.map((row, ri) => (
+                                                                    <tr key={ri}>
+                                                                        {row.map((cell, ci) => (
+                                                                            <td key={ci} className="border px-1 py-1">
+                                                                                <Input
+                                                                                    value={cell}
+                                                                                    onChange={(e) => updateCell(si, ri, ci, e.target.value)}
+                                                                                    className="border-0 shadow-none focus-visible:ring-0 h-7 px-1"
+                                                                                    placeholder="—"
+                                                                                />
+                                                                            </td>
+                                                                        ))}
+                                                                        <td className="border px-1 py-1 text-center">
+                                                                            <Button
+                                                                                type="button" variant="ghost" size="icon"
+                                                                                className="text-red-500 hover:text-red-700 h-7 w-7"
+                                                                                onClick={() => removeRow(si, ri)}
+                                                                                disabled={section.rows.length === 1}
+                                                                            >
+                                                                                <Trash2 className="w-3 h-3" />
+                                                                            </Button>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                    <Button type="button" variant="outline" size="sm" onClick={() => addRow(si)}>
+                                                        <Plus className="w-3 h-3 mr-1" /> Add Row
+                                                    </Button>
                                                 </div>
-                                                <Button type="button" variant="outline" size="sm" onClick={() => addRow(si)}>
-                                                    <Plus className="w-3 h-3 mr-1" /> Add Row
-                                                </Button>
-                                            </div>
-                                        )}
+                                            )}
 
-                                        {/* ── text / note / terms / exclusions / signature ── */}
-                                        {["text", "note", "terms", "exclusions", "signature"].includes(section.type) && (
-                                            <Textarea
-                                                value={section.content}
-                                                onChange={(e) => updateSection(si, "content", e.target.value)}
-                                                placeholder={`Enter ${section.type} content...`}
-                                                rows={5}
-                                                className="w-full"
-                                            />
-                                        )}
+                                            {/* ── text / note / terms / exclusions / signature ── */}
+                                            {["text", "note", "terms", "exclusions", "signature"].includes(section.type) && (
+                                                <Textarea
+                                                    value={section.content}
+                                                    onChange={(e) => updateSection(si, "content", e.target.value)}
+                                                    placeholder={`Enter ${section.type} content...`}
+                                                    rows={5}
+                                                    className="w-full"
+                                                />
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
 
                             {sections.length === 0 && (
                                 <p className="text-sm text-gray-400 text-center py-6 border border-dashed rounded-lg">

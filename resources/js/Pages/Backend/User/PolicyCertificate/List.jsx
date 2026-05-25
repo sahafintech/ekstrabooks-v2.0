@@ -352,13 +352,7 @@ export default function List({ certificates = [], meta = {}, filters = {}, trash
                                         >
                                             ID {renderSortIcon("id")}
                                         </TableHead>
-                                        <TableHead>
-                                            Customer
-                                        </TableHead>
-                                        <TableHead>
-                                            Certificate Type
-                                        </TableHead>
-                                        <TableHead
+                                                                                <TableHead
                                             className="cursor-pointer"
                                             onClick={() => handleSort("certificate_number")}
                                         >
@@ -369,6 +363,12 @@ export default function List({ certificates = [], meta = {}, filters = {}, trash
                                             onClick={() => handleSort("policy_number")}
                                         >
                                             Policy Number {renderSortIcon("policy_number")}
+                                        </TableHead>
+                                        <TableHead>
+                                            Customer
+                                        </TableHead>
+                                        <TableHead>
+                                            Certificate Type
                                         </TableHead>
                                         <TableHead
                                             className="cursor-pointer"
@@ -396,8 +396,6 @@ export default function List({ certificates = [], meta = {}, filters = {}, trash
                                                     />
                                                 </TableCell>
                                                 <TableCell>{cert.id}</TableCell>
-                                                <TableCell>{cert.customer?.name ?? "-"}</TableCell>
-                                                <TableCell>{cert.certificate_type?.name ?? "-"}</TableCell>
                                                 <TableCell>
                                                     <Link
                                                         href={route("policy_certificates.show", cert.id)}
@@ -407,6 +405,8 @@ export default function List({ certificates = [], meta = {}, filters = {}, trash
                                                     </Link>
                                                 </TableCell>
                                                 <TableCell>{cert.policy_number || "-"}</TableCell>
+                                                <TableCell>{cert.customer?.name ?? "-"}</TableCell>
+                                                <TableCell>{cert.certificate_type?.name ?? "-"}</TableCell>
                                                 <TableCell>{cert.policy_start_date || "-"}</TableCell>
                                                 <TableCell>{cert.policy_end_date || "-"}</TableCell>
                                                 <TableCell className="text-right">

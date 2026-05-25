@@ -122,7 +122,20 @@ class PolicyCertificateController extends Controller
             'cert_increment'   => Setting::where('name', 'cert_number_increment')->value('value') ?? 1,
             'policy_prefix'    => Setting::where('name', 'policy_number_prefix')->value('value') ?? '',
             'policy_increment' => Setting::where('name', 'policy_number_increment')->value('value') ?? 1,
-            'certificateTypes' => CertificateType::orderBy('name')->get(['id', 'name', 'slug']),
+            'certificateTypes' => CertificateType::with('templateSections')->orderBy('name')->get()
+                ->map(fn($t) => [
+                    'id'       => $t->id,
+                    'name'     => $t->name,
+                    'slug'     => $t->slug,
+                    'sections' => $t->templateSections->map(fn($s) => [
+                        'title'   => $s->title,
+                        'type'    => $s->type,
+                        'fields'  => $s->fields_json  ?? [['label' => '', 'default_value' => '']],
+                        'columns' => $s->columns_json ?? [''],
+                        'rows'    => $s->rows_json    ?? [['']],
+                        'content' => $s->content      ?? '',
+                    ])->values(),
+                ]),
             'customers'        => Customer::select('id', 'name')->orderBy('name')->get(),
         ]);
     }

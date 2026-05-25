@@ -20,7 +20,7 @@ import {
     Select, SelectContent, SelectItem,
     SelectTrigger, SelectValue,
 } from "@/Components/ui/select";
-import { Pencil, Trash2, Plus, ChevronUp, ChevronDown, Link as LinkIcon } from "lucide-react";
+import { Pencil, Trash2, Plus, ChevronUp, ChevronDown, LayoutTemplate } from "lucide-react";
 import { Link } from "@inertiajs/react";
 
 // ── Slug auto-generator ───────────────────────────────────────────
@@ -192,6 +192,8 @@ export default function List({
         cert_number_increment: settings.cert_number_increment ?? "1",
         policy_number_prefix:    settings.policy_number_prefix    ?? "",
         policy_number_increment: settings.policy_number_increment ?? "1",
+        invoice_primary_color: settings.invoice_primary_color ?? "#6b1f2a",
+        invoice_text_color:    settings.invoice_text_color    ?? "#ffffff",
     });
 
     // ── Certificate Types list state ────────────────────────────────
@@ -398,6 +400,64 @@ export default function List({
                                     </div>
                                 </div>
 
+                                <hr className="my-6" />
+
+                                {/* Certificate Colors */}
+                                <h2 className="text-base font-semibold mb-4">Certificate Colors</h2>
+
+                                <div className="grid grid-cols-12 mb-4">
+                                    <Label htmlFor="invoice_primary_color" className="col-span-12 md:col-span-3 flex items-center">
+                                        Primary Color
+                                    </Label>
+                                    <div className="col-span-12 md:col-span-9 md:ml-4 mt-2 md:mt-0">
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                id="invoice_primary_color"
+                                                type="color"
+                                                value={data.invoice_primary_color}
+                                                onChange={(e) => setData("invoice_primary_color", e.target.value)}
+                                                className="h-10 w-16 cursor-pointer rounded border border-gray-300 p-1"
+                                            />
+                                            <span className="text-sm font-mono text-gray-600">{data.invoice_primary_color}</span>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-1">Used for borders, section headers, and footer backgrounds on certificates.</p>
+                                        <InputError message={settingsErrors.invoice_primary_color} className="mt-1" />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-12 mb-6">
+                                    <Label htmlFor="invoice_text_color" className="col-span-12 md:col-span-3 flex items-center">
+                                        Text Color
+                                    </Label>
+                                    <div className="col-span-12 md:col-span-9 md:ml-4 mt-2 md:mt-0">
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                id="invoice_text_color"
+                                                type="color"
+                                                value={data.invoice_text_color}
+                                                onChange={(e) => setData("invoice_text_color", e.target.value)}
+                                                className="h-10 w-16 cursor-pointer rounded border border-gray-300 p-1"
+                                            />
+                                            <span className="text-sm font-mono text-gray-600">{data.invoice_text_color}</span>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-1">Text color used on top of the primary color background.</p>
+                                        <InputError message={settingsErrors.invoice_text_color} className="mt-1" />
+                                    </div>
+                                </div>
+
+                                {/* Color Preview */}
+                                <div className="mb-6">
+                                    <Label className="mb-2 block">Preview</Label>
+                                    <div
+                                        className="inline-flex items-center gap-4 rounded border-4 px-4 py-2 text-sm font-semibold"
+                                        style={{ borderColor: data.invoice_primary_color, backgroundColor: data.invoice_primary_color, color: data.invoice_text_color }}
+                                    >
+                                        <span>Section Header</span>
+                                        <span>·</span>
+                                        <span>Footer Bar</span>
+                                    </div>
+                                </div>
+
                                 <Button type="submit" disabled={processing}>{processing ? "Saving..." : "Save Settings"}</Button>
                             </form>
                         </TabsContent>
@@ -489,6 +549,11 @@ export default function List({
                                                         </TableCell>
                                                         <TableCell className="text-right">
                                                             <div className="flex justify-end gap-2">
+                                                                <Link href={route("underwriting_configuration.certificate_types.layout", type.id)}>
+                                                                    <Button variant="outline" size="icon" title="Configure Layout">
+                                                                        <LayoutTemplate className="h-4 w-4" />
+                                                                    </Button>
+                                                                </Link>
                                                                 <Button variant="outline" size="icon" onClick={() => { setActiveType(type); setShowEdit(true); }}>
                                                                     <Pencil className="h-4 w-4" />
                                                                 </Button>
