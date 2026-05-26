@@ -119,7 +119,7 @@ class QuotationController extends Controller
             ]),
             'customers' => $customers,
             'summary' => $summary,
-            'trashed_quotations' => Quotation::onlyTrashed()->count(),
+            'trashed_quotations' => Quotation::onlyTrashed()->where('is_deffered', 0)->count(),
         ]);
     }
 
@@ -195,16 +195,14 @@ class QuotationController extends Controller
         Gate::authorize('quotations.create');
 
         $validator = Validator::make($request->all(), [
-            'customer_id'      => 'required',
-            'title'            => 'required',
-            'quotation_date'   => 'required',
-            'expired_date'     => 'required',
-            'product_id'       => 'required',
-            'currency'         => 'required',
+            'customer_id'        => 'required',
+            'title'              => 'required',
+            'quotation_date'     => 'required',
+            'expired_date'       => 'required',
+            'product_id'         => 'required',
+            'currency'           => 'required',
             'exclusions_remarks' => 'nullable|string',
-            'coverage_summary' => 'nullable|string',
-            'is_deffered'      => 'nullable|in:0,1',
-            'invoice_category' => 'nullable|required_if:is_deffered,1|in:medical,gpa,other',
+            'coverage_summary'   => 'nullable|string',
         ], [
             'product_id.required' => _lang('You must add at least one item'),
         ]);
@@ -250,8 +248,8 @@ class QuotationController extends Controller
         $quotation->footer           = $request->input('footer');
         $quotation->exclusions_remarks = $request->input('exclusions_remarks');
         $quotation->coverage_summary = $request->input('coverage_summary');
-        $quotation->is_deffered      = $this->isDeferredQuotation($request);
-        $quotation->invoice_category = $this->isDeferredQuotation($request) ? $request->input('invoice_category') : null;
+        $quotation->is_deffered      = 0;
+        $quotation->invoice_category = null;
         $quotation->short_code       = rand(100000, 9999999) . uniqid();
 
         $quotation->save();
@@ -434,16 +432,14 @@ class QuotationController extends Controller
         Gate::authorize('quotations.update');
 
         $validator = Validator::make($request->all(), [
-            'customer_id'      => 'required',
-            'title'            => 'required',
-            'quotation_date'   => 'required',
-            'expired_date'     => 'required',
-            'product_id'       => 'required',
-            'currency'         => 'required',
+            'customer_id'        => 'required',
+            'title'              => 'required',
+            'quotation_date'     => 'required',
+            'expired_date'       => 'required',
+            'product_id'         => 'required',
+            'currency'           => 'required',
             'exclusions_remarks' => 'nullable|string',
-            'coverage_summary' => 'nullable|string',
-            'is_deffered'      => 'nullable|in:0,1',
-            'invoice_category' => 'nullable|required_if:is_deffered,1|in:medical,gpa,other',
+            'coverage_summary'   => 'nullable|string',
         ], [
             'product_id.required' => _lang('You must add at least one item'),
         ]);
@@ -488,8 +484,8 @@ class QuotationController extends Controller
         $quotation->footer           = $request->input('footer');
         $quotation->exclusions_remarks = $request->input('exclusions_remarks');
         $quotation->coverage_summary = $request->input('coverage_summary');
-        $quotation->is_deffered      = $this->isDeferredQuotation($request);
-        $quotation->invoice_category = $this->isDeferredQuotation($request) ? $request->input('invoice_category') : null;
+        $quotation->is_deffered      = 0;
+        $quotation->invoice_category = null;
 
         $quotation->save();
 
@@ -784,7 +780,7 @@ class QuotationController extends Controller
 
     private function buildQuotationQuery(Request $request, array $relations = [], bool $onlyTrashed = false)
     {
-        $query = $onlyTrashed ? Quotation::onlyTrashed() : Quotation::query();
+        $query = ($onlyTrashed ? Quotation::onlyTrashed() : Quotation::query())->where('is_deffered', 0);
 
         if (!empty($relations)) {
             $query->with($relations);

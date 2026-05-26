@@ -790,9 +790,6 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
                     <TableHead className="cursor-pointer" onClick={() => handleSort("quotation_number")}>
                       Quotation Number {renderSortIcon("quotation_number")}
                     </TableHead>
-                    <TableHead className="cursor-pointer" onClick={() => handleSort("is_deffered")}>
-                      Deferred {renderSortIcon("is_deffered")}
-                    </TableHead>
                     <TableHead className="cursor-pointer" onClick={() => handleSort("customer.name")}>
                       Customer {renderSortIcon("customer.name")}
                     </TableHead>
@@ -823,9 +820,6 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
                           />
                         </TableCell>
                         <TableCell>{quotation.quotation_number}</TableCell>
-                        <TableCell><Badge variant="outline" className={quotation.is_deffered ? "gap-1 text-green-600 border-green-600" : "gap-1 text-blue-600 border-blue-400"}>
-                          {quotation.is_deffered ? "Deferred" : "Normal"}
-                        </Badge></TableCell>
                         <TableCell>{quotation.customer ? quotation.customer.name : "-"}</TableCell>
                         <TableCell>{quotation.quotation_date}</TableCell>
                         <TableCell>{quotation.expired_date}</TableCell>
@@ -874,7 +868,7 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
                     )})
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={10} className="h-24 text-center">
+                      <TableCell colSpan={9} className="h-24 text-center">
                         No quotations found.
                       </TableCell>
                     </TableRow>

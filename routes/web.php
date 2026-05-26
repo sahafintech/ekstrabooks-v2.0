@@ -89,6 +89,7 @@ use App\Http\Controllers\RolesController;
 use App\Http\Controllers\PermissionsController;
 use App\Http\Controllers\PolicyCertificateController;
 use App\Http\Controllers\UnderwritingConfigurationController;
+use App\Http\Controllers\User\UnderwritingQuoteController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -331,6 +332,8 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::delete('underwriting_configuration/certificate_types/{id}', [UnderwritingConfigurationController::class, 'destroyCertificateType'])->name('underwriting_configuration.certificate_types.destroy');
 		Route::post('underwriting_configuration/certificate_types/{id}/restore', [UnderwritingConfigurationController::class, 'restoreCertificateType'])->name('underwriting_configuration.certificate_types.restore');
 		Route::delete('underwriting_configuration/certificate_types/{id}/permanent_destroy', [UnderwritingConfigurationController::class, 'permanentDestroyCertificateType'])->name('underwriting_configuration.certificate_types.permanent_destroy');
+		Route::get('underwriting_configuration/certificate_types/{id}/layout', [UnderwritingConfigurationController::class, 'typeLayout'])->name('underwriting_configuration.certificate_types.layout');
+		Route::post('underwriting_configuration/certificate_types/{id}/layout', [UnderwritingConfigurationController::class, 'saveTypeLayout'])->name('underwriting_configuration.certificate_types.save_layout');
 
 		// Policies
 		Route::get('policy_certificates/trash', [PolicyCertificateController::class, 'trash'])->name('policies.trash');
@@ -347,6 +350,13 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('underwriting_quotes/bulk_restore', [UnderwritingQuoteController::class, 'bulk_restore'])->name('underwriting_quotes.bulk_restore');
 		Route::post('underwriting_quotes/bulk_permanent_destroy', [UnderwritingQuoteController::class, 'bulk_permanent_destroy'])->name('underwriting_quotes.bulk_permanent_destroy');
 		Route::delete('underwriting_quotes/{id}/permanent_destroy', [UnderwritingQuoteController::class, 'permanent_destroy'])->name('underwriting_quotes.permanent_destroy');
+		Route::post('underwriting_quotes/bulk_destroy', [UnderwritingQuoteController::class, 'bulk_destroy'])->name('underwriting_quotes.bulk_destroy');
+		Route::match(['get', 'post'], 'underwriting_quotes/{id}/send_email', [UnderwritingQuoteController::class, 'send_email'])->name('underwriting_quotes.send_email');
+		Route::get('underwriting_quotes/{id}/pdf', [UnderwritingQuoteController::class, 'pdf'])->name('underwriting_quotes.pdf');
+		Route::match(['get', 'post'], 'underwriting_quotes/{id}/convert_to_invoice', [UnderwritingQuoteController::class, 'convert_to_invoice'])->name('underwriting_quotes.convert_to_invoice');
+		Route::post('underwriting_quotes/{id}/accept', [UnderwritingQuoteController::class, 'accept'])->name('underwriting_quotes.accept');
+		Route::post('underwriting_quotes/{id}/reject', [UnderwritingQuoteController::class, 'reject'])->name('underwriting_quotes.reject');
+		Route::get('underwriting_quotes/{id}/duplicate', [UnderwritingQuoteController::class, 'duplicate'])->name('underwriting_quotes.duplicate');
 		Route::resource('underwriting_quotes', UnderwritingQuoteController::class);
 
 		//Vendors
