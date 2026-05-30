@@ -28,7 +28,7 @@ const makeSection = (sortOrder) => ({
     columns: [""], rows: [[""]], content: "",
 });
 
-export default function CertificateTypeLayout({ certificateType, sections: initialSections = [] }) {
+export default function InsuranceCategoryLayout({ insuranceCategory, sections: initialSections = [] }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
     const [sections, setSections] = useState(
@@ -142,7 +142,7 @@ export default function CertificateTypeLayout({ certificateType, sections: initi
         e.preventDefault();
         setProcessing(true);
         router.post(
-            route("underwriting_configuration.certificate_types.save_layout", certificateType.id),
+            route("underwriting_configuration.insurance_categories.save_layout", insuranceCategory.id),
             { sections },
             {
                 preserveScroll: true,
@@ -156,8 +156,8 @@ export default function CertificateTypeLayout({ certificateType, sections: initi
             <Toaster />
             <SidebarInset>
                 <PageHeader
-                    page="Certificate Types"
-                    subpage={`${certificateType.name} — Layout`}
+                    page="Insurance Categories"
+                    subpage={`${insuranceCategory.name} — Layout`}
                     url="underwriting_configuration.index"
                 />
 
@@ -168,7 +168,7 @@ export default function CertificateTypeLayout({ certificateType, sections: initi
                                 <div>
                                     <h3 className="text-lg font-semibold">Certificate Sections</h3>
                                     <p className="text-sm text-gray-500 mt-0.5">
-                                        Define the structure and default values for <span className="font-semibold">{certificateType.name}</span> certificates.
+                                        Define the structure and default values for <span className="font-semibold">{insuranceCategory.name}</span> certificates.
                                         Keys and structure defined here will be locked when creating a certificate.
                                     </p>
                                 </div>
@@ -367,7 +367,7 @@ export default function CertificateTypeLayout({ certificateType, sections: initi
                             </Button>
                             <Button
                                 type="button" variant="outline"
-                                onClick={() => router.visit(route("underwriting_configuration.index", { tab: "certificate_types" }))}
+                                onClick={() => router.visit(route("underwriting_configuration.index", { tab: "insurance_categories" }))}
                             >
                                 Back
                             </Button>

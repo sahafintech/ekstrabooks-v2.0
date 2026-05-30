@@ -252,7 +252,7 @@ export default function PublicView({ certificate, sections = [], business = {} }
                                     </div>
                                 )}
                                 <div className="text-sm font-semibold text-gray-600 mt-0.5">
-                                    Certificate of {certificate.certificate_type} Insurance
+                                    Certificate of {certificate.insurance_category} Insurance
                                 </div>
                                 {certificate.customer_name && (
                                     <div className="text-xs text-gray-500 mt-1">

@@ -368,7 +368,7 @@ export default function List({ certificates = [], meta = {}, filters = {}, trash
                                             Customer
                                         </TableHead>
                                         <TableHead>
-                                            Certificate Type
+                                            Insurance Category
                                         </TableHead>
                                         <TableHead
                                             className="cursor-pointer"
@@ -406,7 +406,7 @@ export default function List({ certificates = [], meta = {}, filters = {}, trash
                                                 </TableCell>
                                                 <TableCell>{cert.policy_number || "-"}</TableCell>
                                                 <TableCell>{cert.customer?.name ?? "-"}</TableCell>
-                                                <TableCell>{cert.certificate_type?.name ?? "-"}</TableCell>
+                                                <TableCell>{cert.insurance_category?.name ?? "-"}</TableCell>
                                                 <TableCell>{cert.policy_start_date || "-"}</TableCell>
                                                 <TableCell>{cert.policy_end_date || "-"}</TableCell>
                                                 <TableCell className="text-right">

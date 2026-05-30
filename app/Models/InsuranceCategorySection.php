@@ -4,10 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class CertificateTypeSection extends Model
+class InsuranceCategorySection extends Model
 {
     protected $fillable = [
-        'certificate_type_id',
+        'insurance_category_id',
         'title',
         'type',
         'sort_order',
@@ -23,8 +23,8 @@ class CertificateTypeSection extends Model
         'rows_json'    => 'array',
     ];
 
-    public function certificateType()
+    public function insuranceCategory()
     {
-        return $this->belongsTo(CertificateType::class);
+        return $this->belongsTo(InsuranceCategory::class);
     }
 }

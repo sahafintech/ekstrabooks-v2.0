@@ -6,7 +6,7 @@ use App\Traits\MultiTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class CertificateType extends Model
+class InsuranceCategory extends Model
 {
     use MultiTenant, SoftDeletes;
 
@@ -14,6 +14,6 @@ class CertificateType extends Model
 
     public function templateSections()
     {
-        return $this->hasMany(CertificateTypeSection::class)->orderBy('sort_order');
+        return $this->hasMany(InsuranceCategorySection::class)->orderBy('sort_order');
     }
 }

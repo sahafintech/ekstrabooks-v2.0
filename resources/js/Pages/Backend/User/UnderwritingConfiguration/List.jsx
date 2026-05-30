@@ -22,13 +22,14 @@ import {
 } from "@/Components/ui/select";
 import { Pencil, Trash2, Plus, ChevronUp, ChevronDown, LayoutTemplate } from "lucide-react";
 import { Link } from "@inertiajs/react";
+import TableActions from "@/Components/shared/TableActions";
 
 // ── Slug auto-generator ───────────────────────────────────────────
 const generateSlug = (name) =>
     name.replace(/[^a-zA-Z]/g, "").slice(0, 3).toUpperCase();
 
 // ── Create Modal ─────────────────────────────────────────────────
-function CreateTypeModal({ show, onClose, errors }) {
+function CreateModal({ show, onClose, errors }) {
     const { data, setData, post, processing, reset } = useForm({ name: "", slug: "" });
 
     const handleNameChange = (value) =>
@@ -36,7 +37,7 @@ function CreateTypeModal({ show, onClose, errors }) {
 
     const submit = (e) => {
         e.preventDefault();
-        post(route("underwriting_configuration.certificate_types.store"), {
+        post(route("underwriting_configuration.insurance_categories.store"), {
             preserveScroll: true,
             onSuccess: () => { reset(); onClose(); },
         });
@@ -47,7 +48,7 @@ function CreateTypeModal({ show, onClose, errors }) {
     return (
         <Modal show={show} onClose={onClose} maxWidth="md">
             <form onSubmit={submit} className="p-6">
-                <h2 className="text-lg font-semibold mb-4">Add Certificate Type</h2>
+                <h2 className="text-lg font-semibold mb-4">Add Insurance Category</h2>
                 <div className="space-y-4">
                     <div>
                         <Label htmlFor="create_name">Name *</Label>
@@ -77,20 +78,20 @@ function CreateTypeModal({ show, onClose, errors }) {
 }
 
 // ── Edit Modal ───────────────────────────────────────────────────
-function EditTypeModal({ show, onClose, certificateType, errors }) {
+function EditModal({ show, onClose, insuranceCategory, errors }) {
     const { data, setData, put, processing, reset } = useForm({ name: "", slug: "" });
 
     useEffect(() => {
-        if (certificateType) setData({ name: certificateType.name, slug: certificateType.slug });
+        if (insuranceCategory) setData({ name: insuranceCategory.name, slug: insuranceCategory.slug });
         if (!show) reset();
-    }, [certificateType, show]);
+    }, [insuranceCategory, show]);
 
     const handleNameChange = (value) =>
         setData((prev) => ({ ...prev, name: value, slug: generateSlug(value) }));
 
     const submit = (e) => {
         e.preventDefault();
-        put(route("underwriting_configuration.certificate_types.update", certificateType.id), {
+        put(route("underwriting_configuration.insurance_categories.update", insuranceCategory.id), {
             preserveScroll: true,
             onSuccess: () => onClose(),
         });
@@ -99,7 +100,7 @@ function EditTypeModal({ show, onClose, certificateType, errors }) {
     return (
         <Modal show={show} onClose={onClose} maxWidth="md">
             <form onSubmit={submit} className="p-6">
-                <h2 className="text-lg font-semibold mb-4">Edit Certificate Type</h2>
+                <h2 className="text-lg font-semibold mb-4">Edit Insurance Category</h2>
                 <div className="space-y-4">
                     <div>
                         <Label htmlFor="edit_name">Name *</Label>
@@ -129,20 +130,20 @@ function EditTypeModal({ show, onClose, certificateType, errors }) {
 }
 
 // ── Delete Single Modal ───────────────────────────────────────────
-function DeleteTypeModal({ show, onClose, certificateType }) {
+function DeleteModal({ show, onClose, insuranceCategory }) {
     const [processing, setProcessing] = useState(false);
     const confirm = (e) => {
         e.preventDefault();
         setProcessing(true);
         router.delete(
-            route("underwriting_configuration.certificate_types.destroy", certificateType.id),
+            route("underwriting_configuration.insurance_categories.destroy", insuranceCategory.id),
             { preserveScroll: true, onSuccess: () => { onClose(); setProcessing(false); }, onError: () => setProcessing(false) }
         );
     };
     return (
         <Modal show={show} onClose={onClose} maxWidth="sm">
             <form onSubmit={confirm} className="p-6">
-                <h2 className="text-lg font-medium">Delete &ldquo;{certificateType?.name}&rdquo;?</h2>
+                <h2 className="text-lg font-medium">Delete &ldquo;{insuranceCategory?.name}&rdquo;?</h2>
                 <p className="mt-1 text-sm text-gray-600">It will be moved to the trash and can be restored later.</p>
                 <div className="flex justify-end gap-2 mt-6">
                     <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
@@ -154,12 +155,12 @@ function DeleteTypeModal({ show, onClose, certificateType }) {
 }
 
 // ── Bulk Delete Modal ─────────────────────────────────────────────
-function DeleteAllTypesModal({ show, onClose, onConfirm, processing, count }) {
+function DeleteAllModal({ show, onClose, onConfirm, processing, count }) {
     return (
         <Modal show={show} onClose={onClose} maxWidth="sm">
             <form onSubmit={onConfirm} className="p-6">
                 <h2 className="text-lg font-medium">
-                    Delete {count} selected type{count !== 1 ? "s" : ""}?
+                    Delete {count} selected categor{count !== 1 ? "ies" : "y"}?
                 </h2>
                 <p className="mt-1 text-sm text-gray-600">They will be moved to the trash.</p>
                 <div className="flex justify-end gap-2 mt-6">
@@ -174,7 +175,7 @@ function DeleteAllTypesModal({ show, onClose, onConfirm, processing, count }) {
 // ── Main Page ─────────────────────────────────────────────────────
 export default function List({
     settings = {},
-    certificateTypes = [],
+    insuranceCategories = [],
     certMeta = {},
     certFilters = {},
     certTrashedCount = 0,
@@ -183,7 +184,6 @@ export default function List({
     const { flash = {}, errors = {} } = usePage().props;
     const { toast } = useToast();
 
-    // ── Tab state (controlled so URL navigations restore the tab) ───
     const [activeTab, setActiveTab] = useState(defaultTab);
 
     // ── Settings form ───────────────────────────────────────────────
@@ -196,21 +196,21 @@ export default function List({
         invoice_text_color:    settings.invoice_text_color    ?? "#ffffff",
     });
 
-    // ── Certificate Types list state ────────────────────────────────
-    const [certSearch, setCertSearch]         = useState(certFilters.search || "");
-    const [certPerPage, setCertPerPage]       = useState(certMeta.per_page || 10);
-    const [certCurrentPage, setCertCurrentPage] = useState(certMeta.current_page || 1);
-    const [certSorting, setCertSorting]       = useState(certFilters.sorting || { column: "name", direction: "asc" });
-    const [certSelectedIds, setCertSelectedIds] = useState([]);
+    // ── Insurance Categories list state ─────────────────────────────
+    const [certSearch, setCertSearch]             = useState(certFilters.search || "");
+    const [certPerPage, setCertPerPage]           = useState(certMeta.per_page || 10);
+    const [certCurrentPage, setCertCurrentPage]   = useState(certMeta.current_page || 1);
+    const [certSorting, setCertSorting]           = useState(certFilters.sorting || { column: "name", direction: "asc" });
+    const [certSelectedIds, setCertSelectedIds]   = useState([]);
     const [certIsAllSelected, setCertIsAllSelected] = useState(false);
-    const [certBulkAction, setCertBulkAction] = useState("");
+    const [certBulkAction, setCertBulkAction]     = useState("");
 
-    // ── Cert type modal state ───────────────────────────────────────
-    const [showCreate, setShowCreate]     = useState(false);
-    const [showEdit,   setShowEdit]       = useState(false);
-    const [showDelete, setShowDelete]     = useState(false);
+    // ── Modal state ─────────────────────────────────────────────────
+    const [showCreate, setShowCreate]       = useState(false);
+    const [showEdit,   setShowEdit]         = useState(false);
+    const [showDelete, setShowDelete]       = useState(false);
     const [showDeleteAll, setShowDeleteAll] = useState(false);
-    const [activeType, setActiveType]     = useState(null);
+    const [activeItem, setActiveItem]       = useState(null);
     const [certDeleteProcessing, setCertDeleteProcessing] = useState(false);
 
     useEffect(() => {
@@ -224,11 +224,11 @@ export default function List({
         post(route("underwriting_configuration.store"), { preserveScroll: true });
     };
 
-    // ── Cert types navigation helper ────────────────────────────────
+    // ── Navigation helper ───────────────────────────────────────────
     const certNav = (params) => {
         router.get(
             route("underwriting_configuration.index"),
-            { tab: "certificate_types", cert_search: certSearch, cert_per_page: certPerPage, cert_sorting: certSorting, ...params },
+            { tab: "insurance_categories", cert_search: certSearch, cert_per_page: certPerPage, cert_sorting: certSorting, ...params },
             { preserveState: true, preserveScroll: true }
         );
     };
@@ -266,12 +266,11 @@ export default function List({
         );
     };
 
-    // ── Cert types selection ────────────────────────────────────────
     const toggleCertSelectAll = () => {
         if (certIsAllSelected) {
             setCertSelectedIds([]);
         } else {
-            setCertSelectedIds(certificateTypes.map((t) => t.id));
+            setCertSelectedIds(insuranceCategories.map((t) => t.id));
         }
         setCertIsAllSelected(!certIsAllSelected);
     };
@@ -283,14 +282,14 @@ export default function List({
         } else {
             const next = [...certSelectedIds, id];
             setCertSelectedIds(next);
-            if (next.length === certificateTypes.length) setCertIsAllSelected(true);
+            if (next.length === insuranceCategories.length) setCertIsAllSelected(true);
         }
     };
 
     const handleCertBulkAction = () => {
         if (!certBulkAction) return;
         if (certSelectedIds.length === 0) {
-            toast({ variant: "destructive", title: "Error", description: "Please select at least one certificate type." });
+            toast({ variant: "destructive", title: "Error", description: "Please select at least one insurance category." });
             return;
         }
         if (certBulkAction === "delete") setShowDeleteAll(true);
@@ -300,7 +299,7 @@ export default function List({
         e.preventDefault();
         setCertDeleteProcessing(true);
         router.post(
-            route("underwriting_configuration.certificate_types.bulk_destroy"),
+            route("underwriting_configuration.insurance_categories.bulk_destroy"),
             { ids: certSelectedIds },
             {
                 preserveScroll: true,
@@ -315,7 +314,6 @@ export default function List({
         );
     };
 
-    // ── Cert types pagination ───────────────────────────────────────
     const renderCertPageNumbers = () => {
         const totalPages = certMeta.last_page || 1;
         const maxPages   = 5;
@@ -341,14 +339,13 @@ export default function List({
                     <Tabs value={activeTab} onValueChange={setActiveTab}>
                         <TabsList>
                             <TabsTrigger value="policy_certificate">Policy Certificate</TabsTrigger>
-                            <TabsTrigger value="certificate_types">Certificate Types</TabsTrigger>
+                            <TabsTrigger value="insurance_categories">Insurance Categories</TabsTrigger>
                         </TabsList>
 
                         {/* ── Policy Certificate Tab ─────────────── */}
                         <TabsContent value="policy_certificate">
                             <form onSubmit={submitSettings} className="mt-4">
 
-                                {/* Certificate Settings */}
                                 <h2 className="text-base font-semibold mb-4">Certificate Settings</h2>
 
                                 <div className="grid grid-cols-12 mb-4">
@@ -375,7 +372,6 @@ export default function List({
 
                                 <hr className="my-6" />
 
-                                {/* Policy Settings */}
                                 <h2 className="text-base font-semibold mb-4">Policy Settings</h2>
 
                                 <div className="grid grid-cols-12 mb-4">
@@ -402,7 +398,6 @@ export default function List({
 
                                 <hr className="my-6" />
 
-                                {/* Certificate Colors */}
                                 <h2 className="text-base font-semibold mb-4">Certificate Colors</h2>
 
                                 <div className="grid grid-cols-12 mb-4">
@@ -445,7 +440,6 @@ export default function List({
                                     </div>
                                 </div>
 
-                                {/* Color Preview */}
                                 <div className="mb-6">
                                     <Label className="mb-2 block">Preview</Label>
                                     <div
@@ -462,8 +456,8 @@ export default function List({
                             </form>
                         </TabsContent>
 
-                        {/* ── Certificate Types Tab ─────────────────── */}
-                        <TabsContent value="certificate_types">
+                        {/* ── Insurance Categories Tab ──────────────── */}
+                        <TabsContent value="insurance_categories">
                             <div className="mt-4">
 
                                 {/* Toolbar */}
@@ -471,9 +465,9 @@ export default function List({
                                     <div className="flex flex-col md:flex-row gap-2">
                                         <Button onClick={() => setShowCreate(true)}>
                                             <Plus className="w-4 h-4 mr-2" />
-                                            Add Type
+                                            Add Category
                                         </Button>
-                                        <Link href={route("underwriting_configuration.certificate_types.trash")}>
+                                        <Link href={route("underwriting_configuration.insurance_categories.trash")}>
                                             <Button variant="outline" className="relative">
                                                 <Trash2 className="h-5 w-5" />
                                                 {certTrashedCount > 0 && (
@@ -485,7 +479,7 @@ export default function List({
                                         </Link>
                                     </div>
                                     <Input
-                                        placeholder="Search types..."
+                                        placeholder="Search categories..."
                                         value={certSearch}
                                         onChange={handleCertSearch}
                                         className="w-full md:w-72"
@@ -536,38 +530,32 @@ export default function List({
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {certificateTypes.length > 0 ? (
-                                                certificateTypes.map((type, index) => (
-                                                    <TableRow key={type.id}>
+                                            {insuranceCategories.length > 0 ? (
+                                                insuranceCategories.map((item, index) => (
+                                                    <TableRow key={item.id}>
                                                         <TableCell>
-                                                            <Checkbox checked={certSelectedIds.includes(type.id)} onCheckedChange={() => toggleCertSelect(type.id)} />
+                                                            <Checkbox checked={certSelectedIds.includes(item.id)} onCheckedChange={() => toggleCertSelect(item.id)} />
                                                         </TableCell>
                                                         <TableCell>{(certCurrentPage - 1) * certPerPage + index + 1}</TableCell>
-                                                        <TableCell>{type.name}</TableCell>
+                                                        <TableCell>{item.name}</TableCell>
                                                         <TableCell>
-                                                            <span className="font-mono text-xs bg-gray-100 border px-2 py-0.5 rounded">{type.slug}</span>
+                                                            <span className="font-mono text-xs bg-gray-100 border px-2 py-0.5 rounded">{item.slug}</span>
                                                         </TableCell>
                                                         <TableCell className="text-right">
-                                                            <div className="flex justify-end gap-2">
-                                                                <Link href={route("underwriting_configuration.certificate_types.layout", type.id)}>
-                                                                    <Button variant="outline" size="icon" title="Configure Layout">
-                                                                        <LayoutTemplate className="h-4 w-4" />
-                                                                    </Button>
-                                                                </Link>
-                                                                <Button variant="outline" size="icon" onClick={() => { setActiveType(type); setShowEdit(true); }}>
-                                                                    <Pencil className="h-4 w-4" />
-                                                                </Button>
-                                                                <Button variant="outline" size="icon" className="text-red-500 hover:text-red-700" onClick={() => { setActiveType(type); setShowDelete(true); }}>
-                                                                    <Trash2 className="h-4 w-4" />
-                                                                </Button>
-                                                            </div>
+                                                            <TableActions
+                                                                actions={[
+                                                                    { label: "Layout", icon: <LayoutTemplate className="h-4 w-4" />, href: route("underwriting_configuration.insurance_categories.layout", item.id) },
+                                                                    { label: "Edit", icon: <Pencil className="h-4 w-4" />, onClick: () => { setActiveItem(item); setShowEdit(true); } },
+                                                                    { label: "Delete", icon: <Trash2 className="h-4 w-4" />, onClick: () => { setActiveItem(item); setShowDelete(true); }, destructive: true },
+                                                                ]}
+                                                            />
                                                         </TableCell>
                                                     </TableRow>
                                                 ))
                                             ) : (
                                                 <TableRow>
                                                     <TableCell colSpan={5} className="h-24 text-center text-gray-400">
-                                                        No certificate types found.
+                                                        No insurance categories found.
                                                     </TableCell>
                                                 </TableRow>
                                             )}
@@ -576,7 +564,7 @@ export default function List({
                                 </div>
 
                                 {/* Pagination */}
-                                {certificateTypes.length > 0 && certMeta.total > 0 && (
+                                {insuranceCategories.length > 0 && certMeta.total > 0 && (
                                     <div className="flex items-center justify-between mt-4">
                                         <div className="text-sm text-gray-500">
                                             Showing {(certCurrentPage - 1) * certPerPage + 1} to {Math.min(certCurrentPage * certPerPage, certMeta.total)} of {certMeta.total} entries
@@ -596,10 +584,10 @@ export default function List({
                 </div>
             </SidebarInset>
 
-            <CreateTypeModal show={showCreate} onClose={() => setShowCreate(false)} errors={errors} />
-            <EditTypeModal   show={showEdit}   onClose={() => setShowEdit(false)}   certificateType={activeType} errors={errors} />
-            <DeleteTypeModal show={showDelete} onClose={() => setShowDelete(false)} certificateType={activeType} />
-            <DeleteAllTypesModal
+            <CreateModal  show={showCreate} onClose={() => setShowCreate(false)} errors={errors} />
+            <EditModal    show={showEdit}   onClose={() => setShowEdit(false)}   insuranceCategory={activeItem} errors={errors} />
+            <DeleteModal  show={showDelete} onClose={() => setShowDelete(false)} insuranceCategory={activeItem} />
+            <DeleteAllModal
                 show={showDeleteAll}
                 onClose={() => setShowDeleteAll(false)}
                 onConfirm={handleCertDeleteAll}

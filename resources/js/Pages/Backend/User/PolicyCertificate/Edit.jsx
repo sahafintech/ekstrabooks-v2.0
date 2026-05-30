@@ -35,10 +35,10 @@ const formatDate = (date) => (date ? date.toLocaleDateString("en-CA") : "");
 const stripMeta = (sections) =>
     sections.map(({ _locked, ...s }) => s);
 
-export default function Edit({ certificate, certificateTypes = [], customers = [], initialSections = [] }) {
+export default function Edit({ certificate, insuranceCategories = [], customers = [], initialSections = [] }) {
     const [basic, setBasic] = useState({
-        customer_id:         String(certificate.customer_id ?? ""),
-        certificate_type_id: String(certificate.certificate_type_id ?? ""),
+        customer_id:            String(certificate.customer_id ?? ""),
+        insurance_category_id:  String(certificate.insurance_category_id ?? ""),
         policy_start_date:   parseDate(certificate.policy_start_date),
         policy_end_date:     parseDate(certificate.policy_end_date),
     });
@@ -157,8 +157,8 @@ export default function Edit({ certificate, certificateTypes = [], customers = [
         router.put(
             route("policy_certificates.update", certificate.id),
             {
-                customer_id:         basic.customer_id,
-                certificate_type_id: basic.certificate_type_id,
+                customer_id:            basic.customer_id,
+                insurance_category_id:  basic.insurance_category_id,
                 policy_start_date:   formatDate(basic.policy_start_date),
                 policy_end_date:     formatDate(basic.policy_end_date),
                 sections:            stripMeta(sections),
@@ -207,20 +207,20 @@ export default function Edit({ certificate, certificateTypes = [], customers = [
                         </div>
 
                         <div className="grid grid-cols-12 mt-2">
-                            <Label htmlFor="certificate_type_id" className="md:col-span-2 col-span-12">
-                                Certificate Type *
+                            <Label htmlFor="insurance_category_id" className="md:col-span-2 col-span-12">
+                                Insurance Category *
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                 <div className="md:w-1/2 w-full">
                                     <SearchableCombobox
-                                        options={certificateTypes}
-                                        value={basic.certificate_type_id}
-                                        onChange={(v) => setBasic({ ...basic, certificate_type_id: v })}
-                                        placeholder="Select certificate type"
-                                        emptyMessage="No certificate types found. Add them in Underwriting Configuration."
+                                        options={insuranceCategories}
+                                        value={basic.insurance_category_id}
+                                        onChange={(v) => setBasic({ ...basic, insurance_category_id: v })}
+                                        placeholder="Select insurance category"
+                                        emptyMessage="No insurance categories found. Add them in Underwriting Configuration."
                                     />
                                 </div>
-                                <InputError message={errors.certificate_type_id} className="text-sm" />
+                                <InputError message={errors.insurance_category_id} className="text-sm" />
                             </div>
                         </div>
 

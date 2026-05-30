@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
-use App\Models\CertificateType;
+use App\Models\InsuranceCategory;
 use App\Models\Customer;
 use App\Models\PolicyCertificate;
 use App\Models\PolicyCertificateField;
@@ -26,13 +26,13 @@ class PolicyCertificateController extends Controller
         $search   = $request->get('search', '');
         $sorting  = $request->get('sorting', []);
 
-        $query = PolicyCertificate::with(['customer', 'certificateType']);
+        $query = PolicyCertificate::with(['customer', 'insuranceCategory']);
 
         if (!empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->where('certificate_number', 'like', "%{$search}%")
                     ->orWhere('policy_number', 'like', "%{$search}%")
-                    ->orWhereHas('certificateType', fn($r) => $r->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('insuranceCategory', fn($r) => $r->where('name', 'like', "%{$search}%"))
                     ->orWhereHas('customer', fn($r) => $r->where('name', 'like', "%{$search}%"));
             });
         }
@@ -69,13 +69,13 @@ class PolicyCertificateController extends Controller
         $search   = $request->get('search', '');
         $sorting  = $request->get('sorting', []);
 
-        $query = PolicyCertificate::onlyTrashed()->with('certificateType');
+        $query = PolicyCertificate::onlyTrashed()->with('insuranceCategory');
 
         if (!empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->where('certificate_number', 'like', "%{$search}%")
                     ->orWhere('policy_number', 'like', "%{$search}%")
-                    ->orWhereHas('certificateType', fn($r) => $r->where('name', 'like', "%{$search}%"));
+                    ->orWhereHas('insuranceCategory', fn($r) => $r->where('name', 'like', "%{$search}%"));
             });
         }
 
@@ -118,11 +118,11 @@ class PolicyCertificateController extends Controller
         Gate::authorize('policy_certificates.create');
 
         return Inertia::render('Backend/User/PolicyCertificate/Create', [
-            'cert_prefix'      => Setting::where('name', 'cert_number_prefix')->value('value') ?? '',
-            'cert_increment'   => Setting::where('name', 'cert_number_increment')->value('value') ?? 1,
-            'policy_prefix'    => Setting::where('name', 'policy_number_prefix')->value('value') ?? '',
-            'policy_increment' => Setting::where('name', 'policy_number_increment')->value('value') ?? 1,
-            'certificateTypes' => CertificateType::with('templateSections')->orderBy('name')->get()
+            'cert_prefix'        => Setting::where('name', 'cert_number_prefix')->value('value') ?? '',
+            'cert_increment'     => Setting::where('name', 'cert_number_increment')->value('value') ?? 1,
+            'policy_prefix'      => Setting::where('name', 'policy_number_prefix')->value('value') ?? '',
+            'policy_increment'   => Setting::where('name', 'policy_number_increment')->value('value') ?? 1,
+            'insuranceCategories' => InsuranceCategory::with('templateSections')->orderBy('name')->get()
                 ->map(fn($t) => [
                     'id'       => $t->id,
                     'name'     => $t->name,
@@ -136,7 +136,7 @@ class PolicyCertificateController extends Controller
                         'content' => $s->content      ?? '',
                     ])->values(),
                 ]),
-            'customers'        => Customer::select('id', 'name')->orderBy('name')->get(),
+            'customers'          => Customer::select('id', 'name')->orderBy('name')->get(),
         ]);
     }
 
@@ -145,13 +145,13 @@ class PolicyCertificateController extends Controller
         Gate::authorize('policy_certificates.create');
 
         $validator = Validator::make($request->all(), [
-            'customer_id'       => 'required|exists:customers,id',
-            'certificate_type'  => 'required|exists:certificate_types,id',
-            'policy_start_date' => 'required|date',
-            'policy_end_date'   => 'required|date|after_or_equal:policy_start_date',
-            'sections'          => 'nullable|array',
-            'sections.*.title'  => 'required|string|max:255',
-            'sections.*.type'   => 'required|string|in:fields,table,text,note,terms,exclusions,signature',
+            'customer_id'         => 'required|exists:customers,id',
+            'insurance_category'  => 'required|exists:insurance_categories,id',
+            'policy_start_date'   => 'required|date',
+            'policy_end_date'     => 'required|date|after_or_equal:policy_start_date',
+            'sections'            => 'nullable|array',
+            'sections.*.title'    => 'required|string|max:255',
+            'sections.*.type'     => 'required|string|in:fields,table,text,note,terms,exclusions,signature',
         ]);
 
         if ($validator->fails()) {
@@ -161,21 +161,20 @@ class PolicyCertificateController extends Controller
         }
 
         DB::transaction(function () use ($request) {
-            $certType          = CertificateType::findOrFail($request->certificate_type);
-            $certificateNumber = $this->buildNumber('cert_number_prefix', 'cert_number_increment', $certType->slug);
-            $policyNumber      = $this->buildNumber('policy_number_prefix', 'policy_number_increment', $certType->slug);
+            $insuranceCategory = InsuranceCategory::findOrFail($request->insurance_category);
+            $certificateNumber = $this->buildNumber('cert_number_prefix', 'cert_number_increment', $insuranceCategory->slug);
+            $policyNumber      = $this->buildNumber('policy_number_prefix', 'policy_number_increment', $insuranceCategory->slug);
 
             $certificate = PolicyCertificate::create([
-                'customer_id'         => $request->customer_id,
-                'certificate_type_id' => $certType->id,
-                'certificate_number'  => $certificateNumber,
-                'policy_number'       => $policyNumber,
-                'policy_start_date'   => $request->policy_start_date,
-                'policy_end_date'     => $request->policy_end_date,
-                'short_code'          => rand(100000, 9999999) . uniqid(),
+                'customer_id'          => $request->customer_id,
+                'insurance_category_id' => $insuranceCategory->id,
+                'certificate_number'   => $certificateNumber,
+                'policy_number'        => $policyNumber,
+                'policy_start_date'    => $request->policy_start_date,
+                'policy_end_date'      => $request->policy_end_date,
+                'short_code'           => rand(100000, 9999999) . uniqid(),
             ]);
 
-            // Increment the counters in settings
             Setting::where('name', 'cert_number_increment')->increment('value');
             Setting::where('name', 'policy_number_increment')->increment('value');
 
@@ -202,7 +201,6 @@ class PolicyCertificateController extends Controller
                     }
                 } elseif ($type === 'table') {
                     $columns = $sectionData['columns'] ?? [];
-                    // Store column headers as a field row
                     PolicyCertificateField::create([
                         'policy_certificate_id' => $certificate->id,
                         'section'               => (string) $section->id,
@@ -210,7 +208,6 @@ class PolicyCertificateController extends Controller
                         'value'                 => json_encode($columns),
                         'sort_order'            => 0,
                     ]);
-                    // Store each data row
                     foreach ($sectionData['rows'] ?? [] as $rowOrder => $row) {
                         PolicyCertificateSectionRow::create([
                             'policy_certificate_section_id' => $section->id,
@@ -219,7 +216,6 @@ class PolicyCertificateController extends Controller
                         ]);
                     }
                 } else {
-                    // text, note, terms, exclusions, signature
                     PolicyCertificateField::create([
                         'policy_certificate_id' => $certificate->id,
                         'section'               => (string) $section->id,
@@ -246,7 +242,7 @@ class PolicyCertificateController extends Controller
 
         $certificate = PolicyCertificate::with([
             'customer',
-            'certificateType',
+            'insuranceCategory',
             'sections',
             'sections.rows',
             'fields',
@@ -288,14 +284,14 @@ class PolicyCertificateController extends Controller
 
         return Inertia::render('Backend/User/PolicyCertificate/View', [
             'certificate' => [
-                'id'                 => $certificate->id,
-                'short_code'         => $certificate->short_code,
-                'customer_name'      => $certificate->customer?->name ?? '',
-                'certificate_number' => $certificate->certificate_number,
-                'policy_number'      => $certificate->policy_number,
-                'certificate_type'   => $certificate->certificateType?->name ?? '',
-                'policy_start_date'  => $certificate->getRawOriginal('policy_start_date'),
-                'policy_end_date'    => $certificate->getRawOriginal('policy_end_date'),
+                'id'                   => $certificate->id,
+                'short_code'           => $certificate->short_code,
+                'customer_name'        => $certificate->customer?->name ?? '',
+                'certificate_number'   => $certificate->certificate_number,
+                'policy_number'        => $certificate->policy_number,
+                'insurance_category'   => $certificate->insuranceCategory?->name ?? '',
+                'policy_start_date'    => $certificate->getRawOriginal('policy_start_date'),
+                'policy_end_date'      => $certificate->getRawOriginal('policy_end_date'),
             ],
             'sections' => $sections,
             'business' => [
@@ -315,7 +311,7 @@ class PolicyCertificateController extends Controller
 
         $certificate = PolicyCertificate::with([
             'customer',
-            'certificateType',
+            'insuranceCategory',
             'sections',
             'sections.rows',
             'fields',
@@ -367,17 +363,17 @@ class PolicyCertificateController extends Controller
 
         return Inertia::render('Backend/User/PolicyCertificate/Edit', [
             'certificate' => [
-                'id'                  => $certificate->id,
-                'customer_id'         => $certificate->customer_id,
-                'certificate_type_id' => $certificate->certificate_type_id,
-                'certificate_number'  => $certificate->certificate_number,
-                'policy_number'       => $certificate->policy_number,
-                'policy_start_date'   => $certificate->getRawOriginal('policy_start_date'),
-                'policy_end_date'     => $certificate->getRawOriginal('policy_end_date'),
+                'id'                    => $certificate->id,
+                'customer_id'           => $certificate->customer_id,
+                'insurance_category_id' => $certificate->insurance_category_id,
+                'certificate_number'    => $certificate->certificate_number,
+                'policy_number'         => $certificate->policy_number,
+                'policy_start_date'     => $certificate->getRawOriginal('policy_start_date'),
+                'policy_end_date'       => $certificate->getRawOriginal('policy_end_date'),
             ],
-            'certificateTypes' => CertificateType::orderBy('name')->get(['id', 'name', 'slug']),
-            'customers'        => Customer::select('id', 'name')->orderBy('name')->get(),
-            'initialSections'  => $initialSections,
+            'insuranceCategories' => InsuranceCategory::orderBy('name')->get(['id', 'name', 'slug']),
+            'customers'           => Customer::select('id', 'name')->orderBy('name')->get(),
+            'initialSections'     => $initialSections,
         ]);
     }
 
@@ -386,13 +382,13 @@ class PolicyCertificateController extends Controller
         Gate::authorize('policy_certificates.update');
 
         $validator = Validator::make($request->all(), [
-            'customer_id'         => 'required|exists:customers,id',
-            'certificate_type_id' => 'required|exists:certificate_types,id',
-            'policy_start_date'   => 'required|date',
-            'policy_end_date'     => 'required|date|after_or_equal:policy_start_date',
-            'sections'            => 'nullable|array',
-            'sections.*.title'    => 'required|string|max:255',
-            'sections.*.type'     => 'required|string|in:fields,table,text,note,terms,exclusions,signature',
+            'customer_id'           => 'required|exists:customers,id',
+            'insurance_category_id' => 'required|exists:insurance_categories,id',
+            'policy_start_date'     => 'required|date',
+            'policy_end_date'       => 'required|date|after_or_equal:policy_start_date',
+            'sections'              => 'nullable|array',
+            'sections.*.title'      => 'required|string|max:255',
+            'sections.*.type'       => 'required|string|in:fields,table,text,note,terms,exclusions,signature',
         ]);
 
         if ($validator->fails()) {
@@ -405,13 +401,12 @@ class PolicyCertificateController extends Controller
             $certificate = PolicyCertificate::findOrFail($id);
 
             $certificate->update([
-                'customer_id'         => $request->customer_id,
-                'certificate_type_id' => $request->certificate_type_id,
-                'policy_start_date'   => $request->policy_start_date,
-                'policy_end_date'     => $request->policy_end_date,
+                'customer_id'           => $request->customer_id,
+                'insurance_category_id' => $request->insurance_category_id,
+                'policy_start_date'     => $request->policy_start_date,
+                'policy_end_date'       => $request->policy_end_date,
             ]);
 
-            // Remove old child records then recreate
             $oldSectionIds = PolicyCertificateSection::where('policy_certificate_id', $id)->pluck('id');
             PolicyCertificateSectionRow::whereIn('policy_certificate_section_id', $oldSectionIds)->forceDelete();
             PolicyCertificateSection::where('policy_certificate_id', $id)->forceDelete();
@@ -570,7 +565,7 @@ class PolicyCertificateController extends Controller
     {
         $certificate = PolicyCertificate::withoutGlobalScopes()->with([
             'customer',
-            'certificateType',
+            'insuranceCategory',
             'sections',
             'sections.rows',
             'fields',
@@ -613,13 +608,13 @@ class PolicyCertificateController extends Controller
 
         return Inertia::render('Backend/User/PolicyCertificate/PublicView', [
             'certificate' => [
-                'id'                 => $certificate->id,
-                'customer_name'      => $certificate->customer?->name ?? '',
-                'certificate_number' => $certificate->certificate_number,
-                'policy_number'      => $certificate->policy_number,
-                'certificate_type'   => $certificate->certificateType?->name ?? '',
-                'policy_start_date'  => $certificate->getRawOriginal('policy_start_date'),
-                'policy_end_date'    => $certificate->getRawOriginal('policy_end_date'),
+                'id'                   => $certificate->id,
+                'customer_name'        => $certificate->customer?->name ?? '',
+                'certificate_number'   => $certificate->certificate_number,
+                'policy_number'        => $certificate->policy_number,
+                'insurance_category'   => $certificate->insuranceCategory?->name ?? '',
+                'policy_start_date'    => $certificate->getRawOriginal('policy_start_date'),
+                'policy_end_date'      => $certificate->getRawOriginal('policy_end_date'),
             ],
             'sections' => $sections,
             'business' => [

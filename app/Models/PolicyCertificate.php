@@ -13,7 +13,7 @@ class PolicyCertificate extends Model
 
     protected $fillable = [
         'customer_id',
-        'certificate_type_id',
+        'insurance_category_id',
         'certificate_number',
         'policy_number',
         'policy_start_date',
@@ -26,9 +26,9 @@ class PolicyCertificate extends Model
         return $this->belongsTo(Customer::class);
     }
 
-    public function certificateType()
+    public function insuranceCategory()
     {
-        return $this->belongsTo(CertificateType::class);
+        return $this->belongsTo(InsuranceCategory::class);
     }
 
     public function sections()

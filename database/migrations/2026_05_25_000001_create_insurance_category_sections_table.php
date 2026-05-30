@@ -8,9 +8,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('certificate_type_sections', function (Blueprint $table) {
+        Schema::create('insurance_category_sections', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('certificate_type_id')->constrained('certificate_types')->cascadeOnDelete();
+            $table->foreignId('insurance_category_id')->constrained('insurance_categories')->cascadeOnDelete();
             $table->string('title');
             $table->string('type')->default('fields');
             $table->unsignedInteger('sort_order')->default(0);
@@ -24,6 +24,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('certificate_type_sections');
+        Schema::dropIfExists('insurance_category_sections');
     }
 };

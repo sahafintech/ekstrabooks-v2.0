@@ -43,10 +43,10 @@ const buildCertNumber = (prefix, slug, increment) => {
 const stripMeta = (sections) =>
     sections.map(({ _locked, ...s }) => s);
 
-export default function Create({ cert_prefix = "", cert_increment = 1, policy_prefix = "", policy_increment = 1, certificateTypes = [], customers = [] }) {
+export default function Create({ cert_prefix = "", cert_increment = 1, policy_prefix = "", policy_increment = 1, insuranceCategories = [], customers = [] }) {
     const [basic, setBasic] = useState({
         customer_id: "",
-        certificate_type: "",
+        insurance_category: "",
         policy_start_date: null,
         policy_end_date: null,
     });
@@ -60,8 +60,8 @@ export default function Create({ cert_prefix = "", cert_increment = 1, policy_pr
     // ── Type selection: auto-populate from template ──────────────────
 
     const handleTypeChange = (typeId) => {
-        setBasic((prev) => ({ ...prev, certificate_type: typeId }));
-        const type = certificateTypes.find((t) => String(t.id) === String(typeId));
+        setBasic((prev) => ({ ...prev, insurance_category: typeId }));
+        const type = insuranceCategories.find((t) => String(t.id) === String(typeId));
         if (!type || !type.sections || type.sections.length === 0) {
             setSections([]);
             return;
@@ -187,8 +187,8 @@ export default function Create({ cert_prefix = "", cert_increment = 1, policy_pr
         router.post(
             route("policy_certificates.store"),
             {
-                customer_id:       basic.customer_id,
-                certificate_type:  basic.certificate_type,
+                customer_id:        basic.customer_id,
+                insurance_category: basic.insurance_category,
                 policy_start_date: formatDate(basic.policy_start_date),
                 policy_end_date:   formatDate(basic.policy_end_date),
                 sections:          stripMeta(sections),
@@ -242,20 +242,20 @@ export default function Create({ cert_prefix = "", cert_increment = 1, policy_pr
                         </div>
 
                         <div className="grid grid-cols-12 mt-2">
-                            <Label htmlFor="certificate_type" className="md:col-span-2 col-span-12">
-                                Certificate Type *
+                            <Label htmlFor="insurance_category" className="md:col-span-2 col-span-12">
+                                Insurance Category *
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
                                 <div className="md:w-1/2 w-full">
                                     <SearchableCombobox
-                                        options={certificateTypes}
-                                        value={basic.certificate_type}
+                                        options={insuranceCategories}
+                                        value={basic.insurance_category}
                                         onChange={handleTypeChange}
-                                        placeholder="Select certificate type"
-                                        emptyMessage="No certificate types found. Add them in Underwriting Configuration."
+                                        placeholder="Select insurance category"
+                                        emptyMessage="No insurance categories found. Add them in Underwriting Configuration."
                                     />
                                 </div>
-                                <InputError message={errors.certificate_type} className="text-sm" />
+                                <InputError message={errors.insurance_category} className="text-sm" />
                             </div>
                         </div>
 
@@ -265,13 +265,13 @@ export default function Create({ cert_prefix = "", cert_increment = 1, policy_pr
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2 flex items-center gap-2">
                                 <span className="inline-flex items-center px-3 py-1.5 rounded-md border bg-gray-100 text-sm font-mono font-semibold text-gray-700 select-all">
-                                    {basic.certificate_type
+                                    {basic.insurance_category
                                         ? buildCertNumber(
                                             cert_prefix,
-                                            certificateTypes.find((t) => String(t.id) === String(basic.certificate_type))?.slug ?? "",
+                                            insuranceCategories.find((t) => String(t.id) === String(basic.insurance_category))?.slug ?? "",
                                             cert_increment
                                         )
-                                        : <span className="text-gray-400 font-normal">Select a certificate type first</span>
+                                        : <span className="text-gray-400 font-normal">Select an insurance category first</span>
                                     }
                                 </span>
                                 <span className="text-xs text-gray-400">Auto-generated</span>
@@ -284,13 +284,13 @@ export default function Create({ cert_prefix = "", cert_increment = 1, policy_pr
                             </Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2 flex items-center gap-2">
                                 <span className="inline-flex items-center px-3 py-1.5 rounded-md border bg-gray-100 text-sm font-mono font-semibold text-gray-700 select-all">
-                                    {basic.certificate_type
+                                    {basic.insurance_category
                                         ? buildCertNumber(
                                             policy_prefix,
-                                            certificateTypes.find((t) => String(t.id) === String(basic.certificate_type))?.slug ?? "",
+                                            insuranceCategories.find((t) => String(t.id) === String(basic.insurance_category))?.slug ?? "",
                                             policy_increment
                                         )
-                                        : <span className="text-gray-400 font-normal">Select a certificate type first</span>
+                                        : <span className="text-gray-400 font-normal">Select an insurance category first</span>
                                     }
                                 </span>
                                 <span className="text-xs text-gray-400">Auto-generated</span>
@@ -545,9 +545,9 @@ export default function Create({ cert_prefix = "", cert_increment = 1, policy_pr
 
                             {sections.length === 0 && (
                                 <p className="text-sm text-gray-400 text-center py-6 border border-dashed rounded-lg">
-                                    {basic.certificate_type
-                                        ? "No template sections defined for this type. Click \"Add Section\" to add sections manually."
-                                        : "Select a certificate type above to auto-load its sections, or click \"Add Section\" to add manually."
+                                    {basic.insurance_category
+                                        ? "No template sections defined for this category. Click \"Add Section\" to add sections manually."
+                                        : "Select an insurance category above to auto-load its sections, or click \"Add Section\" to add manually."
                                     }
                                 </p>
                             )}

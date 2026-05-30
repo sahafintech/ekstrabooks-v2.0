@@ -323,17 +323,17 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		// Underwriting Configuration
 		Route::get('underwriting_configuration', [UnderwritingConfigurationController::class, 'index'])->name('underwriting_configuration.index');
 		Route::post('underwriting_configuration', [UnderwritingConfigurationController::class, 'store'])->name('underwriting_configuration.store');
-		Route::get('underwriting_configuration/certificate_types/trash', [UnderwritingConfigurationController::class, 'certTypesTrash'])->name('underwriting_configuration.certificate_types.trash');
-		Route::post('underwriting_configuration/certificate_types/bulk_destroy', [UnderwritingConfigurationController::class, 'bulkDestroyCertificateType'])->name('underwriting_configuration.certificate_types.bulk_destroy');
-		Route::post('underwriting_configuration/certificate_types/bulk_restore', [UnderwritingConfigurationController::class, 'bulkRestoreCertificateType'])->name('underwriting_configuration.certificate_types.bulk_restore');
-		Route::post('underwriting_configuration/certificate_types/bulk_permanent_destroy', [UnderwritingConfigurationController::class, 'bulkPermanentDestroyCertificateType'])->name('underwriting_configuration.certificate_types.bulk_permanent_destroy');
-		Route::post('underwriting_configuration/certificate_types', [UnderwritingConfigurationController::class, 'storeCertificateType'])->name('underwriting_configuration.certificate_types.store');
-		Route::put('underwriting_configuration/certificate_types/{id}', [UnderwritingConfigurationController::class, 'updateCertificateType'])->name('underwriting_configuration.certificate_types.update');
-		Route::delete('underwriting_configuration/certificate_types/{id}', [UnderwritingConfigurationController::class, 'destroyCertificateType'])->name('underwriting_configuration.certificate_types.destroy');
-		Route::post('underwriting_configuration/certificate_types/{id}/restore', [UnderwritingConfigurationController::class, 'restoreCertificateType'])->name('underwriting_configuration.certificate_types.restore');
-		Route::delete('underwriting_configuration/certificate_types/{id}/permanent_destroy', [UnderwritingConfigurationController::class, 'permanentDestroyCertificateType'])->name('underwriting_configuration.certificate_types.permanent_destroy');
-		Route::get('underwriting_configuration/certificate_types/{id}/layout', [UnderwritingConfigurationController::class, 'typeLayout'])->name('underwriting_configuration.certificate_types.layout');
-		Route::post('underwriting_configuration/certificate_types/{id}/layout', [UnderwritingConfigurationController::class, 'saveTypeLayout'])->name('underwriting_configuration.certificate_types.save_layout');
+		Route::get('underwriting_configuration/insurance_categories/trash', [UnderwritingConfigurationController::class, 'insuranceCategoriesTrash'])->name('underwriting_configuration.insurance_categories.trash');
+		Route::post('underwriting_configuration/insurance_categories/bulk_destroy', [UnderwritingConfigurationController::class, 'bulkDestroyInsuranceCategory'])->name('underwriting_configuration.insurance_categories.bulk_destroy');
+		Route::post('underwriting_configuration/insurance_categories/bulk_restore', [UnderwritingConfigurationController::class, 'bulkRestoreInsuranceCategory'])->name('underwriting_configuration.insurance_categories.bulk_restore');
+		Route::post('underwriting_configuration/insurance_categories/bulk_permanent_destroy', [UnderwritingConfigurationController::class, 'bulkPermanentDestroyInsuranceCategory'])->name('underwriting_configuration.insurance_categories.bulk_permanent_destroy');
+		Route::post('underwriting_configuration/insurance_categories', [UnderwritingConfigurationController::class, 'storeInsuranceCategory'])->name('underwriting_configuration.insurance_categories.store');
+		Route::put('underwriting_configuration/insurance_categories/{id}', [UnderwritingConfigurationController::class, 'updateInsuranceCategory'])->name('underwriting_configuration.insurance_categories.update');
+		Route::delete('underwriting_configuration/insurance_categories/{id}', [UnderwritingConfigurationController::class, 'destroyInsuranceCategory'])->name('underwriting_configuration.insurance_categories.destroy');
+		Route::post('underwriting_configuration/insurance_categories/{id}/restore', [UnderwritingConfigurationController::class, 'restoreInsuranceCategory'])->name('underwriting_configuration.insurance_categories.restore');
+		Route::delete('underwriting_configuration/insurance_categories/{id}/permanent_destroy', [UnderwritingConfigurationController::class, 'permanentDestroyInsuranceCategory'])->name('underwriting_configuration.insurance_categories.permanent_destroy');
+		Route::get('underwriting_configuration/insurance_categories/{id}/layout', [UnderwritingConfigurationController::class, 'insuranceCategoryLayout'])->name('underwriting_configuration.insurance_categories.layout');
+		Route::post('underwriting_configuration/insurance_categories/{id}/layout', [UnderwritingConfigurationController::class, 'saveInsuranceCategoryLayout'])->name('underwriting_configuration.insurance_categories.save_layout');
 
 		// Policies
 		Route::get('policy_certificates/trash', [PolicyCertificateController::class, 'trash'])->name('policies.trash');

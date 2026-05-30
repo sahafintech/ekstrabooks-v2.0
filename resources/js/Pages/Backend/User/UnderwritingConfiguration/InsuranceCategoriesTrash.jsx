@@ -20,11 +20,11 @@ import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
 
-const DeleteTypeModal = ({ show, onClose, onConfirm, processing }) => (
+const DeleteModal = ({ show, onClose, onConfirm, processing }) => (
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm} className="p-6">
             <h2 className="text-lg font-medium">
-                Are you sure you want to permanently delete this certificate type?
+                Are you sure you want to permanently delete this insurance category?
             </h2>
             <p className="mt-2 text-sm text-gray-500">This action cannot be undone.</p>
             <div className="mt-6 flex justify-end gap-2">
@@ -35,11 +35,11 @@ const DeleteTypeModal = ({ show, onClose, onConfirm, processing }) => (
     </Modal>
 );
 
-const DeleteAllTypesModal = ({ show, onClose, onConfirm, processing, count }) => (
+const DeleteAllModal = ({ show, onClose, onConfirm, processing, count }) => (
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm} className="p-6">
             <h2 className="text-lg font-medium">
-                Permanently delete {count} selected certificate type{count !== 1 ? "s" : ""}?
+                Permanently delete {count} selected insurance categor{count !== 1 ? "ies" : "y"}?
             </h2>
             <p className="mt-2 text-sm text-gray-500">This action cannot be undone.</p>
             <div className="mt-6 flex justify-end gap-2">
@@ -50,10 +50,10 @@ const DeleteAllTypesModal = ({ show, onClose, onConfirm, processing, count }) =>
     </Modal>
 );
 
-const RestoreTypeModal = ({ show, onClose, onConfirm, processing }) => (
+const RestoreModal = ({ show, onClose, onConfirm, processing }) => (
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm} className="p-6">
-            <h2 className="text-lg font-medium">Restore this certificate type?</h2>
+            <h2 className="text-lg font-medium">Restore this insurance category?</h2>
             <div className="mt-6 flex justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
                 <Button type="submit" disabled={processing}>Restore</Button>
@@ -62,11 +62,11 @@ const RestoreTypeModal = ({ show, onClose, onConfirm, processing }) => (
     </Modal>
 );
 
-const RestoreAllTypesModal = ({ show, onClose, onConfirm, processing, count }) => (
+const RestoreAllModal = ({ show, onClose, onConfirm, processing, count }) => (
     <Modal show={show} onClose={onClose}>
         <form onSubmit={onConfirm} className="p-6">
             <h2 className="text-lg font-medium">
-                Restore {count} selected certificate type{count !== 1 ? "s" : ""}?
+                Restore {count} selected insurance categor{count !== 1 ? "ies" : "y"}?
             </h2>
             <div className="mt-6 flex justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
@@ -76,7 +76,7 @@ const RestoreAllTypesModal = ({ show, onClose, onConfirm, processing, count }) =
     </Modal>
 );
 
-export default function CertTypesTrash({ certificateTypes = [], meta = {}, filters = {} }) {
+export default function InsuranceCategoriesTrash({ insuranceCategories = [], meta = {}, filters = {} }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
 
@@ -91,11 +91,11 @@ export default function CertTypesTrash({ certificateTypes = [], meta = {}, filte
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
-    const [typeToDelete, setTypeToDelete] = useState(null);
+    const [itemToDelete, setItemToDelete] = useState(null);
 
     const [showRestoreModal, setShowRestoreModal] = useState(false);
     const [showRestoreAllModal, setShowRestoreAllModal] = useState(false);
-    const [typeToRestore, setTypeToRestore] = useState(null);
+    const [itemToRestore, setItemToRestore] = useState(null);
 
     useEffect(() => {
         if (flash?.success) toast({ title: "Success", description: flash.success });
@@ -104,13 +104,13 @@ export default function CertTypesTrash({ certificateTypes = [], meta = {}, filte
 
     const nav = (extra = {}) =>
         router.get(
-            route("underwriting_configuration.certificate_types.trash"),
+            route("underwriting_configuration.insurance_categories.trash"),
             { search, per_page: perPage, sorting, ...extra },
             { preserveState: true }
         );
 
     const toggleAll = () => {
-        if (isAllSelected) { setSelected([]); } else { setSelected(certificateTypes.map((t) => t.id)); }
+        if (isAllSelected) { setSelected([]); } else { setSelected(insuranceCategories.map((t) => t.id)); }
         setIsAllSelected(!isAllSelected);
     };
 
@@ -121,7 +121,7 @@ export default function CertTypesTrash({ certificateTypes = [], meta = {}, filte
         } else {
             const next = [...selected, id];
             setSelected(next);
-            if (next.length === certificateTypes.length) setIsAllSelected(true);
+            if (next.length === insuranceCategories.length) setIsAllSelected(true);
         }
     };
 
@@ -160,7 +160,7 @@ export default function CertTypesTrash({ certificateTypes = [], meta = {}, filte
     const handleBulkAction = () => {
         if (!bulkAction) return;
         if (selected.length === 0) {
-            toast({ variant: "destructive", title: "Error", description: "Please select at least one certificate type." });
+            toast({ variant: "destructive", title: "Error", description: "Please select at least one insurance category." });
             return;
         }
         if (bulkAction === "delete") setShowDeleteAllModal(true);
@@ -170,8 +170,8 @@ export default function CertTypesTrash({ certificateTypes = [], meta = {}, filte
     const handleDelete = (e) => {
         e.preventDefault();
         setProcessing(true);
-        router.delete(route("underwriting_configuration.certificate_types.permanent_destroy", typeToDelete), {
-            onSuccess: () => { setShowDeleteModal(false); setTypeToDelete(null); setProcessing(false); },
+        router.delete(route("underwriting_configuration.insurance_categories.permanent_destroy", itemToDelete), {
+            onSuccess: () => { setShowDeleteModal(false); setItemToDelete(null); setProcessing(false); },
             onError: () => setProcessing(false),
         });
     };
@@ -179,7 +179,7 @@ export default function CertTypesTrash({ certificateTypes = [], meta = {}, filte
     const handleDeleteAll = (e) => {
         e.preventDefault();
         setProcessing(true);
-        router.post(route("underwriting_configuration.certificate_types.bulk_permanent_destroy"), { ids: selected }, {
+        router.post(route("underwriting_configuration.insurance_categories.bulk_permanent_destroy"), { ids: selected }, {
             onSuccess: () => { setShowDeleteAllModal(false); setSelected([]); setIsAllSelected(false); setProcessing(false); },
             onError: () => setProcessing(false),
         });
@@ -188,8 +188,8 @@ export default function CertTypesTrash({ certificateTypes = [], meta = {}, filte
     const handleRestore = (e) => {
         e.preventDefault();
         setProcessing(true);
-        router.post(route("underwriting_configuration.certificate_types.restore", typeToRestore), {}, {
-            onSuccess: () => { setShowRestoreModal(false); setTypeToRestore(null); setProcessing(false); },
+        router.post(route("underwriting_configuration.insurance_categories.restore", itemToRestore), {}, {
+            onSuccess: () => { setShowRestoreModal(false); setItemToRestore(null); setProcessing(false); },
             onError: () => setProcessing(false),
         });
     };
@@ -197,7 +197,7 @@ export default function CertTypesTrash({ certificateTypes = [], meta = {}, filte
     const handleRestoreAll = (e) => {
         e.preventDefault();
         setProcessing(true);
-        router.post(route("underwriting_configuration.certificate_types.bulk_restore"), { ids: selected }, {
+        router.post(route("underwriting_configuration.insurance_categories.bulk_restore"), { ids: selected }, {
             onSuccess: () => { setShowRestoreAllModal(false); setSelected([]); setIsAllSelected(false); setProcessing(false); },
             onError: () => setProcessing(false),
         });
@@ -223,16 +223,16 @@ export default function CertTypesTrash({ certificateTypes = [], meta = {}, filte
                 <div className="main-content">
                     <PageHeader
                         page="Underwriting Configuration"
-                        subpage="Certificate Types Trash"
+                        subpage="Insurance Categories Trash"
                         url="underwriting_configuration.index"
                     />
                     <div className="p-4">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                             <div className="text-red-500 text-sm">
-                                Total trashed certificate types: {meta.total ?? 0}
+                                Total trashed insurance categories: {meta.total ?? 0}
                             </div>
                             <Input
-                                placeholder="Search certificate types..."
+                                placeholder="Search insurance categories..."
                                 value={search}
                                 onChange={handleSearch}
                                 className="w-full md:w-80"
@@ -289,20 +289,20 @@ export default function CertTypesTrash({ certificateTypes = [], meta = {}, filte
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {certificateTypes.length > 0 ? (
-                                        certificateTypes.map((type) => (
-                                            <TableRow key={type.id}>
+                                    {insuranceCategories.length > 0 ? (
+                                        insuranceCategories.map((item) => (
+                                            <TableRow key={item.id}>
                                                 <TableCell>
                                                     <Checkbox
-                                                        checked={selected.includes(type.id)}
-                                                        onCheckedChange={() => toggleOne(type.id)}
+                                                        checked={selected.includes(item.id)}
+                                                        onCheckedChange={() => toggleOne(item.id)}
                                                     />
                                                 </TableCell>
-                                                <TableCell>{type.id}</TableCell>
-                                                <TableCell>{type.name}</TableCell>
+                                                <TableCell>{item.id}</TableCell>
+                                                <TableCell>{item.name}</TableCell>
                                                 <TableCell>
                                                     <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">
-                                                        {type.slug}
+                                                        {item.slug}
                                                     </span>
                                                 </TableCell>
                                                 <TableCell className="text-right">
@@ -311,12 +311,12 @@ export default function CertTypesTrash({ certificateTypes = [], meta = {}, filte
                                                             {
                                                                 label: "Restore",
                                                                 icon: <RotateCcw className="h-4 w-4" />,
-                                                                onClick: () => { setTypeToRestore(type.id); setShowRestoreModal(true); },
+                                                                onClick: () => { setItemToRestore(item.id); setShowRestoreModal(true); },
                                                             },
                                                             {
                                                                 label: "Permanently Delete",
                                                                 icon: <Trash className="h-4 w-4" />,
-                                                                onClick: () => { setTypeToDelete(type.id); setShowDeleteModal(true); },
+                                                                onClick: () => { setItemToDelete(item.id); setShowDeleteModal(true); },
                                                                 destructive: true,
                                                             },
                                                         ]}
@@ -327,7 +327,7 @@ export default function CertTypesTrash({ certificateTypes = [], meta = {}, filte
                                     ) : (
                                         <TableRow>
                                             <TableCell colSpan={5} className="h-24 text-center">
-                                                No trashed certificate types found.
+                                                No trashed insurance categories found.
                                             </TableCell>
                                         </TableRow>
                                     )}
@@ -353,10 +353,10 @@ export default function CertTypesTrash({ certificateTypes = [], meta = {}, filte
                 </div>
             </SidebarInset>
 
-            <DeleteTypeModal show={showDeleteModal} onClose={() => setShowDeleteModal(false)} onConfirm={handleDelete} processing={processing} />
-            <DeleteAllTypesModal show={showDeleteAllModal} onClose={() => setShowDeleteAllModal(false)} onConfirm={handleDeleteAll} processing={processing} count={selected.length} />
-            <RestoreTypeModal show={showRestoreModal} onClose={() => setShowRestoreModal(false)} onConfirm={handleRestore} processing={processing} />
-            <RestoreAllTypesModal show={showRestoreAllModal} onClose={() => setShowRestoreAllModal(false)} onConfirm={handleRestoreAll} processing={processing} count={selected.length} />
+            <DeleteModal show={showDeleteModal} onClose={() => setShowDeleteModal(false)} onConfirm={handleDelete} processing={processing} />
+            <DeleteAllModal show={showDeleteAllModal} onClose={() => setShowDeleteAllModal(false)} onConfirm={handleDeleteAll} processing={processing} count={selected.length} />
+            <RestoreModal show={showRestoreModal} onClose={() => setShowRestoreModal(false)} onConfirm={handleRestore} processing={processing} />
+            <RestoreAllModal show={showRestoreAllModal} onClose={() => setShowRestoreAllModal(false)} onConfirm={handleRestoreAll} processing={processing} count={selected.length} />
         </AuthenticatedLayout>
     );
 }
