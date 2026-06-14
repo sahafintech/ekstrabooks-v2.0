@@ -334,6 +334,13 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::delete('underwriting_configuration/insurance_categories/{id}/permanent_destroy', [UnderwritingConfigurationController::class, 'permanentDestroyInsuranceCategory'])->name('underwriting_configuration.insurance_categories.permanent_destroy');
 		Route::get('underwriting_configuration/insurance_categories/{id}/layout', [UnderwritingConfigurationController::class, 'insuranceCategoryLayout'])->name('underwriting_configuration.insurance_categories.layout');
 		Route::post('underwriting_configuration/insurance_categories/{id}/layout', [UnderwritingConfigurationController::class, 'saveInsuranceCategoryLayout'])->name('underwriting_configuration.insurance_categories.save_layout');
+		Route::post('underwriting_configuration/insurance_categories/{id}/quotation_sections', [UnderwritingConfigurationController::class, 'saveQuotationTemplateSections'])->name('underwriting_configuration.insurance_categories.save_quotation_sections');
+
+		// Rating Rules
+		Route::post('underwriting_configuration/rating_rules/bulk_destroy', [UnderwritingConfigurationController::class, 'bulkDestroyRatingRule'])->name('underwriting_configuration.rating_rules.bulk_destroy');
+		Route::post('underwriting_configuration/rating_rules', [UnderwritingConfigurationController::class, 'storeRatingRule'])->name('underwriting_configuration.rating_rules.store');
+		Route::put('underwriting_configuration/rating_rules/{id}', [UnderwritingConfigurationController::class, 'updateRatingRule'])->name('underwriting_configuration.rating_rules.update');
+		Route::delete('underwriting_configuration/rating_rules/{id}', [UnderwritingConfigurationController::class, 'destroyRatingRule'])->name('underwriting_configuration.rating_rules.destroy');
 
 		// Policies
 		Route::get('policy_certificates/trash', [PolicyCertificateController::class, 'trash'])->name('policies.trash');

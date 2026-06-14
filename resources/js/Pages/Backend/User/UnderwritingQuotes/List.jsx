@@ -90,12 +90,15 @@ const StatusBadge = ({ quotation }) => {
 
 const categoryLabelMap = {
     medical: { label: "Medical", className: "gap-1 text-blue-600 border-blue-600" },
+    gpa: { label: "GPA", className: "gap-1 text-green-600 border-green-600" },
     other: { label: "General", className: "gap-1 text-orange-600 border-orange-600" },
 };
 
-const CategoryBadge = ({ category }) => {
-    const info = categoryLabelMap[category] ?? { label: category ?? "-", className: "gap-1 text-gray-600 border-gray-400" };
-    return <Badge variant="outline" className={info.className}>{info.label}</Badge>;
+const CategoryBadge = ({ quotation }) => {
+    const category = quotation.insurance_category;
+    const type = category?.type ?? quotation.invoice_category;
+    const info = categoryLabelMap[type] ?? { label: type ?? "-", className: "gap-1 text-gray-600 border-gray-400" };
+    return <Badge variant="outline" className={info.className}>{category?.name ?? info.label}</Badge>;
 };
 
 const SummaryCards = ({ summary = {} }) => {
@@ -122,13 +125,7 @@ const SummaryCards = ({ summary = {} }) => {
     );
 };
 
-const categoryFilterOptions = [
-    { id: "", name: "All Categories" },
-    { id: "medical", name: "Medical" },
-    { id: "other", name: "General" },
-];
-
-export default function List({ quotations = [], meta = {}, filters = {}, customers = [], summary = {}, trashed_quotations = 0 }) {
+export default function List({ quotations = [], meta = {}, filters = {}, customers = [], insuranceCategories = [], summary = {}, trashed_quotations = 0 }) {
     const { flash = {} } = usePage().props;
     const { toast } = useToast();
     const [selectedQuotations, setSelectedQuotations] = useState([]);
@@ -139,7 +136,7 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
     const [bulkAction, setBulkAction] = useState("");
     const [sorting, setSorting] = useState(filters.sorting || { column: "id", direction: "desc" });
     const [selectedCustomer, setSelectedCustomer] = useState(filters.customer_id || "");
-    const [selectedCategory, setSelectedCategory] = useState(filters.invoice_category || "");
+    const [selectedCategory, setSelectedCategory] = useState(filters.insurance_category_id || "");
     const [dateRange, setDateRange] = useState(filters.date_range || null);
     const [selectedStatus, setSelectedStatus] = useState(filters.status || "");
 
@@ -153,6 +150,13 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
     const [quoteToConvert, setQuoteToConvert] = useState(null);
     const [quoteToReject, setQuoteToReject] = useState(null);
     const [processing, setProcessing] = useState(false);
+    const categoryFilterOptions = [
+        { id: "", name: "All Categories" },
+        ...insuranceCategories.map((category) => ({
+            id: String(category.id),
+            name: category.name,
+        })),
+    ];
 
     useEffect(() => {
         if (flash?.success) toast({ title: "Success", description: flash.success });
@@ -185,7 +189,7 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
         per_page: perPage,
         sorting,
         customer_id: selectedCustomer,
-        invoice_category: selectedCategory,
+        insurance_category_id: selectedCategory,
         date_range: dateRange,
         status: selectedStatus,
         ...overrides,
@@ -194,7 +198,7 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
     const handleSort = (column) => {
         const direction = sorting.column === column && sorting.direction === "asc" ? "desc" : "asc";
         setSorting({ column, direction });
-        router.get(route("underwriting_quotes.index"), { ...filters, sorting: { column, direction } }, { preserveState: true });
+        router.get(route("underwriting_quotes.index"), buildParams({ sorting: { column, direction } }), { preserveState: true });
     };
 
     const renderSortIcon = (column) => {
@@ -230,7 +234,7 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
 
     const handleCategoryChange = (value) => {
         setSelectedCategory(value);
-        router.get(route("underwriting_quotes.index"), buildParams({ invoice_category: value }), { preserveState: true });
+        router.get(route("underwriting_quotes.index"), buildParams({ insurance_category_id: value }), { preserveState: true });
     };
 
     const handleDateRangeChange = (dates) => {
@@ -423,7 +427,9 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
                                         <TableHead className="cursor-pointer" onClick={() => handleSort("quotation_number")}>
                                             Quote Number {renderSortIcon("quotation_number")}
                                         </TableHead>
-                                        <TableHead>Category</TableHead>
+                                        <TableHead className="cursor-pointer" onClick={() => handleSort("insuranceCategory.name")}>
+                                            Category {renderSortIcon("insuranceCategory.name")}
+                                        </TableHead>
                                         <TableHead className="cursor-pointer" onClick={() => handleSort("customer.name")}>
                                             Customer {renderSortIcon("customer.name")}
                                         </TableHead>
@@ -451,7 +457,7 @@ export default function List({ quotations = [], meta = {}, filters = {}, custome
                                                         <Checkbox checked={selectedQuotations.includes(quotation.id)} onCheckedChange={() => toggleSelectQuotation(quotation.id)} />
                                                     </TableCell>
                                                     <TableCell>{quotation.quotation_number}</TableCell>
-                                                    <TableCell><CategoryBadge category={quotation.invoice_category} /></TableCell>
+                                                    <TableCell><CategoryBadge quotation={quotation} /></TableCell>
                                                     <TableCell>{quotation.customer ? quotation.customer.name : "-"}</TableCell>
                                                     <TableCell>{quotation.quotation_date}</TableCell>
                                                     <TableCell>{quotation.expired_date}</TableCell>

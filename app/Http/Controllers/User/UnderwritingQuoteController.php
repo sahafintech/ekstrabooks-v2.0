@@ -10,6 +10,7 @@ use App\Models\Currency;
 use App\Models\Customer;
 use App\Models\DefferedEarning;
 use App\Models\EmailTemplate;
+use App\Models\InsuranceCategory;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\InvoiceItemTax;
@@ -18,6 +19,8 @@ use App\Models\Product;
 use App\Models\Quotation;
 use App\Models\QuotationItem;
 use App\Models\QuotationItemTax;
+use App\Models\QuotationSection;
+use App\Models\RatingRule;
 use App\Models\Tax;
 use App\Models\Transaction;
 use App\Notifications\SendQuotation;
@@ -61,7 +64,7 @@ class UnderwritingQuoteController extends Controller
     {
         Gate::authorize('quotations.view');
 
-        $query      = $this->buildQuery($request, ['customer']);
+        $query      = $this->buildQuery($request, ['customer', 'insuranceCategory']);
         $allQuotes  = $this->buildQuery($request)->get();
 
         $summary = [
@@ -89,6 +92,7 @@ class UnderwritingQuoteController extends Controller
             ],
             'filters'            => array_merge($request->all(), ['sorting' => $sorting]),
             'customers'          => Customer::all(),
+            'insuranceCategories' => InsuranceCategory::select('id', 'name', 'type')->orderBy('name')->get(),
             'summary'            => $summary,
             'trashed_quotations' => Quotation::onlyTrashed()->where('is_deffered', 1)->count(),
         ]);
@@ -125,13 +129,14 @@ class UnderwritingQuoteController extends Controller
         Gate::authorize('quotations.create');
 
         return Inertia::render('Backend/User/UnderwritingQuotes/Create', [
-            'customers'       => Customer::all(),
-            'currencies'      => Currency::all(),
-            'products'        => Product::all(),
-            'taxes'           => Tax::all(),
-            'familySizes'     => InsuranceFamilySize::all(),
-            'quotation_title' => get_business_option('quotation_title', 'Quotation'),
-            'base_currency'   => get_business_option('currency'),
+            'customers'           => Customer::all(),
+            'currencies'          => Currency::all(),
+            'products'            => Product::all(),
+            'taxes'               => Tax::all(),
+            'quotation_title'     => get_business_option('quotation_title', 'Quotation'),
+            'base_currency'       => get_business_option('currency'),
+            'insuranceCategories' => $this->getInsuranceCategoriesWithSections(),
+            'ratingRules'         => $this->getActiveRatingRules(),
         ]);
     }
 
@@ -140,15 +145,30 @@ class UnderwritingQuoteController extends Controller
         Gate::authorize('quotations.create');
 
         $validator = Validator::make($request->all(), [
-            'customer_id'        => 'required',
-            'title'              => 'required',
-            'quotation_date'     => 'required',
-            'expired_date'       => 'required',
-            'product_id'         => 'required',
-            'currency'           => 'required',
-            'invoice_category'   => 'required|in:medical,gpa,other',
-            'exclusions_remarks' => 'nullable|string',
-            'coverage_summary'   => 'nullable|string',
+            'customer_id'           => 'required',
+            'title'                 => 'required',
+            'quotation_date'        => 'required',
+            'expired_date'          => 'required',
+            'product_id'            => 'required',
+            'currency'              => 'required|exists:currency,name',
+            'insurance_category_id' => 'required|exists:insurance_categories,id',
+            'sections'              => 'nullable|array',
+            'sections.*.title'      => 'required|string|max:255',
+            'sections.*.type'       => 'required|string|in:fields,table,benefits,remarks,rich_text,calculation,premium_summary,text,note,terms,exclusions,signature',
+            'rating_rule_id'         => 'nullable|array',
+            'rating_rule_id.*'       => 'nullable|exists:rating_rules,id',
+            'calculation_type'       => 'nullable|array',
+            'calculation_type.*'     => 'nullable|in:percentage_of_amount,fixed_per_quantity,fixed_amount,manual_premium,tiered_rate,contribution_table',
+            'rate_type'              => 'nullable|array',
+            'rate_type.*'            => 'nullable|in:percentage,fixed,manual,range',
+            'rate_value'             => 'nullable|array',
+            'rate_value.*'           => 'nullable|numeric|min:0',
+            'basis_amount'           => 'nullable|array',
+            'basis_amount.*'         => 'nullable|numeric|min:0',
+            'basis_quantity'         => 'nullable|array',
+            'basis_quantity.*'       => 'nullable|numeric|min:0',
+            'minimum_premium'        => 'nullable|array',
+            'minimum_premium.*'      => 'nullable|numeric|min:0',
         ], [
             'product_id.required' => _lang('You must add at least one item'),
         ]);
@@ -165,35 +185,37 @@ class UnderwritingQuoteController extends Controller
             return redirect()->back()->withInput()->with('error', _lang('Unit Cost is required'));
         }
 
+        $insuranceCategory = InsuranceCategory::findOrFail($request->input('insurance_category_id'));
+
         DB::beginTransaction();
 
         $summary = $this->calculateTotal($request);
 
-        $quotation                     = new Quotation();
-        $quotation->customer_id        = $request->input('customer_id');
-        $quotation->title              = $request->input('title');
-        $quotation->quotation_number   = BusinessSetting::where('name', 'quotation_number')->first()->value;
-        $quotation->po_so_number       = $request->input('po_so_number', $request->input('order_number'));
-        $quotation->quotation_date     = Carbon::parse($request->input('quotation_date'))->format('Y-m-d');
-        $quotation->expired_date       = Carbon::parse($request->input('expired_date'))->format('Y-m-d');
-        $quotation->sub_total          = $summary['subTotal'];
-        $quotation->grand_total        = $summary['grandTotal'];
-        $quotation->currency           = $request['currency'];
-        $quotation->converted_total    = $request->input('converted_total');
-        $quotation->exchange_rate      = Currency::where('name', $request->currency)->first()->exchange_rate;
-        $quotation->discount           = $summary['discountAmount'];
-        $quotation->discount_type      = $request->input('discount_type');
-        $quotation->discount_value     = $request->input('discount_value') ?? 0;
-        $quotation->template_type      = is_numeric($request->template) ? 1 : 0;
-        $quotation->template           = $request->input('template') ?? 'default';
-        $quotation->note               = $request->input('note');
-        $quotation->footer             = $request->input('footer');
-        $quotation->exclusions_remarks = $request->input('exclusions_remarks');
-        $quotation->coverage_summary   = $request->input('coverage_summary');
-        $quotation->is_deffered        = 1;
-        $quotation->invoice_category   = $request->input('invoice_category');
-        $quotation->short_code         = rand(100000, 9999999) . uniqid();
+        $quotation                       = new Quotation();
+        $quotation->customer_id          = $request->input('customer_id');
+        $quotation->title                = $request->input('title');
+        $quotation->quotation_number     = BusinessSetting::where('name', 'quotation_number')->first()->value;
+        $quotation->quotation_date       = Carbon::parse($request->input('quotation_date'))->format('Y-m-d');
+        $quotation->expired_date         = Carbon::parse($request->input('expired_date'))->format('Y-m-d');
+        $quotation->sub_total            = $summary['subTotal'];
+        $quotation->grand_total          = $summary['grandTotal'];
+        $quotation->currency             = $request['currency'];
+        $quotation->converted_total      = $request->input('converted_total');
+        $quotation->exchange_rate        = Currency::where('name', $request->currency)->value('exchange_rate') ?? 1;
+        $quotation->discount             = $summary['discountAmount'];
+        $quotation->discount_type        = $request->input('discount_type');
+        $quotation->discount_value       = $request->input('discount_value') ?? 0;
+        $quotation->template_type        = is_numeric($request->template) ? 1 : 0;
+        $quotation->template             = $request->input('template') ?? 'default';
+        $quotation->note                 = $request->input('note');
+        $quotation->footer               = $request->input('footer');
+        $quotation->insurance_category_id = $request->input('insurance_category_id');
+        $quotation->is_deffered          = 1;
+        $quotation->invoice_category     = $insuranceCategory->type ?: 'other';
+        $quotation->short_code           = rand(100000, 9999999) . uniqid();
         $quotation->save();
+
+        $this->saveQuotationSections($quotation, $request);
 
         for ($i = 0; $i < count($request->product_id); $i++) {
             $quotationItem = $quotation->items()->save(new QuotationItem(
@@ -229,7 +251,8 @@ class UnderwritingQuoteController extends Controller
     {
         Gate::authorize('quotations.view');
 
-        $quotation       = Quotation::where('is_deffered', 1)->with(['business.systemSettings', 'items', 'customer', 'taxes'])->findOrFail($id);
+        $quotation       = Quotation::where('is_deffered', 1)->with(['business.systemSettings', 'items', 'customer', 'taxes', 'sections', 'insuranceCategory'])->findOrFail($id);
+        $this->hydrateQuotationItemMetadata($quotation);
         $email_templates = EmailTemplate::whereIn('slug', ['NEW_QUOTATION_CREATED'])->where('email_status', 1)->get();
         $decimalPlace    = get_business_option('decimal_place', 2);
 
@@ -244,18 +267,18 @@ class UnderwritingQuoteController extends Controller
     {
         Gate::authorize('quotations.update');
 
-        $quotation = Quotation::where('is_deffered', 1)->with('items')->findOrFail($id);
+        $quotation = Quotation::where('is_deffered', 1)->with(['items', 'sections'])->findOrFail($id);
         $taxIds    = $quotation->taxes->pluck('tax_id')->map(fn($id) => (string) $id)->toArray();
 
         return Inertia::render('Backend/User/UnderwritingQuotes/Edit', [
-            'quotation'    => $quotation,
-            'customers'    => Customer::all(),
-            'currencies'   => Currency::all(),
-            'products'     => Product::all(),
-            'taxes'        => Tax::all(),
-            'familySizes'  => InsuranceFamilySize::all(),
-            'decimalPlace' => get_business_option('decimal_place', 2),
-            'taxIds'       => $taxIds,
+            'quotation'           => $quotation,
+            'customers'           => Customer::all(),
+            'currencies'          => Currency::all(),
+            'products'            => Product::all(),
+            'taxes'               => Tax::all(),
+            'taxIds'              => $taxIds,
+            'insuranceCategories' => $this->getInsuranceCategoriesWithSections(),
+            'ratingRules'         => $this->getActiveRatingRules(),
         ]);
     }
 
@@ -264,15 +287,30 @@ class UnderwritingQuoteController extends Controller
         Gate::authorize('quotations.update');
 
         $validator = Validator::make($request->all(), [
-            'customer_id'        => 'required',
-            'title'              => 'required',
-            'quotation_date'     => 'required',
-            'expired_date'       => 'required',
-            'product_id'         => 'required',
-            'currency'           => 'required',
-            'invoice_category'   => 'required|in:medical,gpa,other',
-            'exclusions_remarks' => 'nullable|string',
-            'coverage_summary'   => 'nullable|string',
+            'customer_id'           => 'required',
+            'title'                 => 'required',
+            'quotation_date'        => 'required',
+            'expired_date'          => 'required',
+            'product_id'            => 'required',
+            'currency'              => 'required|exists:currency,name',
+            'insurance_category_id' => 'required|exists:insurance_categories,id',
+            'sections'              => 'nullable|array',
+            'sections.*.title'      => 'required|string|max:255',
+            'sections.*.type'       => 'required|string|in:fields,table,benefits,remarks,rich_text,calculation,premium_summary,text,note,terms,exclusions,signature',
+            'rating_rule_id'         => 'nullable|array',
+            'rating_rule_id.*'       => 'nullable|exists:rating_rules,id',
+            'calculation_type'       => 'nullable|array',
+            'calculation_type.*'     => 'nullable|in:percentage_of_amount,fixed_per_quantity,fixed_amount,manual_premium,tiered_rate,contribution_table',
+            'rate_type'              => 'nullable|array',
+            'rate_type.*'            => 'nullable|in:percentage,fixed,manual,range',
+            'rate_value'             => 'nullable|array',
+            'rate_value.*'           => 'nullable|numeric|min:0',
+            'basis_amount'           => 'nullable|array',
+            'basis_amount.*'         => 'nullable|numeric|min:0',
+            'basis_quantity'         => 'nullable|array',
+            'basis_quantity.*'       => 'nullable|numeric|min:0',
+            'minimum_premium'        => 'nullable|array',
+            'minimum_premium.*'      => 'nullable|numeric|min:0',
         ], [
             'product_id.required' => _lang('You must add at least one item'),
         ]);
@@ -289,36 +327,38 @@ class UnderwritingQuoteController extends Controller
             return redirect()->back()->withInput()->with('error', _lang('Unit Cost is required'));
         }
 
+        $insuranceCategory = InsuranceCategory::findOrFail($request->input('insurance_category_id'));
+
         DB::beginTransaction();
 
         $summary = $this->calculateTotal($request);
 
-        $quotation                     = Quotation::where('is_deffered', 1)->findOrFail($id);
-        $quotation->customer_id        = $request->input('customer_id');
-        $quotation->title              = $request->input('title');
-        $quotation->po_so_number       = $request->input('po_so_number', $request->input('order_number'));
-        $quotation->quotation_date     = Carbon::parse($request->input('quotation_date'))->format('Y-m-d');
-        $quotation->expired_date       = Carbon::parse($request->input('expired_date'))->format('Y-m-d');
-        $quotation->sub_total          = $summary['subTotal'];
-        $quotation->grand_total        = $summary['grandTotal'];
-        $quotation->currency           = $request['currency'];
-        $quotation->converted_total    = $request->input('converted_total');
-        $quotation->exchange_rate      = Currency::where('name', $request->currency)->first()->exchange_rate;
-        $quotation->discount           = $summary['discountAmount'];
-        $quotation->discount_type      = $request->input('discount_type');
-        $quotation->discount_value     = $request->input('discount_value') ?? 0;
-        $quotation->template_type      = is_numeric($request->template) ? 1 : 0;
-        $quotation->template           = $request->input('template') ?? 'default';
-        $quotation->note               = $request->input('note');
-        $quotation->footer             = $request->input('footer');
-        $quotation->exclusions_remarks = $request->input('exclusions_remarks');
-        $quotation->coverage_summary   = $request->input('coverage_summary');
-        $quotation->is_deffered        = 1;
-        $quotation->invoice_category   = $request->input('invoice_category');
+        $quotation                       = Quotation::where('is_deffered', 1)->findOrFail($id);
+        $quotation->customer_id          = $request->input('customer_id');
+        $quotation->title                = $request->input('title');
+        $quotation->quotation_date       = Carbon::parse($request->input('quotation_date'))->format('Y-m-d');
+        $quotation->expired_date         = Carbon::parse($request->input('expired_date'))->format('Y-m-d');
+        $quotation->sub_total            = $summary['subTotal'];
+        $quotation->grand_total          = $summary['grandTotal'];
+        $quotation->currency             = $request['currency'];
+        $quotation->converted_total      = $request->input('converted_total');
+        $quotation->exchange_rate        = Currency::where('name', $request->currency)->value('exchange_rate') ?? 1;
+        $quotation->discount             = $summary['discountAmount'];
+        $quotation->discount_type        = $request->input('discount_type');
+        $quotation->discount_value       = $request->input('discount_value') ?? 0;
+        $quotation->template_type        = is_numeric($request->template) ? 1 : 0;
+        $quotation->template             = $request->input('template') ?? 'default';
+        $quotation->note                 = $request->input('note');
+        $quotation->footer               = $request->input('footer');
+        $quotation->insurance_category_id = $request->input('insurance_category_id');
+        $quotation->is_deffered          = 1;
+        $quotation->invoice_category     = $insuranceCategory->type ?: 'other';
         $quotation->save();
 
         QuotationItemTax::where('quotation_id', $quotation->id)->delete();
         $quotation->items()->delete();
+        $quotation->sections()->delete();
+        $this->saveQuotationSections($quotation, $request);
 
         for ($i = 0; $i < count($request->product_id); $i++) {
             $quotationItem = $quotation->items()->save(new QuotationItem(
@@ -354,7 +394,7 @@ class UnderwritingQuoteController extends Controller
         Gate::authorize('quotations.duplicate');
 
         DB::beginTransaction();
-        $quotation                    = Quotation::where('is_deffered', 1)->findOrFail($id);
+        $quotation                    = Quotation::where('is_deffered', 1)->with(['items.taxes', 'sections'])->findOrFail($id);
         $newQuotation                 = $quotation->replicate();
         $newQuotation->quotation_number = get_business_option('quotation_number', rand());
         $newQuotation->short_code     = rand(100000, 9999999) . uniqid();
@@ -371,6 +411,12 @@ class UnderwritingQuoteController extends Controller
                 $newTax->quotation_item_id = $newItem->id;
                 $newTax->save();
             }
+        }
+
+        foreach ($quotation->sections as $section) {
+            $newSection               = $section->replicate();
+            $newSection->quotation_id = $newQuotation->id;
+            $newSection->save();
         }
 
         BusinessSetting::where('name', 'quotation_number')->increment('value');
@@ -469,7 +515,8 @@ class UnderwritingQuoteController extends Controller
     {
         Gate::authorize('quotations.pdf');
 
-        $quotation = Quotation::where('is_deffered', 1)->with(['business', 'items', 'taxes', 'customer'])->findOrFail($id);
+        $quotation = Quotation::where('is_deffered', 1)->with(['business', 'items', 'taxes', 'customer', 'sections', 'insuranceCategory'])->findOrFail($id);
+        $this->hydrateQuotationItemMetadata($quotation);
         return pdf()
             ->view('backend.user.pdf.quotation', compact('quotation'))
             ->name('quotation-' . $quotation->quotation_number . '.pdf')
@@ -648,6 +695,10 @@ class UnderwritingQuoteController extends Controller
             $query->where('invoice_category', $request->invoice_category);
         }
 
+        if ($request->has('insurance_category_id') && $request->insurance_category_id !== '') {
+            $query->where('insurance_category_id', $request->insurance_category_id);
+        }
+
         $dateRange = $request->input('date_range');
         if (is_array($dateRange) && count($dateRange) >= 2 && $dateRange[0] && $dateRange[1]) {
             $query->whereDate('quotation_date', '>=', $dateRange[0])
@@ -662,7 +713,7 @@ class UnderwritingQuoteController extends Controller
     private function resolveSorting(Request $request): array
     {
         $sorting  = $request->get('sorting', ['column' => 'id', 'direction' => 'desc']);
-        $allowed  = ['id', 'quotation_number', 'invoice_category', 'quotation_date', 'expired_date', 'grand_total', 'customer.name'];
+        $allowed  = ['id', 'quotation_number', 'invoice_category', 'quotation_date', 'expired_date', 'grand_total', 'customer.name', 'insuranceCategory.name'];
         $column   = in_array($sorting['column'] ?? 'id', $allowed, true) ? ($sorting['column'] ?? 'id') : 'id';
         $direction = strtolower((string) ($sorting['direction'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
         return ['column' => $column, 'direction' => $direction];
@@ -673,6 +724,12 @@ class UnderwritingQuoteController extends Controller
         if ($sorting['column'] === 'customer.name') {
             $query->join('customers', 'quotations.customer_id', '=', 'customers.id')
                 ->orderBy('customers.name', $sorting['direction'])
+                ->select('quotations.*');
+            return;
+        }
+        if ($sorting['column'] === 'insuranceCategory.name') {
+            $query->leftJoin('insurance_categories', 'quotations.insurance_category_id', '=', 'insurance_categories.id')
+                ->orderBy('insurance_categories.name', $sorting['direction'])
                 ->select('quotations.*');
             return;
         }
@@ -691,39 +748,118 @@ class UnderwritingQuoteController extends Controller
         };
     }
 
-    private function buildItemPayload(Request $request, int $index): array
+    private function hydrateQuotationItemMetadata(Quotation $quotation): void
     {
-        $category  = $request->input('invoice_category');
-        $isMedical = $category === 'medical';
-        $lineRate  = $this->calculateItemRate($request, $index);
-        $lineTotal = $this->calculateItemLineTotal($request, $index);
-
-        return array_merge([
-            'product_id'   => $request->product_id[$index],
-            'product_name' => $request->product_name[$index],
-            'description'  => $request->description[$index] ?? null,
-            'quantity'     => $request->quantity[$index],
-            'unit_cost'    => $lineRate,
-            'sub_total'    => $lineTotal,
-            'family_size'  => $isMedical ? ($request->family_size[$index] ?? null) : null,
-            'sum_insured'  => $category === 'other'
-                ? (($request->input("sum_insured.$index") !== null && $request->input("sum_insured.$index") !== '') ? $request->input("sum_insured.$index") : 0)
-                : 0,
-        ], $this->buildMedicalCoveragePayload($request, $index, $isMedical));
+        foreach ($quotation->items as $item) {
+            $metadata          = $item->metadata_json ?? [];
+            $item->sum_insured = $item->basis_amount ?? ($metadata['basis_amount'] ?? ($metadata['sum_insured'] ?? 0));
+        }
     }
 
-    private function buildMedicalCoveragePayload(Request $request, int $index, bool $isMedical): array
+    private function saveQuotationSections(Quotation $quotation, Request $request): void
     {
-        $payload  = [];
-        $sections = ['inpatient', 'maternity', 'outpatient', 'dental', 'optical', 'telemedicine'];
+        foreach ($request->input('sections', []) as $sortOrder => $sectionData) {
+            QuotationSection::create([
+                'quotation_id'                   => $quotation->id,
+                'insurance_category_id'          => $request->input('insurance_category_id'),
+                'insurance_category_section_id'  => $sectionData['insurance_category_section_id'] ?? $sectionData['template_section_id'] ?? null,
+                'title'                          => $sectionData['title'],
+                'type'                           => $sectionData['type'],
+                'sort_order'                     => $sectionData['sort_order'] ?? $sortOrder,
+                'data_json'                      => [
+                    'fields'  => $sectionData['fields'] ?? [],
+                    'columns' => $sectionData['columns'] ?? [],
+                    'rows'    => $sectionData['rows'] ?? [],
+                ],
+                'content'                        => $sectionData['content'] ?? null,
+            ]);
+        }
+    }
 
-        foreach ($sections as $section) {
-            $payload["{$section}_limit_per_family"]        = $isMedical ? $this->normalizeDecimal($request->input("coverage_configuration.$index.$section.limit_per_family")) : null;
-            $payload["{$section}_contribution_per_family"] = $isMedical ? $this->normalizeDecimal($request->input("coverage_configuration.$index.$section.contribution_per_family")) : null;
-            $payload["{$section}_total_contribution"]      = $isMedical ? $this->normalizeDecimal($request->input("coverage_configuration.$index.$section.total_contribution")) : null;
+    private function buildItemPayload(Request $request, int $index): array
+    {
+        $ratingRule      = $this->resolveRatingRule($request, $index);
+        $calculationType = $this->resolveCalculationType($request, $index, $ratingRule);
+        $rateType        = $this->resolveRateType($request, $index, $calculationType, $ratingRule);
+        $quantity        = $this->normalizeDecimal($request->input("quantity.$index")) ?? 0;
+        $basisQuantity   = $this->normalizeDecimal($request->input("basis_quantity.$index")) ?? ($quantity > 0 ? $quantity : 1);
+        $basisAmount     = $this->normalizeDecimal($request->input("basis_amount.$index"))
+            ?? $this->normalizeDecimal($request->input("sum_insured.$index"))
+            ?? 0;
+        $minimumPremium  = $this->normalizeDecimal($request->input("minimum_premium.$index"))
+            ?? $this->normalizeDecimal($ratingRule?->minimum_premium);
+        $rateValue       = $this->resolveRateValue($request, $index, $ratingRule);
+        $lineTotal       = $this->calculateFinancialLineTotal($calculationType, $rateValue, $basisAmount, $basisQuantity, $minimumPremium);
+        $unitCost        = $this->resolveLineUnitCost($calculationType, $rateValue, $lineTotal);
+
+        $metadata = array_filter([
+            'rating_rule_name' => $ratingRule?->name,
+        ], fn($value) => $value !== null && $value !== '');
+
+        if ($basisAmount > 0) {
+            $metadata['basis_amount'] = $basisAmount;
         }
 
-        return $payload;
+        return [
+            'insurance_category_id' => $request->input('insurance_category_id'),
+            'rating_rule_id'        => $ratingRule?->id,
+            'product_id'            => $request->product_id[$index],
+            'product_name'          => $request->product_name[$index],
+            'description'           => $request->description[$index] ?? null,
+            'calculation_type'      => $calculationType,
+            'rate_type'             => $rateType,
+            'rate_value'            => $rateValue,
+            'basis_amount'          => $basisAmount,
+            'basis_quantity'        => $basisQuantity,
+            'minimum_premium'       => $minimumPremium,
+            'quantity'              => $quantity,
+            'unit_cost'             => $unitCost,
+            'sub_total'             => $lineTotal,
+            'metadata_json'         => $metadata ?: null,
+        ];
+    }
+
+    private function resolveRatingRule(Request $request, int $index): ?RatingRule
+    {
+        $ruleId = $request->input("rating_rule_id.$index");
+        if (!$ruleId) return null;
+
+        return RatingRule::whereKey($ruleId)
+            ->where('insurance_category_id', $request->input('insurance_category_id'))
+            ->first();
+    }
+
+    private function resolveCalculationType(Request $request, int $index, ?RatingRule $ratingRule = null): string
+    {
+        return $request->input("calculation_type.$index")
+            ?: $ratingRule?->calculation_type
+            ?: 'manual_premium';
+    }
+
+    private function resolveRateType(Request $request, int $index, string $calculationType, ?RatingRule $ratingRule = null): string
+    {
+        return $request->input("rate_type.$index")
+            ?: $ratingRule?->rate_type
+            ?: $this->defaultRateTypeForCalculation($calculationType);
+    }
+
+    private function defaultRateTypeForCalculation(string $calculationType): string
+    {
+        return match ($calculationType) {
+            'percentage_of_amount' => 'percentage',
+            'tiered_rate'          => 'range',
+            'fixed_per_quantity',
+            'fixed_amount'         => 'fixed',
+            default                => 'manual',
+        };
+    }
+
+    private function resolveRateValue(Request $request, int $index, ?RatingRule $ratingRule = null): float
+    {
+        return $this->normalizeDecimal($request->input("rate_value.$index"))
+            ?? $this->normalizeDecimal($request->input("unit_cost.$index"))
+            ?? $this->normalizeDecimal($ratingRule?->default_rate)
+            ?? 0.0;
     }
 
     private function normalizeDecimal($value): ?float
@@ -732,45 +868,28 @@ class UnderwritingQuoteController extends Controller
         return is_numeric($value) ? (float) $value : null;
     }
 
-    private function calculateMedicalRate(Request $request, int $index): float
+    private function calculateFinancialLineTotal(string $calculationType, float $rateValue, float $basisAmount, float $basisQuantity, ?float $minimumPremium): float
     {
-        $rate     = 0.0;
-        $sections = ['inpatient', 'maternity', 'outpatient', 'dental', 'optical', 'telemedicine'];
+        $lineTotal = match ($calculationType) {
+            'percentage_of_amount' => ($basisAmount * $rateValue) / 100,
+            'fixed_per_quantity'   => $rateValue * $basisQuantity,
+            'fixed_amount',
+            'manual_premium',
+            'contribution_table',
+            'tiered_rate'          => $rateValue,
+            default                => $rateValue,
+        };
 
-        foreach ($sections as $section) {
-            $rate += (float) ($this->normalizeDecimal($request->input("coverage_configuration.$index.$section.total_contribution")) ?? 0);
+        if ($minimumPremium !== null && $lineTotal < $minimumPremium) {
+            return $minimumPremium;
         }
 
-        return $rate;
+        return $lineTotal;
     }
 
-    private function calculateItemRate(Request $request, int $index): float
+    private function resolveLineUnitCost(string $calculationType, float $rateValue, float $lineTotal): float
     {
-        if ($request->input('invoice_category') === 'medical') {
-            return $this->calculateMedicalRate($request, $index);
-        }
-
-        $unitCost = $request->input("unit_cost.$index");
-        return is_numeric($unitCost) ? (float) $unitCost : 0.0;
-    }
-
-    private function calculateItemLineTotal(Request $request, int $index): float
-    {
-        $category = $request->input('invoice_category');
-
-        if ($category === 'medical') {
-            return $this->calculateMedicalRate($request, $index);
-        }
-
-        if ($category === 'other') {
-            $rate       = is_numeric($request->input("unit_cost.$index"))    ? (float) $request->input("unit_cost.$index")    : 0.0;
-            $sumInsured = is_numeric($request->input("sum_insured.$index"))  ? (float) $request->input("sum_insured.$index")  : 0.0;
-            return ($rate / 100) * $sumInsured;
-        }
-
-        // GPA: quantity × rate
-        $quantity = $request->input("quantity.$index");
-        return (is_numeric($quantity) ? (float) $quantity : 0.0) * $this->calculateItemRate($request, $index);
+        return $calculationType === 'fixed_per_quantity' ? $rateValue : $lineTotal;
     }
 
     private function calculateTotal(Request $request): array
@@ -778,7 +897,17 @@ class UnderwritingQuoteController extends Controller
         $subTotal = $taxAmount = $discountAmount = 0;
 
         for ($i = 0; $i < count($request->product_id); $i++) {
-            $lineTotal = $this->calculateItemLineTotal($request, $i);
+            $ratingRule      = $this->resolveRatingRule($request, $i);
+            $calculationType = $this->resolveCalculationType($request, $i, $ratingRule);
+            $rateValue       = $this->resolveRateValue($request, $i, $ratingRule);
+            $quantity        = $this->normalizeDecimal($request->input("quantity.$i")) ?? 0;
+            $basisAmount     = $this->normalizeDecimal($request->input("basis_amount.$i"))
+                ?? $this->normalizeDecimal($request->input("sum_insured.$i"))
+                ?? 0;
+            $basisQuantity   = $this->normalizeDecimal($request->input("basis_quantity.$i")) ?? ($quantity > 0 ? $quantity : 1);
+            $minimumPremium  = $this->normalizeDecimal($request->input("minimum_premium.$i"))
+                ?? $this->normalizeDecimal($ratingRule?->minimum_premium);
+            $lineTotal = $this->calculateFinancialLineTotal($calculationType, $rateValue, $basisAmount, $basisQuantity, $minimumPremium);
             $subTotal += $lineTotal;
 
             if (isset($request->taxes)) {
@@ -932,14 +1061,15 @@ class UnderwritingQuoteController extends Controller
             ->format('Y-m-d H:i:s');
 
         foreach ($quotation->items as $item) {
+            $metadata = $item->metadata_json ?? [];
             $invoiceItem = $invoice->items()->save(new InvoiceItem([
                 'invoice_id'   => $invoice->id,
                 'product_id'   => $item->product_id,
                 'product_name' => $item->product_name,
                 'description'  => $item->description,
-                'sum_insured'  => $item->getRawOriginal('sum_insured'),
-                'benefits'     => $item->benefits,
-                'family_size'  => $item->family_size,
+                'sum_insured'  => $item->basis_amount ?? ($metadata['basis_amount'] ?? ($metadata['sum_insured'] ?? 0)),
+                'benefits'     => $metadata['benefits'] ?? null,
+                'family_size'  => $metadata['family_size'] ?? null,
                 'quantity'     => $item->quantity,
                 'unit_cost'    => $item->getRawOriginal('unit_cost'),
                 'sub_total'    => $item->getRawOriginal('sub_total'),
@@ -987,6 +1117,56 @@ class UnderwritingQuoteController extends Controller
         }
 
         return $invoice;
+    }
+
+    private function getInsuranceCategoriesWithSections(): \Illuminate\Support\Collection
+    {
+        return InsuranceCategory::with('quotationSections')->orderBy('name')->get()
+            ->map(fn($c) => [
+                'id'       => $c->id,
+                'name'     => $c->name,
+                'type'     => $c->type ?? 'other',
+                'sections' => $c->quotationSections->map(fn($s) => [
+                    'id'         => $s->id,
+                    'title'      => $s->title,
+                    'type'       => $s->type,
+                    'sort_order' => $s->sort_order,
+                    'fields'     => $s->fields_json  ?? [['label' => '', 'default_value' => '']],
+                    'columns'    => $s->columns_json ?? [''],
+                    'rows'       => $s->rows_json    ?? [['']],
+                    'content'    => $s->content      ?? '',
+                ])->values(),
+            ]);
+    }
+
+    private function getActiveRatingRules(): \Illuminate\Support\Collection
+    {
+        $today = Carbon::today()->toDateString();
+
+        return RatingRule::where('is_active', 1)
+            ->where(function ($query) use ($today) {
+                $query->whereNull('active_from')->orWhereDate('active_from', '<=', $today);
+            })
+            ->where(function ($query) use ($today) {
+                $query->whereNull('active_to')->orWhereDate('active_to', '>=', $today);
+            })
+            ->orderBy('name')
+            ->get()
+            ->map(fn($rule) => [
+                'id'                    => $rule->id,
+                'insurance_category_id' => $rule->insurance_category_id,
+                'product_id'            => $rule->product_id,
+                'name'                  => $rule->name,
+                'calculation_type'      => $rule->calculation_type,
+                'rate_type'             => $rule->rate_type,
+                'default_rate'          => $rule->default_rate,
+                'min_rate'              => $rule->min_rate,
+                'max_rate'              => $rule->max_rate,
+                'minimum_premium'       => $rule->minimum_premium,
+                'tax_rate'              => $rule->tax_rate,
+                'currency'              => $rule->currency,
+                'metadata_json'         => $rule->metadata_json,
+            ]);
     }
 
     private function recordTransaction(string $date, int $accountId, string $drCr, Invoice $invoice, float $amount, string $refType, string $description, Request $request, ?int $taxId = null): void

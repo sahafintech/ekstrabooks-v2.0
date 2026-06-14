@@ -10,10 +10,24 @@ class InsuranceCategory extends Model
 {
     use MultiTenant, SoftDeletes;
 
-    protected $fillable = ['name', 'slug'];
+    protected $fillable = ['name', 'slug', 'type'];
 
     public function templateSections()
     {
-        return $this->hasMany(InsuranceCategorySection::class)->orderBy('sort_order');
+        return $this->hasMany(InsuranceCategorySection::class)
+            ->where('purpose', 'certificate')
+            ->orderBy('sort_order');
+    }
+
+    public function quotationSections()
+    {
+        return $this->hasMany(InsuranceCategorySection::class)
+            ->where('purpose', 'quotation')
+            ->orderBy('sort_order');
+    }
+
+    public function ratingRules()
+    {
+        return $this->hasMany(RatingRule::class);
     }
 }

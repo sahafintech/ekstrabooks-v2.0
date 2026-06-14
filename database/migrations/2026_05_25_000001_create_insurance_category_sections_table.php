@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::create('insurance_category_sections', function (Blueprint $table) {
             $table->id();
             $table->foreignId('insurance_category_id')->constrained('insurance_categories')->cascadeOnDelete();
+            $table->string('purpose', 50)->default('certificate'); // certificate | quotation
             $table->string('title');
             $table->string('type')->default('fields');
             $table->unsignedInteger('sort_order')->default(0);

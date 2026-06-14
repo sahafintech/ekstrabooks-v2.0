@@ -20,6 +20,14 @@ class Quotation extends Model {
         return $this->hasMany(QuotationItem::class, 'quotation_id')->withoutGlobalScope('business_id');
     }
 
+    public function sections() {
+        return $this->hasMany(QuotationSection::class, 'quotation_id')->orderBy('sort_order');
+    }
+
+    public function insuranceCategory() {
+        return $this->belongsTo(InsuranceCategory::class, 'insurance_category_id')->withDefault()->withoutGlobalScope('business_id');
+    }
+
     public function taxes() {
         return $this->hasMany(QuotationItemTax::class, "quotation_id")
             ->withoutGlobalScope('business_id')

@@ -8,6 +8,7 @@ class InsuranceCategorySection extends Model
 {
     protected $fillable = [
         'insurance_category_id',
+        'purpose',
         'title',
         'type',
         'sort_order',

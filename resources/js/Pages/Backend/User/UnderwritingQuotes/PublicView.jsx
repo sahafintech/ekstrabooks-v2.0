@@ -61,44 +61,57 @@ const sortMedicalQuotationItems = (items = []) =>
         return String(a.family_size || "").localeCompare(String(b.family_size || ""));
     });
 
-const buildMedicalSectionTotals = (items = []) =>
-    MEDICAL_COVERAGE_SECTIONS.reduce((totals, section) => {
-        totals[section.key] = items.reduce(
-            (sum, item) => sum + (Number(item?.[`${section.key}_total_contribution`]) || 0),
-            0
-        );
-        return totals;
-    }, {});
+const QuotationSections = ({ sections = [], sectionStyle }) => {
+    if (!sections.length) return null;
 
-const allocateAmountAcrossSections = (amount, sectionTotals, decimalPlaces) => {
-    const factor = 10 ** decimalPlaces;
-    const totalAmountUnits = Math.round((Number(amount) || 0) * factor);
-    const grandSectionTotal = MEDICAL_COVERAGE_SECTIONS.reduce(
-        (sum, section) => sum + (Number(sectionTotals[section.key]) || 0),
-        0
+    return (
+        <div className="mt-5 grid grid-cols-1 gap-3">
+            {sections.map((section, index) => {
+                const data = section.data_json ?? {};
+                const fields = data.fields ?? [];
+                const columns = data.columns ?? [];
+                const rows = data.rows ?? [];
+
+                return (
+                    <div key={section.id ?? index} className="border border-slate-900">
+                        <div className="px-2 py-1 text-xs font-bold uppercase" style={sectionStyle}>{section.title}</div>
+
+                        {section.type === "fields" && (
+                            <table className="w-full border-collapse text-sm">
+                                <tbody>
+                                    {fields.map((field, fieldIndex) => (
+                                        <tr key={fieldIndex}>
+                                            <td className="w-1/3 border-t border-slate-900 px-3 py-2 font-semibold">{field.label}</td>
+                                            <td className="border-t border-slate-900 px-3 py-2">{field.value || "-"}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+
+                        {section.type === "table" && (
+                            <table className="w-full border-collapse text-sm">
+                                <thead>
+                                    <tr>{columns.map((column, columnIndex) => <th key={columnIndex} className="border-t border-slate-900 px-3 py-2 text-left">{column}</th>)}</tr>
+                                </thead>
+                                <tbody>
+                                    {rows.map((row, rowIndex) => (
+                                        <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex} className="border-t border-slate-900 px-3 py-2">{cell || "-"}</td>)}</tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+
+                        {section.type !== "fields" && section.type !== "table" && (
+                            <div className="min-h-[80px] whitespace-pre-line p-3 text-sm leading-6 text-slate-800">{section.content || "-"}</div>
+                        )}
+                    </div>
+                );
+            })}
+        </div>
     );
-
-    if (grandSectionTotal === 0) {
-        return MEDICAL_COVERAGE_SECTIONS.reduce((alloc, section) => {
-            alloc[section.key] = 0;
-            return alloc;
-        }, {});
-    }
-
-    let allocatedUnits = 0;
-    return MEDICAL_COVERAGE_SECTIONS.reduce((alloc, section, idx) => {
-        if (idx === MEDICAL_COVERAGE_SECTIONS.length - 1) {
-            alloc[section.key] = (totalAmountUnits - allocatedUnits) / factor;
-            return alloc;
-        }
-        const sectionUnits = Math.round(
-            totalAmountUnits * ((Number(sectionTotals[section.key]) || 0) / grandSectionTotal)
-        );
-        allocatedUnits += sectionUnits;
-        alloc[section.key] = sectionUnits / factor;
-        return alloc;
-    }, {});
 };
+
 
 export default function PublicView({ quotation }) {
     const { flash = {} } = usePage().props;
@@ -109,14 +122,13 @@ export default function PublicView({ quotation }) {
     const isOther   = quotation?.invoice_category === "other";
 
     const decimalPlaces = Number(
-        quotation?.business?.system_settings?.find((s) => s.name === "decimal_place")?.value ?? 2
+        quotation?.business?.system_settings?.find((s) => s.name === "decimal_places")?.value ?? 2
     );
 
     const primaryColor = quotation?.business?.system_settings?.find((s) => s.name === "invoice_primary_color")?.value || "#6d0e47";
     const textColor    = quotation?.business?.system_settings?.find((s) => s.name === "invoice_text_color")?.value  || "#ffffff";
 
-    const coverageSummary   = quotation?.coverage_summary   || quotation?.note   || "";
-    const exclusionsRemarks = quotation?.exclusions_remarks || quotation?.footer || "";
+    const quotationSections = quotation?.sections || [];
 
     const printStyles = `
         @media print {
@@ -135,6 +147,11 @@ export default function PublicView({ quotation }) {
     const formatMoney = (amount) =>
         formatCurrency({ amount, currency: quotation?.currency, decimalPlaces });
 
+    const formatItemRate = (item) =>
+        item.calculation_type === "percentage_of_amount"
+            ? `${Number(item.rate_value ?? 0)}%`
+            : formatMoney(item.unit_cost);
+
     const formatPlainNumber = (amount) =>
         amount === null || amount === undefined || amount === ""
             ? "-"
@@ -144,15 +161,6 @@ export default function PublicView({ quotation }) {
               }).format(Number(amount) || 0);
 
     const medicalItems  = isMedical ? sortMedicalQuotationItems(quotation?.items || []) : [];
-    const medicalTotals = isMedical ? buildMedicalSectionTotals(medicalItems) : {};
-    const medicalTaxAllocations = (quotation?.taxes || []).map((tax) => ({
-        ...tax,
-        allocations: allocateAmountAcrossSections(tax.amount, medicalTotals, decimalPlaces),
-    }));
-    const medicalDiscountAllocations =
-        Number(quotation?.discount) > 0
-            ? allocateAmountAcrossSections(quotation.discount, medicalTotals, decimalPlaces)
-            : null;
     const getMedicalSectionLimit = (key) =>
         medicalItems.find((i) => i?.[`${key}_limit_per_family`] != null && i?.[`${key}_limit_per_family`] !== "")
             ?.[`${key}_limit_per_family`];
@@ -240,7 +248,6 @@ export default function PublicView({ quotation }) {
                                     <table className="w-full text-sm">
                                         <tbody>
                                             <tr><td className="w-36 py-0.5 font-semibold">Quote To:</td><td className="py-0.5">{quotation?.customer?.name || "-"}</td></tr>
-                                            <tr><td className="py-0.5 font-semibold">Policy Number:</td><td className="py-0.5">{quotation?.po_so_number || "-"}</td></tr>
                                             <tr><td className="py-0.5 font-semibold">Valid Until:</td><td className="py-0.5">{quotation?.expired_date || "-"}</td></tr>
                                         </tbody>
                                     </table>
@@ -338,9 +345,9 @@ export default function PublicView({ quotation }) {
                                                 <tr key={index}>
                                                     <td className="border border-slate-900 px-2 py-2 align-top">{item.product_name}</td>
                                                     <td className="border border-slate-900 px-2 py-2 align-top">{item.description}</td>
-                                                    {isOther && <td className="border border-slate-900 px-2 py-2 text-right align-top">{formatMoney(item.sum_insured)}</td>}
+                                                    {isOther && <td className="border border-slate-900 px-2 py-2 text-right align-top">{formatMoney(item.basis_amount ?? item.sum_insured)}</td>}
                                                     {!isOther && <td className="border border-slate-900 px-2 py-2 text-right align-top">{item.quantity}</td>}
-                                                    <td className="border border-slate-900 px-2 py-2 text-right align-top">{isOther ? `${item.unit_cost}%` : formatMoney(item.unit_cost)}</td>
+                                                    <td className="border border-slate-900 px-2 py-2 text-right align-top">{formatItemRate(item)}</td>
                                                     <td className="border border-slate-900 px-2 py-2 text-right align-top">{formatMoney(item.sub_total)}</td>
                                                 </tr>
                                             ))}
@@ -349,47 +356,34 @@ export default function PublicView({ quotation }) {
                                 )}
                             </div>
 
-                            {/* Footer: summary + premium */}
-                            <div className="mt-5 grid grid-cols-12 gap-0 border border-slate-900">
-                                <div className="col-span-4 border-r border-slate-900">
-                                    <div className="px-2 py-1 text-xs font-bold uppercase" style={sectionStyle}>Coverage Summary</div>
-                                    <div className="min-h-[120px] whitespace-pre-line p-3 text-sm leading-6 text-slate-800">
-                                        {coverageSummary || "No additional coverage summary provided."}
-                                    </div>
-                                </div>
-                                <div className="col-span-4 border-r border-slate-900">
-                                    <div className="px-2 py-1 text-xs font-bold uppercase" style={sectionStyle}>Exclusions and Remarks</div>
-                                    <div className="min-h-[120px] whitespace-pre-line p-3 text-sm leading-6 text-slate-800">
-                                        {exclusionsRemarks || "No additional exclusions or remarks provided."}
-                                    </div>
-                                </div>
-                                <div className="col-span-4">
-                                    <div className="px-2 py-1 text-xs font-bold uppercase" style={sectionStyle}>Premium Summary</div>
-                                    <table className="w-full border-collapse text-sm">
-                                        <tbody>
-                                            <tr>
-                                                <td className="border-b border-slate-900 px-3 py-2 font-semibold">Sub-Total</td>
-                                                <td className="border-b border-slate-900 px-3 py-2 text-right">{formatMoney(quotation?.sub_total)}</td>
+                            <QuotationSections sections={quotationSections} sectionStyle={sectionStyle} />
+
+                            <div className="mt-5 border border-slate-900">
+                                <div className="px-2 py-1 text-xs font-bold uppercase" style={sectionStyle}>Premium Summary</div>
+                                <table className="w-full border-collapse text-sm">
+                                    <tbody>
+                                        <tr>
+                                            <td className="border-b border-slate-900 px-3 py-2 font-semibold">Sub-Total</td>
+                                            <td className="border-b border-slate-900 px-3 py-2 text-right">{formatMoney(quotation?.sub_total)}</td>
+                                        </tr>
+                                        {(quotation?.taxes || []).map((tax, i) => (
+                                            <tr key={i}>
+                                                <td className="border-b border-slate-900 px-3 py-2 font-semibold">{tax.name}</td>
+                                                <td className="border-b border-slate-900 px-3 py-2 text-right">{formatMoney(tax.amount)}</td>
                                             </tr>
-                                            {(quotation?.taxes || []).map((tax, i) => (
-                                                <tr key={i}>
-                                                    <td className="border-b border-slate-900 px-3 py-2 font-semibold">{tax.name}</td>
-                                                    <td className="border-b border-slate-900 px-3 py-2 text-right">{formatMoney(tax.amount)}</td>
-                                                </tr>
-                                            ))}
-                                            {Number(quotation?.discount) > 0 && (
-                                                <tr>
-                                                    <td className="border-b border-slate-900 px-3 py-2 font-semibold">Discount</td>
-                                                    <td className="border-b border-slate-900 px-3 py-2 text-right">-{formatMoney(quotation.discount)}</td>
-                                                </tr>
-                                            )}
+                                        ))}
+                                        {Number(quotation?.discount) > 0 && (
                                             <tr>
-                                                <td className="px-3 py-2 font-bold uppercase">Total Premium</td>
-                                                <td className="px-3 py-2 text-right font-bold">{formatMoney(quotation?.grand_total)}</td>
+                                                <td className="border-b border-slate-900 px-3 py-2 font-semibold">Discount</td>
+                                                <td className="border-b border-slate-900 px-3 py-2 text-right">-{formatMoney(quotation.discount)}</td>
                                             </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
+                                        )}
+                                        <tr>
+                                            <td className="px-3 py-2 font-bold uppercase">Total Premium</td>
+                                            <td className="px-3 py-2 text-right font-bold">{formatMoney(quotation?.grand_total)}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
 
                             <div className="border-x border-b border-slate-900 px-4 py-3 text-center text-sm text-slate-800">

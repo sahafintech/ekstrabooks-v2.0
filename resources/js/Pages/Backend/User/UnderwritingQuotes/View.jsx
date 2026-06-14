@@ -21,13 +21,15 @@ import {
     MessageCircle,
     Copy,
 } from "lucide-react";
-import { Fragment, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import Modal from "@/Components/Modal";
 import { Input } from "@/Components/ui/input";
+import { Textarea } from "@/Components/ui/textarea";
 import { QRCodeSVG } from "qrcode.react";
+import QuotationSections from "@/Components/shared/QuotationSections";
 
-const buildPrintStyles = (isLandscape) => `
+const buildPrintStyles = () => `
   @media print {
     body * {
       visibility: hidden;
@@ -55,7 +57,7 @@ const buildPrintStyles = (isLandscape) => `
     }
 
     @page {
-      size: A4 ${isLandscape ? "landscape" : "portrait"};
+      size: A4 portrait;
       margin: 8mm;
     }
 
@@ -73,169 +75,31 @@ const sectionTitleStyle = (primaryColor, textColor) => ({
     letterSpacing: "0.12em",
 });
 
-const MEDICAL_COVERAGE_SECTIONS = [
-    { key: "inpatient", label: "INPATIENT" },
-    { key: "outpatient", label: "OUTPATIENT" },
-    { key: "maternity", label: "MATERNITY" },
-    { key: "dental", label: "DENTAL" },
-    { key: "optical", label: "OPTICAL" },
-    { key: "telemedicine", label: "TELEMEDICINE" },
-];
-
-const MEDICAL_TABLE_COLUMN_WIDTHS = [
-    "5%",
-    "6%",
-    "8%",
-    ...Array(MEDICAL_COVERAGE_SECTIONS.length * 2).fill("6%"),
-    "9%",
-];
-
-const MEDICAL_TABLE_CLASS_NAME = "w-full table-fixed border-collapse text-[7px] leading-tight";
-const MEDICAL_TABLE_HEADER_CELL_CLASS_NAME = "border border-slate-900 px-1 py-0.5 text-[7px] leading-tight";
-const MEDICAL_TABLE_BODY_CELL_CLASS_NAME = "border border-slate-900 px-1 py-1 text-[7px] leading-tight";
-const MEDICAL_TABLE_NUMERIC_CELL_CLASS_NAME = `${MEDICAL_TABLE_BODY_CELL_CLASS_NAME} text-right whitespace-nowrap`;
-
-const parseFamilySizeValue = (familySize) => {
-    if (!familySize) return null;
-    const n = String(familySize).trim().toUpperCase();
-    const m = n.match(/^M\s*\+\s*(\d+(?:\.\d+)?)$/);
-    if (m) return 1 + Number(m[1]);
-    if (n === "M") return 1;
-    if (/^\d+(?:\.\d+)?$/.test(n)) return Number(n);
-    const c = n.match(/^(\d+(?:\.\d+)?)\s*\+\s*(\d+(?:\.\d+)?)$/);
-    if (c) return Number(c[1]) + Number(c[2]);
-    return null;
-};
-
-const calculateMembersAndFamilyValue = (members, familySize) => {
-    const fsv = parseFamilySizeValue(familySize);
-    if (fsv === null) return 0;
-    return (Number(members) || 0) * fsv;
-};
-
-const getFamilySizeSortValue = (familySize) => {
-    const n = String(familySize || "").trim().toUpperCase();
-    if (n === "M") return 0;
-    const m = n.match(/^M\s*\+\s*(\d+(?:\.\d+)?)$/);
-    if (m) return Number(m[1]);
-    return Number.MAX_SAFE_INTEGER;
-};
-
-const sortMedicalQuotationItems = (items = []) =>
-    [...items].sort((a, b) => {
-        const av = getFamilySizeSortValue(a.family_size);
-        const bv = getFamilySizeSortValue(b.family_size);
-        if (av !== bv) return av - bv;
-        return String(a.family_size || "").localeCompare(String(b.family_size || ""));
-    });
-
-const buildMedicalSectionTotals = (items = []) =>
-    MEDICAL_COVERAGE_SECTIONS.reduce((totals, section) => {
-        totals[section.key] = items.reduce(
-            (sum, item) => sum + (Number(item?.[`${section.key}_total_contribution`]) || 0),
-            0
-        );
-        return totals;
-    }, {});
-
-const allocateAmountAcrossSections = (amount, sectionTotals, decimalPlaces) => {
-    const factor = 10 ** decimalPlaces;
-    const totalAmountUnits = Math.round((Number(amount) || 0) * factor);
-    const grandSectionTotal = MEDICAL_COVERAGE_SECTIONS.reduce(
-        (sum, section) => sum + (Number(sectionTotals[section.key]) || 0),
-        0
-    );
-
-    if (grandSectionTotal === 0) {
-        return MEDICAL_COVERAGE_SECTIONS.reduce((alloc, section) => {
-            alloc[section.key] = 0;
-            return alloc;
-        }, {});
-    }
-
-    let allocatedUnits = 0;
-    return MEDICAL_COVERAGE_SECTIONS.reduce((alloc, section, idx) => {
-        if (idx === MEDICAL_COVERAGE_SECTIONS.length - 1) {
-            alloc[section.key] = (totalAmountUnits - allocatedUnits) / factor;
-            return alloc;
-        }
-        const sectionUnits = Math.round(
-            totalAmountUnits * ((Number(sectionTotals[section.key]) || 0) / grandSectionTotal)
-        );
-        allocatedUnits += sectionUnits;
-        alloc[section.key] = sectionUnits / factor;
-        return alloc;
-    }, {});
-};
-
-export default function View({ quotation, decimalPlace }) {
-    const [isLoading, setIsLoading] = useState({ print: false, email: false });
+export default function View({ quotation, decimalPlace, email_templates = [] }) {
+    const [isLoading, setIsLoading]               = useState({ print: false });
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-    const [shareLink, setShareLink] = useState("");
-
-    const isMedical = quotation?.invoice_category === "medical";
-    const isOther   = quotation?.invoice_category === "other";
-    const quantityLabel = isMedical ? "Members" : "Quantity";
+    const [shareLink, setShareLink]               = useState("");
+    const [showEmailModal, setShowEmailModal]     = useState(false);
+    const [emailProcessing, setEmailProcessing]   = useState(false);
+    const [emailForm, setEmailForm]               = useState({ email: "", subject: "", message: "", template: "" });
 
     const getBusinessSettingValue = (name, fallback) =>
         quotation?.business?.system_settings?.find((s) => s.name === name)?.value || fallback;
 
-    const primaryColor = getBusinessSettingValue("invoice_primary_color", "#6d0e47");
-    const textColor    = getBusinessSettingValue("invoice_text_color", "#ffffff");
-    const businessName = quotation?.business?.business_name || quotation?.business?.name || "Business";
-    const businessEmail = quotation?.business?.business_email || quotation?.business?.email || "";
-    const coverageSummary    = quotation?.coverage_summary    || quotation?.note   || "";
-    const exclusionsRemarks  = quotation?.exclusions_remarks  || quotation?.footer || "";
+    const primaryColor      = getBusinessSettingValue("invoice_primary_color", "#6d0e47");
+    const textColor         = getBusinessSettingValue("invoice_text_color", "#ffffff");
+    const businessName      = quotation?.business?.business_name || quotation?.business?.name || "Business";
+    const businessEmail     = quotation?.business?.business_email || quotation?.business?.email || "";
+    const quotationSections = quotation?.sections || [];
+    const sectionStyle      = sectionTitleStyle(primaryColor, textColor);
 
     const formatMoney = (amount, currency = quotation?.currency) =>
         formatCurrency({ amount, currency, decimalPlaces: decimalPlace });
 
-    const formatOptionalMoney = (amount) =>
-        amount === null || amount === undefined || amount === "" ? "-" : formatMoney(amount);
-
-    const formatPlainNumber = (amount) =>
-        amount === null || amount === undefined || amount === ""
-            ? "-"
-            : new Intl.NumberFormat(undefined, {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: decimalPlace,
-              }).format(Number(amount) || 0);
-
-    const hasCoverageValue = (value) => value !== null && value !== undefined && value !== "";
-
-    const getMedicalCoverageConfigEntries = (item) =>
-        MEDICAL_COVERAGE_SECTIONS.map((section) => ({
-            ...section,
-            limitPerFamily: item?.[`${section.key}_limit_per_family`],
-            contributionPerFamily: item?.[`${section.key}_contribution_per_family`],
-            totalContribution: item?.[`${section.key}_total_contribution`],
-        })).filter(
-            (s) => hasCoverageValue(s.limitPerFamily) || hasCoverageValue(s.contributionPerFamily) || hasCoverageValue(s.totalContribution)
-        );
-
-    const medicalItems   = isMedical ? sortMedicalQuotationItems(quotation?.items || []) : [];
-    const medicalTotals  = isMedical ? buildMedicalSectionTotals(medicalItems) : {};
-    const medicalTotalMembers = medicalItems.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
-    const medicalTotalMembersAndFamily = medicalItems.reduce(
-        (s, i) => s + calculateMembersAndFamilyValue(i.quantity, i.family_size),
-        0
-    );
-    const medicalTaxAllocations = (quotation?.taxes || []).map((tax) => ({
-        ...tax,
-        allocations: allocateAmountAcrossSections(tax.amount, medicalTotals, decimalPlace),
-    }));
-    const medicalDiscountAllocations =
-        Number(quotation?.discount) > 0
-            ? allocateAmountAcrossSections(quotation.discount, medicalTotals, decimalPlace)
-            : null;
-    const medicalGrossTotals = MEDICAL_COVERAGE_SECTIONS.reduce((totals, section) => {
-        const taxTotal = medicalTaxAllocations.reduce((s, tax) => s + (Number(tax.allocations?.[section.key]) || 0), 0);
-        const discountAlloc = Number(medicalDiscountAllocations?.[section.key]) || 0;
-        totals[section.key] = (Number(medicalTotals[section.key]) || 0) + taxTotal - discountAlloc;
-        return totals;
-    }, {});
-    const getMedicalSectionLimit = (key) =>
-        medicalItems.find((i) => hasCoverageValue(i?.[`${key}_limit_per_family`]))?.[`${key}_limit_per_family`];
+    const formatItemRate = (item) =>
+        item.calculation_type === "percentage_of_amount"
+            ? `${Number(item.rate_value ?? 0)}%`
+            : formatMoney(item.unit_cost);
 
     const handlePrint = () => {
         setIsLoading((prev) => ({ ...prev, print: true }));
@@ -243,11 +107,26 @@ export default function View({ quotation, decimalPlace }) {
     };
 
     const handleEmailInvoice = () => {
-        setIsLoading((prev) => ({ ...prev, email: true }));
-        router.visit(route("underwriting_quotes.send_email", quotation.id), {
+        setEmailForm({
+            email:    quotation?.customer?.email || "",
+            subject:  `Quotation #${quotation?.quotation_number}`,
+            message:  "",
+            template: email_templates[0]?.slug || "",
+        });
+        setShowEmailModal(true);
+    };
+
+    const handleSendEmail = (e) => {
+        e.preventDefault();
+        setEmailProcessing(true);
+        router.post(route("underwriting_quotes.send_email", quotation.id), emailForm, {
             preserveScroll: true,
-            onSuccess: () => { toast.success("Email form opened successfully"); setIsLoading((prev) => ({ ...prev, email: false })); },
-            onError: () => { toast.error("Failed to open email form"); setIsLoading((prev) => ({ ...prev, email: false })); },
+            onSuccess: () => {
+                toast.success("Email sent successfully");
+                setShowEmailModal(false);
+            },
+            onError: () => toast.error("Failed to send email"),
+            onFinish: () => setEmailProcessing(false),
         });
     };
 
@@ -282,15 +161,14 @@ export default function View({ quotation, decimalPlace }) {
     ];
 
     const quoteToRows = [
-        { label: "Quote To",      value: quotation?.customer?.name || "-" },
-        { label: "Policy Number", value: quotation?.po_so_number || "-" },
-        { label: "Valid Until",   value: quotation?.expired_date || "-" },
+        { label: "Quote To",    value: quotation?.customer?.name || "-" },
+        { label: "Valid Until", value: quotation?.expired_date || "-" },
     ];
 
     return (
         <AuthenticatedLayout>
             <SidebarInset>
-                <style dangerouslySetInnerHTML={{ __html: buildPrintStyles(isMedical) }} />
+                <style dangerouslySetInnerHTML={{ __html: buildPrintStyles() }} />
 
                 <div className="space-y-4 p-4">
                     <PageHeader page="Underwriting Quotes" subpage={`Quote #${quotation.id}`} url="underwriting_quotes.index" />
@@ -301,14 +179,12 @@ export default function View({ quotation, decimalPlace }) {
                             {isLoading.print ? "Printing..." : "Print"}
                         </Button>
 
-                        <Button variant="outline" onClick={handleEmailInvoice} disabled={isLoading.email}>
-                            <MailIcon className="mr-2 h-4 w-4" />
-                            {isLoading.email ? "Sending..." : "Email"}
+                        <Button variant="outline" onClick={handleEmailInvoice}>
+                            <MailIcon className="mr-2 h-4 w-4" />Email
                         </Button>
 
                         <Button variant="outline" onClick={handleDownloadPDF}>
-                            <DownloadIcon className="mr-2 h-4 w-4" />
-                            Download PDF
+                            <DownloadIcon className="mr-2 h-4 w-4" />Download PDF
                         </Button>
 
                         <DropdownMenu>
@@ -331,17 +207,11 @@ export default function View({ quotation, decimalPlace }) {
                     </div>
 
                     <div className="overflow-x-auto pb-4">
-                        <div
-                            id="printable-area"
-                            className={`mx-auto bg-white flex flex-col ${isMedical ? "min-h-[210mm] w-[281mm]" : "min-h-[297mm] w-[210mm]"}`}
-                        >
-                            <div
-                                className={`flex-1 flex flex-col ${isMedical ? "border-[8px] p-2" : "border-[10px] p-3"}`}
-                                style={{ borderColor: primaryColor }}
-                            >
+                        <div id="printable-area" className="mx-auto bg-white flex flex-col min-h-[297mm] w-[210mm]">
+                            <div className="flex-1 flex flex-col border-[10px] p-3" style={{ borderColor: primaryColor }}>
                                 <div className="mb-4 h-4" style={{ backgroundColor: primaryColor }} />
 
-                                <div className={`grid grid-cols-12 ${isMedical ? "gap-4" : "gap-6"}`}>
+                                <div className="grid grid-cols-12 gap-6">
                                     <div className="col-span-7">
                                         <div className="mb-6 flex items-start justify-between gap-4">
                                             <div className="max-w-[260px]">
@@ -391,140 +261,62 @@ export default function View({ quotation, decimalPlace }) {
                                 </div>
 
                                 <div className="mt-5 border border-slate-900">
-                                    <div className="border-b border-slate-900 px-2 py-1 text-xs font-bold uppercase" style={sectionTitleStyle(primaryColor, textColor)}>
-                                        {quotation?.invoice_category ? `${quotation.invoice_category.toUpperCase()} Quote` : "Quote Items"}
+                                    <div className="border-b border-slate-900 px-2 py-1 text-xs font-bold uppercase" style={sectionStyle}>
+                                        Quote Items
                                     </div>
 
-                                    {isMedical ? (
-                                        <div>
-                                            <table className={MEDICAL_TABLE_CLASS_NAME}>
-                                                <colgroup>
-                                                    {MEDICAL_TABLE_COLUMN_WIDTHS.map((width, index) => (
-                                                        <col key={`col-${index}`} style={{ width }} />
-                                                    ))}
-                                                </colgroup>
-                                                <thead>
-                                                    <tr>
-                                                        <th className={MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} colSpan={3}></th>
-                                                        {MEDICAL_COVERAGE_SECTIONS.map((section) => (
-                                                            <th key={section.key} className={`${MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} text-center font-bold uppercase`} colSpan={2} style={sectionTitleStyle(primaryColor, textColor)}>
-                                                                {section.label}
-                                                            </th>
-                                                        ))}
-                                                        <th className={`${MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} text-center font-bold uppercase`} style={sectionTitleStyle(primaryColor, textColor)}>
-                                                            Total
-                                                        </th>
-                                                    </tr>
-                                                    <tr className="bg-slate-50">
-                                                        <th className={MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} colSpan={3}></th>
-                                                        {MEDICAL_COVERAGE_SECTIONS.map((section) => (
-                                                            <th key={`${section.key}-limit`} className={`${MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} text-center font-semibold`} colSpan={2}>
-                                                                Limit: {formatPlainNumber(getMedicalSectionLimit(section.key))} / Family
-                                                            </th>
-                                                        ))}
-                                                        <th className={MEDICAL_TABLE_HEADER_CELL_CLASS_NAME}></th>
-                                                    </tr>
-                                                    <tr className="bg-slate-100 font-semibold uppercase">
-                                                        <th className={`${MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} text-left`}>Family Size</th>
-                                                        <th className={`${MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} text-right`}>Staff</th>
-                                                        <th className={`${MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} text-right`}>Staff + Family</th>
-                                                        {MEDICAL_COVERAGE_SECTIONS.map((section) => (
-                                                            <Fragment key={`${section.key}-subhead`}>
-                                                                <th className={`${MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} text-right`}>Contrib./Family</th>
-                                                                <th className={`${MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} text-right`}>Total Contrib.</th>
-                                                            </Fragment>
-                                                        ))}
-                                                        <th className={`${MEDICAL_TABLE_HEADER_CELL_CLASS_NAME} text-right`}>Total</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {medicalItems.map((item, index) => (
-                                                        <tr key={index}>
-                                                            <td className={`${MEDICAL_TABLE_BODY_CELL_CLASS_NAME} font-semibold whitespace-nowrap`}>{item.family_size}</td>
-                                                            <td className={MEDICAL_TABLE_NUMERIC_CELL_CLASS_NAME}>{formatPlainNumber(item.quantity)}</td>
-                                                            <td className={MEDICAL_TABLE_NUMERIC_CELL_CLASS_NAME}>{formatPlainNumber(calculateMembersAndFamilyValue(item.quantity, item.family_size))}</td>
-                                                            {MEDICAL_COVERAGE_SECTIONS.map((section) => (
-                                                                <Fragment key={`${item.id || index}-${section.key}`}>
-                                                                    <td className={MEDICAL_TABLE_NUMERIC_CELL_CLASS_NAME}>{formatPlainNumber(item?.[`${section.key}_contribution_per_family`])}</td>
-                                                                    <td className={MEDICAL_TABLE_NUMERIC_CELL_CLASS_NAME}>{formatPlainNumber(item?.[`${section.key}_total_contribution`])}</td>
-                                                                </Fragment>
-                                                            ))}
-                                                            <td className={`${MEDICAL_TABLE_NUMERIC_CELL_CLASS_NAME} font-semibold`}>{formatPlainNumber(item.sub_total)}</td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    ) : (
-                                        <table className="w-full border-collapse text-xs">
-                                            <thead>
-                                                <tr>
-                                                    <th className="border border-slate-900 px-2 py-1 text-left" style={sectionTitleStyle(primaryColor, textColor)}>Item</th>
-                                                    <th className="border border-slate-900 px-2 py-1 text-left" style={sectionTitleStyle(primaryColor, textColor)}>Description</th>
-                                                    {isOther && <th className="border border-slate-900 px-2 py-1 text-right" style={sectionTitleStyle(primaryColor, textColor)}>Sum Insured</th>}
-                                                    {!isOther && <th className="border border-slate-900 px-2 py-1 text-right" style={sectionTitleStyle(primaryColor, textColor)}>{quantityLabel}</th>}
-                                                    <th className="border border-slate-900 px-2 py-1 text-right" style={sectionTitleStyle(primaryColor, textColor)}>{isOther ? "Rate (%)" : "Rate"}</th>
-                                                    <th className="border border-slate-900 px-2 py-1 text-right" style={sectionTitleStyle(primaryColor, textColor)}>Premium</th>
+                                    <table className="w-full border-collapse text-xs">
+                                        <thead>
+                                            <tr>
+                                                <th className="border border-slate-900 px-2 py-1 text-left" style={sectionStyle}>Item</th>
+                                                <th className="border border-slate-900 px-2 py-1 text-left" style={sectionStyle}>Description</th>
+                                                <th className="border border-slate-900 px-2 py-1 text-right" style={sectionStyle}>Qty</th>
+                                                <th className="border border-slate-900 px-2 py-1 text-right" style={sectionStyle}>Rate</th>
+                                                <th className="border border-slate-900 px-2 py-1 text-right" style={sectionStyle}>Premium</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {(quotation?.items || []).map((item, index) => (
+                                                <tr key={index}>
+                                                    <td className="border border-slate-900 px-2 py-2 align-top">{item.product_name}</td>
+                                                    <td className="border border-slate-900 px-2 py-2 align-top">{item.description}</td>
+                                                    <td className="border border-slate-900 px-2 py-2 text-right align-top">{item.quantity}</td>
+                                                    <td className="border border-slate-900 px-2 py-2 text-right align-top">{formatItemRate(item)}</td>
+                                                    <td className="border border-slate-900 px-2 py-2 text-right align-top">{formatMoney(item.sub_total)}</td>
                                                 </tr>
-                                            </thead>
-                                            <tbody>
-                                                {(quotation?.items || []).map((item, index) => (
-                                                    <tr key={index}>
-                                                        <td className="border border-slate-900 px-2 py-2 align-top">{item.product_name}</td>
-                                                        <td className="border border-slate-900 px-2 py-2 align-top">{item.description}</td>
-                                                        {isOther && <td className="border border-slate-900 px-2 py-2 text-right align-top">{formatMoney(item.sum_insured)}</td>}
-                                                        {!isOther && <td className="border border-slate-900 px-2 py-2 text-right align-top">{item.quantity}</td>}
-                                                        <td className="border border-slate-900 px-2 py-2 text-right align-top">{isOther ? `${item.unit_cost}%` : formatMoney(item.unit_cost)}</td>
-                                                        <td className="border border-slate-900 px-2 py-2 text-right align-top">{formatMoney(item.sub_total)}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    )}
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
 
-                                <div className="mt-5 grid grid-cols-12 gap-0 border border-slate-900">
-                                    <div className="col-span-4 border-r border-slate-900">
-                                        <div className="px-2 py-1 text-xs font-bold uppercase" style={sectionTitleStyle(primaryColor, textColor)}>Coverage Summary</div>
-                                        <div className="min-h-[150px] whitespace-pre-line p-3 text-sm leading-6 text-slate-800">
-                                            {coverageSummary || "No additional coverage summary provided."}
-                                        </div>
-                                    </div>
+                                <QuotationSections sections={quotationSections} style={sectionStyle} />
 
-                                    <div className="col-span-4 border-r border-slate-900">
-                                        <div className="px-2 py-1 text-xs font-bold uppercase" style={sectionTitleStyle(primaryColor, textColor)}>Exclusions and Remarks</div>
-                                        <div className="min-h-[150px] whitespace-pre-line p-3 text-sm leading-6 text-slate-800">
-                                            {exclusionsRemarks || "No additional exclusions or remarks provided."}
-                                        </div>
-                                    </div>
-
-                                    <div className="col-span-4">
-                                        <div className="px-2 py-1 text-xs font-bold uppercase" style={sectionTitleStyle(primaryColor, textColor)}>Premium Summary</div>
-                                        <table className="w-full border-collapse text-sm">
-                                            <tbody>
-                                                <tr>
-                                                    <td className="border-b border-slate-900 px-3 py-2 font-semibold">Sub-Total</td>
-                                                    <td className="border-b border-slate-900 px-3 py-2 text-right">{formatMoney(quotation?.sub_total)}</td>
+                                <div className="mt-5 border border-slate-900">
+                                    <div className="px-2 py-1 text-xs font-bold uppercase" style={sectionStyle}>Premium Summary</div>
+                                    <table className="w-full border-collapse text-sm">
+                                        <tbody>
+                                            <tr>
+                                                <td className="border-b border-slate-900 px-3 py-2 font-semibold">Sub-Total</td>
+                                                <td className="border-b border-slate-900 px-3 py-2 text-right">{formatMoney(quotation?.sub_total)}</td>
+                                            </tr>
+                                            {(quotation?.taxes || []).map((tax, index) => (
+                                                <tr key={index}>
+                                                    <td className="border-b border-slate-900 px-3 py-2 font-semibold">{tax.name}</td>
+                                                    <td className="border-b border-slate-900 px-3 py-2 text-right">{formatMoney(tax.amount)}</td>
                                                 </tr>
-                                                {(quotation?.taxes || []).map((tax, index) => (
-                                                    <tr key={index}>
-                                                        <td className="border-b border-slate-900 px-3 py-2 font-semibold">{tax.name}</td>
-                                                        <td className="border-b border-slate-900 px-3 py-2 text-right">{formatMoney(tax.amount)}</td>
-                                                    </tr>
-                                                ))}
-                                                {Number(quotation?.discount) > 0 && (
-                                                    <tr>
-                                                        <td className="border-b border-slate-900 px-3 py-2 font-semibold">Discount</td>
-                                                        <td className="border-b border-slate-900 px-3 py-2 text-right">-{formatMoney(quotation.discount)}</td>
-                                                    </tr>
-                                                )}
+                                            ))}
+                                            {Number(quotation?.discount) > 0 && (
                                                 <tr>
-                                                    <td className="px-3 py-2 font-bold uppercase">Total Premium</td>
-                                                    <td className="px-3 py-2 text-right font-bold">{formatMoney(quotation?.grand_total)}</td>
+                                                    <td className="border-b border-slate-900 px-3 py-2 font-semibold">Discount</td>
+                                                    <td className="border-b border-slate-900 px-3 py-2 text-right">-{formatMoney(quotation.discount)}</td>
                                                 </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                            )}
+                                            <tr>
+                                                <td className="px-3 py-2 font-bold uppercase">Total Premium</td>
+                                                <td className="px-3 py-2 text-right font-bold">{formatMoney(quotation?.grand_total)}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
 
                                 <div className="mt-auto border-x border-b border-slate-900 px-4 py-3 text-center text-sm text-slate-800">
@@ -540,6 +332,63 @@ export default function View({ quotation, decimalPlace }) {
                 </div>
             </SidebarInset>
 
+            {/* Email Modal */}
+            <Modal show={showEmailModal} onClose={() => setShowEmailModal(false)} maxWidth="xl">
+                <form onSubmit={handleSendEmail} className="p-4">
+                    <h2 className="text-lg font-medium text-gray-900 mb-4">Send Quotation via Email</h2>
+                    <div className="space-y-4">
+                        {email_templates.length > 0 && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Template</label>
+                                <select
+                                    value={emailForm.template}
+                                    onChange={(e) => setEmailForm((p) => ({ ...p, template: e.target.value }))}
+                                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                >
+                                    <option value="">No template</option>
+                                    {email_templates.map((t) => (
+                                        <option key={t.slug} value={t.slug}>{t.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">To *</label>
+                            <Input
+                                type="email"
+                                value={emailForm.email}
+                                onChange={(e) => setEmailForm((p) => ({ ...p, email: e.target.value }))}
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Subject *</label>
+                            <Input
+                                value={emailForm.subject}
+                                onChange={(e) => setEmailForm((p) => ({ ...p, subject: e.target.value }))}
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Message *</label>
+                            <Textarea
+                                value={emailForm.message}
+                                onChange={(e) => setEmailForm((p) => ({ ...p, message: e.target.value }))}
+                                rows={4}
+                                required
+                            />
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-2 mt-6">
+                        <Button type="button" variant="outline" onClick={() => setShowEmailModal(false)}>Cancel</Button>
+                        <Button type="submit" disabled={emailProcessing}>
+                            {emailProcessing ? "Sending..." : "Send Email"}
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* Share Modal */}
             <Modal show={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} maxWidth="2xl">
                 <div className="mb-6">
                     <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Share Underwriting Quote</h2>
