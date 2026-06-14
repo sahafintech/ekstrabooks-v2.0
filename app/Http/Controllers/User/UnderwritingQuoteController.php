@@ -783,9 +783,7 @@ class UnderwritingQuoteController extends Controller
         $rateType        = $this->resolveRateType($request, $index, $calculationType, $ratingRule);
         $quantity        = $this->normalizeDecimal($request->input("quantity.$index")) ?? 0;
         $basisQuantity   = $this->normalizeDecimal($request->input("basis_quantity.$index")) ?? ($quantity > 0 ? $quantity : 1);
-        $basisAmount     = $this->normalizeDecimal($request->input("basis_amount.$index"))
-            ?? $this->normalizeDecimal($request->input("sum_insured.$index"))
-            ?? 0;
+        $basisAmount     = $this->normalizeDecimal($request->input("basis_amount.$index")) ?? 0;
         $minimumPremium  = $this->normalizeDecimal($request->input("minimum_premium.$index"))
             ?? $this->normalizeDecimal($ratingRule?->minimum_premium);
         $rateValue       = $this->resolveRateValue($request, $index, $ratingRule);
@@ -901,9 +899,7 @@ class UnderwritingQuoteController extends Controller
             $calculationType = $this->resolveCalculationType($request, $i, $ratingRule);
             $rateValue       = $this->resolveRateValue($request, $i, $ratingRule);
             $quantity        = $this->normalizeDecimal($request->input("quantity.$i")) ?? 0;
-            $basisAmount     = $this->normalizeDecimal($request->input("basis_amount.$i"))
-                ?? $this->normalizeDecimal($request->input("sum_insured.$i"))
-                ?? 0;
+            $basisAmount     = $this->normalizeDecimal($request->input("basis_amount.$i")) ?? 0;
             $basisQuantity   = $this->normalizeDecimal($request->input("basis_quantity.$i")) ?? ($quantity > 0 ? $quantity : 1);
             $minimumPremium  = $this->normalizeDecimal($request->input("minimum_premium.$i"))
                 ?? $this->normalizeDecimal($ratingRule?->minimum_premium);
@@ -916,16 +912,16 @@ class UnderwritingQuoteController extends Controller
                     $taxAmount += ($lineTotal / 100) * $tax->rate;
                 }
             }
+        }
 
-            if ($request->discount_type == '0') {
-                $discountAmount = ($subTotal / 100) * ($request->discount_value ?? 0);
-            } elseif ($request->discount_type == '1') {
-                $discountAmount = $request->discount_value ?? 0;
-            }
+        if ($request->discount_type == '0') {
+            $discountAmount = ($subTotal / 100) * ($request->discount_value ?? 0);
+        } elseif ($request->discount_type == '1') {
+            $discountAmount = $request->discount_value ?? 0;
         }
 
         $grandTotal = ($subTotal + $taxAmount) - $discountAmount;
-        $rate       = $request->exchange_rate ?? 1;
+        $rate       = Currency::where('name', $request->currency)->value('exchange_rate') ?? 1;
 
         return [
             'subTotal'       => $subTotal / $rate,

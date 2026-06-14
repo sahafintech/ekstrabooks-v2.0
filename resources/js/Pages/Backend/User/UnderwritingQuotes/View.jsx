@@ -101,6 +101,8 @@ export default function View({ quotation, decimalPlace, email_templates = [] }) 
             ? `${Number(item.rate_value ?? 0)}%`
             : formatMoney(item.unit_cost);
 
+    const hasAnySumInsured = (quotation?.items || []).some((item) => Number(item.sum_insured) > 0);
+
     const handlePrint = () => {
         setIsLoading((prev) => ({ ...prev, print: true }));
         setTimeout(() => { window.print(); setIsLoading((prev) => ({ ...prev, print: false })); }, 300);
@@ -271,6 +273,9 @@ export default function View({ quotation, decimalPlace, email_templates = [] }) 
                                                 <th className="border border-slate-900 px-2 py-1 text-left" style={sectionStyle}>Item</th>
                                                 <th className="border border-slate-900 px-2 py-1 text-left" style={sectionStyle}>Description</th>
                                                 <th className="border border-slate-900 px-2 py-1 text-right" style={sectionStyle}>Qty</th>
+                                                {hasAnySumInsured && (
+                                                    <th className="border border-slate-900 px-2 py-1 text-right" style={sectionStyle}>Sum Insured</th>
+                                                )}
                                                 <th className="border border-slate-900 px-2 py-1 text-right" style={sectionStyle}>Rate</th>
                                                 <th className="border border-slate-900 px-2 py-1 text-right" style={sectionStyle}>Premium</th>
                                             </tr>
@@ -281,6 +286,11 @@ export default function View({ quotation, decimalPlace, email_templates = [] }) 
                                                     <td className="border border-slate-900 px-2 py-2 align-top">{item.product_name}</td>
                                                     <td className="border border-slate-900 px-2 py-2 align-top">{item.description}</td>
                                                     <td className="border border-slate-900 px-2 py-2 text-right align-top">{item.quantity}</td>
+                                                    {hasAnySumInsured && (
+                                                        <td className="border border-slate-900 px-2 py-2 text-right align-top">
+                                                            {Number(item.sum_insured) > 0 ? formatMoney(item.sum_insured) : "—"}
+                                                        </td>
+                                                    )}
                                                     <td className="border border-slate-900 px-2 py-2 text-right align-top">{formatItemRate(item)}</td>
                                                     <td className="border border-slate-900 px-2 py-2 text-right align-top">{formatMoney(item.sub_total)}</td>
                                                 </tr>

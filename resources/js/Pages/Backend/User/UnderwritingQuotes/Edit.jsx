@@ -9,19 +9,18 @@ import { Button } from "@/Components/ui/button";
 import { toast } from "sonner";
 import { SearchableCombobox } from "@/Components/ui/searchable-combobox";
 import { Textarea } from "@/Components/ui/textarea";
-import { formatCurrency, parseDateObject } from "@/lib/utils";
-import { useEffect, useState } from "react";
+import { parseDateObject } from "@/lib/utils";
 import { SearchableMultiSelectCombobox } from "@/Components/ui/searchable-multiple-combobox";
 import DateTimePicker from "@/Components/DateTimePicker";
 import QuoteItemsEditor from "./QuoteItemsEditor";
 import {
-    parseNumericValue,
     getDefaultRateType,
-    calculateFinancialLineTotal,
-    calculateLineUnitCost,
     createEmptyQuotationItem,
     sectionsFromTemplate,
 } from "@/lib/quote-form-utils";
+import { useQuoteForm } from "@/hooks/useQuoteForm";
+
+// ── Helpers to hydrate saved data back into form shape ────────────────────────
 
 const formatQuotationItem = (item = {}) => {
     const metadata        = item.metadata_json ?? {};
@@ -49,8 +48,8 @@ const getInitialQuotationItems = (quotation) =>
 
 const formatSavedSections = (savedSections = []) =>
     savedSections.map((section, index) => {
-        const dataJson  = section.data_json ?? {};
-        const columns   = dataJson.columns ?? [""];
+        const dataJson = section.data_json ?? {};
+        const columns  = dataJson.columns ?? [""];
         return {
             id:                            section.id,
             insurance_category_section_id: section.insurance_category_section_id ?? null,
@@ -108,6 +107,8 @@ const buildInitialFormData = (quotation, taxIds, initialSections) => {
     };
 };
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function Edit({
     customers = [],
     products = [],
@@ -122,12 +123,35 @@ export default function Edit({
     const initialSections       = getInitialSections(quotation, insuranceCategories);
     const initialFormData       = buildInitialFormData(quotation, taxIds, initialSections);
 
-    const [quotationItems, setQuotationItems] = useState(initialQuotationItems);
-    const [sections, setSections]             = useState(initialSections);
-    const [exchangeRate, setExchangeRate]     = useState(quotation.exchange_rate ?? 1);
-    const [baseCurrencyInfo, setBaseCurrencyInfo] = useState(null);
-
     const { data, setData, post, processing, errors, reset } = useForm(initialFormData);
+
+    const {
+        quotationItems,
+        setQuotationItems,
+        sections,
+        syncSections,
+        setExchangeRate,
+        handleInsuranceCategoryChange,
+        addItem,
+        removeItem,
+        updateItem,
+        calculateSubtotal,
+        calculateTaxes,
+        calculateDiscount,
+        handleCurrencyChange,
+        renderTotal,
+    } = useQuoteForm({
+        data,
+        setData,
+        products,
+        currencies,
+        taxes,
+        insuranceCategories,
+        ratingRules,
+        initialItems:        initialQuotationItems,
+        initialSections,
+        initialExchangeRate: quotation.exchange_rate ?? 1,
+    });
 
     const customerOptions          = customers.map((c) => ({ id: c.id, name: c.name }));
     const insuranceCategoryOptions = insuranceCategories.map((c) => ({ id: c.id, name: c.name }));
@@ -139,184 +163,6 @@ export default function Edit({
         { id: "0", name: "Percentage (%)" },
         { id: "1", name: "Fixed Amount" },
     ];
-
-    const findDefaultRatingRule = (item, categoryId = data.insurance_category_id) => {
-        const rules = ratingRules.filter((rule) => {
-            if (String(rule.insurance_category_id) !== String(categoryId)) return false;
-            if (!rule.product_id) return true;
-            return String(rule.product_id) === String(item.product_id);
-        });
-        return rules.find((r) => r.product_id && String(r.product_id) === String(item.product_id))
-            ?? rules.find((r) => !r.product_id)
-            ?? null;
-    };
-
-    const applyRatingRule = (item, rule) => {
-        if (!rule) return item;
-        const calcType = rule.calculation_type || "manual_premium";
-        return {
-            ...item,
-            rating_rule_id:   rule.id,
-            calculation_type: calcType,
-            rate_type:        rule.rate_type || getDefaultRateType(calcType),
-            rate_value:       parseNumericValue(rule.default_rate ?? item.rate_value ?? 0),
-            minimum_premium:  parseNumericValue(rule.minimum_premium ?? item.minimum_premium ?? ""),
-        };
-    };
-
-    const syncItems = (items) => {
-        setData("product_id",       items.map((i) => i.product_id));
-        setData("product_name",     items.map((i) => i.product_name));
-        setData("description",      items.map((i) => i.description));
-        setData("rating_rule_id",   items.map((i) => i.rating_rule_id ?? ""));
-        setData("calculation_type", items.map((i) => i.calculation_type));
-        setData("rate_type",        items.map((i) => i.rate_type));
-        setData("rate_value",       items.map((i) => i.rate_value));
-        setData("basis_amount",     items.map((i) => i.basis_amount));
-        setData("basis_quantity",   items.map((i) => i.basis_quantity || i.quantity || 1));
-        setData("minimum_premium",  items.map((i) => i.minimum_premium));
-        setData("quantity",         items.map((i) => i.quantity));
-        setData("unit_cost",        items.map((i) => calculateLineUnitCost(i)));
-    };
-
-    const syncSections = (nextSections) => {
-        setSections(nextSections);
-        setData("sections", nextSections);
-    };
-
-    const updateItems = (items) => {
-        const normalized = items.map((item) => ({
-            ...item,
-            basis_quantity: item.basis_quantity || item.quantity || 1,
-            unit_cost:      calculateLineUnitCost(item),
-        }));
-        setQuotationItems(normalized);
-        syncItems(normalized);
-    };
-
-    const sanitizeItems = (items, categoryId = data.insurance_category_id) =>
-        items.map((item) => {
-            const nextItem = {
-                ...item,
-                rating_rule_id:   "",
-                calculation_type: "manual_premium",
-                rate_type:        getDefaultRateType("manual_premium"),
-                basis_amount:     "",
-                basis_quantity:   item.basis_quantity || item.quantity || 1,
-            };
-            return applyRatingRule(nextItem, findDefaultRatingRule(nextItem, categoryId));
-        });
-
-    const handleInsuranceCategoryChange = (catId) => {
-        const cat = insuranceCategories.find((c) => String(c.id) === String(catId));
-        setData("insurance_category_id", catId);
-        syncSections(cat ? sectionsFromTemplate(cat.sections) : []);
-        updateItems(sanitizeItems(quotationItems, catId));
-    };
-
-    const addItem = () => {
-        const newItem = sanitizeItems([createEmptyQuotationItem()])[0];
-        updateItems([...quotationItems, newItem]);
-    };
-
-    const removeItem = (index) => {
-        updateItems(quotationItems.filter((_, i) => i !== index));
-    };
-
-    const updateItem = (index, field, value) => {
-        const updated = [...quotationItems];
-        updated[index] = { ...updated[index], [field]: value };
-
-        if (field === "rating_rule_id") {
-            const rule = ratingRules.find((r) => String(r.id) === String(value));
-            updated[index] = rule
-                ? applyRatingRule(updated[index], rule)
-                : { ...updated[index], rating_rule_id: "" };
-        }
-        if (field === "calculation_type") {
-            updated[index].rate_type = getDefaultRateType(value);
-            if (value !== "percentage_of_amount") updated[index].basis_amount = "";
-        }
-        if (field === "quantity") {
-            updated[index].basis_quantity = value || 0;
-        }
-        if (field === "product_id") {
-            const product = products.find((p) => p.id === parseInt(value, 10));
-            if (product) {
-                updated[index].product_name = product.name;
-                if (!updated[index].description) updated[index].description = product.description || "";
-                const rule = findDefaultRatingRule(updated[index]);
-                if (rule) {
-                    updated[index] = applyRatingRule(updated[index], rule);
-                } else {
-                    updated[index].rate_value     = parseNumericValue(product.selling_price ?? updated[index].rate_value ?? 0);
-                    updated[index].rating_rule_id = "";
-                }
-            }
-        }
-        updateItems(updated);
-    };
-
-    const calculateSubtotal = () =>
-        quotationItems.reduce((s, item) => s + calculateFinancialLineTotal(item), 0);
-
-    const taxRateMap = new Map(taxes.map((t) => [t.id, Number(t.rate)]));
-    const calculateTaxes = () =>
-        quotationItems.reduce((sum, item) => {
-            const base = calculateFinancialLineTotal(item);
-            return sum + data.taxes.reduce((ts, id) => ts + (base * (taxRateMap.get(Number(id)) || 0)) / 100, 0);
-        }, 0);
-
-    const calculateDiscount = () => {
-        const sub = calculateSubtotal();
-        const dv  = Number(data.discount_value) || 0;
-        return data.discount_type === "0" ? (sub * dv) / 100 : dv;
-    };
-
-    const calculateTotal = () => calculateSubtotal() + calculateTaxes() - calculateDiscount();
-
-    useEffect(() => {
-        const baseC = currencies.find((c) => c.base_currency === 1) || currencies[0];
-        if (baseC) setBaseCurrencyInfo(baseC);
-    }, [currencies]);
-
-    const handleCurrencyChange = (currencyName) => {
-        const currencyObj = currencies.find((c) => c.name === currencyName);
-        if (currencyObj) {
-            const rate = parseFloat(currencyObj.exchange_rate);
-            setExchangeRate(rate);
-            setData("exchange_rate", rate);
-            fetch(`/user/find_currency/${currencyObj.name}`)
-                .then((r) => r.json())
-                .then((d) => {
-                    if (d?.exchange_rate) {
-                        const ar = parseFloat(d.exchange_rate);
-                        setExchangeRate(ar);
-                        setData("exchange_rate", ar);
-                    }
-                })
-                .catch(() => {});
-        }
-    };
-
-    useEffect(() => {
-        setData("converted_total", calculateTotal());
-    }, [data.currency, quotationItems, data.discount_type, data.discount_value, exchangeRate]);
-
-    const renderTotal = () => {
-        const total    = calculateTotal();
-        const selected = currencies.find((c) => c.name === data.currency);
-        if (!selected) return <h2 className="text-xl font-bold">Total: 0.00</h2>;
-        if (baseCurrencyInfo && selected.name !== baseCurrencyInfo.name && exchangeRate && exchangeRate !== 1) {
-            return (
-                <div>
-                    <h2 className="text-xl font-bold">Total: {formatCurrency({ amount: total, currency: selected.name })}</h2>
-                    <p className="text-sm text-gray-600">Equivalent to {formatCurrency({ amount: total / exchangeRate, currency: baseCurrencyInfo.name })}</p>
-                </div>
-            );
-        }
-        return <h2 className="text-xl font-bold">Total: {formatCurrency({ amount: total, currency: selected.name })}</h2>;
-    };
 
     const submit = (e) => {
         e.preventDefault();
@@ -367,12 +213,10 @@ export default function Edit({
                                         emptyMessage="No categories found. Add them in Underwriting Configuration."
                                     />
                                 </div>
-                                <p className="text-xs text-gray-400 mt-0.5">Selecting a category loads its quotation sections and available rating rules.</p>
+                                <p className="text-xs text-gray-400 mt-0.5">Changing the category will reload sections from the new template.</p>
                                 <InputError message={errors.insurance_category_id} className="text-sm" />
                             </div>
                         </div>
-
-
 
                         <div className="grid grid-cols-12 mt-2">
                             <Label htmlFor="quotation_date" className="md:col-span-2 col-span-12">Quotation Date *</Label>
@@ -450,7 +294,7 @@ export default function Edit({
                         <div className="grid grid-cols-12 mt-2">
                             <Label htmlFor="discount_value" className="md:col-span-2 col-span-12">Discount Value</Label>
                             <div className="md:col-span-10 col-span-12 md:mt-0 mt-2">
-                                <Input id="discount_value" type="number" step="0.01" min="0" value={data.discount_value} onChange={(e) => setData("discount_value", parseNumericValue(e.target.value))} className="md:w-1/2 w-full" />
+                                <Input id="discount_value" type="number" step="0.01" min="0" value={data.discount_value} onChange={(e) => setData("discount_value", parseFloat(e.target.value) || 0)} className="md:w-1/2 w-full" />
                                 <InputError message={errors.discount_value} className="text-sm" />
                             </div>
                         </div>
@@ -484,8 +328,8 @@ export default function Edit({
                                     variant="secondary"
                                     onClick={() => {
                                         reset();
-                                        setQuotationItems(getInitialQuotationItems(quotation));
-                                        setSections(initialSections);
+                                        setQuotationItems(initialQuotationItems);
+                                        syncSections(initialSections);
                                         setExchangeRate(quotation.exchange_rate ?? 1);
                                     }}
                                 >

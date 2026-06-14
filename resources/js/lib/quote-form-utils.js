@@ -4,6 +4,7 @@ export const CALCULATION_TYPES = [
     { id: "fixed_amount",         name: "Fixed Amount" },
     { id: "manual_premium",       name: "Manual Premium" },
     { id: "tiered_rate",          name: "Tiered Rate" },
+    { id: "contribution_table",   name: "Contribution Table" },
 ];
 
 export const TEXT_SECTION_TYPES = [

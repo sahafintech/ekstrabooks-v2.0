@@ -65,6 +65,7 @@ export default function QuoteItemsEditor({
                         <div key={index} className="border rounded-lg p-3 bg-gray-50">
                             <div className="flex gap-2 items-end">
                                 <div className="grid grid-cols-12 gap-2 items-end flex-1">
+                                    {/* Product — 2 cols */}
                                     <div className="md:col-span-2 col-span-12">
                                         <Label>Product</Label>
                                         <SearchableCombobox
@@ -75,7 +76,8 @@ export default function QuoteItemsEditor({
                                         />
                                     </div>
 
-                                    <div className={`${hasBasis ? "md:col-span-2" : "md:col-span-3"} col-span-12`}>
+                                    {/* Rating Rule — 2 cols */}
+                                    <div className="md:col-span-2 col-span-12">
                                         <Label>Rating Rule</Label>
                                         <SearchableCombobox
                                             options={getRatingRuleOptions(item)}
@@ -85,6 +87,7 @@ export default function QuoteItemsEditor({
                                         />
                                     </div>
 
+                                    {/* Qty — 1 col */}
                                     <div className="md:col-span-1 col-span-12">
                                         <Label>Qty</Label>
                                         <Input
@@ -95,6 +98,7 @@ export default function QuoteItemsEditor({
                                         />
                                     </div>
 
+                                    {/* Calculation Type — 2 cols */}
                                     <div className="md:col-span-2 col-span-12">
                                         <Label>Calculation Type</Label>
                                         <SearchableCombobox
@@ -105,6 +109,7 @@ export default function QuoteItemsEditor({
                                         />
                                     </div>
 
+                                    {/* Rate — 1 col */}
                                     <div className="md:col-span-1 col-span-12">
                                         <Label>{getRateLabel(item)}</Label>
                                         <Input
@@ -115,6 +120,7 @@ export default function QuoteItemsEditor({
                                         />
                                     </div>
 
+                                    {/* Sum Insured — 1 col, only for percentage_of_amount */}
                                     {hasBasis && (
                                         <div className="md:col-span-1 col-span-12">
                                             <Label>Sum Insured</Label>
@@ -127,7 +133,20 @@ export default function QuoteItemsEditor({
                                         </div>
                                     )}
 
-                                    <div className="md:col-span-2 col-span-12">
+                                    {/* Min. Premium — 1 col */}
+                                    <div className="md:col-span-1 col-span-12">
+                                        <Label>Min. Premium</Label>
+                                        <Input
+                                            type="number"
+                                            step="0.01"
+                                            value={item.minimum_premium ?? ""}
+                                            onChange={(e) => onUpdateItem(index, "minimum_premium", parseNumericValue(e.target.value))}
+                                            placeholder="Optional"
+                                        />
+                                    </div>
+
+                                    {/* Description — shrinks to 1 col when sum insured is shown */}
+                                    <div className={`${hasBasis ? "md:col-span-1" : "md:col-span-2"} col-span-12`}>
                                         <Label>Description</Label>
                                         <Textarea
                                             value={item.description}
@@ -137,6 +156,7 @@ export default function QuoteItemsEditor({
                                         />
                                     </div>
 
+                                    {/* Subtotal — 1 col */}
                                     <div className="md:col-span-1 col-span-12">
                                         <Label>Subtotal</Label>
                                         <div className="h-10 flex items-center justify-end px-2 bg-white rounded border text-sm font-medium">
