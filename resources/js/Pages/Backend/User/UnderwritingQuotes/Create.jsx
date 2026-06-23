@@ -1,4 +1,5 @@
-import { useForm } from "@inertiajs/react";
+import { useEffect } from "react";
+import { useForm, usePage } from "@inertiajs/react";
 import { Label } from "@/Components/ui/label";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset, SidebarSeparator } from "@/Components/ui/sidebar";
@@ -25,6 +26,8 @@ export default function Create({
     quotation_title,
     base_currency,
 }) {
+    const { flash = {} } = usePage().props;
+
     const { data, setData, post, processing, errors, reset } = useForm({
         customer_id:           "",
         insurance_category_id: "",
@@ -94,15 +97,26 @@ export default function Create({
         { id: "1", name: "Fixed Amount" },
     ];
 
+    useEffect(() => {
+        if (flash?.success) toast.success(flash.success);
+        if (flash?.error) toast.error(flash.error);
+    }, [flash?.success, flash?.error]);
+
     const submit = (e) => {
         e.preventDefault();
         const selected = currencies.find((c) => c.name === data.currency);
         if (!selected)                    { toast.error("Please select a valid currency"); return; }
         if (!data.insurance_category_id)  { toast.error("Please select an insurance category"); return; }
+        if (quotationItems.some((item) => !item.product_id)) {
+            toast.error("Please select a product for each item");
+            return;
+        }
 
         post(route("underwriting_quotes.store"), {
             preserveScroll: true,
-            onSuccess: () => {
+            onSuccess: (page) => {
+                if (page.props.flash?.error) return;
+
                 toast.success("Underwriting quote created successfully");
                 reset();
                 setQuotationItems([createEmptyQuotationItem()]);

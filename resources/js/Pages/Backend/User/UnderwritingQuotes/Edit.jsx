@@ -1,4 +1,5 @@
-import { useForm } from "@inertiajs/react";
+import { useEffect } from "react";
+import { useForm, usePage } from "@inertiajs/react";
 import { Label } from "@/Components/ui/label";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset, SidebarSeparator } from "@/Components/ui/sidebar";
@@ -117,6 +118,7 @@ export default function Edit({
     insuranceCategories = [],
     ratingRules = [],
 }) {
+    const { flash = {} } = usePage().props;
     const initialQuotationItems = getInitialQuotationItems(quotation);
     const initialSections       = getInitialSections(quotation, insuranceCategories);
     const initialFormData       = buildInitialFormData(quotation, taxIds, initialSections);
@@ -162,15 +164,28 @@ export default function Edit({
         { id: "1", name: "Fixed Amount" },
     ];
 
+    useEffect(() => {
+        if (flash?.success) toast.success(flash.success);
+        if (flash?.error) toast.error(flash.error);
+    }, [flash?.success, flash?.error]);
+
     const submit = (e) => {
         e.preventDefault();
         const selected = currencies.find((c) => c.name === data.currency);
         if (!selected)                   { toast.error("Please select a valid currency"); return; }
         if (!data.insurance_category_id) { toast.error("Please select an insurance category"); return; }
+        if (quotationItems.some((item) => !item.product_id)) {
+            toast.error("Please select a product for each item");
+            return;
+        }
 
         post(route("underwriting_quotes.update", quotation.id), {
             preserveScroll: true,
-            onSuccess: () => toast.success("Underwriting quote updated successfully"),
+            onSuccess: (page) => {
+                if (page.props.flash?.error) return;
+
+                toast.success("Underwriting quote updated successfully");
+            },
         });
     };
 
