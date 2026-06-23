@@ -27,7 +27,6 @@ return new class extends Migration
             $table->decimal('rate_value', 28, 8)->default(0);
             $table->decimal('basis_amount', 28, 8)->default(0);
             $table->decimal('basis_quantity', 28, 8)->default(1);
-            $table->decimal('minimum_premium', 28, 8)->nullable();
 
             $table->decimal('quantity', 10, 2)->default(1);
             $table->decimal('unit_cost', 28, 8)->default(0);

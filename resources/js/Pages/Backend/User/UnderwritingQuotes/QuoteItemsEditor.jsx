@@ -133,20 +133,8 @@ export default function QuoteItemsEditor({
                                         </div>
                                     )}
 
-                                    {/* Min. Premium — 1 col */}
-                                    <div className="md:col-span-1 col-span-12">
-                                        <Label>Min. Premium</Label>
-                                        <Input
-                                            type="number"
-                                            step="0.01"
-                                            value={item.minimum_premium ?? ""}
-                                            onChange={(e) => onUpdateItem(index, "minimum_premium", parseNumericValue(e.target.value))}
-                                            placeholder="Optional"
-                                        />
-                                    </div>
-
-                                    {/* Description — shrinks to 1 col when sum insured is shown */}
-                                    <div className={`${hasBasis ? "md:col-span-1" : "md:col-span-2"} col-span-12`}>
+                                    {/* Description */}
+                                    <div className="md:col-span-2 col-span-12">
                                         <Label>Description</Label>
                                         <Textarea
                                             value={item.description}

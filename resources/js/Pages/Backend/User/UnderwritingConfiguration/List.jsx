@@ -268,17 +268,10 @@ function RuleFormFields({ data, setData, errors, allInsuranceCategories, allProd
                     <InputError message={errors.default_rate} className="mt-1" />
                 </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <Label>Minimum Premium</Label>
-                    <Input type="number" step="any" value={data.minimum_premium} onChange={(e) => setData("minimum_premium", e.target.value)} placeholder="0" className="mt-1" />
-                    <InputError message={errors.minimum_premium} className="mt-1" />
-                </div>
-                <div>
-                    <Label>Tax Rate (%)</Label>
-                    <Input type="number" step="any" value={data.tax_rate} onChange={(e) => setData("tax_rate", e.target.value)} placeholder="0" className="mt-1" />
-                    <InputError message={errors.tax_rate} className="mt-1" />
-                </div>
+            <div>
+                <Label>Tax Rate (%)</Label>
+                <Input type="number" step="any" value={data.tax_rate} onChange={(e) => setData("tax_rate", e.target.value)} placeholder="0" className="mt-1" />
+                <InputError message={errors.tax_rate} className="mt-1" />
             </div>
             <div className="grid grid-cols-3 gap-3">
                 <div>
@@ -323,7 +316,7 @@ const EMPTY_RULE = {
     insurance_category_id: "", product_id: "",
     name: "", calculation_type: "percentage_of_amount", rate_type: "percentage",
     min_rate: "", max_rate: "", default_rate: "",
-    minimum_premium: "", tax_rate: "", currency: "",
+    tax_rate: "", currency: "",
     active_from: "", active_to: "", is_active: true,
 };
 
@@ -363,7 +356,6 @@ function EditRuleModal({ show, onClose, rule, errors, allInsuranceCategories, al
             min_rate:              rule.min_rate ?? "",
             max_rate:              rule.max_rate ?? "",
             default_rate:          formatRateNumber(rule.default_rate, ""),
-            minimum_premium:       rule.minimum_premium ?? "",
             tax_rate:              rule.tax_rate ?? "",
             currency:              rule.currency ?? "",
             active_from:           rule.active_from ?? "",

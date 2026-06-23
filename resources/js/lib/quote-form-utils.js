@@ -29,16 +29,12 @@ export const calculateFinancialLineTotal = (item) => {
     const rate          = Number(item.rate_value) || 0;
     const basisAmount   = Number(item.basis_amount) || 0;
     const basisQuantity = Number(item.basis_quantity || item.quantity) || 0;
-    const minimumPremium =
-        item.minimum_premium === "" || item.minimum_premium === null || item.minimum_premium === undefined
-            ? null
-            : Number(item.minimum_premium) || 0;
 
     let lineTotal = rate;
     if (item.calculation_type === "percentage_of_amount") lineTotal = (basisAmount * rate) / 100;
     if (item.calculation_type === "fixed_per_quantity")   lineTotal = basisQuantity * rate;
 
-    return minimumPremium !== null && lineTotal < minimumPremium ? minimumPremium : lineTotal;
+    return lineTotal;
 };
 
 export const calculateLineUnitCost = (item) =>
@@ -76,7 +72,6 @@ export const createEmptyQuotationItem = () => ({
     rate_value:       0,
     basis_amount:     "",
     basis_quantity:   1,
-    minimum_premium:  "",
     quantity:         1,
     unit_cost:        0,
 });

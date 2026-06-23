@@ -35,7 +35,6 @@ const formatQuotationItem = (item = {}) => {
         rate_value:       item.rate_value ?? item.unit_cost ?? 0,
         basis_amount:     item.basis_amount ?? metadata.sum_insured ?? "",
         basis_quantity:   item.basis_quantity ?? item.quantity ?? 1,
-        minimum_premium:  item.minimum_premium ?? "",
         quantity:         item.quantity ?? item.basis_quantity ?? 1,
         unit_cost:        item.unit_cost ?? item.rate_value ?? 0,
     };
@@ -98,7 +97,6 @@ const buildInitialFormData = (quotation, taxIds, initialSections) => {
         rate_value:            initialItems.map((i) => i.rate_value),
         basis_amount:          initialItems.map((i) => i.basis_amount),
         basis_quantity:        initialItems.map((i) => i.basis_quantity || i.quantity || 1),
-        minimum_premium:       initialItems.map((i) => i.minimum_premium),
         quantity:              initialItems.map((i) => i.quantity),
         unit_cost:             initialItems.map((i) => i.unit_cost),
         sections:              initialSections,

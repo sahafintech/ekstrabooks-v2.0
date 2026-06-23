@@ -100,7 +100,6 @@ export function useQuoteForm({
             calculation_type: calcType,
             rate_type:        rule.rate_type || getDefaultRateType(calcType),
             rate_value:       parseNumericValue(rule.default_rate ?? item.rate_value ?? 0),
-            minimum_premium:  parseNumericValue(rule.minimum_premium ?? item.minimum_premium ?? ""),
         };
     };
 
@@ -116,7 +115,6 @@ export function useQuoteForm({
         setData("rate_value",       items.map((i) => i.rate_value));
         setData("basis_amount",     items.map((i) => i.basis_amount));
         setData("basis_quantity",   items.map((i) => i.basis_quantity || i.quantity || 1));
-        setData("minimum_premium",  items.map((i) => i.minimum_premium));
         setData("quantity",         items.map((i) => i.quantity));
         setData("unit_cost",        items.map((i) => calculateLineUnitCost(i)));
     };

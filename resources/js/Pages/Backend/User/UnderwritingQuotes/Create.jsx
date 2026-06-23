@@ -50,7 +50,6 @@ export default function Create({
         rate_value:            [],
         basis_amount:          [],
         basis_quantity:        [],
-        minimum_premium:       [],
         quantity:              [],
         unit_cost:             [],
         sections:              [],

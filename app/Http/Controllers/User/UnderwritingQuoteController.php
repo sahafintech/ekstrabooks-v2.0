@@ -167,8 +167,6 @@ class UnderwritingQuoteController extends Controller
             'basis_amount.*'         => 'nullable|numeric|min:0',
             'basis_quantity'         => 'nullable|array',
             'basis_quantity.*'       => 'nullable|numeric|min:0',
-            'minimum_premium'        => 'nullable|array',
-            'minimum_premium.*'      => 'nullable|numeric|min:0',
         ], [
             'product_id.required' => _lang('You must add at least one item'),
         ]);
@@ -307,8 +305,6 @@ class UnderwritingQuoteController extends Controller
             'basis_amount.*'         => 'nullable|numeric|min:0',
             'basis_quantity'         => 'nullable|array',
             'basis_quantity.*'       => 'nullable|numeric|min:0',
-            'minimum_premium'        => 'nullable|array',
-            'minimum_premium.*'      => 'nullable|numeric|min:0',
         ], [
             'product_id.required' => _lang('You must add at least one item'),
         ]);
@@ -780,10 +776,8 @@ class UnderwritingQuoteController extends Controller
         $quantity        = $this->normalizeDecimal($request->input("quantity.$index")) ?? 0;
         $basisQuantity   = $this->normalizeDecimal($request->input("basis_quantity.$index")) ?? ($quantity > 0 ? $quantity : 1);
         $basisAmount     = $this->normalizeDecimal($request->input("basis_amount.$index")) ?? 0;
-        $minimumPremium  = $this->normalizeDecimal($request->input("minimum_premium.$index"))
-            ?? $this->normalizeDecimal($ratingRule?->minimum_premium);
         $rateValue       = $this->resolveRateValue($request, $index, $ratingRule);
-        $lineTotal       = $this->calculateFinancialLineTotal($calculationType, $rateValue, $basisAmount, $basisQuantity, $minimumPremium);
+        $lineTotal       = $this->calculateFinancialLineTotal($calculationType, $rateValue, $basisAmount, $basisQuantity);
         $unitCost        = $this->resolveLineUnitCost($calculationType, $rateValue, $lineTotal);
 
         $metadata = array_filter([
@@ -805,7 +799,6 @@ class UnderwritingQuoteController extends Controller
             'rate_value'            => $rateValue,
             'basis_amount'          => $basisAmount,
             'basis_quantity'        => $basisQuantity,
-            'minimum_premium'       => $minimumPremium,
             'quantity'              => $quantity,
             'unit_cost'             => $unitCost,
             'sub_total'             => $lineTotal,
@@ -862,9 +855,9 @@ class UnderwritingQuoteController extends Controller
         return is_numeric($value) ? (float) $value : null;
     }
 
-    private function calculateFinancialLineTotal(string $calculationType, float $rateValue, float $basisAmount, float $basisQuantity, ?float $minimumPremium): float
+    private function calculateFinancialLineTotal(string $calculationType, float $rateValue, float $basisAmount, float $basisQuantity): float
     {
-        $lineTotal = match ($calculationType) {
+        return match ($calculationType) {
             'percentage_of_amount' => ($basisAmount * $rateValue) / 100,
             'fixed_per_quantity'   => $rateValue * $basisQuantity,
             'fixed_amount',
@@ -873,12 +866,6 @@ class UnderwritingQuoteController extends Controller
             'tiered_rate'          => $rateValue,
             default                => $rateValue,
         };
-
-        if ($minimumPremium !== null && $lineTotal < $minimumPremium) {
-            return $minimumPremium;
-        }
-
-        return $lineTotal;
     }
 
     private function resolveLineUnitCost(string $calculationType, float $rateValue, float $lineTotal): float
@@ -897,9 +884,7 @@ class UnderwritingQuoteController extends Controller
             $quantity        = $this->normalizeDecimal($request->input("quantity.$i")) ?? 0;
             $basisAmount     = $this->normalizeDecimal($request->input("basis_amount.$i")) ?? 0;
             $basisQuantity   = $this->normalizeDecimal($request->input("basis_quantity.$i")) ?? ($quantity > 0 ? $quantity : 1);
-            $minimumPremium  = $this->normalizeDecimal($request->input("minimum_premium.$i"))
-                ?? $this->normalizeDecimal($ratingRule?->minimum_premium);
-            $lineTotal = $this->calculateFinancialLineTotal($calculationType, $rateValue, $basisAmount, $basisQuantity, $minimumPremium);
+            $lineTotal = $this->calculateFinancialLineTotal($calculationType, $rateValue, $basisAmount, $basisQuantity);
             $subTotal += $lineTotal;
 
             if (isset($request->taxes)) {
@@ -1153,7 +1138,6 @@ class UnderwritingQuoteController extends Controller
                 'default_rate'          => $rule->default_rate,
                 'min_rate'              => $rule->min_rate,
                 'max_rate'              => $rule->max_rate,
-                'minimum_premium'       => $rule->minimum_premium,
                 'tax_rate'              => $rule->tax_rate,
                 'currency'              => $rule->currency,
                 'metadata_json'         => $rule->metadata_json,

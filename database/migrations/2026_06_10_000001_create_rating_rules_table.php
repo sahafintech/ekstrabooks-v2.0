@@ -24,7 +24,6 @@ return new class extends Migration
             $table->decimal('min_rate', 28, 8)->nullable();
             $table->decimal('max_rate', 28, 8)->nullable();
             $table->decimal('default_rate', 28, 8)->nullable();
-            $table->decimal('minimum_premium', 28, 8)->nullable();
             $table->decimal('tax_rate', 10, 4)->nullable();
 
             $table->string('currency', 55)->nullable();

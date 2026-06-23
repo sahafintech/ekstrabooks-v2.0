@@ -334,7 +334,6 @@ class UnderwritingConfigurationController extends Controller
             'min_rate'              => 'nullable|numeric|min:0',
             'max_rate'              => 'nullable|numeric|min:0',
             'default_rate'          => 'nullable|numeric|min:0',
-            'minimum_premium'       => 'nullable|numeric|min:0',
             'tax_rate'              => 'nullable|numeric|min:0',
             'currency'              => 'nullable|string|max:55',
             'active_from'           => 'nullable|date',
@@ -350,7 +349,7 @@ class UnderwritingConfigurationController extends Controller
             'insurance_category_id', 'product_id', 'name',
             'calculation_type', 'rate_type',
             'min_rate', 'max_rate', 'default_rate',
-            'minimum_premium', 'tax_rate', 'currency',
+            'tax_rate', 'currency',
             'active_from', 'active_to', 'is_active',
         ]));
 
@@ -368,7 +367,6 @@ class UnderwritingConfigurationController extends Controller
             'min_rate'              => 'nullable|numeric|min:0',
             'max_rate'              => 'nullable|numeric|min:0',
             'default_rate'          => 'nullable|numeric|min:0',
-            'minimum_premium'       => 'nullable|numeric|min:0',
             'tax_rate'              => 'nullable|numeric|min:0',
             'currency'              => 'nullable|string|max:55',
             'active_from'           => 'nullable|date',
@@ -384,7 +382,7 @@ class UnderwritingConfigurationController extends Controller
             'insurance_category_id', 'product_id', 'name',
             'calculation_type', 'rate_type',
             'min_rate', 'max_rate', 'default_rate',
-            'minimum_premium', 'tax_rate', 'currency',
+            'tax_rate', 'currency',
             'active_from', 'active_to', 'is_active',
         ]));
 

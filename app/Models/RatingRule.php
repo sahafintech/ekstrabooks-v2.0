@@ -20,7 +20,6 @@ class RatingRule extends Model
         'min_rate',
         'max_rate',
         'default_rate',
-        'minimum_premium',
         'tax_rate',
         'currency',
         'active_from',

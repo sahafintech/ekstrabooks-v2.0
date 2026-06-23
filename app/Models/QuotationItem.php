@@ -25,7 +25,6 @@ class QuotationItem extends Model
         'rate_value',
         'basis_amount',
         'basis_quantity',
-        'minimum_premium',
         'quantity',
         'unit_cost',
         'sub_total',
