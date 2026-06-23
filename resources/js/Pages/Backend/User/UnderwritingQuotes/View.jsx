@@ -57,7 +57,7 @@ const buildPrintStyles = () => `
     }
 
     @page {
-      size: A4 portrait;
+      size: A4 landscape;
       margin: 8mm;
     }
 
@@ -209,7 +209,7 @@ export default function View({ quotation, decimalPlace, email_templates = [] }) 
                     </div>
 
                     <div className="overflow-x-auto pb-4">
-                        <div id="printable-area" className="mx-auto bg-white flex flex-col min-h-[297mm] w-[210mm]">
+                        <div id="printable-area" className="mx-auto max-w-full bg-white flex flex-col min-h-[190mm] w-[281mm]">
                             <div className="flex-1 flex flex-col border-[10px] p-3" style={{ borderColor: primaryColor }}>
                                 <div className="mb-4 h-4" style={{ backgroundColor: primaryColor }} />
 

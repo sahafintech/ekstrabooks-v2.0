@@ -2,15 +2,19 @@ export default function QuotationSections({ sections = [], style }) {
     if (!sections.length) return null;
 
     return (
-        <div className="mt-5 grid grid-cols-1 gap-3">
+        <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 print:grid-cols-2">
             {sections.map((section, index) => {
                 const data    = section.data_json ?? {};
                 const fields  = data.fields  ?? [];
                 const columns = data.columns ?? [];
                 const rows    = data.rows    ?? [];
+                const isLastOddSection = sections.length % 2 === 1 && index === sections.length - 1;
 
                 return (
-                    <div key={section.id ?? index} className="border border-slate-900">
+                    <div
+                        key={section.id ?? index}
+                        className={`border border-slate-900 ${isLastOddSection ? "md:col-span-2 print:col-span-2" : ""}`}
+                    >
                         <div className="px-2 py-1 text-xs font-bold uppercase" style={style}>
                             {section.title}
                         </div>

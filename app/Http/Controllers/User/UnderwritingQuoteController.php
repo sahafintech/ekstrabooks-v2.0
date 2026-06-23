@@ -537,6 +537,9 @@ class UnderwritingQuoteController extends Controller
         $this->hydrateQuotationItemMetadata($quotation);
         return pdf()
             ->view('backend.user.pdf.quotation', compact('quotation'))
+            ->format('a4')
+            ->landscape()
+            ->margins(8, 8, 8, 8, 'mm')
             ->name('quotation-' . $quotation->quotation_number . '.pdf')
             ->download();
     }

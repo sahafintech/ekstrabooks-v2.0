@@ -65,15 +65,19 @@ const QuotationSections = ({ sections = [], sectionStyle }) => {
     if (!sections.length) return null;
 
     return (
-        <div className="mt-5 grid grid-cols-1 gap-3">
+        <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 print:grid-cols-2">
             {sections.map((section, index) => {
                 const data = section.data_json ?? {};
                 const fields = data.fields ?? [];
                 const columns = data.columns ?? [];
                 const rows = data.rows ?? [];
+                const isLastOddSection = sections.length % 2 === 1 && index === sections.length - 1;
 
                 return (
-                    <div key={section.id ?? index} className="border border-slate-900">
+                    <div
+                        key={section.id ?? index}
+                        className={`border border-slate-900 ${isLastOddSection ? "md:col-span-2 print:col-span-2" : ""}`}
+                    >
                         <div className="px-2 py-1 text-xs font-bold uppercase" style={sectionStyle}>{section.title}</div>
 
                         {section.type === "fields" && (
@@ -133,7 +137,7 @@ export default function PublicView({ quotation }) {
     const printStyles = `
         @media print {
             @page {
-                size: A4 ${isMedical ? "landscape" : "portrait"};
+                size: A4 landscape;
                 margin: 8mm;
             }
             body {
@@ -185,8 +189,8 @@ export default function PublicView({ quotation }) {
             if (!content) throw new Error("Content element not found");
 
             const canvas = await html2canvas(content, { scale: 2, useCORS: true, logging: false });
-            const pdf = new jsPDF({ orientation: isMedical ? "landscape" : "portrait", unit: "mm", format: "a4" });
-            const imgWidth = isMedical ? 297 : 210;
+            const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+            const imgWidth = 297;
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
             pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, imgWidth, imgHeight);
             pdf.save(`UW-Quote-${quotation.id}.pdf`);
@@ -204,7 +208,7 @@ export default function PublicView({ quotation }) {
         <GuestLayout>
             <style dangerouslySetInnerHTML={{ __html: printStyles }} />
             <div className="container mx-auto px-4 py-8">
-                <div className={`flex justify-end gap-4 mb-6 w-full mx-auto print:hidden ${isMedical ? "md:w-[281mm]" : "md:w-[210mm]"}`}>
+                <div className="flex justify-end gap-4 mb-6 w-full mx-auto print:hidden md:w-[281mm]">
                     <Button variant="outline" onClick={handlePrint} disabled={isLoading.print}>
                         <PrinterIcon className="h-4 w-4 mr-2" />Print
                     </Button>
@@ -214,11 +218,7 @@ export default function PublicView({ quotation }) {
                 </div>
 
                 <div
-                    className={`bg-white mx-auto w-full print-container ${
-                        isMedical
-                            ? "p-3 md:w-[281mm] min-h-[210mm] md:p-4"
-                            : "p-4 md:w-[210mm] min-h-[297mm] md:p-8"
-                    } print:w-full print:p-0 print:shadow-none print:rounded-none`}
+                    className="bg-white mx-auto w-full print-container p-3 md:w-[281mm] min-h-[190mm] md:p-4 print:w-full print:p-0 print:shadow-none print:rounded-none"
                 >
                     <div className={`border-[10px]`} style={{ borderColor: primaryColor }}>
                         <div className="mb-4 h-4" style={{ backgroundColor: primaryColor }} />

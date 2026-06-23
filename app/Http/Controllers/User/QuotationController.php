@@ -374,11 +374,17 @@ class QuotationController extends Controller
 
     public function show_public_quotation($short_code)
     {
-        $quotation = Quotation::withoutGlobalScopes()->with(['customer', 'business.systemSettings', 'items', 'taxes'])
+        $quotation = Quotation::withoutGlobalScopes()->with(['customer', 'business.systemSettings', 'items', 'taxes', 'sections', 'insuranceCategory'])
             ->where('short_code', $short_code)
             ->first();
 
-        return Inertia::render('Backend/User/Quotation/PublicView', [
+        $view = $quotation
+            && (int) ($quotation->is_deffered ?? 0) === 1
+            && ! empty($quotation->insurance_category_id)
+                ? 'Backend/User/UnderwritingQuotes/PublicView'
+                : 'Backend/User/Quotation/PublicView';
+
+        return Inertia::render($view, [
             'quotation' => $quotation
         ]);
     }

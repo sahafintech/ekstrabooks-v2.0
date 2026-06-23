@@ -5,6 +5,8 @@
     $textColor    = get_business_option('invoice_text_color', '#ffffff');
     $businessName = $quotation->business->business_name ?? $quotation->business->name ?? 'Business';
     $businessEmail = $quotation->business->business_email ?? $quotation->business->email ?? '';
+    $isUnderwritingQuotation = (int) ($quotation->is_deffered ?? 0) === 1 && ! empty($quotation->insurance_category_id);
+    $pageOrientation = $isUnderwritingQuotation ? 'landscape' : 'portrait';
 
     $quotationSections = $quotation->sections ?? collect();
 
@@ -24,8 +26,29 @@
         }
 
         @page {
-            size: A4 portrait;
+            size: A4 {{ $pageOrientation }};
             margin: 8mm;
+        }
+    }
+
+    .quotation-sections-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 20px;
+    }
+
+    .quotation-section-full {
+        grid-column: 1 / -1;
+    }
+
+    @media screen and (max-width: 767px) {
+        .quotation-sections-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .quotation-section-full {
+            grid-column: auto;
         }
     }
 </style>
@@ -132,56 +155,59 @@
         </div>
 
         @if($quotationSections->isNotEmpty())
-            @foreach($quotationSections as $section)
-                @php
-                    $sectionData = $section->data_json ?? [];
-                    $fields  = $sectionData['fields']  ?? [];
-                    $columns = $sectionData['columns'] ?? [];
-                    $rows    = $sectionData['rows']    ?? [];
-                @endphp
+            <div class="quotation-sections-grid">
+                @foreach($quotationSections as $section)
+                    @php
+                        $sectionData = $section->data_json ?? [];
+                        $fields  = $sectionData['fields']  ?? [];
+                        $columns = $sectionData['columns'] ?? [];
+                        $rows    = $sectionData['rows']    ?? [];
+                        $isLastOddSection = $quotationSections->count() % 2 === 1 && $loop->last;
+                    @endphp
 
-                <div class="mt-5 border border-slate-900">
-                    <div class="px-2 py-1 text-xs font-bold uppercase" style="background-color: {{ $primaryColor }}; color: {{ $textColor }}; letter-spacing: 0.12em;">
-                        {{ $section->title }}
-                    </div>
+                    <div class="border border-slate-900 {{ $isLastOddSection ? 'quotation-section-full' : '' }}">
+                        <div class="px-2 py-1 text-xs font-bold uppercase" style="background-color: {{ $primaryColor }}; color: {{ $textColor }}; letter-spacing: 0.12em;">
+                            {{ $section->title }}
+                        </div>
 
-                    @if($section->type === 'fields')
-                        <table class="w-full border-collapse text-sm">
-                            <tbody>
-                                @foreach($fields as $field)
-                                    <tr>
-                                        <td class="w-1/3 border-t border-slate-900 px-3 py-2 font-semibold">{{ $field['label'] ?? '-' }}</td>
-                                        <td class="border-t border-slate-900 px-3 py-2">{{ $field['value'] ?? '-' }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    @elseif($section->type === 'table')
-                        <table class="w-full border-collapse text-sm">
-                            <thead>
-                                <tr>
-                                    @foreach($columns as $column)
-                                        <th class="border-t border-slate-900 px-3 py-2 text-left">{{ $column }}</th>
+                        @if($section->type === 'fields')
+                            <table class="w-full border-collapse text-sm">
+                                <tbody>
+                                    @foreach($fields as $field)
+                                        <tr>
+                                            <td class="w-1/3 border-t border-slate-900 px-3 py-2 font-semibold">{{ $field['label'] ?? '-' }}</td>
+                                            <td class="border-t border-slate-900 px-3 py-2">{{ $field['value'] ?? '-' }}</td>
+                                        </tr>
                                     @endforeach
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($rows as $row)
+                                </tbody>
+                            </table>
+                        @elseif($section->type === 'table')
+                            <table class="w-full border-collapse text-sm">
+                                <thead>
                                     <tr>
-                                        @foreach($row as $cell)
-                                            <td class="border-t border-slate-900 px-3 py-2">{{ $cell ?: '-' }}</td>
+                                        @foreach($columns as $column)
+                                            <th class="border-t border-slate-900 px-3 py-2 text-left">{{ $column }}</th>
                                         @endforeach
                                     </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    @else
-                        <div class="min-h-[80px] p-3 text-sm leading-6 text-slate-800" style="white-space: pre-line;">
-                            {{ $section->content ?: '-' }}
-                        </div>
-                    @endif
-                </div>
-            @endforeach
+                                </thead>
+                                <tbody>
+                                    @foreach($rows as $row)
+                                        <tr>
+                                            @foreach($row as $cell)
+                                                <td class="border-t border-slate-900 px-3 py-2">{{ $cell ?: '-' }}</td>
+                                            @endforeach
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        @else
+                            <div class="min-h-[80px] p-3 text-sm leading-6 text-slate-800" style="white-space: pre-line;">
+                                {{ $section->content ?: '-' }}
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
         @endif
 
         <div class="mt-5 border border-slate-900">
