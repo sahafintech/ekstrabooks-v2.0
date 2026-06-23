@@ -45,6 +45,14 @@ const RATE_TYPES = [
     { id: "range",      name: "Range" },
 ];
 
+const formatRateNumber = (value, emptyValue = "-") => {
+    if (value === null || value === undefined || value === "") return emptyValue;
+
+    return String(value)
+        .replace(/(\.\d*?[1-9])0+$/, "$1")
+        .replace(/\.0+$/, "");
+};
+
 function CreateModal({ show, onClose, errors }) {
     const { data, setData, post, processing, reset } = useForm({ name: "", slug: "" });
 
@@ -354,7 +362,7 @@ function EditRuleModal({ show, onClose, rule, errors, allInsuranceCategories, al
             rate_type:             rule.rate_type ?? "percentage",
             min_rate:              rule.min_rate ?? "",
             max_rate:              rule.max_rate ?? "",
-            default_rate:          rule.default_rate ?? "",
+            default_rate:          formatRateNumber(rule.default_rate, ""),
             minimum_premium:       rule.minimum_premium ?? "",
             tax_rate:              rule.tax_rate ?? "",
             currency:              rule.currency ?? "",
@@ -863,7 +871,7 @@ export default function List({
                                                                 {RATE_TYPES.find((t) => t.id === rule.rate_type)?.name ?? rule.rate_type}
                                                             </span>
                                                         </TableCell>
-                                                        <TableCell>{rule.default_rate ?? "—"}</TableCell>
+                                                        <TableCell>{formatRateNumber(rule.default_rate)}</TableCell>
                                                         <TableCell>
                                                             {rule.is_active
                                                                 ? <span className="inline-flex items-center gap-1 text-xs text-green-700"><ToggleRight className="w-4 h-4" />Active</span>
