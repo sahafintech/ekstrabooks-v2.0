@@ -380,7 +380,7 @@ function EditRuleModal({ show, onClose, rule, errors, allInsuranceCategories, al
         });
     };
     return (
-        <Modal show={show} onClose={onClose} maxWidth="lg">
+        <Modal show={show} onClose={onClose} maxWidth="4xl">
             <form onSubmit={submit} className="p-6 max-h-[85vh] overflow-y-auto">
                 <h2 className="text-lg font-semibold mb-4">Edit Rating Rule</h2>
                 <RuleFormFields data={data} setData={setData} errors={errors} allInsuranceCategories={allInsuranceCategories} allProducts={allProducts} />
