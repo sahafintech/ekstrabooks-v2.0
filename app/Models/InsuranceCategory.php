@@ -10,7 +10,7 @@ class InsuranceCategory extends Model
 {
     use MultiTenant, SoftDeletes;
 
-    protected $fillable = ['name', 'slug', 'type'];
+    protected $fillable = ['name', 'slug'];
 
     public function templateSections()
     {

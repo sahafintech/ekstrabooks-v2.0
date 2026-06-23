@@ -92,7 +92,7 @@ class UnderwritingQuoteController extends Controller
             ],
             'filters'            => array_merge($request->all(), ['sorting' => $sorting]),
             'customers'          => Customer::all(),
-            'insuranceCategories' => InsuranceCategory::select('id', 'name', 'type')->orderBy('name')->get(),
+            'insuranceCategories' => InsuranceCategory::select('id', 'name')->orderBy('name')->get(),
             'summary'            => $summary,
             'trashed_quotations' => Quotation::onlyTrashed()->where('is_deffered', 1)->count(),
         ]);
@@ -185,8 +185,6 @@ class UnderwritingQuoteController extends Controller
             return redirect()->back()->withInput()->with('error', _lang('Unit Cost is required'));
         }
 
-        $insuranceCategory = InsuranceCategory::findOrFail($request->input('insurance_category_id'));
-
         DB::beginTransaction();
 
         $summary = $this->calculateTotal($request);
@@ -211,7 +209,7 @@ class UnderwritingQuoteController extends Controller
         $quotation->footer               = $request->input('footer');
         $quotation->insurance_category_id = $request->input('insurance_category_id');
         $quotation->is_deffered          = 1;
-        $quotation->invoice_category     = $insuranceCategory->type ?: 'other';
+        $quotation->invoice_category     = $request->input('invoice_category', 'other');
         $quotation->short_code           = rand(100000, 9999999) . uniqid();
         $quotation->save();
 
@@ -327,8 +325,6 @@ class UnderwritingQuoteController extends Controller
             return redirect()->back()->withInput()->with('error', _lang('Unit Cost is required'));
         }
 
-        $insuranceCategory = InsuranceCategory::findOrFail($request->input('insurance_category_id'));
-
         DB::beginTransaction();
 
         $summary = $this->calculateTotal($request);
@@ -352,7 +348,7 @@ class UnderwritingQuoteController extends Controller
         $quotation->footer               = $request->input('footer');
         $quotation->insurance_category_id = $request->input('insurance_category_id');
         $quotation->is_deffered          = 1;
-        $quotation->invoice_category     = $insuranceCategory->type ?: 'other';
+        $quotation->invoice_category     = $request->input('invoice_category', $quotation->invoice_category ?: 'other');
         $quotation->save();
 
         QuotationItemTax::where('quotation_id', $quotation->id)->delete();
@@ -1121,7 +1117,6 @@ class UnderwritingQuoteController extends Controller
             ->map(fn($c) => [
                 'id'       => $c->id,
                 'name'     => $c->name,
-                'type'     => $c->type ?? 'other',
                 'sections' => $c->quotationSections->map(fn($s) => [
                     'id'         => $s->id,
                     'title'      => $s->title,

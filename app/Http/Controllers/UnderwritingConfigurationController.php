@@ -76,7 +76,7 @@ class UnderwritingConfigurationController extends Controller
                 'total'        => $ratingRules->total(),
             ],
             'ratingRulesFilters'    => ['search' => $ruleSearch, 'sorting' => $ruleSorting],
-            'allInsuranceCategories' => InsuranceCategory::select('id', 'name', 'type')->orderBy('name')->get(),
+            'allInsuranceCategories' => InsuranceCategory::select('id', 'name')->orderBy('name')->get(),
             'allProducts'           => Product::select('id', 'name')->orderBy('name')->get(),
             'defaultTab'            => $request->get('tab', 'policy_certificate'),
         ]);
@@ -169,7 +169,7 @@ class UnderwritingConfigurationController extends Controller
             ->values();
 
         return Inertia::render('Backend/User/UnderwritingConfiguration/InsuranceCategoryLayout', [
-            'insuranceCategory' => ['id' => $insuranceCategory->id, 'name' => $insuranceCategory->name, 'type' => $insuranceCategory->type],
+            'insuranceCategory' => ['id' => $insuranceCategory->id, 'name' => $insuranceCategory->name],
             'certSections'      => $certSections,
             'quotSections'      => $quotSections,
         ]);
@@ -252,7 +252,6 @@ class UnderwritingConfigurationController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100',
             'slug' => 'required|string|size:3|unique:insurance_categories,slug|regex:/^[A-Z]{3}$/',
-            'type' => 'required|in:medical,gpa,other',
         ]);
 
         if ($validator->fails()) {
@@ -262,7 +261,6 @@ class UnderwritingConfigurationController extends Controller
         InsuranceCategory::create([
             'name' => $request->name,
             'slug' => strtoupper($request->slug),
-            'type' => $request->type,
         ]);
 
         return back()->with('success', _lang('Insurance category created successfully'));
@@ -273,7 +271,6 @@ class UnderwritingConfigurationController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100',
             'slug' => 'required|string|size:3|unique:insurance_categories,slug,' . $id . '|regex:/^[A-Z]{3}$/',
-            'type' => 'required|in:medical,gpa,other',
         ]);
 
         if ($validator->fails()) {
@@ -283,7 +280,6 @@ class UnderwritingConfigurationController extends Controller
         InsuranceCategory::findOrFail($id)->update([
             'name' => $request->name,
             'slug' => strtoupper($request->slug),
-            'type' => $request->type,
         ]);
 
         return back()->with('success', _lang('Insurance category updated successfully'));

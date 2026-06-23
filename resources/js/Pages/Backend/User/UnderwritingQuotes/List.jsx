@@ -96,7 +96,7 @@ const categoryLabelMap = {
 
 const CategoryBadge = ({ quotation }) => {
     const category = quotation.insurance_category;
-    const type = category?.type ?? quotation.invoice_category;
+    const type = quotation.invoice_category;
     const info = categoryLabelMap[type] ?? { label: type ?? "-", className: "gap-1 text-gray-600 border-gray-400" };
     return <Badge variant="outline" className={info.className}>{category?.name ?? info.label}</Badge>;
 };
