@@ -260,7 +260,7 @@ class UnderwritingQuoteController extends Controller
     {
         Gate::authorize('quotations.view');
 
-        $quotation       = Quotation::where('is_deffered', 1)->with(['business.systemSettings', 'items', 'customer', 'taxes', 'sections', 'insuranceCategory'])->findOrFail($id);
+        $quotation       = Quotation::where('is_deffered', 1)->with(['business.systemSettings', 'items', 'customer', 'taxes', 'sections', 'insuranceCategory', 'createdBy', 'updatedBy'])->findOrFail($id);
         $this->hydrateQuotationItemMetadata($quotation);
         $email_templates = EmailTemplate::whereIn('slug', ['NEW_QUOTATION_CREATED'])->where('email_status', 1)->get();
         $decimalPlace    = get_business_option('decimal_place', 2);
@@ -533,7 +533,7 @@ class UnderwritingQuoteController extends Controller
     {
         Gate::authorize('quotations.pdf');
 
-        $quotation = Quotation::where('is_deffered', 1)->with(['business', 'items', 'taxes', 'customer', 'sections', 'insuranceCategory'])->findOrFail($id);
+        $quotation = Quotation::where('is_deffered', 1)->with(['business', 'items', 'taxes', 'customer', 'sections', 'insuranceCategory', 'createdBy', 'updatedBy'])->findOrFail($id);
         $this->hydrateQuotationItemMetadata($quotation);
         return pdf()
             ->view('backend.user.pdf.quotation', compact('quotation'))

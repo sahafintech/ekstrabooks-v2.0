@@ -75,6 +75,21 @@ const sectionTitleStyle = (primaryColor, textColor) => ({
     letterSpacing: "0.12em",
 });
 
+const formatDateTime = (value) => {
+    if (!value) return "-";
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+
+    return date.toLocaleString(undefined, {
+        year:   "numeric",
+        month:  "short",
+        day:    "2-digit",
+        hour:   "2-digit",
+        minute: "2-digit",
+    });
+};
+
 export default function View({ quotation, decimalPlace, email_templates = [] }) {
     const [isLoading, setIsLoading]               = useState({ print: false });
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -155,11 +170,16 @@ export default function View({ quotation, decimalPlace, email_templates = [] }) 
         window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareLink)}`, "_blank");
     };
 
+    const createdByName = quotation?.created_by?.name || quotation?.createdBy?.name || "-";
+
     const infoRows = [
         { label: "Quotation Date",     value: quotation?.quotation_date },
         { label: "Currency Type",      value: quotation?.currency },
         { label: "Quotation No",       value: quotation?.quotation_number },
         { label: "Quotation Validity", value: quotation?.expired_date },
+        { label: "Created By",         value: createdByName },
+        { label: "Created Date",       value: formatDateTime(quotation?.created_at) },
+        { label: "Last Updated",       value: formatDateTime(quotation?.updated_at) },
     ];
 
     const quoteToRows = [
@@ -254,7 +274,7 @@ export default function View({ quotation, decimalPlace, email_templates = [] }) 
                                                 {infoRows.map((row) => (
                                                     <div key={row.label} className="flex items-start justify-between gap-4 py-0.5 text-sm">
                                                         <span className="font-semibold text-slate-900">{row.label}:</span>
-                                                        <span className="text-slate-700">{row.value}</span>
+                                                        <span className="text-right text-slate-700">{row.value}</span>
                                                     </div>
                                                 ))}
                                             </div>

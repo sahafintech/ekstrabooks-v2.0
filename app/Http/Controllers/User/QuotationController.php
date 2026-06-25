@@ -301,7 +301,7 @@ class QuotationController extends Controller
     {
         Gate::authorize('quotations.view');
 
-        $quotation = quotation::with(['business.systemSettings', 'items', 'customer', 'taxes'])->find($id);
+        $quotation = quotation::with(['business.systemSettings', 'items', 'customer', 'taxes', 'createdBy', 'updatedBy'])->find($id);
         $email_templates = EmailTemplate::whereIn('slug', ['NEW_QUOTATION_CREATED'])
             ->where('email_status', 1)->get();
         $decimalPlace = get_business_option('decimal_place', 2);
@@ -365,7 +365,7 @@ class QuotationController extends Controller
     {
         Gate::authorize('quotations.pdf');
 
-        $quotation = Quotation::with(['business', 'items', 'taxes', 'customer'])->find($id);
+        $quotation = Quotation::with(['business', 'items', 'taxes', 'customer', 'createdBy', 'updatedBy'])->find($id);
         return pdf()
             ->view('backend.user.pdf.quotation', compact('quotation'))
             ->footerView('backend.user.pdf.quotation-footer', compact('quotation'))
@@ -377,7 +377,7 @@ class QuotationController extends Controller
 
     public function show_public_quotation($short_code)
     {
-        $quotation = Quotation::withoutGlobalScopes()->with(['customer', 'business.systemSettings', 'items', 'taxes', 'sections', 'insuranceCategory'])
+        $quotation = Quotation::withoutGlobalScopes()->with(['customer', 'business.systemSettings', 'items', 'taxes', 'sections', 'insuranceCategory', 'createdBy', 'updatedBy'])
             ->where('short_code', $short_code)
             ->first();
 

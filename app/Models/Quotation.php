@@ -43,6 +43,14 @@ class Quotation extends Model {
         return $this->belongsTo(Business::class, 'business_id')->withDefault()->withoutGlobalScope('business_id');
     }
 
+    public function createdBy() {
+        return $this->belongsTo(User::class, 'created_user_id')->withDefault()->withoutGlobalScopes();
+    }
+
+    public function updatedBy() {
+        return $this->belongsTo(User::class, 'updated_user_id')->withDefault()->withoutGlobalScopes();
+    }
+
     public function invoice_template() {
         return $this->belongsTo(InvoiceTemplate::class, 'template')->withDefault()->withoutGlobalScope('business_id');
     }

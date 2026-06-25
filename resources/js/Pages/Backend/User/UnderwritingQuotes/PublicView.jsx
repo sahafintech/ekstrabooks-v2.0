@@ -61,6 +61,21 @@ const sortMedicalQuotationItems = (items = []) =>
         return String(a.family_size || "").localeCompare(String(b.family_size || ""));
     });
 
+const formatDateTime = (value) => {
+    if (!value) return "-";
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+
+    return date.toLocaleString(undefined, {
+        year:   "numeric",
+        month:  "short",
+        day:    "2-digit",
+        hour:   "2-digit",
+        minute: "2-digit",
+    });
+};
+
 const QuotationSections = ({ sections = [], sectionStyle }) => {
     if (!sections.length) return null;
 
@@ -203,6 +218,16 @@ export default function PublicView({ quotation }) {
     };
 
     const sectionStyle = { backgroundColor: primaryColor, color: textColor };
+    const createdByName = quotation?.created_by?.name || quotation?.createdBy?.name || "-";
+    const infoRows = [
+        { label: "Quotation Date", value: quotation?.quotation_date || "-" },
+        { label: "Currency",       value: quotation?.currency || "-" },
+        { label: "Quotation No",   value: quotation?.quotation_number || "-" },
+        { label: "Validity",       value: quotation?.expired_date || "-" },
+        { label: "Created By",     value: createdByName },
+        { label: "Created Date",   value: formatDateTime(quotation?.created_at) },
+        { label: "Last Updated",   value: formatDateTime(quotation?.updated_at) },
+    ];
 
     return (
         <GuestLayout>
@@ -259,10 +284,12 @@ export default function PublicView({ quotation }) {
                                             Quotation
                                         </div>
                                         <div className="px-4 py-2 text-sm space-y-1">
-                                            <div className="flex justify-between"><span className="font-semibold">Quotation Date:</span><span>{quotation?.quotation_date}</span></div>
-                                            <div className="flex justify-between"><span className="font-semibold">Currency:</span><span>{quotation?.currency}</span></div>
-                                            <div className="flex justify-between"><span className="font-semibold">Quotation No:</span><span>{quotation?.quotation_number}</span></div>
-                                            <div className="flex justify-between"><span className="font-semibold">Validity:</span><span>{quotation?.expired_date}</span></div>
+                                            {infoRows.map((row) => (
+                                                <div key={row.label} className="flex justify-between gap-4">
+                                                    <span className="font-semibold">{row.label}:</span>
+                                                    <span className="text-right">{row.value}</span>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 </div>

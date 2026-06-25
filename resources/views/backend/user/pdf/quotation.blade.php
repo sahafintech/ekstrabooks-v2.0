@@ -5,6 +5,10 @@
     $textColor    = get_business_option('invoice_text_color', '#ffffff');
     $businessName = $quotation->business->business_name ?? $quotation->business->name ?? 'Business';
     $businessEmail = $quotation->business->business_email ?? $quotation->business->email ?? '';
+    $createdByName = optional($quotation->createdBy)->name ?: '-';
+    $dateTimeFormat = trim(get_date_format() . ' ' . get_time_format());
+    $createdDate = $quotation->created_at ? $quotation->created_at->format($dateTimeFormat) : '-';
+    $updatedDate = $quotation->updated_at ? $quotation->updated_at->format($dateTimeFormat) : '-';
     $isUnderwritingQuotation = (int) ($quotation->is_deffered ?? 0) === 1 && ! empty($quotation->insurance_category_id);
     $pageOrientation = $isUnderwritingQuotation ? 'landscape' : 'portrait';
 
@@ -13,6 +17,16 @@
     $quoteToRows = [
         ['label' => 'Quote To',    'value' => $quotation->customer->name ?? '-'],
         ['label' => 'Valid Until', 'value' => $quotation->expired_date ?: '-'],
+    ];
+
+    $quotationInfoRows = [
+        ['label' => 'Quotation Date',     'value' => $quotation->quotation_date ?: '-'],
+        ['label' => 'Currency Type',      'value' => $quotation->currency ?: '-'],
+        ['label' => 'Quotation No',       'value' => $quotation->quotation_number ?: '-'],
+        ['label' => 'Quotation Validity', 'value' => $quotation->expired_date ?: '-'],
+        ['label' => 'Created By',         'value' => $createdByName],
+        ['label' => 'Created Date',       'value' => $createdDate],
+        ['label' => 'Last Updated',       'value' => $updatedDate],
     ];
 @endphp
 
@@ -154,22 +168,12 @@
                         Quotation
                     </div>
                     <div class="px-4 py-2">
-                        <div class="flex items-start justify-between gap-4 py-0.5 text-sm">
-                            <span class="font-semibold text-slate-900">Quotation Date:</span>
-                            <span class="text-slate-700">{{ $quotation->quotation_date }}</span>
-                        </div>
-                        <div class="flex items-start justify-between gap-4 py-0.5 text-sm">
-                            <span class="font-semibold text-slate-900">Currency Type:</span>
-                            <span class="text-slate-700">{{ $quotation->currency }}</span>
-                        </div>
-                        <div class="flex items-start justify-between gap-4 py-0.5 text-sm">
-                            <span class="font-semibold text-slate-900">Quotation No:</span>
-                            <span class="text-slate-700">{{ $quotation->quotation_number }}</span>
-                        </div>
-                        <div class="flex items-start justify-between gap-4 py-0.5 text-sm">
-                            <span class="font-semibold text-slate-900">Quotation Validity:</span>
-                            <span class="text-slate-700">{{ $quotation->expired_date }}</span>
-                        </div>
+                        @foreach($quotationInfoRows as $row)
+                            <div class="flex items-start justify-between gap-4 py-0.5 text-sm">
+                                <span class="font-semibold text-slate-900">{{ $row['label'] }}:</span>
+                                <span class="text-right text-slate-700">{{ $row['value'] }}</span>
+                            </div>
+                        @endforeach
                     </div>
                 </div>
             </div>
