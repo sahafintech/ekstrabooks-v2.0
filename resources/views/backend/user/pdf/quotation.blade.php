@@ -18,24 +18,80 @@
 
 @push('styles')
 <style>
+    html {
+        font-size: 12px;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        background: white;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    @page {
+        size: A4 {{ $pageOrientation }};
+        margin: 7mm 7mm 14mm 7mm;
+    }
+
+    .quotation-pdf {
+        color: #0f172a;
+        font-size: 0.875rem;
+        line-height: 1.25;
+    }
+
+    .quotation-header,
+    .quotation-section,
+    .quotation-summary,
+    .quotation-closing {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    .quotation-section-title,
+    .quotation-table-title {
+        page-break-after: avoid;
+        break-after: avoid;
+    }
+
+    .quotation-pdf table {
+        page-break-inside: auto;
+        break-inside: auto;
+    }
+
+    .quotation-pdf thead {
+        display: table-header-group;
+    }
+
+    .quotation-pdf tr,
+    .quotation-pdf img {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+
+    .quotation-pdf td,
+    .quotation-pdf th {
+        line-height: 1.2;
+    }
+
     @media print {
+        html {
+            font-size: 12px;
+        }
+
         body {
             margin: 0;
             padding: 0;
             background: white;
-        }
-
-        @page {
-            size: A4 {{ $pageOrientation }};
-            margin: 8mm;
         }
     }
 
     .quotation-sections-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
-        margin-top: 20px;
+        gap: 8px;
+        margin-top: 12px;
     }
 
     .quotation-section-full {
@@ -55,11 +111,11 @@
 @endpush
 
 @section('content')
-<div class="w-full bg-white">
-    <div class="border-[10px] p-3" style="border-color: {{ $primaryColor }};">
+<div class="quotation-pdf w-full bg-white">
+    <div class="quotation-shell border-[10px] p-3" style="border-color: {{ $primaryColor }};">
         <div class="mb-4 h-4" style="background-color: {{ $primaryColor }};"></div>
 
-        <div class="grid grid-cols-12 gap-6">
+        <div class="quotation-header grid grid-cols-12 gap-6">
             <div class="col-span-7">
                 <div class="mb-6 flex items-start justify-between gap-4">
                     <div class="max-w-[260px]">
@@ -119,8 +175,8 @@
             </div>
         </div>
 
-        <div class="mt-5 border border-slate-900">
-            <div class="border-b border-slate-900 px-2 py-1 text-xs font-bold uppercase" style="background-color: {{ $primaryColor }}; color: {{ $textColor }}; letter-spacing: 0.12em;">
+        <div class="quotation-items mt-5 border border-slate-900">
+            <div class="quotation-table-title border-b border-slate-900 px-2 py-1 text-xs font-bold uppercase" style="background-color: {{ $primaryColor }}; color: {{ $textColor }}; letter-spacing: 0.12em;">
                 Quote Items
             </div>
 
@@ -165,8 +221,8 @@
                         $isLastOddSection = $quotationSections->count() % 2 === 1 && $loop->last;
                     @endphp
 
-                    <div class="border border-slate-900 {{ $isLastOddSection ? 'quotation-section-full' : '' }}">
-                        <div class="px-2 py-1 text-xs font-bold uppercase" style="background-color: {{ $primaryColor }}; color: {{ $textColor }}; letter-spacing: 0.12em;">
+                    <div class="quotation-section border border-slate-900 {{ $isLastOddSection ? 'quotation-section-full' : '' }}">
+                        <div class="quotation-section-title px-2 py-1 text-xs font-bold uppercase" style="background-color: {{ $primaryColor }}; color: {{ $textColor }}; letter-spacing: 0.12em;">
                             {{ $section->title }}
                         </div>
 
@@ -210,8 +266,8 @@
             </div>
         @endif
 
-        <div class="mt-5 border border-slate-900">
-            <div class="px-2 py-1 text-xs font-bold uppercase" style="background-color: {{ $primaryColor }}; color: {{ $textColor }}; letter-spacing: 0.12em;">
+        <div class="quotation-summary mt-5 border border-slate-900">
+            <div class="quotation-section-title px-2 py-1 text-xs font-bold uppercase" style="background-color: {{ $primaryColor }}; color: {{ $textColor }}; letter-spacing: 0.12em;">
                 Premium Summary
             </div>
             <table class="w-full border-collapse text-sm">
@@ -240,13 +296,10 @@
             </table>
         </div>
 
-        <div class="border-x border-b border-slate-900 px-4 py-3 text-center text-sm text-slate-800">
+        <div class="quotation-closing border-x border-b border-slate-900 px-4 py-3 text-center text-sm text-slate-800">
             We trust you will find our quotation competitive and await your placement instructions.
         </div>
 
-        <div class="mt-4 px-4 py-4 text-center text-sm font-semibold" style="background-color: {{ $primaryColor }}; color: {{ $textColor }};">
-            {{ collect([$quotation->business->phone ?? null, $businessEmail, $quotation->business->website ?? null])->filter()->join(' | ') }}
-        </div>
     </div>
 </div>
 @endsection

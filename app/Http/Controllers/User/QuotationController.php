@@ -367,9 +367,12 @@ class QuotationController extends Controller
 
         $quotation = Quotation::with(['business', 'items', 'taxes', 'customer'])->find($id);
         return pdf()
-        ->view('backend.user.pdf.quotation', compact('quotation'))
-        ->name('quotation-' . $quotation->quotation_number . '.pdf')
-        ->download();
+            ->view('backend.user.pdf.quotation', compact('quotation'))
+            ->footerView('backend.user.pdf.quotation-footer', compact('quotation'))
+            ->format('a4')
+            ->margins(7, 7, 14, 7, 'mm')
+            ->name('quotation-' . $quotation->quotation_number . '.pdf')
+            ->download();
     }
 
     public function show_public_quotation($short_code)
