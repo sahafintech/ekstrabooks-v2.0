@@ -11,6 +11,7 @@
     $updatedDate = $quotation->updated_at ? $quotation->updated_at->format($dateTimeFormat) : '-';
     $isUnderwritingQuotation = (int) ($quotation->is_deffered ?? 0) === 1 && ! empty($quotation->insurance_category_id);
     $pageOrientation = $isUnderwritingQuotation ? 'landscape' : 'portrait';
+    $pageHeight = $isUnderwritingQuotation ? '210mm' : '297mm';
 
     $quotationSections = $quotation->sections ?? collect();
 
@@ -33,7 +34,7 @@
 @push('styles')
 <style>
     html {
-        font-size: 12px;
+        font-size: 11px;
     }
 
     body {
@@ -46,52 +47,38 @@
 
     @page {
         size: A4 {{ $pageOrientation }};
-        margin: 7mm 7mm 14mm 7mm;
+        margin: 0;
     }
 
     .quotation-pdf {
         color: #0f172a;
         font-size: 0.875rem;
-        line-height: 1.25;
+        line-height: 1.18;
     }
 
-    .quotation-header,
-    .quotation-section,
-    .quotation-summary,
-    .quotation-closing {
-        page-break-inside: avoid;
-        break-inside: avoid;
-    }
-
-    .quotation-section-title,
-    .quotation-table-title {
-        page-break-after: avoid;
-        break-after: avoid;
-    }
-
-    .quotation-pdf table {
-        page-break-inside: auto;
-        break-inside: auto;
+    .quotation-shell {
+        box-sizing: border-box;
+        display: flex;
+        min-height: {{ $pageHeight }};
+        flex-direction: column;
+        border-width: 6px;
+        padding: 7px;
     }
 
     .quotation-pdf thead {
         display: table-header-group;
     }
 
-    .quotation-pdf tr,
-    .quotation-pdf img {
-        page-break-inside: avoid;
-        break-inside: avoid;
-    }
-
     .quotation-pdf td,
     .quotation-pdf th {
-        line-height: 1.2;
+        padding-top: 3px;
+        padding-bottom: 3px;
+        line-height: 1.15;
     }
 
     @media print {
         html {
-            font-size: 12px;
+            font-size: 11px;
         }
 
         body {
@@ -104,12 +91,30 @@
     .quotation-sections-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+        margin-top: 7px;
+    }
+
+    .quotation-header {
         gap: 8px;
-        margin-top: 12px;
+    }
+
+    .quotation-items,
+    .quotation-summary {
+        margin-top: 7px;
+    }
+
+    .quotation-section-content {
+        min-height: 36px;
+        line-height: 1.25;
     }
 
     .quotation-section-full {
         grid-column: 1 / -1;
+    }
+
+    .quotation-contact-footer {
+        margin-top: auto;
     }
 
     @media screen and (max-width: 767px) {
@@ -127,17 +132,17 @@
 @section('content')
 <div class="quotation-pdf w-full bg-white">
     <div class="quotation-shell border-[10px] p-3" style="border-color: {{ $primaryColor }};">
-        <div class="mb-4 h-4" style="background-color: {{ $primaryColor }};"></div>
+        <div class="mb-2 h-3" style="background-color: {{ $primaryColor }};"></div>
 
-        <div class="quotation-header grid grid-cols-12 gap-6">
+        <div class="quotation-header grid grid-cols-12 gap-2">
             <div class="col-span-7">
-                <div class="mb-6 flex items-start justify-between gap-4">
+                <div class="mb-2 flex items-start justify-between gap-2">
                     <div class="max-w-[260px]">
                         @if($quotation->business->logo)
                             <img
                                 src="{{ public_path('/uploads/media/' . $quotation->business->logo) }}"
                                 alt="Business Logo"
-                                class="max-h-24 object-contain"
+                                class="max-h-20 object-contain"
                             />
                         @else
                             <div class="text-3xl font-bold uppercase" style="color: {{ $primaryColor }};">
@@ -146,7 +151,7 @@
                         @endif
                     </div>
                     <div class="shrink-0">
-                        {!! QrCode::size(100)->errorCorrection('H')->margin(10)->generate(route('quotations.show_public_quotation', $quotation->short_code)) !!}
+                        {!! QrCode::size(82)->errorCorrection('H')->margin(6)->generate(route('quotations.show_public_quotation', $quotation->short_code)) !!}
                     </div>
                 </div>
 
@@ -164,12 +169,12 @@
 
             <div class="col-span-5">
                 <div class="border border-slate-900">
-                    <div class="border-b-2 px-4 py-2 text-center text-2xl font-bold uppercase" style="color: {{ $primaryColor }}; border-color: {{ $primaryColor }};">
+                    <div class="border-b-2 px-3 py-1 text-center text-xl font-bold uppercase" style="color: {{ $primaryColor }}; border-color: {{ $primaryColor }};">
                         Quotation
                     </div>
-                    <div class="px-4 py-2">
+                    <div class="px-3 py-1">
                         @foreach($quotationInfoRows as $row)
-                            <div class="flex items-start justify-between gap-4 py-0.5 text-sm">
+                            <div class="flex items-start justify-between gap-2 py-0.5 text-sm">
                                 <span class="font-semibold text-slate-900">{{ $row['label'] }}:</span>
                                 <span class="text-right text-slate-700">{{ $row['value'] }}</span>
                             </div>
@@ -179,7 +184,7 @@
             </div>
         </div>
 
-        <div class="quotation-items mt-5 border border-slate-900">
+        <div class="quotation-items border border-slate-900">
             <div class="quotation-table-title border-b border-slate-900 px-2 py-1 text-xs font-bold uppercase" style="background-color: {{ $primaryColor }}; color: {{ $textColor }}; letter-spacing: 0.12em;">
                 Quote Items
             </div>
@@ -197,17 +202,17 @@
                 <tbody>
                     @foreach($quotation->items as $item)
                         <tr>
-                            <td class="border border-slate-900 px-2 py-2 align-top">{{ $item->product_name }}</td>
-                            <td class="border border-slate-900 px-2 py-2 align-top">{{ $item->description }}</td>
-                            <td class="border border-slate-900 px-2 py-2 text-right align-top">{{ $item->quantity }}</td>
-                            <td class="border border-slate-900 px-2 py-2 text-right align-top">
+                            <td class="border border-slate-900 px-2 py-1 align-top">{{ $item->product_name }}</td>
+                            <td class="border border-slate-900 px-2 py-1 align-top">{{ $item->description }}</td>
+                            <td class="border border-slate-900 px-2 py-1 text-right align-top">{{ $item->quantity }}</td>
+                            <td class="border border-slate-900 px-2 py-1 text-right align-top">
                                 @if($item->calculation_type === 'percentage_of_amount')
                                     {{ $item->rate_value ?? 0 }}%
                                 @else
                                     {{ formatCurrency($item->unit_cost) }}
                                 @endif
                             </td>
-                            <td class="border border-slate-900 px-2 py-2 text-right align-top">{{ formatCurrency($item->sub_total) }}</td>
+                            <td class="border border-slate-900 px-2 py-1 text-right align-top">{{ formatCurrency($item->sub_total) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -261,7 +266,7 @@
                                 </tbody>
                             </table>
                         @else
-                            <div class="min-h-[80px] p-3 text-sm leading-6 text-slate-800" style="white-space: pre-line;">
+                            <div class="quotation-section-content p-2 text-sm text-slate-800" style="white-space: pre-line;">
                                 {{ $section->content ?: '-' }}
                             </div>
                         @endif
@@ -270,38 +275,42 @@
             </div>
         @endif
 
-        <div class="quotation-summary mt-5 border border-slate-900">
+        <div class="quotation-summary border border-slate-900">
             <div class="quotation-section-title px-2 py-1 text-xs font-bold uppercase" style="background-color: {{ $primaryColor }}; color: {{ $textColor }}; letter-spacing: 0.12em;">
                 Premium Summary
             </div>
             <table class="w-full border-collapse text-sm">
                 <tbody>
                     <tr>
-                        <td class="border-b border-slate-900 px-3 py-2 font-semibold">Sub-Total</td>
-                        <td class="border-b border-slate-900 px-3 py-2 text-right">{{ formatCurrency($quotation->sub_total) }}</td>
+                        <td class="border-b border-slate-900 px-3 py-1 font-semibold">Sub-Total</td>
+                        <td class="border-b border-slate-900 px-3 py-1 text-right">{{ formatCurrency($quotation->sub_total) }}</td>
                     </tr>
                     @foreach($quotation->taxes as $tax)
                         <tr>
-                            <td class="border-b border-slate-900 px-3 py-2 font-semibold">{{ $tax->name }}</td>
-                            <td class="border-b border-slate-900 px-3 py-2 text-right">{{ formatCurrency($tax->amount) }}</td>
+                            <td class="border-b border-slate-900 px-3 py-1 font-semibold">{{ $tax->name }}</td>
+                            <td class="border-b border-slate-900 px-3 py-1 text-right">{{ formatCurrency($tax->amount) }}</td>
                         </tr>
                     @endforeach
                     @if($quotation->discount > 0)
                         <tr>
-                            <td class="border-b border-slate-900 px-3 py-2 font-semibold">Discount</td>
-                            <td class="border-b border-slate-900 px-3 py-2 text-right">-{{ formatCurrency($quotation->discount) }}</td>
+                            <td class="border-b border-slate-900 px-3 py-1 font-semibold">Discount</td>
+                            <td class="border-b border-slate-900 px-3 py-1 text-right">-{{ formatCurrency($quotation->discount) }}</td>
                         </tr>
                     @endif
                     <tr>
-                        <td class="px-3 py-2 font-bold uppercase">Total Premium</td>
-                        <td class="px-3 py-2 text-right font-bold">{{ formatCurrency($quotation->grand_total) }}</td>
+                        <td class="px-3 py-1 font-bold uppercase">Total Premium</td>
+                        <td class="px-3 py-1 text-right font-bold">{{ formatCurrency($quotation->grand_total) }}</td>
                     </tr>
                 </tbody>
             </table>
         </div>
 
-        <div class="quotation-closing border-x border-b border-slate-900 px-4 py-3 text-center text-sm text-slate-800">
+        <div class="quotation-closing border-x border-b border-slate-900 px-3 py-1.5 text-center text-sm text-slate-800">
             We trust you will find our quotation competitive and await your placement instructions.
+        </div>
+
+        <div class="quotation-contact-footer px-3 py-1.5 text-center text-xs font-semibold" style="background-color: {{ $primaryColor }}; color: {{ $textColor }};">
+            {{ collect([$quotation->business->phone ?? null, $businessEmail, $quotation->business->website ?? null])->filter()->join(' | ') }}
         </div>
 
     </div>
