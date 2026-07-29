@@ -11,6 +11,7 @@ use App\Models\Attendance;
 use App\Models\AuditLog;
 use App\Models\Currency;
 use App\Models\Employee;
+use App\Models\EmailTemplate;
 use App\Models\Holiday;
 use App\Models\Payroll;
 use App\Models\SalaryAdvance;
@@ -18,12 +19,15 @@ use App\Models\SalaryBenefit;
 use App\Models\Timesheet;
 use App\Models\Transaction;
 use App\Models\TransactionMethod;
+use App\Models\User;
+use App\Notifications\SendPayrollApprovalRequest;
 use App\Utilities\Overrider;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Validator;
@@ -82,11 +86,23 @@ class PayrollController extends Controller
         $hasConfiguredCheckers = is_array($configuredCheckerUserIds) && count($configuredCheckerUserIds) > 0;
         $isCurrentUserChecker = $hasConfiguredCheckers && in_array($currentUserId, $configuredCheckerUserIds);
 
+        $approvers = [];
+        if ($hasConfiguredApprovers) {
+            $approvers = User::whereIn('id', $configuredUserIds)
+                ->select('id', 'name', 'email')
+                ->orderBy('name')
+                ->get();
+        }
+
+        $approvalEmailTemplate = EmailTemplate::where('slug', 'PAYROLL_APPROVAL_REQUEST')
+            ->where('email_status', 1)
+            ->first();
+
         $query = Payroll::query()
             ->where('payslips.business_id', $request->activeBusiness->id)
             ->where('month', $month)
             ->where('year', $year)
-            ->with('staff', 'staff.salary_benefits', 'approvals.actionUser');
+            ->with('staff', 'staff.salary_benefits', 'approvals.actionUser', 'business');
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -152,6 +168,8 @@ class PayrollController extends Controller
             'isCurrentUserApprover' => $isCurrentUserApprover,
             'hasConfiguredCheckers' => $hasConfiguredCheckers,
             'isCurrentUserChecker' => $isCurrentUserChecker,
+            'approvers' => $approvers,
+            'emailTemplate' => $approvalEmailTemplate,
         ]);
     }
 
@@ -1535,6 +1553,80 @@ class PayrollController extends Controller
         }
 
         return back()->with('success', _lang('Verification recorded for ' . $verifiedCount . ' payslips'));
+    }
+
+    /**
+     * Share selected payrolls with a configured payroll approver by email.
+     */
+    public function bulk_email(Request $request)
+    {
+        Gate::authorize('payslips.send_email');
+
+        $approvalUserIds = json_decode(
+            get_business_option('payroll_approval_users', '[]'),
+            true
+        );
+        $approvalUserIds = is_array($approvalUserIds) ? $approvalUserIds : [];
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'distinct', 'exists:payslips,id'],
+            'recipient_id' => ['required', 'integer', 'exists:users,id'],
+            'subject' => ['required', 'string', 'max:255'],
+            'message' => ['required', 'string'],
+        ]);
+
+        if (!in_array((int) $validated['recipient_id'], array_map('intval', $approvalUserIds), true)) {
+            return back()->withErrors([
+                'recipient_id' => _lang('The recipient must be a configured payroll approver'),
+            ]);
+        }
+
+        $requestedIds = collect($validated['ids'])->map(fn ($id) => (int) $id)->unique();
+        $payrolls = Payroll::with(['employee', 'business'])
+            ->where('business_id', $request->activeBusiness->id)
+            ->whereIn('id', $requestedIds)
+            ->get();
+
+        if ($payrolls->count() !== $requestedIds->count()) {
+            return back()->with('error', _lang('One or more selected payslips are unavailable for this business'));
+        }
+
+        $recipient = User::find($validated['recipient_id']);
+        if (!$recipient || empty($recipient->email)) {
+            return back()->withErrors([
+                'recipient_id' => _lang('The selected approver does not have an email address'),
+            ]);
+        }
+
+        $customMessage = [
+            'subject' => $validated['subject'],
+            'message' => $validated['message'],
+            'origin' => rtrim($request->getSchemeAndHttpHost(), '/'),
+        ];
+
+        try {
+            Notification::send(
+                $recipient,
+                new SendPayrollApprovalRequest($payrolls, $recipient, $customMessage)
+            );
+        } catch (\Exception $e) {
+            $errorMessage = $e->getMessage() ?: 'Failed to send email. Please check mail configuration and try again.';
+
+            return back()->with('error', $errorMessage);
+        }
+
+        foreach ($payrolls as $payroll) {
+            $audit = new AuditLog();
+            $audit->date_changed = now()->format('Y-m-d H:i:s');
+            $audit->changed_by = auth()->id();
+            $audit->event = 'Sent Payroll Approval Request for Payslip ' . $payroll->id
+                . ' (' . $payroll->employee->name . ', ' . $payroll->month . '/' . $payroll->year . ')'
+                . ' to ' . $recipient->email;
+            $audit->save();
+        }
+
+        return back()->with('success', _lang('Email has been sent'));
     }
 
     /**

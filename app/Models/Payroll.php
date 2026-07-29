@@ -35,6 +35,10 @@ class Payroll extends Model
     public function employee() {
         return $this->belongsTo(Employee::class, 'employee_id');
     }
+
+    public function business() {
+        return $this->belongsTo(Business::class, 'business_id')->withDefault();
+    }
     
     public function taxCalculationMethod() {
         return $this->belongsTo(TaxCalculationMethod::class);

@@ -37,6 +37,7 @@ import {
     ChevronUp,
     ChevronDown,
     ShieldCheck,
+    Mail,
 } from "lucide-react";
 import { toast } from 'sonner'
 import TableActions from "@/Components/shared/TableActions";
@@ -50,6 +51,7 @@ import { DrawerComponent } from "@/Components/DrawerComponent";
 import { Textarea } from "@/Components/ui/textarea";
 import InputError from "@/Components/InputError";
 import { Badge } from "@/Components/ui/badge";
+import RichTextEditor from "@/Components/RichTextEditor";
 
 // Delete Confirmation Modal Component
 const DeleteConfirmationModal = ({ show, onClose, onConfirm, processing }) => (
@@ -185,6 +187,108 @@ const BulkVerifyConfirmationModal = ({
         </form>
     </Modal>
 );
+
+const ShareSelectedPayrollsModal = ({
+    show,
+    onClose,
+    onSubmit,
+    processing,
+    approvers,
+    emailData,
+    onRecipientChange,
+    onSubjectChange,
+    onMessageChange,
+    errors,
+    selectionCount,
+}) => (
+    <Modal show={show} onClose={onClose} maxWidth="4xl">
+        <form onSubmit={onSubmit} className="space-y-4">
+            <h2 className="text-lg font-medium">Share Selected Payrolls via Email</h2>
+            <p className="text-sm text-gray-600">
+                {selectionCount} payslip{selectionCount !== 1 ? "s" : ""} will be inserted into the email body.
+            </p>
+
+            <div className="grid gap-3">
+                <div className="grid gap-2">
+                    <Label>Recipient</Label>
+                    <Select value={emailData.recipient_id} onValueChange={onRecipientChange}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select recipient" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {approvers.map((user) => (
+                                <SelectItem key={user.id} value={user.id.toString()}>
+                                    {user.name} ({user.email})
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <InputError message={errors?.recipient_id} className="text-sm" />
+                </div>
+
+                <div className="grid gap-2">
+                    <Label>Subject</Label>
+                    <Input
+                        value={emailData.subject}
+                        onChange={(e) => onSubjectChange(e.target.value)}
+                    />
+                    <InputError message={errors?.subject} className="text-sm" />
+                </div>
+
+                <div className="grid gap-2">
+                    <Label>Message</Label>
+                    <RichTextEditor
+                        value={emailData.message}
+                        onChange={onMessageChange}
+                        height={260}
+                    />
+                    <InputError message={errors?.message} className="text-sm" />
+                </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+                <Button type="button" variant="outline" onClick={onClose}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={processing}>
+                    {processing ? "Sending..." : "Send"}
+                </Button>
+            </div>
+        </form>
+    </Modal>
+);
+
+const DEFAULT_PAYROLL_TEMPLATE = `
+<div style="font-family: Arial, sans-serif; font-size: 14px; color: #333333;">
+    <h2 style="color: #333333;">Payroll Approval Required</h2>
+    <p>Dear {{approverName}},</p>
+    <p>Please review the following payrolls and take action.</p>
+    <table style="border-collapse: collapse; width: 100%; margin-top: 12px;">
+        <thead>
+            <tr style="background-color: #f2f2f2;">
+                <th style="border: 1px solid #dddddd; padding: 8px; text-align: left;">Payslip</th>
+                <th style="border: 1px solid #dddddd; padding: 8px; text-align: left;">Employee</th>
+                <th style="border: 1px solid #dddddd; padding: 8px; text-align: left;">Period</th>
+                <th style="border: 1px solid #dddddd; padding: 8px; text-align: right;">Net Salary</th>
+                <th style="border: 1px solid #dddddd; padding: 8px; text-align: left;">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#each payrolls}}
+            <tr>
+                <td style="border: 1px solid #dddddd; padding: 8px;">
+                    <a href="{{payrollUrl}}" style="color: #1a73e8; text-decoration: none;">#{{payrollId}}</a>
+                </td>
+                <td style="border: 1px solid #dddddd; padding: 8px;">{{employeeName}}</td>
+                <td style="border: 1px solid #dddddd; padding: 8px;">{{payrollPeriod}}</td>
+                <td style="border: 1px solid #dddddd; padding: 8px; text-align: right;">{{netSalary}}</td>
+                <td style="border: 1px solid #dddddd; padding: 8px;">{{status}}</td>
+            </tr>
+            {{/each}}
+        </tbody>
+    </table>
+    <p style="margin-top: 12px;">Best regards,<br />{{companyName}}</p>
+</div>`;
 
 const BulkRejectConfirmationModal = ({
     show,
@@ -495,6 +599,8 @@ export default function List({
     isCurrentUserApprover = false,
     hasConfiguredCheckers = false,
     isCurrentUserChecker = false,
+    approvers = [],
+    emailTemplate = null,
 }) {
     const { flash = {}, errors = {}, userPackage } = usePage().props;
     const [selectedPaylips, setSelectedPayslips] = useState([]);
@@ -508,6 +614,7 @@ export default function List({
     const [showBulkApproveModal, setShowBulkApproveModal] = useState(false);
     const [showBulkRejectModal, setShowBulkRejectModal] = useState(false);
     const [showBulkVerifyModal, setShowBulkVerifyModal] = useState(false);
+    const [showShareModal, setShowShareModal] = useState(false);
     const [showBulkAccrueModal, setShowBulkAccrueModal] = useState(false);
     const [payslipsToDelete, setPayslipsToDelete] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -526,6 +633,12 @@ export default function List({
         filters.sorting || { column: "id", direction: "desc" }
     );
     const [paymentAmounts, setPaymentAmounts] = useState({});
+    const [shareErrors, setShareErrors] = useState({});
+    const [emailData, setEmailData] = useState({
+        recipient_id: approvers[0]?.id?.toString() || "",
+        subject: emailTemplate?.subject || "Payroll Approval Required",
+        message: "",
+    });
 
     // Edit drawer states
     const [editDrawerOpen, setEditDrawerOpen] = useState(false);
@@ -542,6 +655,61 @@ export default function List({
         allowances: [],
         _method: "PUT",
     });
+
+    const payrollEmailStatusLabel = (payroll) => {
+        const payrollStatus = Number(payroll.status);
+
+        if (payrollStatus === 4) return "Paid";
+        if (payrollStatus === 3) return "Partially Paid";
+        if (payrollStatus === 1 || payrollStatus === 2) return "Approved";
+        if (Number(payroll.checker_status) === 1) return "Verified";
+
+        return "Draft";
+    };
+
+    const buildEmailBody = (recipientId) => {
+        const recipient = approvers.find(
+            (user) => user.id.toString() === (recipientId || "").toString()
+        );
+        const companyName =
+            payrolls[0]?.business?.business_name || payrolls[0]?.business?.name || "";
+        const selected = payrolls.filter((payroll) =>
+            selectedPaylips.includes(payroll.id)
+        );
+
+        const templateRaw = emailTemplate?.email_body || DEFAULT_PAYROLL_TEMPLATE;
+        const hasLoop = templateRaw.includes("{{#each payrolls}}");
+        const baseTemplate = hasLoop ? templateRaw : DEFAULT_PAYROLL_TEMPLATE;
+        const rowPattern = /{{#each payrolls}}([\s\S]*?){{\/each}}/;
+        const rowMatch = baseTemplate.match(rowPattern);
+        const rowTemplate = rowMatch?.[1] || "";
+
+        const rows = selected
+            .map((payroll) => {
+                let row = rowTemplate;
+                row = row.replace(/{{payrollUrl}}/g, `/user/payslips/${payroll.id}`);
+                row = row.replace(/{{payrollId}}/g, payroll.id);
+                row = row.replace(/{{employeeName}}/g, payroll.staff?.name || "-");
+                row = row.replace(/{{payrollPeriod}}/g, `${payroll.month}/${payroll.year}`);
+                row = row.replace(
+                    /{{netSalary}}/g,
+                    formatCurrency({
+                        amount: payroll.net_salary,
+                        currency: payroll.business?.currency,
+                    })
+                );
+                row = row.replace(/{{status}}/g, payrollEmailStatusLabel(payroll));
+
+                return row;
+            })
+            .join("");
+
+        let body = baseTemplate.replace(rowPattern, rows);
+        body = body.replace(/{{approverName}}/g, recipient?.name || "");
+        body = body.replace(/{{companyName}}/g, companyName);
+
+        return body;
+    };
 
     useEffect(() => {
         // Initialize paymentAmounts with the correct due amounts
@@ -713,6 +881,26 @@ export default function List({
 
         if (bulkAction === "delete") {
             setShowBulkDeleteModal(true);
+        }
+
+        if (bulkAction === "share_email") {
+            if (approvers.length === 0) {
+                toast("Error", {
+                    description: "No payroll approvers are configured.",
+                });
+                return;
+            }
+
+            const recipientId =
+                emailData.recipient_id || approvers[0]?.id?.toString() || "";
+            setEmailData((previous) => ({
+                ...previous,
+                recipient_id: recipientId,
+                subject: emailTemplate?.subject || "Payroll Approval Required",
+                message: buildEmailBody(recipientId),
+            }));
+            setShareErrors({});
+            setShowShareModal(true);
         }
 
         if (bulkAction === "approve") {
@@ -901,6 +1089,44 @@ export default function List({
                 },
                 onError: () => {
                     setIsProcessing(false);
+                },
+            }
+        );
+    };
+
+    const handleRecipientChange = (value) => {
+        setEmailData((previous) => ({
+            ...previous,
+            recipient_id: value,
+            message: buildEmailBody(value),
+        }));
+    };
+
+    const handleShareSubmit = (e) => {
+        e.preventDefault();
+        setIsProcessing(true);
+        setShareErrors({});
+
+        router.post(
+            route("payslips.bulk_email"),
+            {
+                ids: selectedPaylips,
+                recipient_id: emailData.recipient_id,
+                subject: emailData.subject,
+                message: emailData.message,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setIsProcessing(false);
+                    setShowShareModal(false);
+                    setSelectedPayslips([]);
+                    setIsAllSelected(false);
+                    setBulkAction("");
+                },
+                onError: (errors) => {
+                    setIsProcessing(false);
+                    setShareErrors(errors);
                 },
             }
         );
@@ -1366,6 +1592,14 @@ export default function List({
                                         <SelectValue placeholder="Bulk actions" />
                                     </SelectTrigger>
                                     <SelectContent>
+                                        {approvers.length > 0 && (
+                                            <SelectItem value="share_email">
+                                                <span className="flex items-center gap-2">
+                                                    <Mail className="h-4 w-4 text-sky-600" />
+                                                    Share Selected via Email
+                                                </span>
+                                            </SelectItem>
+                                        )}
                                         <SelectItem value="delete">
                                             Delete Selected
                                         </SelectItem>
@@ -2316,6 +2550,30 @@ export default function List({
                         onConfirm={handleBulkVerifyConfirm}
                         processing={isProcessing}
                         count={selectedPaylips.length}
+                    />
+
+                    <ShareSelectedPayrollsModal
+                        show={showShareModal}
+                        onClose={() => setShowShareModal(false)}
+                        onSubmit={handleShareSubmit}
+                        processing={isProcessing}
+                        approvers={approvers}
+                        emailData={emailData}
+                        onRecipientChange={handleRecipientChange}
+                        onSubjectChange={(value) =>
+                            setEmailData((previous) => ({
+                                ...previous,
+                                subject: value,
+                            }))
+                        }
+                        onMessageChange={(value) =>
+                            setEmailData((previous) => ({
+                                ...previous,
+                                message: value,
+                            }))
+                        }
+                        errors={shareErrors}
+                        selectionCount={selectedPaylips.length}
                     />
 
                     <BulkAccrueConfirmationModal
