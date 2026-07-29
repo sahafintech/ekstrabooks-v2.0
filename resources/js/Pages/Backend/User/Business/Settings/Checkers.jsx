@@ -46,6 +46,9 @@ export default function Checkers({ business, id, users = [], activeTab }) {
             "hospital_purchase_checker_users",
             "purchase_checker_users",
         ]),
+
+        payroll_checker_required_count: getSettingValue("payroll_checker_required_count", "1"),
+        payroll_checker_users: getArraySettingValue("payroll_checker_users"),
     });
 
     const submitCheckerSettings = (e) => {
@@ -178,6 +181,56 @@ export default function Checkers({ business, id, users = [], activeTab }) {
                                                 Finance experts who validate the accuracy of hospital purchase records
                                             </p>
                                             <InputError message={errors.hospital_purchase_checker_users} className="mt-1" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                                        Payroll Checker Workflow
+                                    </h3>
+                                    <p className="text-sm text-gray-600 mb-4">
+                                        Payroll verifiers review draft payslips before they can be approved.
+                                    </p>
+
+                                    <div className="grid grid-cols-12 mb-4">
+                                        <Label htmlFor="payroll_checker_required_count" className="col-span-12 md:col-span-3 flex items-center mb-2 md:mb-0">
+                                            Number of Checks Required
+                                        </Label>
+                                        <div className="col-span-12 md:col-span-9">
+                                            <Input
+                                                id="payroll_checker_required_count"
+                                                type="number"
+                                                min="0"
+                                                max="10"
+                                                value={data.payroll_checker_required_count}
+                                                onChange={(e) => setData("payroll_checker_required_count", e.target.value)}
+                                                className="w-full"
+                                                disabled={processing}
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Minimum number of verifications needed before payroll is marked as verified
+                                            </p>
+                                            <InputError message={errors.payroll_checker_required_count} className="mt-1" />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-12 mb-4">
+                                        <Label htmlFor="payroll_checker_users" className="col-span-12 md:col-span-3 flex items-center mb-2 md:mb-0">
+                                            Verifier Users
+                                        </Label>
+                                        <div className="col-span-12 md:col-span-9">
+                                            <SearchableMultiSelectCombobox
+                                                options={userOptions}
+                                                value={data.payroll_checker_users}
+                                                onChange={(values) => setData("payroll_checker_users", values)}
+                                                placeholder="Select payroll verifiers"
+                                                emptyMessage="No users found"
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Users who are permitted to verify draft payrolls before approval
+                                            </p>
+                                            <InputError message={errors.payroll_checker_users} className="mt-1" />
                                         </div>
                                     </div>
                                 </div>

@@ -6,6 +6,7 @@ use App\Exports\PayslipsExport;
 use App\Http\Controllers\Controller;
 use App\Mail\GeneralMail;
 use App\Models\Account;
+use App\Models\Approvals;
 use App\Models\Attendance;
 use App\Models\AuditLog;
 use App\Models\Currency;
@@ -75,6 +76,12 @@ class PayrollController extends Controller
         $hasConfiguredApprovers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
         $isCurrentUserApprover = $hasConfiguredApprovers && in_array($currentUserId, $configuredUserIds);
 
+        // Check if current user is a configured payroll verifier
+        $checkerUsersJson = get_business_option('payroll_checker_users', '[]');
+        $configuredCheckerUserIds = json_decode($checkerUsersJson, true);
+        $hasConfiguredCheckers = is_array($configuredCheckerUserIds) && count($configuredCheckerUserIds) > 0;
+        $isCurrentUserChecker = $hasConfiguredCheckers && in_array($currentUserId, $configuredCheckerUserIds);
+
         $query = Payroll::query()
             ->where('payslips.business_id', $request->activeBusiness->id)
             ->where('month', $month)
@@ -143,6 +150,8 @@ class PayrollController extends Controller
             'trashed_payrolls' => Payroll::onlyTrashed()->where('business_id', $request->activeBusiness->id)->count(),
             'hasConfiguredApprovers' => $hasConfiguredApprovers,
             'isCurrentUserApprover' => $isCurrentUserApprover,
+            'hasConfiguredCheckers' => $hasConfiguredCheckers,
+            'isCurrentUserChecker' => $isCurrentUserChecker,
         ]);
     }
 
@@ -267,6 +276,7 @@ class PayrollController extends Controller
 
         // Create approval records for configured approvers
         $this->createPayrollApprovalRecords($payroll);
+        $this->createPayrollCheckerRecords($payroll);
     }
 
     /**
@@ -291,9 +301,42 @@ class PayrollController extends Controller
         foreach ($validUserIds as $userId) {
             $payroll->approvals()->create([
                 'ref_name' => 'payroll',
+                'checker_type' => 'approval',
                 'action_user' => $userId,
                 'status' => 0, // pending
             ]);
+        }
+    }
+
+    /**
+     * Create verification records for a payroll.
+     */
+    private function createPayrollCheckerRecords(Payroll $payroll): void
+    {
+        $checkerUsersJson = get_business_option('payroll_checker_users', '[]');
+        $configuredUserIds = json_decode($checkerUsersJson, true);
+
+        if (!is_array($configuredUserIds) || empty($configuredUserIds)) {
+            return;
+        }
+
+        $validUserIds = \App\Models\User::whereIn('id', $configuredUserIds)->pluck('id')->toArray();
+
+        foreach ($validUserIds as $userId) {
+            $existingChecker = Approvals::where('ref_id', $payroll->id)
+                ->where('ref_name', 'payroll')
+                ->where('checker_type', 'checker')
+                ->where('action_user', $userId)
+                ->first();
+
+            if (!$existingChecker) {
+                $payroll->checkers()->create([
+                    'ref_name' => 'payroll',
+                    'checker_type' => 'checker',
+                    'action_user' => $userId,
+                    'status' => 0,
+                ]);
+            }
         }
     }
 
@@ -318,6 +361,7 @@ class PayrollController extends Controller
             if (!in_array($userId, $existingApproverIds)) {
                 $payroll->approvals()->create([
                     'ref_name' => 'payroll',
+                    'checker_type' => 'approval',
                     'action_user' => $userId,
                     'status' => 0, // pending
                 ]);
@@ -326,11 +370,43 @@ class PayrollController extends Controller
 
         // Remove approvers who are no longer in the configured list
         // Only remove if they haven't taken action yet (status = 0)
-        \App\Models\Approvals::where('ref_id', $payroll->id)
+        Approvals::where('ref_id', $payroll->id)
             ->where('ref_name', 'payroll')
+            ->where('checker_type', 'approval')
             ->where('status', 0) // Only remove pending approvals
             ->whereNotIn('action_user', $validUserIds)
             ->delete();
+    }
+
+    /**
+     * Sync verification records for a payroll with configured checkers.
+     */
+    private function syncCheckerRecordsForPayroll(Payroll $payroll, array $configuredUserIds): void
+    {
+        $validUserIds = \App\Models\User::whereIn('id', $configuredUserIds)->pluck('id')->toArray();
+        $existingCheckerIds = $payroll->checkers->pluck('action_user')->toArray();
+
+        foreach ($validUserIds as $userId) {
+            if (!in_array($userId, $existingCheckerIds)) {
+                $payroll->checkers()->create([
+                    'ref_name' => 'payroll',
+                    'checker_type' => 'checker',
+                    'action_user' => $userId,
+                    'status' => 0,
+                ]);
+            }
+        }
+
+        $pendingCheckers = Approvals::where('ref_id', $payroll->id)
+            ->where('ref_name', 'payroll')
+            ->where('checker_type', 'checker')
+            ->where('status', 0);
+
+        if (empty($validUserIds)) {
+            $pendingCheckers->delete();
+        } else {
+            $pendingCheckers->whereNotIn('action_user', $validUserIds)->delete();
+        }
     }
 
     /**
@@ -544,7 +620,13 @@ class PayrollController extends Controller
      */
     public function show($id)
     {
-        $payroll = Payroll::with('staff', 'staff.department', 'staff.designation', 'approvals.actionUser')->find($id);
+        $payroll = Payroll::with(
+            'staff',
+            'staff.department',
+            'staff.designation',
+            'approvals.actionUser',
+            'checkers.actionUser'
+        )->find($id);
 
         if (!$payroll) {
             abort(404, 'Payroll not found');
@@ -569,6 +651,18 @@ class PayrollController extends Controller
             $this->syncApprovalRecordsForPayroll($payroll, $configuredUserIds);
             // Reload approvals with actionUser relationship
             $payroll->load('approvals.actionUser');
+        }
+
+        $payrollCheckerUsersJson = get_business_option('payroll_checker_users', '[]');
+        $configuredCheckerUserIds = json_decode($payrollCheckerUsersJson, true);
+        $hasConfiguredCheckers = is_array($configuredCheckerUserIds) && count($configuredCheckerUserIds) > 0;
+
+        if ((int) $payroll->status === 0 && $payroll->checker_status == 0) {
+            $this->syncCheckerRecordsForPayroll(
+                $payroll,
+                $hasConfiguredCheckers ? $configuredCheckerUserIds : []
+            );
+            $payroll->load('checkers.actionUser');
         }
 
         $working_days = Attendance::whereMonth('date', $payroll->month)
@@ -641,6 +735,8 @@ class PayrollController extends Controller
             'actual_working_hours' => $actual_working_hours,
             'approvalUsersCount' => $payroll->approvals->count(),
             'hasConfiguredApprovers' => $hasConfiguredApprovers,
+            'checkerUsersCount' => $payroll->checkers->count(),
+            'hasConfiguredCheckers' => $hasConfiguredCheckers,
         ]);
     }
 
@@ -1202,12 +1298,19 @@ class PayrollController extends Controller
         }
 
         $payrolls = Payroll::with('approvals')
+            ->where('business_id', $request->activeBusiness->id)
             ->where('status', 0)
             ->whereIn('id', $request->ids)
             ->get();
 
         if ($payrolls->count() == 0) {
             return back()->with('error', _lang('No draft payslips found to approve'));
+        }
+
+        if ($this->payrollRequiresVerification() && $payrolls->contains(
+            fn (Payroll $payroll) => (int) $payroll->checker_status !== 1
+        )) {
+            return back()->with('error', _lang('Please verify the selected payrolls before approval'));
         }
 
         $approvedCount = 0;
@@ -1360,6 +1463,81 @@ class PayrollController extends Controller
     }
 
     /**
+     * Verify selected draft payrolls before approval.
+     */
+    public function bulk_verify(Request $request)
+    {
+        Gate::authorize('payslips.verify');
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+        ]);
+
+        $currentUserId = auth()->id();
+        $checkerUsersJson = get_business_option('payroll_checker_users', '[]');
+        $configuredUserIds = json_decode($checkerUsersJson, true);
+        $hasConfiguredCheckers = is_array($configuredUserIds) && count($configuredUserIds) > 0;
+
+        if (!$hasConfiguredCheckers) {
+            return back()->with('error', _lang('No payroll verifiers are configured. Please configure them in business settings first.'));
+        }
+
+        if (!in_array($currentUserId, $configuredUserIds)) {
+            return back()->with('error', _lang('You are not assigned as a verifier for payrolls'));
+        }
+
+        $payrolls = Payroll::with('checkers', 'employee')
+            ->where('business_id', $request->activeBusiness->id)
+            ->where('status', 0)
+            ->whereIn('id', $validated['ids'])
+            ->get();
+
+        if ($payrolls->isEmpty()) {
+            return back()->with('error', _lang('No draft payslips found to verify'));
+        }
+
+        $verifiedCount = 0;
+
+        foreach ($payrolls as $payroll) {
+            if ($payroll->checkers->isEmpty()) {
+                $this->createPayrollCheckerRecords($payroll);
+                $payroll->load('checkers');
+            }
+
+            $checker = $payroll->checkers()
+                ->where('action_user', $currentUserId)
+                ->first();
+
+            if (!$checker) {
+                continue;
+            }
+
+            $checker->update([
+                'status' => 1,
+                'comment' => 'Bulk verified',
+                'action_date' => now(),
+            ]);
+
+            $this->checkAndUpdatePayrollCheckerStatus($payroll);
+
+            $audit = new AuditLog();
+            $audit->date_changed = now()->format('Y-m-d H:i:s');
+            $audit->changed_by = $currentUserId;
+            $audit->event = 'Bulk Verified Payroll for ' . $payroll->employee->name . ' (' . $payroll->month . '/' . $payroll->year . ')';
+            $audit->save();
+
+            $verifiedCount++;
+        }
+
+        if ($verifiedCount === 0) {
+            return back()->with('error', _lang('No payslips were verified'));
+        }
+
+        return back()->with('success', _lang('Verification recorded for ' . $verifiedCount . ' payslips'));
+    }
+
+    /**
      * Approve a payroll (single user approval)
      */
     public function approve(Request $request, $id)
@@ -1378,6 +1556,10 @@ class PayrollController extends Controller
         // Only allow approval actions on draft payrolls (status = 0)
         if ($payroll->status != 0) {
             return back()->with('error', _lang('Only draft payrolls can be approved'));
+        }
+
+        if ($this->payrollRequiresVerification() && (int) $payroll->checker_status !== 1) {
+            return back()->with('error', _lang('Please verify this payroll before approval'));
         }
 
         $currentUserId = auth()->id();
@@ -1502,6 +1684,10 @@ class PayrollController extends Controller
      */
     private function checkAndUpdatePayrollStatus(Payroll $payroll): void
     {
+        if ($this->payrollRequiresVerification() && (int) $payroll->checker_status !== 1) {
+            return;
+        }
+
         // Reload approvals to get the most current state
         $payroll->load('approvals');
         $approvals = $payroll->approvals;
@@ -1543,6 +1729,54 @@ class PayrollController extends Controller
         }
 
         // Default: Not enough approvals yet - stay in draft
+    }
+
+    /**
+     * Determine whether the current business has an active payroll verification workflow.
+     */
+    private function payrollRequiresVerification(): bool
+    {
+        $checkerUsers = json_decode(
+            get_business_option('payroll_checker_users', '[]'),
+            true
+        );
+
+        return is_array($checkerUsers) && count($checkerUsers) > 0;
+    }
+
+    /**
+     * Update payroll verification state once the configured checker threshold is met.
+     */
+    private function checkAndUpdatePayrollCheckerStatus(Payroll $payroll): void
+    {
+        $payroll->load('checkers');
+        $checkers = $payroll->checkers;
+
+        if ($checkers->isEmpty()) {
+            return;
+        }
+
+        $requiredCheckerCount = (int) get_business_option('payroll_checker_required_count', 1);
+        $requiredCheckerCount = min($requiredCheckerCount, $checkers->count());
+        $verifiedCount = $checkers->where('status', 1)->count();
+
+        if ($verifiedCount >= $requiredCheckerCount) {
+            if ((int) $payroll->checker_status !== 1) {
+                $payroll->update([
+                    'checker_status' => 1,
+                    'checked_by' => auth()->id(),
+                ]);
+            }
+
+            return;
+        }
+
+        if ((int) $payroll->checker_status === 1) {
+            $payroll->update([
+                'checker_status' => 0,
+                'checked_by' => null,
+            ]);
+        }
     }
 
     public function bulk_delete(Request $request)

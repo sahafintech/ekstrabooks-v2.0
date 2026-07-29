@@ -39,6 +39,8 @@ return new class extends Migration {
             $table->decimal('net_salary', 8, 2);
             $table->decimal('paid', 8, 2)->default(0);
             $table->tinyInteger('status')->deafult(0);
+            $table->tinyInteger('checker_status')->default(0)->comment('0 = pending, 1 = verified');
+            $table->unsignedBigInteger('checked_by')->nullable();
 
             $table->bigInteger('user_id')->unsigned();
             $table->bigInteger('business_id')->unsigned();
@@ -52,6 +54,7 @@ return new class extends Migration {
             $table->foreign('employee_id')->references('id')->on('employees')->cascadeOnDelete();
             $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
             $table->foreign('business_id')->references('id')->on('business')->cascadeOnDelete();
+            $table->foreign('checked_by')->references('id')->on('users')->nullOnDelete();
         });
     }
 

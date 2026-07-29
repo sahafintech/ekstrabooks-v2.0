@@ -730,6 +730,9 @@ class BusinessSettingsController extends Controller
         $validator = Validator::make($request->all(), [
             'purchase_checker_required_count' => 'required|integer|min:0|max:10',
             'hospital_purchase_checker_required_count' => 'required|integer|min:0|max:10',
+            'payroll_checker_required_count' => 'required|integer|min:0|max:10',
+            'payroll_checker_users' => 'nullable|array',
+            'payroll_checker_users.*' => 'integer|distinct|exists:users,id',
         ]);
 
         if ($validator->fails()) {
@@ -746,6 +749,7 @@ class BusinessSettingsController extends Controller
         // Sync checker records for pending items with new checkers
         $this->syncPurchaseCheckerRecords($request->purchase_checker_users ?? [], $businessId);
         $this->syncHospitalPurchaseCheckerRecords($request->hospital_purchase_checker_users ?? [], $businessId);
+        $this->syncPayrollCheckerRecords($request->payroll_checker_users ?? [], $businessId);
 
         // audit log
         $audit = new AuditLog();
@@ -898,6 +902,7 @@ class BusinessSettingsController extends Controller
                 // Check if approval record already exists for this user
                 $existingApproval = Approvals::where('ref_id', $payroll->id)
                     ->where('ref_name', 'payroll')
+                    ->where('checker_type', 'approval')
                     ->where('action_user', $userId)
                     ->first();
 
@@ -905,6 +910,7 @@ class BusinessSettingsController extends Controller
                     Approvals::create([
                         'ref_id' => $payroll->id,
                         'ref_name' => 'payroll',
+                        'checker_type' => 'approval',
                         'action_user' => $userId,
                         'status' => 0, // pending
                     ]);
@@ -915,9 +921,54 @@ class BusinessSettingsController extends Controller
             // Only remove if they haven't taken action yet (status = 0)
             Approvals::where('ref_id', $payroll->id)
                 ->where('ref_name', 'payroll')
+                ->where('checker_type', 'approval')
                 ->where('status', 0) // Only remove pending approvals
                 ->whereNotIn('action_user', $validUserIds)
                 ->delete();
+        }
+    }
+
+    /**
+     * Sync checker records for draft payrolls awaiting verification.
+     */
+    private function syncPayrollCheckerRecords(array $checkerUserIds, $businessId): void
+    {
+        $validUserIds = User::whereIn('id', $checkerUserIds)->pluck('id')->toArray();
+
+        $payrolls = Payroll::where('business_id', $businessId)
+            ->where('status', 0)
+            ->where('checker_status', 0)
+            ->get();
+
+        foreach ($payrolls as $payroll) {
+            foreach ($validUserIds as $userId) {
+                $existingChecker = Approvals::where('ref_id', $payroll->id)
+                    ->where('ref_name', 'payroll')
+                    ->where('checker_type', 'checker')
+                    ->where('action_user', $userId)
+                    ->first();
+
+                if (!$existingChecker) {
+                    Approvals::create([
+                        'ref_id' => $payroll->id,
+                        'ref_name' => 'payroll',
+                        'checker_type' => 'checker',
+                        'action_user' => $userId,
+                        'status' => 0,
+                    ]);
+                }
+            }
+
+            $pendingCheckers = Approvals::where('ref_id', $payroll->id)
+                ->where('ref_name', 'payroll')
+                ->where('checker_type', 'checker')
+                ->where('status', 0);
+
+            if (empty($validUserIds)) {
+                $pendingCheckers->delete();
+            } else {
+                $pendingCheckers->whereNotIn('action_user', $validUserIds)->delete();
+            }
         }
     }
 

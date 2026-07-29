@@ -916,6 +916,7 @@ Route::group(['middleware' => $initialMiddleware], function () {
 		Route::post('payslips/{id}/reject', [PayrollController::class, 'reject'])->name('payslips.reject');
 		Route::post('payslips/bulk_approve', [PayrollController::class, 'bulk_approve'])->name('payslips.bulk_approve');
 		Route::post('payslips/bulk_reject', [PayrollController::class, 'bulk_reject'])->name('payslips.bulk_reject');
+		Route::post('payslips/bulk_verify', [PayrollController::class, 'bulk_verify'])->name('payslips.bulk_verify');
 		Route::post('payslips/bulk_delete', [PayrollController::class, 'bulk_delete'])->name('payslips.bulk_delete');
 		Route::post('payslips/bulk_accrue', [PayrollController::class, 'bulk_accrue'])->name('payslips.bulk_accrue');
 		Route::post('payslips/bulk_payment', [PayrollController::class, 'bulk_payment'])->name('payslips.bulk_payment');

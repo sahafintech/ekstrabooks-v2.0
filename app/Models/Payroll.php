@@ -21,7 +21,7 @@ class Payroll extends Model
         'employee_id', 'month', 'year', 'current_salary', 'net_salary',
         'tax_amount', 'taxes', 'tax_calculation_method_id', 'total_allowance',
         'total_deduction', 'absence_fine', 'advance', 'advance_description',
-        'status', 'transaction_id'
+        'status', 'transaction_id', 'checker_status', 'checked_by'
     ];
 
     public function staff() {
@@ -45,7 +45,24 @@ class Payroll extends Model
      */
     public function approvals()
     {
-        return $this->hasMany(Approvals::class, 'ref_id')->where('ref_name', 'payroll');
+        return $this->hasMany(Approvals::class, 'ref_id')
+            ->where('ref_name', 'payroll')
+            ->where('checker_type', 'approval');
+    }
+
+    /**
+     * Get the verification records for this payroll.
+     */
+    public function checkers()
+    {
+        return $this->hasMany(Approvals::class, 'ref_id')
+            ->where('ref_name', 'payroll')
+            ->where('checker_type', 'checker');
+    }
+
+    public function checkedByUser()
+    {
+        return $this->belongsTo(User::class, 'checked_by');
     }
 
     protected function currentSalary(): Attribute{

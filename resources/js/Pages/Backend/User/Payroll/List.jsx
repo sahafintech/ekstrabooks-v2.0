@@ -36,8 +36,9 @@ import {
     Trash2,
     ChevronUp,
     ChevronDown,
+    ShieldCheck,
 } from "lucide-react";
-import { toast, Toaster } from 'sonner'
+import { toast } from 'sonner'
 import TableActions from "@/Components/shared/TableActions";
 import PageHeader from "@/Components/PageHeader";
 import Modal from "@/Components/Modal";
@@ -137,6 +138,48 @@ const BulkApproveConfirmationModal = ({
                 </Button>
                 <Button type="submit" variant="default" disabled={processing}>
                     Approve Selected
+                </Button>
+            </div>
+        </form>
+    </Modal>
+);
+
+const BulkVerifyConfirmationModal = ({
+    show,
+    onClose,
+    onConfirm,
+    processing,
+    count,
+}) => (
+    <Modal show={show} onClose={onClose}>
+        <form onSubmit={onConfirm}>
+            <div className="flex items-center gap-3 mb-4">
+                <div className="p-3 bg-blue-100 rounded-full">
+                    <ShieldCheck className="h-6 w-6 text-blue-600" />
+                </div>
+                <h2 className="text-lg font-medium">
+                    Confirm Payroll Verification
+                </h2>
+            </div>
+            <p className="text-gray-600 mb-6">
+                Are you sure you want to verify {count} selected{" "}
+                {count !== 1 ? "payslips" : "payslip"}? Only draft payslips
+                will be processed.
+            </p>
+            <div className="flex justify-end gap-3">
+                <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={onClose}
+                >
+                    Cancel
+                </Button>
+                <Button
+                    type="submit"
+                    className="bg-blue-600 hover:bg-blue-700"
+                    disabled={processing}
+                >
+                    {processing ? "Verifying..." : "Verify Selected"}
                 </Button>
             </div>
         </form>
@@ -450,6 +493,8 @@ export default function List({
     trashed_payrolls = 0,
     hasConfiguredApprovers = false,
     isCurrentUserApprover = false,
+    hasConfiguredCheckers = false,
+    isCurrentUserChecker = false,
 }) {
     const { flash = {}, errors = {}, userPackage } = usePage().props;
     const [selectedPaylips, setSelectedPayslips] = useState([]);
@@ -462,6 +507,7 @@ export default function List({
     const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
     const [showBulkApproveModal, setShowBulkApproveModal] = useState(false);
     const [showBulkRejectModal, setShowBulkRejectModal] = useState(false);
+    const [showBulkVerifyModal, setShowBulkVerifyModal] = useState(false);
     const [showBulkAccrueModal, setShowBulkAccrueModal] = useState(false);
     const [payslipsToDelete, setPayslipsToDelete] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -682,6 +728,18 @@ export default function List({
                 });
                 return;
             }
+            const hasUnverifiedPayrolls = payrolls.some(
+                (payroll) =>
+                    selectedPaylips.includes(payroll.id) &&
+                    Number(payroll.status) === 0 &&
+                    Number(payroll.checker_status) !== 1
+            );
+            if (hasConfiguredCheckers && hasUnverifiedPayrolls) {
+                toast("Verification Required", {
+                    description: "Please verify the selected payrolls before approval.",
+                });
+                return;
+            }
             setShowBulkApproveModal(true);
         }
 
@@ -699,6 +757,22 @@ export default function List({
                 return;
             }
             setShowBulkRejectModal(true);
+        }
+
+        if (bulkAction === "verify") {
+            if (!hasConfiguredCheckers) {
+                toast("Error", {
+                    description: "No payroll verifiers are configured. Please configure them in business settings first.",
+                });
+                return;
+            }
+            if (!isCurrentUserChecker) {
+                toast("Error", {
+                    description: "You are not assigned as a verifier for payrolls",
+                });
+                return;
+            }
+            setShowBulkVerifyModal(true);
         }
 
         if (bulkAction === "accrue") {
@@ -798,6 +872,31 @@ export default function List({
                     setIsAllSelected(false);
                     setBulkAction("");
                     setShowBulkRejectModal(false);
+                    setIsProcessing(false);
+                },
+                onError: () => {
+                    setIsProcessing(false);
+                },
+            }
+        );
+    };
+
+    const handleBulkVerifyConfirm = (e) => {
+        e.preventDefault();
+        setIsProcessing(true);
+
+        router.post(
+            route("payslips.bulk_verify"),
+            {
+                ids: selectedPaylips,
+            },
+            {
+                preserveState: true,
+                onSuccess: () => {
+                    setSelectedPayslips([]);
+                    setIsAllSelected(false);
+                    setBulkAction("");
+                    setShowBulkVerifyModal(false);
                     setIsProcessing(false);
                 },
                 onError: () => {
@@ -948,18 +1047,40 @@ export default function List({
         return pages;
     };
 
-    const PayrollStatusBadge = ({ status }) => {
-        const statusMap = {
-            0: { label: "Draft", className: "gap-1 text-gray-600 border-gray-400" },
-            1: { label: "Approved", className: "gap-1 text-blue-600 border-blue-600" },
-            2: { label: "Accrued", className: "gap-1 text-purple-600 border-purple-600" },
-            3: { label: "Partially Paid", className: "gap-1 text-yellow-600 border-yellow-600" },
-            4: { label: "Paid", className: "gap-1 text-green-600 border-green-600" },
-        };
+    const PayrollStatusBadge = ({ status, checkerStatus }) => {
+        const payrollStatus = Number(status);
+        let statusConfig;
+
+        if (payrollStatus === 4) {
+            statusConfig = {
+                label: "Paid",
+                className: "gap-1 text-green-600 border-green-600",
+            };
+        } else if (payrollStatus === 3) {
+            statusConfig = {
+                label: "Partially Paid",
+                className: "gap-1 text-yellow-600 border-yellow-600",
+            };
+        } else if (payrollStatus === 1 || payrollStatus === 2) {
+            statusConfig = {
+                label: "Approved",
+                className: "gap-1 text-blue-600 border-blue-600",
+            };
+        } else if (Number(checkerStatus) === 1) {
+            statusConfig = {
+                label: "Verified",
+                className: "gap-1 text-purple-600 border-purple-600",
+            };
+        } else {
+            statusConfig = {
+                label: "Draft",
+                className: "gap-1 text-gray-600 border-gray-400",
+            };
+        }
 
         return (
-            <Badge variant="outline" className={statusMap[status].className}>
-                {statusMap[status].label}
+            <Badge variant="outline" className={statusConfig.className}>
+                {statusConfig.label}
             </Badge>
         );
     };
@@ -1094,7 +1215,6 @@ export default function List({
 
     return (
         <AuthenticatedLayout>
-            <Toaster position="top-center" />
             <SidebarInset>
                 <div className="main-content">
                     <PageHeader
@@ -1134,7 +1254,23 @@ export default function List({
                                     <div>
                                         <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">You are a Payroll Approver</h3>
                                         <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                                            You can approve or reject draft payrolls using the bulk actions or by viewing individual payslips.
+                                            You can approve verified payrolls or reject draft payrolls using the bulk actions or individual payslip view.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {isCurrentUserChecker && (
+                            <div className="mb-4 p-4 rounded-lg border border-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 dark:border-cyan-600">
+                                <div className="flex items-start gap-3">
+                                    <ShieldCheck className="h-5 w-5 mt-0.5 text-cyan-600 dark:text-cyan-400" />
+                                    <div>
+                                        <h3 className="text-sm font-medium text-cyan-800 dark:text-cyan-200">
+                                            You are a Payroll Verifier
+                                        </h3>
+                                        <p className="text-sm text-cyan-700 dark:text-cyan-300 mt-1">
+                                            Select draft payslips and use Verify Selected before they are approved.
                                         </p>
                                     </div>
                                 </div>
@@ -1233,6 +1369,11 @@ export default function List({
                                         <SelectItem value="delete">
                                             Delete Selected
                                         </SelectItem>
+                                        {hasConfiguredCheckers && (
+                                            <SelectItem value="verify">
+                                                Verify Selected
+                                            </SelectItem>
+                                        )}
                                         <SelectItem value="approve">
                                             Approve Selected
                                         </SelectItem>
@@ -2069,6 +2210,7 @@ export default function List({
                                                 <TableCell>
                                                     <PayrollStatusBadge
                                                         status={payroll.status}
+                                                        checkerStatus={payroll.checker_status}
                                                     />
                                                 </TableCell>
                                                 <TableCell className="text-right">
@@ -2164,6 +2306,14 @@ export default function List({
                         show={showBulkRejectModal}
                         onClose={() => setShowBulkRejectModal(false)}
                         onConfirm={handleBulkRejectConfirm}
+                        processing={isProcessing}
+                        count={selectedPaylips.length}
+                    />
+
+                    <BulkVerifyConfirmationModal
+                        show={showBulkVerifyModal}
+                        onClose={() => setShowBulkVerifyModal(false)}
+                        onConfirm={handleBulkVerifyConfirm}
                         processing={isProcessing}
                         count={selectedPaylips.length}
                     />

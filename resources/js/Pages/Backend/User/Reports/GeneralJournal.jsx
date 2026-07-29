@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Head, router, useForm } from "@inertiajs/react";
+import { router, useForm } from "@inertiajs/react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { SidebarInset } from "@/Components/ui/sidebar";
 import { Button } from "@/Components/ui/button";

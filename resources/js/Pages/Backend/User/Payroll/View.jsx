@@ -64,7 +64,8 @@ export default function View({
     advance,
     actual_working_hours,
     approvalUsersCount,
-    hasConfiguredApprovers
+    hasConfiguredApprovers,
+    hasConfiguredCheckers = false
 }) {
     const [isLoading, setIsLoading] = useState({
         print: false,
@@ -77,6 +78,15 @@ export default function View({
     const [isSubmittingApproval, setIsSubmittingApproval] = useState(false);
 
     const handleApprovalAction = (action) => {
+        if (
+            action === 'approve' &&
+            hasConfiguredCheckers &&
+            Number(payroll.checker_status) !== 1
+        ) {
+            toast.error("Please verify this payroll before approval");
+            return;
+        }
+
         setApprovalAction(action);
         setApprovalComment('');
         setIsApproveRejectModalOpen(true);
