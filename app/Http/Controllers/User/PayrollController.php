@@ -1219,7 +1219,7 @@ class PayrollController extends Controller
 
             DB::commit();
 
-            return redirect()->route('payslips.index')->with('success', _lang('Accruement made successfully'));
+            return back()->with('success', _lang('Payroll accrued successfully'));
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', $e->getMessage());

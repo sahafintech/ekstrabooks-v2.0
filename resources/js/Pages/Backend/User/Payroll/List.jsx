@@ -661,7 +661,8 @@ export default function List({
 
         if (payrollStatus === 4) return "Paid";
         if (payrollStatus === 3) return "Partially Paid";
-        if (payrollStatus === 1 || payrollStatus === 2) return "Approved";
+        if (payrollStatus === 2) return "Accrued";
+        if (payrollStatus === 1) return "Approved";
         if (Number(payroll.checker_status) === 1) return "Verified";
 
         return "Draft";
@@ -1287,7 +1288,12 @@ export default function List({
                 label: "Partially Paid",
                 className: "gap-1 text-yellow-600 border-yellow-600",
             };
-        } else if (payrollStatus === 1 || payrollStatus === 2) {
+        } else if (payrollStatus === 2) {
+            statusConfig = {
+                label: "Accrued",
+                className: "gap-1 text-teal-600 border-teal-600",
+            };
+        } else if (payrollStatus === 1) {
             statusConfig = {
                 label: "Approved",
                 className: "gap-1 text-blue-600 border-blue-600",
